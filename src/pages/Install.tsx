@@ -18,13 +18,17 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { clearDeferredInstallPrompt, getDeferredInstallPrompt } from '@/components/DownloadAppBanner';
+import { AnimatePresence } from 'framer-motion';
 
 export default function Install() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showInstallConfirm, setShowInstallConfirm] = useState(false);
+  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
   const deferredPromptRef = useRef<any>(null);
   const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://songchainn.xyz';
+  const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
   useEffect(() => {
     // Check if already installed
@@ -80,6 +84,10 @@ export default function Install() {
     if (isInstalled) return;
     const deferredPrompt = deferredPromptRef.current ?? getDeferredInstallPrompt();
     if (!deferredPrompt) {
+      if (isIOS) {
+        setShowIOSInstructions(true);
+        return;
+      }
       toast({
         title: 'Install not available',
         description: 'Use your browser menu to "Add to Home Screen" or "Install App".',
@@ -89,12 +97,18 @@ export default function Install() {
 
     deferredPrompt.prompt();
     try {
-      await deferredPrompt.userChoice;
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        toast({
+          title: 'Installing…',
+          description: 'If prompted, confirm to add the app to your home screen.',
+        });
+      }
     } finally {
       deferredPromptRef.current = null;
       clearDeferredInstallPrompt();
     }
-  }, [isInstalled]);
+  }, [isInstalled, isIOS]);
 
   const steps = {
     ios: [
@@ -139,6 +153,82 @@ export default function Install() {
       <Navigation />
 
       <main className="container mx-auto px-4 py-8 relative z-10">
+        <AnimatePresence>
+          {showIOSInstructions && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[120] bg-background/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+              onClick={() => setShowIOSInstructions(false)}
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.98 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="w-full max-w-sm glass-card rounded-2xl border border-border p-4 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    <h3 className="font-heading font-semibold text-foreground text-base">
+                      Add to Home Screen
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Follow these steps in {isSafari ? 'Safari' : 'your browser'}.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowIOSInstructions(false)}
+                    className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground flex-shrink-0"
+                  >
+                    <Plus className="w-4 h-4 rotate-45" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-primary font-bold text-sm">1</span>
+                    </div>
+                    <div>
+                      <p className="text-foreground text-sm font-medium">Tap the Share button</p>
+                      <p className="text-muted-foreground text-xs flex items-center gap-1 mt-1">
+                        <Share className="w-3.5 h-3.5" /> at the bottom of {isSafari ? 'Safari' : 'your browser'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-primary font-bold text-sm">2</span>
+                    </div>
+                    <div>
+                      <p className="text-foreground text-sm font-medium">Tap “Add to Home Screen”</p>
+                      <p className="text-muted-foreground text-xs mt-1">Scroll down in the share menu to find it</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-primary font-bold text-sm">3</span>
+                    </div>
+                    <div>
+                      <p className="text-foreground text-sm font-medium">Tap “Add” to confirm</p>
+                      <p className="text-muted-foreground text-xs mt-1">The app will appear on your home screen</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Button onClick={() => setShowIOSInstructions(false)} className="w-full gradient-primary">
+                  Got it!
+                </Button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {showInstallConfirm && (
           <div
             className="fixed inset-0 z-[110] bg-background/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"

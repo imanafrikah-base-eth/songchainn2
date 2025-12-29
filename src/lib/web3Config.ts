@@ -2,6 +2,52 @@ import { createWeb3Modal } from '@web3modal/wagmi/react';
 import { defaultWagmiConfig } from '@web3modal/wagmi/react/config';
 import { base } from 'wagmi/chains';
 
+try {
+  const WebSocketCtor = (globalThis as any).WebSocket as any;
+  const proto = WebSocketCtor?.prototype as any;
+
+  if (proto && typeof proto.close === "function" && typeof proto.disconnect !== "function") {
+    try {
+      Object.defineProperty(proto, "disconnect", {
+        value: proto.close,
+        writable: true,
+        configurable: true,
+      });
+    } catch {
+      try {
+        proto.disconnect = proto.close;
+      } catch {
+        void 0;
+      }
+    }
+  }
+
+  if (WebSocketCtor && typeof proto?.close === "function" && typeof proto?.disconnect !== "function") {
+    const OriginalWebSocket = WebSocketCtor;
+    const WrappedWebSocket = function (...args: any[]) {
+      const socket = new OriginalWebSocket(...args);
+      if (socket && typeof socket.disconnect !== "function" && typeof socket.close === "function") {
+        try {
+          socket.disconnect = socket.close.bind(socket);
+        } catch {
+          void 0;
+        }
+      }
+      return socket;
+    } as any;
+
+    try {
+      WrappedWebSocket.prototype = OriginalWebSocket.prototype;
+      Object.setPrototypeOf(WrappedWebSocket, OriginalWebSocket);
+      (globalThis as any).WebSocket = WrappedWebSocket;
+    } catch {
+      void 0;
+    }
+  }
+} catch {
+  void 0;
+}
+
 // WalletConnect Project ID
 const projectId = '8b68fe8730c4f8ac97065fb052022217';
 
@@ -21,7 +67,7 @@ export const wagmiConfig = defaultWagmiConfig({
   chains,
   projectId,
   metadata,
-  enableWalletConnect: true,
+  enableWalletConnect: false,
   enableInjected: true,
   enableEIP6963: true,
   enableCoinbase: false,
@@ -36,11 +82,6 @@ export function ensureWeb3ModalInitialized() {
   isWeb3ModalInitialized = true;
 
   try {
-    const ws = (window as any).WebSocket;
-    if (ws?.prototype && typeof ws.prototype.disconnect !== 'function' && typeof ws.prototype.close === 'function') {
-      ws.prototype.disconnect = ws.prototype.close;
-    }
-
     web3Modal = createWeb3Modal({
       wagmiConfig,
       projectId,

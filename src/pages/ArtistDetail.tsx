@@ -36,16 +36,12 @@ export default function ArtistDetail() {
     queryKey: ['artist-followers', id],
     queryFn: async () => {
       if (!id) return 0;
-      const { count, error } = await supabase
-        .from('liked_artists')
-        .select('*', { count: 'exact', head: true })
-        .eq('artist_id', id);
-      
+      const { data, error } = await supabase.rpc('get_artist_follower_count', { p_artist_id: id });
       if (error) {
         console.error('Error fetching follower count:', error);
         return 0;
       }
-      return count || 0;
+      return data ?? 0;
     },
     enabled: !!id,
   });

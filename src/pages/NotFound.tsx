@@ -1,15 +1,31 @@
 import { Link, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Home, Music, Users, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
+  const [secondsLeft, setSecondsLeft] = useState(5);
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setSecondsLeft((s) => Math.max(0, s - 1));
+    }, 1000);
+
+    const timeout = window.setTimeout(() => {
+      window.location.assign("/");
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -34,6 +50,9 @@ const NotFound = () => {
         </h2>
         <p className="text-muted-foreground mb-8 leading-relaxed">
           Looks like this track got lost in the mix. The page you're looking for doesn't exist or may have been moved.
+        </p>
+        <p className="text-xs text-muted-foreground mb-6">
+          Redirecting to home in {secondsLeft}s…
         </p>
 
         {/* Quick Links */}

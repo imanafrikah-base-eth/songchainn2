@@ -1,25 +1,26 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-
-const BANNER_DISMISSED_KEY = 'notification-banner-dismissed';
 
 export function NotificationBanner() {
   const [isVisible, setIsVisible] = useState(false);
   const { isSupported, isSubscribed, permission, subscribe } = usePushNotifications();
 
   useEffect(() => {
-    // Check if banner was already dismissed
-    const wasDismissed = localStorage.getItem(BANNER_DISMISSED_KEY);
-    
-    // Show banner if notifications are supported, not subscribed, and not previously dismissed
-    if (isSupported && !isSubscribed && permission !== 'denied' && !wasDismissed) {
-      // Delay showing the banner for a better UX
-      const timer = setTimeout(() => setIsVisible(true), 2000);
-      return () => clearTimeout(timer);
+    if (!isSupported) {
+      setIsVisible(false);
+      return;
     }
+
+    if (permission === 'granted' || isSubscribed) {
+      setIsVisible(false);
+      return;
+    }
+
+    const timer = setTimeout(() => setIsVisible(true), 800);
+    return () => clearTimeout(timer);
   }, [isSupported, isSubscribed, permission]);
 
   const handleEnable = async () => {
@@ -27,11 +28,6 @@ export function NotificationBanner() {
     if (success) {
       setIsVisible(false);
     }
-  };
-
-  const handleDismiss = () => {
-    localStorage.setItem(BANNER_DISMISSED_KEY, 'true');
-    setIsVisible(false);
   };
 
   return (
@@ -54,7 +50,7 @@ export function NotificationBanner() {
                   Stay in the loop
                 </h3>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Get notified when artists drop new music, when someone likes your posts, or follows you.
+                  Get notified about activity on your posts and new drops.
                 </p>
                 
                 <div className="flex items-center gap-2">
@@ -62,26 +58,12 @@ export function NotificationBanner() {
                     size="sm" 
                     onClick={handleEnable}
                     className="gradient-primary text-xs h-8"
+                    disabled={permission === 'denied'}
                   >
                     Enable Notifications
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost"
-                    onClick={handleDismiss}
-                    className="text-xs h-8 text-muted-foreground"
-                  >
-                    Maybe Later
-                  </Button>
                 </div>
               </div>
-              
-              <button
-                onClick={handleDismiss}
-                className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
           </div>
         </motion.div>

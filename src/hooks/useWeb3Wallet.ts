@@ -4,7 +4,7 @@ import { ensureWeb3ModalInitialized } from '@/lib/web3Config';
 
 export function useWeb3Wallet() {
   const { address, isConnected, isConnecting, connector } = useAccount();
-  const { disconnect } = useDisconnect();
+  const { disconnectAsync } = useDisconnect();
   
   const { data: balanceData, isLoading: isBalanceLoading, refetch: refetchBalance } = useBalance({
     address: address,
@@ -22,7 +22,7 @@ export function useWeb3Wallet() {
   };
 
   const disconnectWallet = () => {
-    disconnect();
+    void disconnectAsync().catch(() => {});
   };
 
   const getWalletName = (): string => {

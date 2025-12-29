@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/hooks/use-toast';
 
 const VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
 
 export function usePushNotifications() {
-  const { user } = useAuth();
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>('default');
@@ -65,7 +63,7 @@ export function usePushNotifications() {
   }, [isSupported]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
-    if (!isSupported || !user) return false;
+    if (!isSupported) return false;
 
     try {
       // Register service worker if not already registered
@@ -107,7 +105,7 @@ export function usePushNotifications() {
       });
       return false;
     }
-  }, [isSupported, user, requestPermission]);
+  }, [isSupported, requestPermission]);
 
   const unsubscribe = useCallback(async (): Promise<boolean> => {
     try {

@@ -1,6 +1,6 @@
 import { memo, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, Share2, ListMusic, Shuffle, Repeat, Repeat1, Copy, Check } from 'lucide-react';
+import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, Share2, ListMusic, Shuffle, Repeat, Repeat1, Copy, Check, MessageCircle } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
 import { Slider } from '@/components/ui/slider';
@@ -85,6 +85,20 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
       const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
       shareToX(text, url);
     }
+  };
+
+  const handleShareToWhatsApp = () => {
+    if (!currentSong) return;
+    const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
+    const text = `Check out "${currentSong.title}" by ${currentSong.artist} on $ongChainn!`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, '_blank');
+  };
+
+  const handleShareToTelegram = () => {
+    if (!currentSong) return;
+    const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
+    const text = `Check out "${currentSong.title}" by ${currentSong.artist} on $ongChainn!`;
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const toggleRepeat = () => {
@@ -358,12 +372,20 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                       {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                       Copy Link
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleShareToX} className="gap-2">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                      </svg>
-                      Share on X
-                    </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareToX} className="gap-2">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                    Share on X
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareToWhatsApp} className="gap-2">
+                    <MessageCircle className="w-4 h-4" />
+                    WhatsApp
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareToTelegram} className="gap-2">
+                    <Share2 className="w-4 h-4" />
+                    Telegram
+                  </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </motion.div>

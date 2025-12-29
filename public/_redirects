@@ -1,2 +1,2 @@
-/* Handle SPA routing - all routes serve index.html */
-/*    /index.html   200
+# SPA routing fallback (serve index.html for all routes)
+/* /index.html 200

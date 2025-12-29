@@ -636,6 +636,14 @@ export type Database = {
         Args: { p_new_user_id: string; p_referral_code: string }
         Returns: boolean
       }
+      get_artist_follow_counts: {
+        Args: { artist_ids: string[] }
+        Returns: {
+          artist_id: string
+          follower_count: number
+        }[]
+      }
+      get_artist_follower_count: { Args: { p_artist_id: string }; Returns: number }
       get_song_popularity: {
         Args: never
         Returns: {

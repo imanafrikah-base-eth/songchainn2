@@ -9,6 +9,7 @@ import { PlayerProvider } from "@/context/PlayerContext";
 import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { NotificationBanner } from "@/components/NotificationBanner";
 // Lazy load pages for better initial load performance
 const Home = lazy(() => import("./pages/Home"));
 const Discover = lazy(() => import("./pages/Discover"));
@@ -25,6 +26,7 @@ const Community = lazy(() => import("./pages/Community"));
 const AudienceProfile = lazy(() => import("./pages/AudienceProfile"));
 const Install = lazy(() => import("./pages/Install"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Room = lazy(() => import("./pages/Room"));
 
 
 // Loading spinner component
@@ -56,6 +58,37 @@ function RedirectHandler() {
   return null;
 }
 
+function AppShell() {
+  const location = useLocation();
+  const hideChrome = location.pathname.startsWith('/room');
+
+  return (
+    <>
+      <div className={hideChrome ? undefined : "pb-20 lg:pb-0"}>
+        <RedirectHandler />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/discover" element={<Discover />} />
+          <Route path="/artists" element={<Artists />} />
+          <Route path="/artist/:id" element={<ArtistDetail />} />
+          <Route path="/song/:id" element={<SongDetail />} />
+          <Route path="/post/:id" element={<Social />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/social" element={<Social />} />
+          <Route path="/community" element={<Community />} />
+          <Route path="/audience/:userId" element={<AudienceProfile />} />
+          <Route path="/install" element={<Install />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/room" element={<Room />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+      {!hideChrome && <BottomTabBar />}
+    </>
+  );
+}
+
 // AppContent must be rendered inside AuthProvider
 function AppContent() {
   const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
@@ -70,6 +103,7 @@ function AppContent() {
 
   return (
     <BrowserRouter>
+      <NotificationBanner />
       {!isAuthenticated ? (
         <Suspense fallback={<PageLoader />}>
           <Auth />
@@ -83,26 +117,7 @@ function AppContent() {
           <PlayerProvider>
             <EngagementProvider>
               <Suspense fallback={<PageLoader />}>
-                <div className="pb-20 lg:pb-0">
-                  <RedirectHandler />
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/discover" element={<Discover />} />
-                    <Route path="/artists" element={<Artists />} />
-                    <Route path="/artist/:id" element={<ArtistDetail />} />
-                    <Route path="/song/:id" element={<SongDetail />} />
-                    <Route path="/post/:id" element={<Social />} />
-                    <Route path="/marketplace" element={<Marketplace />} />
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/social" element={<Social />} />
-                    <Route path="/community" element={<Community />} />
-                    <Route path="/audience/:userId" element={<AudienceProfile />} />
-                    <Route path="/install" element={<Install />} />
-                    <Route path="/admin" element={<Admin />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </div>
-                <BottomTabBar />
+                <AppShell />
               </Suspense>
             </EngagementProvider>
           </PlayerProvider>

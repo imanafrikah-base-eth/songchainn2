@@ -20,6 +20,8 @@ export function BottomTabBar() {
   // Hide tab bar when music is playing - player takes its place
   if (currentSong) return null;
 
+  if (location.pathname === '/install') return null;
+
   return (
     <AnimatePresence>
       <motion.nav 

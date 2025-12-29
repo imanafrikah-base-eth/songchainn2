@@ -31,8 +31,8 @@ export default function Auth() {
   const [showOtherOptions, setShowOtherOptions] = useState(false);
   
   // Auth state
-  const [authView, setAuthView] = useState<AuthView>('main');
-  const [authMode, setAuthMode] = useState<AuthMode>('signin');
+  const [authView, setAuthView] = useState<AuthView>('email');
+  const [authMode, setAuthMode] = useState<AuthMode>('signup');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>(DEFAULT_COUNTRY);
@@ -392,6 +392,18 @@ export default function Auth() {
               </motion.div>
             ) : authView === 'main' ? (
               <motion.div key="main" initial={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <button
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setAuthView('email');
+                    setError(null);
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect mb-4"
+                >
+                  <Mail className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-foreground font-medium">Sign up with Email</span>
+                </button>
+
                 {/* Wallet Primary CTA */}
                 <div className="text-center mb-6">
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass text-xs font-medium text-primary mb-4">

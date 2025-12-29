@@ -35,16 +35,53 @@ export function useShare() {
   }, [getShareUrl]);
 
   const copyToClipboard = useCallback(async (url: string) => {
-    try {
+    const tryClipboardApi = async () => {
+      if (!navigator?.clipboard?.writeText) return false;
       await navigator.clipboard.writeText(url);
+      return true;
+    };
+
+    const tryLegacyCopy = () => {
+      if (typeof document === 'undefined') return false;
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '0';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    };
+
+    let ok = false;
+    try {
+      ok = await tryClipboardApi();
+    } catch {
+      ok = false;
+    }
+
+    if (!ok) {
+      try {
+        ok = tryLegacyCopy();
+      } catch {
+        ok = false;
+      }
+    }
+
+    if (ok) {
       setCopied(true);
       toast({ title: 'Link copied to clipboard!' });
       setTimeout(() => setCopied(false), 2000);
       return true;
-    } catch {
-      toast({ title: 'Failed to copy link', variant: 'destructive' });
-      return false;
     }
+
+    toast({ title: 'Failed to copy link', variant: 'destructive' });
+    return false;
   }, []);
 
   const nativeShare = useCallback(async (options: ShareOptions) => {

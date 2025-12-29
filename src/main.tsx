@@ -23,6 +23,64 @@ const queryClient = new QueryClient({
   },
 });
 
+if (typeof window !== "undefined") {
+  const AUTO_RELOAD_KEY = "__songchainn_auto_reload_at";
+  const AUTO_RELOAD_WINDOW_MS = 30_000;
+
+  const canAutoReload = () => {
+    try {
+      const last = Number(sessionStorage.getItem(AUTO_RELOAD_KEY) || "0");
+      return !last || Date.now() - last > AUTO_RELOAD_WINDOW_MS;
+    } catch {
+      return true;
+    }
+  };
+
+  const markAutoReload = () => {
+    try {
+      sessionStorage.setItem(AUTO_RELOAD_KEY, String(Date.now()));
+    } catch {
+      void 0;
+    }
+  };
+
+  const isRecoverableLoadError = (value: unknown) => {
+    const message =
+      typeof value === "string"
+        ? value
+        : value && typeof value === "object" && "message" in value
+          ? String((value as any).message)
+          : "";
+
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes("loading chunk") ||
+      normalized.includes("chunkloaderror") ||
+      normalized.includes("failed to fetch dynamically imported module") ||
+      normalized.includes("importing a module script failed") ||
+      normalized.includes("error loading dynamically imported module")
+    );
+  };
+
+  const tryAutoReload = () => {
+    if (!canAutoReload()) return;
+    markAutoReload();
+    window.location.reload();
+  };
+
+  window.addEventListener("error", (event) => {
+    if (isRecoverableLoadError((event as ErrorEvent).error) || isRecoverableLoadError((event as ErrorEvent).message)) {
+      tryAutoReload();
+    }
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    if (isRecoverableLoadError((event as PromiseRejectionEvent).reason)) {
+      tryAutoReload();
+    }
+  });
+}
+
 if (typeof window !== "undefined" && typeof window.fetch === "function") {
   const originalFetch = window.fetch.bind(window);
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {

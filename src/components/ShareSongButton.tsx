@@ -40,9 +40,53 @@ export function ShareSongButton({
   const shareUrl = getSongShareUrl({ id: songId, title: songTitle, artist: artistName, coverImage });
   const shareText = `Check out "${songTitle}" by ${artistName} on $ongChainn!`;
 
+  const copyText = useCallback(async (text: string) => {
+    const tryClipboardApi = async () => {
+      if (!navigator?.clipboard?.writeText) return false;
+      await navigator.clipboard.writeText(text);
+      return true;
+    };
+
+    const tryLegacyCopy = () => {
+      if (typeof document === 'undefined') return false;
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '0';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    };
+
+    let ok = false;
+    try {
+      ok = await tryClipboardApi();
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      try {
+        ok = tryLegacyCopy();
+      } catch {
+        ok = false;
+      }
+    }
+    return ok;
+  }, []);
+
   const handleCopyLink = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      const ok = await copyText(shareUrl);
+      if (!ok) {
+        toast.error('Failed to copy link');
+        return;
+      }
       setCopied(true);
       toast.success('Link copied!');
       
@@ -61,7 +105,7 @@ export function ShareSongButton({
     } catch {
       toast.error('Failed to copy link');
     }
-  }, [shareUrl, songId]);
+  }, [copyText, shareUrl, songId]);
 
   const handleNativeShare = useCallback(async () => {
     if (navigator.share) {
@@ -215,11 +259,7 @@ export function ShareSongButton({
         whileTap={{ scale: 0.9 }}
         onClick={(e) => {
           e.stopPropagation();
-          if (navigator.share) {
-            handleNativeShare();
-          } else {
-            setShowDropdown(!showDropdown);
-          }
+          setShowDropdown((v) => !v);
         }}
         className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all"
       >
@@ -260,7 +300,7 @@ export function ShareSongButton({
                   <X className="w-3 h-3 text-muted-foreground" />
                 </button>
               </div>
-              {shareOptions.filter((_, i) => i > 0 || !('share' in navigator)).map((option, index) => (
+              {shareOptions.map((option, index) => (
                 <button
                   key={index}
                   onClick={option.action}

@@ -12,7 +12,6 @@ import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { FeaturedTracksSection } from '@/components/FeaturedTracksSection';
-import { NotificationBanner } from '@/components/NotificationBanner';
 import { DownloadAppBanner } from '@/components/DownloadAppBanner';
 import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
@@ -65,7 +64,6 @@ export default function Home() {
       <OfflineIndicator />
       <Navigation />
       <UpdateAvailableBanner />
-      <NotificationBanner />
       <DownloadAppBanner />
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 relative z-10">
@@ -319,6 +317,27 @@ export default function Home() {
             transition={{ delay: 0.4 }}
           >
             <EngagementPanel />
+
+            <Link to="/room" className="block group">
+              <div className="rounded-2xl sm:rounded-3xl border border-border/60 bg-black/80 p-4 sm:p-6 transition-colors group-hover:border-primary/50">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <div className="font-heading font-semibold text-zinc-100">The Room</div>
+                    <div className="text-xs sm:text-sm text-zinc-400">
+                      Global chat + one shared playlist. No distractions.
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                    <Headphones className="w-5 h-5 text-zinc-100" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Button className="w-full bg-white text-black hover:bg-white/90">
+                    Enter
+                  </Button>
+                </div>
+              </div>
+            </Link>
 
             {/* Phase Info */}
             <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 shine-overlay">

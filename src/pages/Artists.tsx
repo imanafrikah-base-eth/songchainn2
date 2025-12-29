@@ -25,23 +25,26 @@ const itemVariants = {
 
 export default function Artists() {
   const { data: popularityData } = useSongPopularity();
+  const artistIds = useMemo(() => ARTISTS.map(a => a.id), []);
   
   // Fetch follower counts for all artists
   const { data: followerCounts = {} } = useQuery({
     queryKey: ['all-artist-followers'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('liked_artists')
-        .select('artist_id');
-      
-      if (error) throw error;
-      
       const counts: Record<string, number> = {};
-      data?.forEach(item => {
-        counts[item.artist_id] = (counts[item.artist_id] || 0) + 1;
+      const { data, error } = await supabase.rpc('get_artist_follow_counts', { artist_ids: artistIds });
+
+      if (error) {
+        console.error('Error fetching follower counts:', error);
+        return counts;
+      }
+
+      data?.forEach(row => {
+        counts[row.artist_id] = row.follower_count || 0;
       });
       return counts;
     },
+    enabled: artistIds.length > 0,
     staleTime: 1000 * 60 * 2,
   });
 
