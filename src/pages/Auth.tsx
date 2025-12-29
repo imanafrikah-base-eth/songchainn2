@@ -509,6 +509,18 @@ export default function Auth() {
 
                 <button
                   onClick={() => {
+                    setAuthMode('signin');
+                    setAuthView('email');
+                    setError(null);
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect mb-4"
+                >
+                  <Mail className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-foreground font-medium">Sign in with Email</span>
+                </button>
+
+                <button
+                  onClick={() => {
                     setArtistUsername('');
                     setArtistPassword('');
                     setAuthView('artist');
@@ -615,18 +627,8 @@ export default function Auth() {
                       >
                         <div className="pt-4 space-y-3">
                           <p className="text-xs text-center text-muted-foreground mb-3">
-                            Email or phone can be used alongside Base Wallet. You'll still need to connect your wallet to access music.
+                            Phone can be used alongside Base Wallet. You'll still need to connect your wallet to access music.
                           </p>
-                          <button
-                            onClick={() => {
-                              setAuthMode('signin');
-                              setAuthView('email');
-                            }}
-                            className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect"
-                          >
-                            <Mail className="w-5 h-5 text-muted-foreground" />
-                            <span className="text-foreground font-medium">Sign in with Email</span>
-                          </button>
                           <button
                             onClick={() => setAuthView('phone')}
                             className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect"

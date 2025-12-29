@@ -95,7 +95,7 @@ export default function Social() {
 
   useEffect(() => {
     refetchPosts(feedType === 'following' ? 'following' : 'all');
-  }, [feedType]);
+  }, [feedType, refetchPosts]);
 
   useEffect(() => {
     if (!sharedPostId) {
@@ -212,7 +212,7 @@ export default function Social() {
     if (newIndex !== currentPostIndex && newIndex >= 0 && newIndex < filteredPosts.length) {
       setCurrentPostIndex(newIndex);
     }
-  }, [currentPostIndex, filteredPosts.length]);
+  }, [currentPostIndex, filteredPosts.length, sharedPostId]);
 
   const goToProfile = (userId: string) => {
     navigate(`/audience/${userId}`);
