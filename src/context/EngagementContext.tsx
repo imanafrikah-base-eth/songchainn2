@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
@@ -23,9 +23,10 @@ interface PointsBreakdown {
 
 const EngagementContext = createContext<EngagementContextType | undefined>(undefined);
 
-const POINTS_PER_PLAY = 10;
-const POINTS_PER_LIKE = 5;
-const STREAK_BONUS = 25;
+const POINTS_PER_PLAY = 2;
+const POINTS_PER_LIKE = 1;
+const STREAK_BONUS = 5;
+const PLAY_DEDUPE_WINDOW_MS = 30_000;
 
 export function EngagementProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -52,6 +53,20 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   
   const [likedSongs, setLikedSongs] = useState<Set<string>>(new Set());
   const [isInitialized, setIsInitialized] = useState(false);
+  const lastPlayRef = useRef<{ songId: string; at: number } | null>(null);
+
+  useEffect(() => {
+    const raw = localStorage.getItem('songchainn_last_play');
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { songId?: string; at?: number };
+      if (typeof parsed.songId === 'string' && typeof parsed.at === 'number') {
+        lastPlayRef.current = { songId: parsed.songId, at: parsed.at };
+      }
+    } catch {
+      void 0;
+    }
+  }, []);
 
   // Sync liked songs from database when user logs in
   useEffect(() => {
@@ -100,26 +115,17 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     }
   }, [likedSongs, user, isInitialized]);
 
-  const addPlay = useCallback(async (songId: string) => {
+  const addPlay = useCallback((songId: string) => {
+    const now = Date.now();
+    const last = lastPlayRef.current;
+    if (last && last.songId === songId && now - last.at < PLAY_DEDUPE_WINDOW_MS) return;
+    lastPlayRef.current = { songId, at: now };
+    localStorage.setItem('songchainn_last_play', JSON.stringify({ songId, at: now }));
+
     setTodayPlays(prev => prev + 1);
     setTotalPlays(prev => prev + 1);
     setEngagementPoints(prev => prev + POINTS_PER_PLAY);
-
-    // Record play event in database
-    if (user) {
-      await supabase.from('song_analytics').insert({
-        song_id: songId,
-        user_id: user.id,
-        event_type: 'play'
-      });
-    } else {
-      // For anonymous users, still record the play without user_id
-      await supabase.from('song_analytics').insert({
-        song_id: songId,
-        event_type: 'play'
-      });
-    }
-  }, [user]);
+  }, []);
 
   const toggleLike = useCallback(async (songId: string) => {
     const isCurrentlyLiked = likedSongs.has(songId);

@@ -117,11 +117,21 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mb-4 sm:mb-6 leading-relaxed"
+                className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mb-3 sm:mb-4 leading-relaxed"
               >
                 Stream original music from artists in the Create On Base pioneer chapter.
                 Your listening activity builds culture and unlocks future ownership.
               </motion.p>
+
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                <Link to="/room">
+                  <Button className="gradient-primary text-primary-foreground shadow-glow gap-2">
+                    <Headphones className="w-4 h-4" />
+                    <span>Enter The Room</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
 
               <motion.div
                 initial={{ opacity: 0 }}

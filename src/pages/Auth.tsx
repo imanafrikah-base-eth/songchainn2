@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, ExternalLink, Loader2, Shield, Music, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,13 +10,14 @@ import logo from '@/assets/songchainn-logo.webp';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { CountryCodeSelector } from '@/components/CountryCodeSelector';
 import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
+import { ARTISTS } from '@/data/musicData';
 import { cn } from '@/lib/utils';
 import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
 import { useNavigate } from 'react-router-dom';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
-type AuthView = 'main' | 'email' | 'phone' | 'verify-otp' | 'connect-wallet';
+type AuthView = 'main' | 'email' | 'phone' | 'verify-otp' | 'connect-wallet' | 'artist';
 
 // Default to Zambia
 const DEFAULT_COUNTRY = COUNTRY_CODES.find(c => c.code === 'ZM') || COUNTRY_CODES[0];
@@ -31,7 +32,7 @@ export default function Auth() {
   const [showOtherOptions, setShowOtherOptions] = useState(false);
   
   // Auth state
-  const [authView, setAuthView] = useState<AuthView>('email');
+  const [authView, setAuthView] = useState<AuthView>('main');
   const [authMode, setAuthMode] = useState<AuthMode>('signup');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -41,6 +42,8 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [resendTimer, setResendTimer] = useState(0);
+  const [artistUsername, setArtistUsername] = useState('');
+  const [artistPassword, setArtistPassword] = useState('');
 
   // Track if user signed in via email/phone but needs wallet
   const [pendingWalletConnection, setPendingWalletConnection] = useState(false);
@@ -53,20 +56,53 @@ export default function Auth() {
 
   const fullPhoneNumber = `${selectedCountry.dialCode}${phoneNumber.replace(/\D/g, '')}`;
 
-  // Handle WalletConnect connection success
-  useEffect(() => {
-    if (isConnected && web3Address && connectionState === 'idle') {
-      // User connected via WalletConnect modal, now sign in
-      handleWalletSignIn();
-    }
-  }, [isConnected, web3Address]);
+  const normalizeArtistKey = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 
-  const handleWalletConnect = async () => {
-    setError(null);
-    await openConnectModal();
+  const ARTIST_LOGIN_CODES: Record<string, string> = {
+    [normalizeArtistKey('Santana')]: '01',
+    [normalizeArtistKey('Sanchy')]: '02',
+    [normalizeArtistKey('PRP')]: '03',
+    [normalizeArtistKey('NDA')]: '04',
+    [normalizeArtistKey('IMan Afrikah')]: '05',
+    [normalizeArtistKey('DenaJah')]: '06',
+    [normalizeArtistKey('7ROO7H BASED')]: '07',
   };
 
-  const handleWalletSignIn = async () => {
+  const resolveArtistLogin = (usernameRaw: string) => {
+    const key = normalizeArtistKey(usernameRaw);
+    const artist = ARTISTS.find(a => normalizeArtistKey(a.name) === key);
+    if (!artist) return null;
+    const code = ARTIST_LOGIN_CODES[normalizeArtistKey(artist.name)];
+    if (!code) return null;
+    const email = `artist+${artist.id}@songchainn.app`;
+    const password = `${artist.name.replace(/\s+/g, '')}${code}`;
+    return { artist, code, email, password };
+  };
+
+  const upsertArtistAudienceProfile = async (artist: (typeof ARTISTS)[number]) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return;
+    await supabase
+      .from('audience_profiles')
+      .upsert(
+        {
+          user_id: userId,
+          profile_name: artist.name,
+          bio: artist.bio || null,
+          profile_picture_url: artist.profileImage || null,
+          cover_photo_url: null,
+          x_profile_link: null,
+          base_profile_link: null,
+          location: artist.location || null,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+        } as any,
+        { onConflict: 'user_id' }
+      );
+  };
+
+  const handleWalletSignIn = useCallback(async () => {
     setError(null);
     // Proceed if any wallet is available (injected or WalletConnect)
     if (!hasWallet && !isWalletDetected && !isConnected) {
@@ -94,6 +130,19 @@ export default function Auth() {
       setError('Connection failed. Please try again.');
       setConnectionState('idle');
     }
+  }, [hasWallet, isWalletDetected, isConnected, signInWithWallet]);
+
+  // Handle WalletConnect connection success
+  useEffect(() => {
+    if (isConnected && web3Address && connectionState === 'idle') {
+      // User connected via WalletConnect modal, now sign in
+      handleWalletSignIn();
+    }
+  }, [isConnected, web3Address, connectionState, handleWalletSignIn]);
+
+  const handleWalletConnect = async () => {
+    setError(null);
+    await openConnectModal();
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -168,6 +217,60 @@ export default function Auth() {
     }
   };
 
+  const handleArtistLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const resolved = resolveArtistLogin(artistUsername);
+      if (!resolved) {
+        throw new Error('Unknown artist username');
+      }
+
+      const typed = artistPassword.trim().replace(/\s+/g, '');
+      const expected = resolved.password;
+      if (normalizeArtistKey(typed) !== normalizeArtistKey(expected)) {
+        throw new Error('Incorrect artist password');
+      }
+
+      const signInRes = await supabase.auth.signInWithPassword({
+        email: resolved.email,
+        password: expected,
+      });
+
+      const signInError = signInRes?.error;
+      if (signInError) {
+        const signUpRes = await supabase.auth.signUp({
+          email: resolved.email,
+          password: expected,
+          options: {
+            data: { artist_id: resolved.artist.id, artist_name: resolved.artist.name },
+            emailRedirectTo: `${window.location.origin}/`,
+          },
+        });
+
+        if (signUpRes?.error) {
+          throw signInError;
+        }
+
+        const retryRes = await supabase.auth.signInWithPassword({
+          email: resolved.email,
+          password: expected,
+        });
+        if (retryRes?.error) throw retryRes.error;
+      }
+
+      await upsertArtistAudienceProfile(resolved.artist);
+      toast.success(`Signed in as ${resolved.artist.name}`);
+      navigate(`/?r=/artist/${resolved.artist.id}`, { replace: true });
+    } catch (err: any) {
+      setError(err?.message || 'Artist login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const startResendTimer = () => {
     setResendTimer(60);
     const interval = setInterval(() => {
@@ -207,7 +310,7 @@ export default function Auth() {
       const timer = setTimeout(() => handleWalletSignIn(), 500);
       return () => clearTimeout(timer);
     }
-  }, [isWalletDetected, hasWallet, authView]);
+  }, [isWalletDetected, hasWallet, authView, connectionState, error, handleWalletSignIn]);
 
   React.useEffect(() => {
     if (walletAddress && connectionState === 'success') {
@@ -404,6 +507,19 @@ export default function Auth() {
                   <span className="text-foreground font-medium">Sign up with Email</span>
                 </button>
 
+                <button
+                  onClick={() => {
+                    setArtistUsername('');
+                    setArtistPassword('');
+                    setAuthView('artist');
+                    setError(null);
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect mb-4"
+                >
+                  <Music className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-foreground font-medium">Log in as Artist</span>
+                </button>
+
                 {/* Wallet Primary CTA */}
                 <div className="text-center mb-6">
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass text-xs font-medium text-primary mb-4">
@@ -502,11 +618,14 @@ export default function Auth() {
                             Email or phone can be used alongside Base Wallet. You'll still need to connect your wallet to access music.
                           </p>
                           <button
-                            onClick={() => setAuthView('email')}
+                            onClick={() => {
+                              setAuthMode('signin');
+                              setAuthView('email');
+                            }}
                             className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect"
                           >
                             <Mail className="w-5 h-5 text-muted-foreground" />
-                            <span className="text-foreground font-medium">Continue with Email</span>
+                            <span className="text-foreground font-medium">Sign in with Email</span>
                           </button>
                           <button
                             onClick={() => setAuthView('phone')}
@@ -598,14 +717,64 @@ export default function Auth() {
                   >
                     {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : authMode === 'signup' ? 'Create Account' : 'Sign In'}
                   </Button>
+                </form>
+              </motion.div>
+            ) : authView === 'artist' ? (
+              <motion.div key="artist" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                <button
+                  onClick={() => { setAuthView('main'); setError(null); }}
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="text-sm">Back</span>
+                </button>
 
-                  <p className="text-center text-sm text-muted-foreground">
-                    {authMode === 'signin' ? (
-                      <>Don't have an account? <button type="button" onClick={() => setAuthMode('signup')} className="text-primary hover:underline font-medium">Sign up</button></>
-                    ) : (
-                      <>Already have an account? <button type="button" onClick={() => setAuthMode('signin')} className="text-primary hover:underline font-medium">Sign in</button></>
-                    )}
-                  </p>
+                <h3 className="font-heading text-xl font-semibold text-foreground mb-1">Log in as Artist</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  No sign up. Use your artist name and password.
+                </p>
+
+                <form onSubmit={handleArtistLogin} className="space-y-4">
+                  <Input
+                    placeholder="Username"
+                    value={artistUsername}
+                    onChange={(e) => setArtistUsername(e.target.value)}
+                    required
+                    className="h-12 rounded-xl glass border-border/50"
+                    autoComplete="username"
+                  />
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Password"
+                      value={artistPassword}
+                      onChange={(e) => setArtistPassword(e.target.value)}
+                      required
+                      className="h-12 rounded-xl glass border-border/50 pr-10"
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+
+                  {error && (
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3">
+                      <p className="text-sm text-destructive text-center">{error}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={isLoading || !artistUsername.trim() || !artistPassword.trim()}
+                    className="w-full gradient-primary text-primary-foreground font-semibold h-12 rounded-xl"
+                  >
+                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Log In'}
+                  </Button>
                 </form>
               </motion.div>
             ) : authView === 'phone' ? (

@@ -160,6 +160,8 @@ export default function Social() {
           content: postData.content,
           song_id: postData.song_id,
           playlist_id: postData.playlist_id,
+          image_url: (postData as any).image_url ?? null,
+          image_path: (postData as any).image_path ?? null,
           post_type: postData.post_type as 'text' | 'song_share' | 'playlist_share' | 'listening' | 'welcome' | 'song_like',
           created_at: postData.created_at,
           updated_at: postData.updated_at,

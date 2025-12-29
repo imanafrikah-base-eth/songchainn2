@@ -9,11 +9,15 @@ import {
   generateNonce 
 } from '@/lib/baseWallet';
 
+const ALLOWED_ARTIST_IDS = new Set(['1', '2', '3', '4', '5', '6', '7']);
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isArtist: boolean;
+  artistId: string | null;
   isLoading: boolean;
   audienceProfile: AudienceProfile | null;
   needsOnboarding: boolean;
@@ -49,11 +53,27 @@ Nonce: ${nonce}
 Issued At: ${issuedAt}`;
 }
 
+function resolveArtistIdFromUser(user: User | null) {
+  if (!user) return null;
+
+  const metaArtistId = (user.user_metadata as any)?.artist_id as string | undefined;
+  if (metaArtistId && ALLOWED_ARTIST_IDS.has(metaArtistId)) return metaArtistId;
+
+  const email = user.email || '';
+  const match = email.match(/^artist\+(\d+)@/i);
+  const fromEmail = match?.[1] || null;
+  if (fromEmail && ALLOWED_ARTIST_IDS.has(fromEmail)) return fromEmail;
+
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isArtist, setIsArtist] = useState(false);
+  const [artistId, setArtistId] = useState<string | null>(null);
   const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -116,6 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        const resolvedArtistId = resolveArtistIdFromUser(session?.user ?? null);
+        setIsArtist(Boolean(resolvedArtistId));
+        setArtistId(resolvedArtistId);
         
         // Extract wallet address from user metadata
         if (session?.user?.user_metadata?.base_wallet_address) {
@@ -130,6 +153,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, 0);
         } else {
           setIsAdmin(false);
+          setIsArtist(false);
+          setArtistId(null);
           setAudienceProfile(null);
           setNeedsOnboarding(false);
           setWalletAddress(null);
@@ -143,6 +168,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      const resolvedArtistId = resolveArtistIdFromUser(session?.user ?? null);
+      setIsArtist(Boolean(resolvedArtistId));
+      setArtistId(resolvedArtistId);
       
       if (session?.user?.user_metadata?.base_wallet_address) {
         setWalletAddress(session.user.user_metadata.base_wallet_address);
@@ -267,6 +295,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       isAuthenticated: !!session, 
       isAdmin,
+      isArtist,
+      artistId,
       isLoading,
       audienceProfile, 
       needsOnboarding,

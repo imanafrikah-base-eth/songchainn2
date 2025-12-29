@@ -25,7 +25,7 @@ interface PlayerActionsContext {
   playPrevious: () => void;
   addToQueue: (song: Song) => void;
   volume: number;
-  enterRoomMode: (playlist: Song[]) => Promise<boolean>;
+  enterRoomMode: (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => Promise<boolean>;
   exitRoomMode: () => Promise<void>;
 }
 
@@ -230,8 +230,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setAudioVersion(v => v + 1);
 
     if (typeof options?.startTime === 'number' && Number.isFinite(options.startTime) && options.startTime > 0) {
-      audio.currentTime = options.startTime;
-      setCurrentTime(options.startTime);
+      try {
+        audio.currentTime = options.startTime;
+        setCurrentTime(options.startTime);
+      } catch {
+        setCurrentTime(0);
+      }
     }
 
     if (options?.shouldPlay === false) {
@@ -263,12 +267,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [crossfadeToSong, currentSong, forceSetSong, isPlaying, isRoomMode]);
 
   const togglePlay = useCallback(() => {
-    if (isRoomMode) {
-      if (audioRef.current?.paused) {
-        void audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      }
-      return;
-    }
     if (audioRef.current) {
       if (audioRef.current.paused) {
         audioRef.current.play().then(() => {
@@ -282,16 +280,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setIsPlaying(false);
       }
     }
-  }, [isRoomMode]);
+  }, []);
 
   const pause = useCallback(() => {
-    if (isRoomMode) return;
     if (audioRef.current) {
       audioRef.current.pause();
       nextAudioRef.current?.pause();
       setIsPlaying(false);
     }
-  }, [isRoomMode]);
+  }, []);
 
   const play = useCallback(() => {
     if (audioRef.current && currentSong) {
@@ -353,20 +350,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [currentSong, queue, isPlaying, crossfadeToSong, playSong, isRoomMode]);
 
   const playNext = useCallback(() => {
-    if (isRoomMode) return;
     advanceToNext();
-  }, [advanceToNext, isRoomMode]);
+  }, [advanceToNext]);
 
   const playPrevious = useCallback(() => {
-    if (isRoomMode) return;
     advanceToPrevious();
-  }, [advanceToPrevious, isRoomMode]);
+  }, [advanceToPrevious]);
 
   const addToQueue = useCallback((song: Song) => {
     setQueue(prev => [...prev, song]);
   }, []);
 
-  const enterRoomMode = useCallback(async (playlist: Song[]) => {
+  const enterRoomMode = useCallback(async (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => {
     if (playlist.length === 0) return false;
 
     if (!roomRestoreRef.current) {
@@ -383,7 +378,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setIsCrossfading(false);
     crossfadeTriggeredRef.current = false;
 
-    return forceSetSong(playlist[0], { shouldPlay: true });
+    const startIndex = typeof options?.startIndex === 'number' && Number.isFinite(options.startIndex)
+      ? Math.max(0, Math.min(playlist.length - 1, Math.floor(options.startIndex)))
+      : 0;
+
+    const startTime = typeof options?.startTime === 'number' && Number.isFinite(options.startTime) && options.startTime > 0
+      ? options.startTime
+      : 0;
+
+    return forceSetSong(playlist[startIndex], { shouldPlay: true, startTime });
   }, [currentSong, currentTime, forceSetSong, isPlaying, queue]);
 
   const exitRoomMode = useCallback(async () => {
@@ -411,48 +414,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       startTime: snapshot.currentTime,
     });
   }, [forceSetSong]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const handlePause = () => {
-      if (!isRoomMode) return;
-      void audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-    };
-
-    audio.addEventListener('pause', handlePause);
-    return () => audio.removeEventListener('pause', handlePause);
-  }, [audioVersion, isRoomMode]);
-
-  useEffect(() => {
-    if (!('mediaSession' in navigator)) return;
-
-    const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
-      try {
-        navigator.mediaSession.setActionHandler(action, handler);
-      } catch {
-        void 0;
-      }
-    };
-
-    if (isRoomMode) {
-      set('pause', () => {
-        if (audioRef.current?.paused) {
-          void audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-        }
-      });
-      set('play', () => {
-        if (audioRef.current?.paused) {
-          void audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-        }
-      });
-      set('nexttrack', null);
-      set('previoustrack', null);
-      set('seekbackward', null);
-      set('seekforward', null);
-    }
-  }, [isRoomMode]);
 
   // Memoize context values to prevent unnecessary re-renders
   const stateValue = useMemo(() => ({

@@ -25,7 +25,7 @@ const createNotificationRecord = async (
 };
 
 export function useSocial() {
-  const { user } = useAuth();
+  const { user, isArtist } = useAuth();
   const { toast } = useToast();
   const [posts, setPosts] = useState<SocialPostWithProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -124,6 +124,8 @@ export function useSocial() {
         content: post.content,
         song_id: post.song_id,
         playlist_id: post.playlist_id,
+        image_url: (post as any).image_url ?? null,
+        image_path: (post as any).image_path ?? null,
         post_type: post.post_type as 'text' | 'song_share' | 'playlist_share' | 'listening' | 'welcome' | 'song_like',
         created_at: post.created_at,
         updated_at: post.updated_at,
@@ -188,9 +190,15 @@ export function useSocial() {
     content: string,
     postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
     songId?: string,
-    playlistId?: string
+    playlistId?: string,
+    image?: { url: string; path: string }
   ) => {
     if (!user) return;
+
+    if (image && !isArtist) {
+      toast({ title: 'Only artists can upload images', variant: 'destructive' });
+      return;
+    }
 
     const { error } = await supabase
       .from('social_posts')
@@ -199,7 +207,9 @@ export function useSocial() {
         content,
         post_type: postType,
         song_id: songId || null,
-        playlist_id: playlistId || null
+        playlist_id: playlistId || null,
+        image_url: image?.url || null,
+        image_path: image?.path || null,
       });
 
     if (error) {
@@ -209,7 +219,7 @@ export function useSocial() {
 
     toast({ title: 'Post shared!' });
     fetchPosts();
-  }, [user, toast, fetchPosts]);
+  }, [user, isArtist, toast, fetchPosts]);
 
   const deletePost = useCallback(async (postId: string) => {
     if (!user) return;

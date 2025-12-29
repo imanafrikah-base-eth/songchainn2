@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Headphones, Camera, User, FileText, Link2, Loader2, Upload, MapPin } from 'lucide-react';
+import { Headphones, User, FileText, Link2, Loader2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,51 +31,6 @@ export default function Onboarding() {
   const [location, setLocation] = useState('');
   const [xProfileLink, setXProfileLink] = useState('');
   const [baseProfileLink, setBaseProfileLink] = useState('');
-  const [profilePicture, setProfilePicture] = useState<File | null>(null);
-  const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
-  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
-  const [coverPhotoPreview, setCoverPhotoPreview] = useState<string | null>(null);
-
-  const profilePictureRef = useRef<HTMLInputElement>(null);
-  const coverPhotoRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    setFile: (f: File | null) => void,
-    setPreview: (p: string | null) => void
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadImage = async (file: File, bucket: string): Promise<string | null> => {
-    if (!user) return null;
-    
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-    
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file, { upsert: true });
-    
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
-    
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-    
-    return publicUrl;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,17 +62,6 @@ export default function Onboarding() {
     setIsLoading(true);
     
     try {
-      let profilePictureUrl: string | null = null;
-      let coverPhotoUrl: string | null = null;
-      
-      if (profilePicture) {
-        profilePictureUrl = await uploadImage(profilePicture, 'profile-pictures');
-      }
-      
-      if (coverPhoto) {
-        coverPhotoUrl = await uploadImage(coverPhoto, 'cover-photos');
-      }
-      
       const { error } = await supabase
         .from('audience_profiles')
         .insert({
@@ -125,8 +69,8 @@ export default function Onboarding() {
           profile_name: profileName.trim(),
           bio: bio.trim() || null,
           location: location.trim(),
-          profile_picture_url: profilePictureUrl,
-          cover_photo_url: coverPhotoUrl,
+          profile_picture_url: null,
+          cover_photo_url: null,
           x_profile_link: xProfileLink.trim() || null,
           base_profile_link: baseProfileLink.trim() || null,
           onboarding_completed: true
@@ -183,74 +127,6 @@ export default function Onboarding() {
           onSubmit={handleSubmit}
           className="space-y-6"
         >
-          {/* Cover Photo */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium flex items-center gap-2">
-              <Camera className="w-4 h-4" />
-              Cover Photo
-            </Label>
-            <div
-              onClick={() => coverPhotoRef.current?.click()}
-              className="relative w-full h-32 bg-secondary rounded-xl border-2 border-dashed border-border hover:border-primary/50 cursor-pointer overflow-hidden transition-colors"
-            >
-              {coverPhotoPreview ? (
-                <img
-                  src={coverPhotoPreview}
-                  alt="Cover preview"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <Upload className="w-6 h-6 mb-2" />
-                  <span className="text-sm">Upload cover photo</span>
-                </div>
-              )}
-            </div>
-            <input
-              ref={coverPhotoRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileChange(e, setCoverPhoto, setCoverPhotoPreview)}
-              className="hidden"
-            />
-          </div>
-
-          {/* Profile Picture */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium flex items-center gap-2">
-              <User className="w-4 h-4" />
-              Profile Picture
-            </Label>
-            <div className="flex items-center gap-4">
-              <div
-                onClick={() => profilePictureRef.current?.click()}
-                className="relative w-24 h-24 bg-secondary rounded-full border-2 border-dashed border-border hover:border-primary/50 cursor-pointer overflow-hidden transition-colors flex-shrink-0"
-              >
-                {profilePicturePreview ? (
-                  <img
-                    src={profilePicturePreview}
-                    alt="Profile preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <Upload className="w-5 h-5" />
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Choose a photo that represents you as an Audience member
-              </p>
-            </div>
-            <input
-              ref={profilePictureRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileChange(e, setProfilePicture, setProfilePicturePreview)}
-              className="hidden"
-            />
-          </div>
-
           {/* Profile Name */}
           <div className="space-y-2">
             <Label htmlFor="profileName" className="text-sm font-medium flex items-center gap-2">

@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, Edit3, Save, X as XIcon, ExternalLink, Heart, ListMusic, Loader2, Gift, Star, Users } from 'lucide-react';
+import { Edit3, Save, X as XIcon, ExternalLink, Heart, ListMusic, Loader2, Gift, Star, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,9 +42,6 @@ export default function Profile() {
   const [bio, setBio] = useState(audienceProfile?.bio || '');
   const [xProfileLink, setXProfileLink] = useState(audienceProfile?.x_profile_link || '');
   const [baseProfileLink, setBaseProfileLink] = useState(audienceProfile?.base_profile_link || '');
-  
-  const profilePictureRef = useRef<HTMLInputElement>(null);
-  const coverPhotoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (audienceProfile) {
@@ -54,56 +51,6 @@ export default function Profile() {
       setBaseProfileLink(audienceProfile.base_profile_link || '');
     }
   }, [audienceProfile]);
-
-  const uploadImage = async (file: File, bucket: string): Promise<string | null> => {
-    if (!user) return null;
-    
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-    
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file, { upsert: true });
-    
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
-    
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-    
-    return publicUrl;
-  };
-
-  const handleImageUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: 'profile_picture_url' | 'cover_photo_url',
-    bucket: string
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    
-    setIsSaving(true);
-    
-    try {
-      const url = await uploadImage(file, bucket);
-      if (url) {
-        await supabase
-          .from('audience_profiles')
-          .update({ [field]: url })
-          .eq('user_id', user.id);
-        
-        await refreshProfile();
-        toast({ title: 'Image updated!' });
-      }
-    } catch (err) {
-      toast({ title: 'Error uploading image', variant: 'destructive' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleSave = async () => {
     if (!user || !profileName.trim()) {
@@ -157,20 +104,6 @@ export default function Profile() {
             className="w-full h-full object-cover"
           />
         )}
-        <button
-          onClick={() => coverPhotoRef.current?.click()}
-          className="absolute bottom-3 right-3 bg-background/80 backdrop-blur-sm p-2 rounded-full hover:bg-background transition-colors"
-          disabled={isSaving}
-        >
-          <Camera className="w-4 h-4" />
-        </button>
-        <input
-          ref={coverPhotoRef}
-          type="file"
-          accept="image/*"
-          onChange={(e) => handleImageUpload(e, 'cover_photo_url', 'cover-photos')}
-          className="hidden"
-        />
       </div>
 
       <div className="px-4 -mt-16 max-w-2xl mx-auto">
@@ -190,20 +123,6 @@ export default function Profile() {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => profilePictureRef.current?.click()}
-              className="absolute bottom-0 right-0 bg-primary p-1.5 rounded-full hover:bg-primary/90 transition-colors"
-              disabled={isSaving}
-            >
-              <Camera className="w-3.5 h-3.5 text-primary-foreground" />
-            </button>
-            <input
-              ref={profilePictureRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImageUpload(e, 'profile_picture_url', 'profile-pictures')}
-              className="hidden"
-            />
           </div>
 
           <div className="flex-1">
