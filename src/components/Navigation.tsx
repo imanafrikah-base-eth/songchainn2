@@ -5,6 +5,7 @@ import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Downlo
 import { useEngagement } from '@/context/EngagementContext';
 import { useAuth } from '@/context/AuthContext';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/songchainn-logo.webp';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
@@ -25,10 +26,11 @@ export function Navigation() {
   const location = useLocation();
   const navigate = useNavigate();
   const { engagementPoints, currentStreak } = useEngagement();
-  const { signOut, walletAddress } = useAuth();
+  const { signOut, walletAddress, user } = useAuth();
   const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const [showInvite, setShowInvite] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const roomOnlineCount = useRoomOnlineCount(user?.id);
   
   // Enable swipe gestures for mobile navigation
   useSwipeNavigation();
@@ -88,6 +90,11 @@ export function Navigation() {
                     <span className="flex items-center gap-2 relative z-10">
                       <item.icon className="w-4 h-4" />
                       {item.label}
+                      {item.path === '/room' && roomOnlineCount > 0 && (
+                        <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
+                          {roomOnlineCount}
+                        </span>
+                      )}
                     </span>
                     {isActive && (
                       <motion.div
@@ -285,7 +292,14 @@ export function Navigation() {
                       )}
                     >
                       <item.icon className="w-5 h-5" />
-                      <span>{item.label}</span>
+                      <span className="flex items-center gap-2">
+                        {item.label}
+                        {item.path === '/room' && roomOnlineCount > 0 && (
+                          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
+                            {roomOnlineCount}
+                          </span>
+                        )}
+                      </span>
                     </motion.button>
                   );
                 })}

@@ -5,6 +5,7 @@ import { Sparkles, Headphones, Users, ArrowRight, Music, Coins } from 'lucide-re
 import { SONGS, ARTISTS } from '@/data/musicData';
 import { useRankedSongs, useRankedArtists } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
+import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 import { SongCard } from '@/components/SongCard';
 import { ArtistCard } from '@/components/ArtistCard';
 import { EngagementPanel } from '@/components/EngagementPanel';
@@ -35,8 +36,9 @@ const itemVariants = {
 export default function Home() {
   const { rankedSongs } = useRankedSongs();
   const { rankedArtists } = useRankedArtists();
-  const { audienceProfile, refreshProfile } = useAuth();
+  const { audienceProfile, refreshProfile, user } = useAuth();
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const roomOnlineCount = useRoomOnlineCount(user?.id);
   
   const featuredSongs = rankedSongs.slice(0, 3);
   const allSongs = rankedSongs;
@@ -128,6 +130,11 @@ export default function Home() {
                   <Button className="gradient-primary text-primary-foreground shadow-glow gap-2">
                     <Headphones className="w-4 h-4" />
                     <span>Enter The Room</span>
+                    {roomOnlineCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-black/25 text-primary-foreground text-[11px] font-semibold">
+                        {roomOnlineCount}
+                      </span>
+                    )}
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </Link>

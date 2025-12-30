@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Settings } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Link2, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
@@ -108,6 +108,61 @@ export default function Room() {
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const typingSentRef = useRef(false);
+  const beepCtxRef = useRef<AudioContext | null>(null);
+  const beepUnlockedRef = useRef(false);
+  const lastBeepAtRef = useRef(0);
+
+  const unlockBeep = useCallback(async () => {
+    if (beepUnlockedRef.current) return;
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx: AudioContext = beepCtxRef.current ?? new Ctx();
+      beepCtxRef.current = ctx;
+      if (ctx.state === 'suspended') await ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.01);
+      beepUnlockedRef.current = true;
+    } catch {
+      void 0;
+    }
+  }, []);
+
+  const playBeep = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastBeepAtRef.current < 350) return;
+    lastBeepAtRef.current = now;
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx: AudioContext = beepCtxRef.current ?? new Ctx();
+      beepCtxRef.current = ctx;
+      if (ctx.state === 'suspended') await ctx.resume();
+
+      const start = ctx.currentTime;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.06, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
+      gain.connect(ctx.destination);
+
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(980, start);
+      osc.frequency.linearRampToValueAtTime(780, start + 0.12);
+      osc.connect(gain);
+      osc.start(start);
+      osc.stop(start + 0.13);
+    } catch {
+      void 0;
+    }
+  }, []);
 
   const broadcastRoomMessage = useCallback((message: RoomMessage) => {
     const channel = presenceChannelRef.current;
@@ -302,8 +357,12 @@ export default function Room() {
     presenceChannelRef.current = channel;
 
     const syncPresence = () => {
-      const state = channel.presenceState() as Record<string, Array<{ room_name?: string }>>;
-      setOnlineCount(Object.keys(state).length);
+      const state = channel.presenceState() as Record<string, Array<{ room_name?: string; in_room?: boolean }>>;
+      let count = 0;
+      for (const metas of Object.values(state)) {
+        if (Array.isArray(metas) && metas.some(m => Boolean(m?.in_room))) count += 1;
+      }
+      setOnlineCount(count);
     };
 
     channel.on('presence', { event: 'sync' }, syncPresence);
@@ -334,6 +393,9 @@ export default function Room() {
         if (chatBackend === 'local') persistLocalMessages(updated);
         return updated;
       });
+      if (next.user_id !== user.id && document.visibilityState === 'visible') {
+        void playBeep();
+      }
     });
 
     channel.subscribe(async status => {
@@ -341,7 +403,7 @@ export default function Room() {
       const storedNameRaw = localStorage.getItem(`room_username:${user.id}`) || '';
       const storedName = storedNameRaw ? normalizeRoomName(storedNameRaw) : '';
       const toTrack = normalizeRoomName(roomName || storedName || '');
-      await channel.track({ room_name: toTrack || 'Guest' });
+      await channel.track({ room_name: toTrack || 'Guest', in_room: true });
       syncPresence();
     });
 
@@ -356,7 +418,7 @@ export default function Room() {
       presenceChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [chatBackend, persistLocalMessages, roomName, user]);
+  }, [chatBackend, persistLocalMessages, playBeep, roomName, user]);
 
   const mergeRecentMessages = useCallback((incoming: RoomMessage[]) => {
     setMessages(prev => {
@@ -384,10 +446,39 @@ export default function Room() {
   }, [mergeRecentMessages]);
 
   useEffect(() => {
+    if (!user) return;
+    if (chatBackend !== 'supabase') return;
+
+    let isActive = true;
+
+    const tick = () => {
+      if (!isActive) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void fetchRecentMessages();
+    };
+
+    const interval = window.setInterval(tick, 2000);
+    const onFocus = () => tick();
+    const onVisibility = () => tick();
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    tick();
+
+    return () => {
+      isActive = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [chatBackend, fetchRecentMessages, user]);
+
+  useEffect(() => {
     const channel = presenceChannelRef.current;
     if (!channel || !user) return;
     const toTrack = normalizeRoomName(roomName || '');
-    void channel.track({ room_name: toTrack || 'Guest' });
+    void channel.track({ room_name: toTrack || 'Guest', in_room: true });
   }, [roomName, user]);
 
   useEffect(() => {
@@ -402,6 +493,9 @@ export default function Room() {
         const next = (payload as any)?.new as RoomMessage | undefined;
         if (!next?.id) return;
         mergeRecentMessages([next]);
+        if (next.user_id !== user.id && document.visibilityState === 'visible') {
+          void playBeep();
+        }
         return;
       }
       if (eventType === 'DELETE') {
@@ -424,7 +518,7 @@ export default function Room() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatBackend, fetchRecentMessages, mergeRecentMessages, user]);
+  }, [chatBackend, fetchRecentMessages, mergeRecentMessages, playBeep, user]);
 
   useEffect(() => {
     if (!shouldAutoScrollRef.current) return;
@@ -701,21 +795,39 @@ export default function Room() {
             <ArrowLeft className="w-4 h-4" />
             <span>Leave Room</span>
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (isArtist) {
-                setIsIdentityPromptOpen(true);
-                return;
-              }
-              setNameDraft(roomName || '');
-              setIsNamePromptOpen(true);
-            }}
-            className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            <span>{roomName ? roomName : 'Set name'}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                const url = `${window.location.origin}/room`;
+                try {
+                  await navigator.clipboard.writeText(url);
+                  toast.success('Invite link copied');
+                } catch {
+                  toast.error('Could not copy invite link');
+                }
+              }}
+              className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+            >
+              <Link2 className="w-4 h-4" />
+              <span>Invite</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isArtist) {
+                  setIsIdentityPromptOpen(true);
+                  return;
+                }
+                setNameDraft(roomName || '');
+                setIsNamePromptOpen(true);
+              }}
+              className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              <span>{roomName ? roomName : 'Set name'}</span>
+            </button>
+          </div>
         </div>
         <div className="max-w-3xl mx-auto px-4 pb-2 text-xs text-zinc-400">
           {onlineCount} online
@@ -778,6 +890,8 @@ export default function Room() {
               <input
                 value={draft}
                 onChange={e => handleDraftChange(e.target.value)}
+                onFocus={() => void unlockBeep()}
+                onPointerDown={() => void unlockBeep()}
                 placeholder="Say something..."
                 className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-white/20"
                 disabled={isSending}

@@ -53,6 +53,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const currentSongRef = useRef<Song | null>(null);
   const isPlayingRef = useRef(false);
   const currentTimeRef = useRef(0);
+  const isRoomModeRef = useRef(false);
+  const recoverInFlightRef = useRef(false);
+  const recoverAttemptsRef = useRef(0);
+  const lastRecoverAtRef = useRef(0);
+  const stallTimerRef = useRef<number | null>(null);
   const roomRestoreRef = useRef<{
     queue: Song[];
     currentSong: Song | null;
@@ -104,6 +109,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     currentTimeRef.current = currentTime;
   }, [currentTime]);
+
+  useEffect(() => {
+    isRoomModeRef.current = isRoomMode;
+  }, [isRoomMode]);
+
+  useEffect(() => {
+    recoverAttemptsRef.current = 0;
+    lastRecoverAtRef.current = 0;
+  }, [currentSong?.id]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -301,6 +315,79 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return false;
     }
   }, []);
+
+  const recoverRoomPlayback = useCallback(async () => {
+    if (!isRoomModeRef.current) return;
+    if (recoverInFlightRef.current) return;
+    const song = currentSongRef.current;
+    const audio = audioRef.current;
+    if (!song || !audio) return;
+
+    const now = Date.now();
+    if (now - lastRecoverAtRef.current < 4000) return;
+    if (recoverAttemptsRef.current >= 4) return;
+
+    recoverInFlightRef.current = true;
+    lastRecoverAtRef.current = now;
+    recoverAttemptsRef.current += 1;
+
+    const targetTime = Number.isFinite(audio.currentTime) ? audio.currentTime : currentTimeRef.current;
+    try {
+      await forceSetSong(song, { shouldPlay: true, startTime: targetTime });
+    } finally {
+      recoverInFlightRef.current = false;
+    }
+  }, [forceSetSong]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const clearStallTimer = () => {
+      if (!stallTimerRef.current) return;
+      window.clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    };
+
+    const scheduleRecovery = () => {
+      if (!isRoomModeRef.current) return;
+      clearStallTimer();
+      stallTimerRef.current = window.setTimeout(() => {
+        stallTimerRef.current = null;
+        const a = audioRef.current;
+        if (!a) return;
+        if (!isRoomModeRef.current) return;
+        if (a.paused) return;
+        if (a.readyState >= 3) return;
+        void recoverRoomPlayback();
+      }, 2500);
+    };
+
+    const onError = () => {
+      if (!isRoomModeRef.current) return;
+      void recoverRoomPlayback();
+    };
+
+    const onStalled = () => scheduleRecovery();
+    const onWaiting = () => scheduleRecovery();
+    const onPlaying = () => clearStallTimer();
+    const onCanPlay = () => clearStallTimer();
+
+    audio.addEventListener('error', onError);
+    audio.addEventListener('stalled', onStalled);
+    audio.addEventListener('waiting', onWaiting);
+    audio.addEventListener('playing', onPlaying);
+    audio.addEventListener('canplay', onCanPlay);
+
+    return () => {
+      clearStallTimer();
+      audio.removeEventListener('error', onError);
+      audio.removeEventListener('stalled', onStalled);
+      audio.removeEventListener('waiting', onWaiting);
+      audio.removeEventListener('playing', onPlaying);
+      audio.removeEventListener('canplay', onCanPlay);
+    };
+  }, [audioVersion, recoverRoomPlayback]);
 
   const playSong = useCallback((song: Song, options?: { userAddress?: string; hasOwnership?: boolean; force?: boolean }) => {
     if (isRoomMode && !options?.force) return;

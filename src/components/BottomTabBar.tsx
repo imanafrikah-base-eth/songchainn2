@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Compass, Users, MessageCircle, User, Headphones } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSafePlayerState } from '@/context/PlayerContext';
+import { useAuth } from '@/context/AuthContext';
+import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 
 const tabItems = [
   { path: '/', label: 'Home', icon: Home },
@@ -17,6 +19,8 @@ export function BottomTabBar() {
   const location = useLocation();
   const playerState = useSafePlayerState();
   const currentSong = playerState?.currentSong;
+  const { user } = useAuth();
+  const roomOnlineCount = useRoomOnlineCount(user?.id);
 
   // Hide tab bar when music is playing - player takes its place
   if (currentSong) return null;
@@ -53,6 +57,11 @@ export function BottomTabBar() {
                       "w-5 h-5 transition-transform",
                       isActive && "scale-110"
                     )} />
+                    {item.path === '/room' && roomOnlineCount > 0 && (
+                      <span className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
+                        {roomOnlineCount}
+                      </span>
+                    )}
                     {isActive && (
                       <motion.div
                         layoutId="bottom-tab-indicator"
