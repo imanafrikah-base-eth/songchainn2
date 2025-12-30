@@ -49,6 +49,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const playNextRef = useRef<() => void>(() => {});
   const crossfadeTriggeredRef = useRef(false);
   const volumeRef = useRef(0.8);
+  const queueRef = useRef<Song[]>(SONGS);
+  const currentSongRef = useRef<Song | null>(null);
+  const isPlayingRef = useRef(false);
+  const currentTimeRef = useRef(0);
   const roomRestoreRef = useRef<{
     queue: Song[];
     currentSong: Song | null;
@@ -84,6 +88,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!current) return;
     if (!isCrossfading) current.volume = volume;
   }, [volume, isCrossfading, audioVersion]);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  useEffect(() => {
+    currentSongRef.current = currentSong;
+  }, [currentSong]);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -229,10 +249,37 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.volume = volumeRef.current;
     setAudioVersion(v => v + 1);
 
-    if (typeof options?.startTime === 'number' && Number.isFinite(options.startTime) && options.startTime > 0) {
+    const startTime =
+      typeof options?.startTime === 'number' && Number.isFinite(options.startTime) && options.startTime > 0
+        ? options.startTime
+        : 0;
+
+    if (startTime > 0) {
+      const waitForMetadata = () =>
+        new Promise<void>((resolve) => {
+          if (Number.isFinite(audio.duration) && audio.duration > 0) return resolve();
+          const onLoaded = () => {
+            audio.removeEventListener('loadedmetadata', onLoaded);
+            resolve();
+          };
+          audio.addEventListener('loadedmetadata', onLoaded);
+          window.setTimeout(() => {
+            audio.removeEventListener('loadedmetadata', onLoaded);
+            resolve();
+          }, 1500);
+        });
+
       try {
-        audio.currentTime = options.startTime;
-        setCurrentTime(options.startTime);
+        audio.load();
+      } catch {
+        void 0;
+      }
+
+      await waitForMetadata();
+      try {
+        const clamped = Math.max(0, Math.min(startTime, Number.isFinite(audio.duration) ? Math.max(0, audio.duration - 0.25) : startTime));
+        audio.currentTime = clamped;
+        setCurrentTime(clamped);
       } catch {
         setCurrentTime(0);
       }
@@ -366,10 +413,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     if (!roomRestoreRef.current) {
       roomRestoreRef.current = {
-        queue,
-        currentSong,
-        isPlaying,
-        currentTime,
+        queue: queueRef.current,
+        currentSong: currentSongRef.current,
+        isPlaying: isPlayingRef.current,
+        currentTime: currentTimeRef.current,
       };
     }
 
@@ -387,7 +434,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       : 0;
 
     return forceSetSong(playlist[startIndex], { shouldPlay: true, startTime });
-  }, [currentSong, currentTime, forceSetSong, isPlaying, queue]);
+  }, [forceSetSong]);
 
   const exitRoomMode = useCallback(async () => {
     setIsRoomMode(false);

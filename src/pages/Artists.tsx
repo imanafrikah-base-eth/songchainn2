@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Music, Play, Heart, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { useSongPopularity } from '@/hooks/usePopularity';
 import { Navigation } from '@/components/Navigation';
@@ -26,6 +26,7 @@ const itemVariants = {
 export default function Artists() {
   const { data: popularityData } = useSongPopularity();
   const artistIds = useMemo(() => ARTISTS.map(a => a.id), []);
+  const queryClient = useQueryClient();
   
   // Fetch follower counts for all artists
   const { data: followerCounts = {} } = useQuery({
@@ -35,18 +36,53 @@ export default function Artists() {
       const { data, error } = await supabase.rpc('get_artist_follow_counts', { artist_ids: artistIds });
 
       if (error) {
-        console.error('Error fetching follower counts:', error);
+        const fallback = await supabase.functions.invoke('artist-follow-counts', {
+          body: { artist_ids: artistIds },
+        });
+
+        if (fallback.error) {
+          console.error('Error fetching follower counts:', error);
+          return counts;
+        }
+
+        const rows = (fallback.data as any)?.data ?? (fallback.data as any);
+        const arr = Array.isArray(rows) ? rows : [];
+        arr.forEach((row: any) => {
+          const raw = row?.follower_count;
+          const parsed = typeof raw === 'string' ? Number(raw) : (raw ?? 0);
+          counts[String(row?.artist_id)] = Number.isFinite(parsed) ? parsed : 0;
+        });
         return counts;
       }
 
       data?.forEach(row => {
-        counts[row.artist_id] = row.follower_count || 0;
+        const raw = (row as any).follower_count;
+        const parsed = typeof raw === 'string' ? Number(raw) : (raw ?? 0);
+        counts[(row as any).artist_id] = Number.isFinite(parsed) ? parsed : 0;
       });
       return counts;
     },
     enabled: artistIds.length > 0,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 10,
+    refetchInterval: 15000,
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('artist-followers-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'liked_artists' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['all-artist-followers'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Calculate stats for each artist
   const artistsWithStats = useMemo(() => {

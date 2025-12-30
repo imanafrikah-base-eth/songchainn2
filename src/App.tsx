@@ -106,7 +106,10 @@ function AppContent() {
       <NotificationBanner />
       {!isAuthenticated ? (
         <Suspense fallback={<PageLoader />}>
-          <Auth />
+          <Routes>
+            <Route path="/install" element={<Install />} />
+            <Route path="*" element={<Auth />} />
+          </Routes>
         </Suspense>
       ) : needsOnboarding ? (
         <Suspense fallback={<PageLoader />}>

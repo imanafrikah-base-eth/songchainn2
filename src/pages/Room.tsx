@@ -104,6 +104,7 @@ export default function Room() {
   const shouldAutoScrollRef = useRef(true);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
   const isPlayingRef = useRef(false);
+  const roomEnterAtRef = useRef<number>(0);
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const typingSentRef = useRef(false);
@@ -120,10 +121,7 @@ export default function Room() {
     const nowSeconds = Date.now() / 1000;
     const startIndex = Math.floor(nowSeconds / ROOM_SEGMENT_SECONDS) % playlist.length;
     const startTime = nowSeconds % ROOM_SEGMENT_SECONDS;
-    const timeoutId = window.setTimeout(() => {
-      if (!isActive) return;
-      if (!isPlayingRef.current) setAutoplayBlocked(true);
-    }, 1200);
+    roomEnterAtRef.current = Date.now();
 
     void enterRoomMode(playlist, { startIndex, startTime }).then(ok => {
       if (!isActive) return;
@@ -132,7 +130,6 @@ export default function Room() {
 
     return () => {
       isActive = false;
-      window.clearTimeout(timeoutId);
       void exitRoomMode();
     };
   }, [enterRoomMode, exitRoomMode, playlist, user]);
@@ -142,6 +139,7 @@ export default function Room() {
     if (autoplayBlocked) return;
     if (!currentSong) return;
     if (isPlaying) return;
+    if (roomEnterAtRef.current && Date.now() - roomEnterAtRef.current < 2000) return;
     void play();
   }, [autoplayBlocked, currentSong, isPlaying, isRoomMode, play]);
 
@@ -216,6 +214,10 @@ export default function Room() {
         .select('room_name')
         .eq('user_id', user.id)
         .maybeSingle();
+
+      if (profileRes?.error && isMissingTableError(profileRes.error)) {
+        setChatBackend('local');
+      }
 
       const loadedName = profileRes?.data?.room_name as string | undefined;
       if (loadedName) {
@@ -395,6 +397,10 @@ export default function Room() {
 
     setIsSavingName(false);
     if (error) {
+      if (isMissingTableError(error)) {
+        setChatBackend('local');
+        return;
+      }
       toast.error('Could not save Room name', { description: error.message });
       return;
     }
@@ -450,6 +456,7 @@ export default function Room() {
         .ilike('room_name', escapeLikePattern(mention))
         .maybeSingle();
 
+      if (res?.error && isMissingTableError(res.error)) return;
       const mentionedUserId = res?.data?.user_id as string | undefined;
       if (mentionedUserId && mentionedUserId !== user.id) {
         mentionedUserIds.add(mentionedUserId);
@@ -585,11 +592,15 @@ export default function Room() {
     if (nextTyping && typingSentRef.current) return;
 
     typingSentRef.current = nextTyping;
-    void channel.send({
-      type: 'broadcast',
-      event: 'typing',
-      payload: { user_id: user.id, room_name: roomName, is_typing: nextTyping },
-    });
+    channel
+      .send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { user_id: user.id, room_name: roomName, is_typing: nextTyping },
+      })
+      .catch(() => {
+        void 0;
+      });
   }, [roomName, user]);
 
   const handleDraftChange = useCallback((value: string) => {

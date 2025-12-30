@@ -261,9 +261,21 @@ export default function Auth() {
         if (retryRes?.error) throw retryRes.error;
       }
 
+      await supabase.auth.updateUser({
+        data: { artist_id: resolved.artist.id, artist_name: resolved.artist.name },
+      });
+      await supabase.auth.refreshSession();
+
       await upsertArtistAudienceProfile(resolved.artist);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData?.session?.user?.id;
+      if (userId) {
+        await (supabase as any)
+          .from('artist_accounts')
+          .upsert({ artist_id: resolved.artist.id, user_id: userId }, { onConflict: 'artist_id' });
+      }
       toast.success(`Signed in as ${resolved.artist.name}`);
-      navigate(`/?r=/artist/${resolved.artist.id}`, { replace: true });
+      navigate(`/artist/${resolved.artist.id}`, { replace: true });
     } catch (err: any) {
       setError(err?.message || 'Artist login failed');
     } finally {

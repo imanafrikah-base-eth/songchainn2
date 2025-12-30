@@ -6,12 +6,8 @@ import path from "path";
 export default defineConfig(() => ({
   server: {
     port: 5173,
-    host: "127.0.0.1",
-    hmr: {
-      protocol: "ws",
-      host: "127.0.0.1",
-      clientPort: 5173,
-    },
+    host: true,
+    strictPort: true,
   },
   esbuild: {
     sourcemap: false,

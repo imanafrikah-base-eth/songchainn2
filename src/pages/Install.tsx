@@ -27,6 +27,7 @@ export default function Install() {
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
   const deferredPromptRef = useRef<any>(null);
   const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://songchainn.xyz';
+  const installUrl = `${appUrl}/install`;
   const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
@@ -326,7 +327,7 @@ export default function Install() {
               
               <div className="bg-white p-4 rounded-xl inline-block mb-4">
                 <QRCodeSVG 
-                  value={appUrl}
+                  value={installUrl}
                   size={180}
                   level="H"
                   includeMargin={false}
@@ -336,7 +337,7 @@ export default function Install() {
               </div>
               
               <p className="text-sm text-muted-foreground">
-                Open your phone camera and scan this QR code to visit the app on mobile
+                Scan to open the install page on your phone
               </p>
             </div>
           </motion.section>
