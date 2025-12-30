@@ -61,8 +61,8 @@ export default function Auth() {
   const ARTIST_LOGIN_CODES: Record<string, string> = {
     [normalizeArtistKey('Santana')]: '01',
     [normalizeArtistKey('Sanchy')]: '02',
-    [normalizeArtistKey('PRP')]: '03',
-    [normalizeArtistKey('NDA')]: '04',
+    [normalizeArtistKey('PRP')]: '999',
+    [normalizeArtistKey('NDA')]: '666',
     [normalizeArtistKey('IMan Afrikah')]: '05',
     [normalizeArtistKey('DenaJah')]: '06',
     [normalizeArtistKey('7ROO7H BASED')]: '07',
@@ -70,13 +70,17 @@ export default function Auth() {
 
   const resolveArtistLogin = (usernameRaw: string) => {
     const key = normalizeArtistKey(usernameRaw);
-    const artist = ARTISTS.find(a => normalizeArtistKey(a.name) === key);
+    const baseKey = key.replace(/\d+$/, '');
+    const artist =
+      ARTISTS.find(a => normalizeArtistKey(a.name) === key) ??
+      ARTISTS.find(a => normalizeArtistKey(a.name) === baseKey);
     if (!artist) return null;
     const code = ARTIST_LOGIN_CODES[normalizeArtistKey(artist.name)];
     if (!code) return null;
     const email = `artist+${artist.id}@songchainn.app`;
-    const password = `${artist.name.replace(/\s+/g, '')}${code}`;
-    return { artist, code, email, password };
+    const base = artist.name.replace(/\s+/g, '');
+    const password = `${base}${code}`;
+    return { artist, email, password };
   };
 
   const upsertArtistAudienceProfile = async (artist: (typeof ARTISTS)[number]) => {
