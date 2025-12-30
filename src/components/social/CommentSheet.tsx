@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useCommentLikes } from '@/hooks/useCommentLikes';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CommentSheetProps {
   isOpen: boolean;
@@ -113,8 +114,17 @@ export function CommentSheet({
     setReplyingTo(null);
   };
 
-  const goToProfile = (userId: string) => {
+  const goToProfile = async (userId: string) => {
     onClose();
+    const { data } = await (supabase as any)
+      .from('artist_accounts')
+      .select('artist_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (data?.artist_id) {
+      navigate(`/artist/${data.artist_id}`);
+      return;
+    }
     navigate(`/audience/${userId}`);
   };
 
@@ -134,9 +144,7 @@ export function CommentSheet({
               const mentionedUser = localComments.find(
                 c => c.profile?.profile_name?.toLowerCase() === part.toLowerCase()
               );
-              if (mentionedUser) {
-                goToProfile(mentionedUser.user_id);
-              }
+              if (mentionedUser) void goToProfile(mentionedUser.user_id);
             }}
           >
             @{part}
@@ -201,7 +209,7 @@ export function CommentSheet({
                       animate={{ opacity: 1, y: 0 }}
                       className="flex gap-3"
                     >
-                      <button onClick={() => goToProfile(comment.user_id)}>
+                      <button onClick={() => void goToProfile(comment.user_id)}>
                         <Avatar className="w-10 h-10">
                           <AvatarImage src={comment.profile?.profile_picture_url || ''} />
                           <AvatarFallback className="bg-primary/20 text-primary">
@@ -214,7 +222,7 @@ export function CommentSheet({
                         <div className="flex items-start justify-between">
                           <div>
                             <button 
-                              onClick={() => goToProfile(comment.user_id)}
+                              onClick={() => void goToProfile(comment.user_id)}
                               className="font-semibold text-sm hover:underline"
                             >
                               {comment.profile?.profile_name || 'Anonymous'}

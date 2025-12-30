@@ -26,3 +26,4 @@ bun.lockb
 *.sw?
 
 Song Arts/
+*.tsbuildinfo

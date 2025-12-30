@@ -9,8 +9,6 @@ import {
   generateNonce 
 } from '@/lib/baseWallet';
 
-const ALLOWED_ARTIST_IDS = new Set(['1', '2', '3', '4', '5', '6', '7']);
-
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -56,15 +54,27 @@ Issued At: ${issuedAt}`;
 function resolveArtistIdFromUser(user: User | null) {
   if (!user) return null;
 
-  const metaArtistId = (user.user_metadata as any)?.artist_id as string | undefined;
-  if (metaArtistId && ALLOWED_ARTIST_IDS.has(metaArtistId)) return metaArtistId;
+  const metaArtistIdRaw = (user.user_metadata as any)?.artist_id as string | number | undefined | null;
+  const metaArtistId = metaArtistIdRaw != null ? String(metaArtistIdRaw) : null;
+  if (metaArtistId) return metaArtistId;
 
   const email = user.email || '';
   const match = email.match(/^artist\+(\d+)@/i);
   const fromEmail = match?.[1] || null;
-  if (fromEmail && ALLOWED_ARTIST_IDS.has(fromEmail)) return fromEmail;
+  if (fromEmail) return fromEmail;
 
   return null;
+}
+
+async function fetchArtistIdFromArtistAccounts(userId: string): Promise<string | null> {
+  const { data } = await (supabase as any)
+    .from('artist_accounts')
+    .select('artist_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const artistId = (data as any)?.artist_id;
+  return artistId != null ? String(artistId) : null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -108,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const fetchAudienceProfile = async (userId: string) => {
+  const fetchAudienceProfile = async (userId: string, options?: { skipOnboarding?: boolean }) => {
     const { data } = await supabase
       .from('audience_profiles')
       .select('*')
@@ -117,18 +127,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     if (data) {
       setAudienceProfile(data as AudienceProfile);
-      setNeedsOnboarding(!data.onboarding_completed);
+      setNeedsOnboarding(options?.skipOnboarding ? false : !data.onboarding_completed);
     } else {
       setAudienceProfile(null);
-      setNeedsOnboarding(true);
+      setNeedsOnboarding(options?.skipOnboarding ? false : true);
     }
   };
 
   const refreshProfile = useCallback(async () => {
     if (user) {
-      await fetchAudienceProfile(user.id);
+      await fetchAudienceProfile(user.id, { skipOnboarding: isArtist });
     }
-  }, [user]);
+  }, [isArtist, user]);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -136,9 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        const resolvedArtistId = resolveArtistIdFromUser(session?.user ?? null);
-        setIsArtist(Boolean(resolvedArtistId));
-        setArtistId(resolvedArtistId);
         
         // Extract wallet address from user metadata
         if (session?.user?.user_metadata?.base_wallet_address) {
@@ -148,8 +155,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           // Defer data fetching with setTimeout to prevent deadlock
           setTimeout(() => {
-            fetchUserRole(session.user.id);
-            fetchAudienceProfile(session.user.id);
+            void (async () => {
+              const artistIdFromDb = await fetchArtistIdFromArtistAccounts(session.user.id);
+              const resolvedArtistId = artistIdFromDb ?? resolveArtistIdFromUser(session.user);
+              setIsArtist(Boolean(resolvedArtistId));
+              setArtistId(resolvedArtistId);
+              fetchUserRole(session.user.id);
+              fetchAudienceProfile(session.user.id, { skipOnboarding: Boolean(resolvedArtistId) });
+            })();
           }, 0);
         } else {
           setIsAdmin(false);
@@ -168,17 +181,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      const resolvedArtistId = resolveArtistIdFromUser(session?.user ?? null);
-      setIsArtist(Boolean(resolvedArtistId));
-      setArtistId(resolvedArtistId);
       
       if (session?.user?.user_metadata?.base_wallet_address) {
         setWalletAddress(session.user.user_metadata.base_wallet_address);
       }
       
       if (session?.user) {
-        fetchUserRole(session.user.id);
-        fetchAudienceProfile(session.user.id);
+        void (async () => {
+          const artistIdFromDb = await fetchArtistIdFromArtistAccounts(session.user.id);
+          const resolvedArtistId = artistIdFromDb ?? resolveArtistIdFromUser(session.user);
+          setIsArtist(Boolean(resolvedArtistId));
+          setArtistId(resolvedArtistId);
+          fetchUserRole(session.user.id);
+          fetchAudienceProfile(session.user.id, { skipOnboarding: Boolean(resolvedArtistId) });
+        })();
       }
       
       setIsLoading(false);
@@ -284,6 +300,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setIsAdmin(false);
+    setIsArtist(false);
+    setArtistId(null);
     setAudienceProfile(null);
     setNeedsOnboarding(false);
     setWalletAddress(null);

@@ -82,7 +82,7 @@ export function useSocial() {
       const userIds = [...new Set(postsData.map(p => p.user_id))];
       const postIds = postsData.map(p => p.id);
 
-      const [profilesRes, likesRes, commentsRes, userLikesRes] = await Promise.all([
+      const [profilesRes, likesRes, commentsRes, userLikesRes, artistAccountsRes] = await Promise.all([
         supabase
           .from('audience_profiles')
           .select('*')
@@ -99,7 +99,11 @@ export function useSocial() {
           .from('post_likes')
           .select('post_id')
           .eq('user_id', user.id)
-          .in('post_id', postIds)
+          .in('post_id', postIds),
+        (supabase as any)
+          .from('artist_accounts')
+          .select('user_id, artist_id, is_verified')
+          .in('user_id', userIds)
       ]);
 
       const profilesMap = new Map(
@@ -118,7 +122,19 @@ export function useSocial() {
 
       const userLikedPosts = new Set(userLikesRes.data?.map(l => l.post_id) || []);
 
+      const artistAccountMap = new Map<
+        string,
+        { artist_id: string; is_verified?: boolean | null }
+      >(
+        ((artistAccountsRes as any)?.data as any[] | undefined)?.map(row => [
+          String(row.user_id),
+          { artist_id: String(row.artist_id), is_verified: (row as any).is_verified ?? null },
+        ]) || []
+      );
+
       const enrichedPosts: SocialPostWithProfile[] = postsData.map(post => ({
+        artist_id: artistAccountMap.get(post.user_id)?.artist_id ?? null,
+        artist_is_verified: artistAccountMap.get(post.user_id)?.is_verified ?? null,
         id: post.id,
         user_id: post.user_id,
         content: post.content,

@@ -13,6 +13,7 @@ import { useNotifications, Notification } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { supabase } from '@/integrations/supabase/client';
 
 const notificationIcons = {
   follow: UserPlus,
@@ -37,7 +38,7 @@ function NotificationItem({
   notification: Notification; 
   onRead: (id: string) => void;
   onDelete: (id: string) => void;
-  onNavigate: (notification: Notification) => void;
+  onNavigate: (notification: Notification) => void | Promise<void>;
 }) {
   const Icon = notificationIcons[notification.type];
   const message = notification.message || notificationMessages[notification.type];
@@ -47,7 +48,7 @@ function NotificationItem({
     if (!notification.is_read) {
       onRead(notification.id);
     }
-    onNavigate(notification);
+    void onNavigate(notification);
   };
 
   return (
@@ -114,13 +115,22 @@ export function NotificationDropdown() {
     deleteNotification 
   } = useNotifications();
 
-  const handleNotificationNavigate = (notification: Notification) => {
+  const handleNotificationNavigate = async (notification: Notification) => {
     setOpen(false);
     
     switch (notification.type) {
       case 'follow':
         // Navigate to the follower's profile
         if (notification.from_user_id) {
+          const { data } = await (supabase as any)
+            .from('artist_accounts')
+            .select('artist_id')
+            .eq('user_id', notification.from_user_id)
+            .maybeSingle();
+          if (data?.artist_id) {
+            navigate(`/artist/${data.artist_id}`);
+            return;
+          }
           navigate(`/audience/${notification.from_user_id}`);
         }
         break;

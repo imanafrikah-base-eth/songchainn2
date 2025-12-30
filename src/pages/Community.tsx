@@ -160,7 +160,16 @@ export default function Community() {
     await followUser(userId);
   };
 
-  const goToProfile = (userId: string) => {
+  const goToProfile = async (userId: string) => {
+    const { data } = await (supabase as any)
+      .from('artist_accounts')
+      .select('artist_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (data?.artist_id) {
+      navigate(`/artist/${data.artist_id}`);
+      return;
+    }
     navigate(`/audience/${userId}`);
   };
 
@@ -297,7 +306,7 @@ export default function Community() {
                 className={`group relative glass-card rounded-2xl overflow-hidden cursor-pointer transition-all hover:shadow-float ${
                   viewMode === 'list' ? 'flex items-center' : ''
                 }`}
-                onClick={() => goToProfile(profile.user_id)}
+                onClick={() => void goToProfile(profile.user_id)}
               >
                 {/* Cover Photo / Background */}
                 {viewMode === 'grid' && (

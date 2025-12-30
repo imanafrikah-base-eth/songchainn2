@@ -26,11 +26,15 @@ export function Navigation() {
   const location = useLocation();
   const navigate = useNavigate();
   const { engagementPoints, currentStreak } = useEngagement();
-  const { signOut, walletAddress, user } = useAuth();
+  const { signOut, walletAddress, user, isArtist, artistId } = useAuth();
   const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const [showInvite, setShowInvite] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const roomOnlineCount = useRoomOnlineCount(user?.id);
+  const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
+  const effectiveNavItems = navItems.map((item) =>
+    item.path === '/profile' ? { ...item, path: profilePath } : item
+  );
   
   // Enable swipe gestures for mobile navigation
   useSwipeNavigation();
@@ -76,7 +80,7 @@ export function Navigation() {
 
             {/* Desktop Nav Links - hidden on mobile */}
             <nav className="hidden lg:flex items-center gap-1">
-              {navItems.map((item) => {
+              {effectiveNavItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
                   <Link
@@ -117,7 +121,7 @@ export function Navigation() {
                   animate={{ opacity: 1, scale: 1 }}
                   whileHover={{ scale: 1.05 }}
                   className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl glass text-xs sm:text-sm cursor-pointer"
-                  onClick={() => navigate('/profile')}
+                  onClick={() => navigate(profilePath)}
                   title={walletAddress}
                 >
                   <Wallet className="w-3.5 h-3.5 text-primary" />
@@ -275,7 +279,7 @@ export function Navigation() {
 
               {/* Nav Links */}
               <div className="p-4 space-y-2">
-                {navItems.map((item, index) => {
+                {effectiveNavItems.map((item, index) => {
                   const isActive = location.pathname === item.path;
                   return (
                     <motion.button

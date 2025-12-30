@@ -19,8 +19,12 @@ export function BottomTabBar() {
   const location = useLocation();
   const playerState = useSafePlayerState();
   const currentSong = playerState?.currentSong;
-  const { user } = useAuth();
+  const { user, isArtist, artistId } = useAuth();
   const roomOnlineCount = useRoomOnlineCount(user?.id);
+  const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
+  const effectiveTabItems = tabItems.map((item) =>
+    item.path === '/profile' ? { ...item, path: profilePath } : item
+  );
 
   // Hide tab bar when music is playing - player takes its place
   if (currentSong) return null;
@@ -39,7 +43,7 @@ export function BottomTabBar() {
         {/* Glass background with blur */}
         <div className="glass-surface border-t border-border/50 pb-safe">
           <div className="flex items-center justify-around h-16 px-2">
-            {tabItems.map((item) => {
+            {effectiveTabItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <Link

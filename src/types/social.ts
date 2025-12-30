@@ -15,6 +15,8 @@ export interface SocialPost {
 
 export interface SocialPostWithProfile extends SocialPost {
   profile?: AudienceProfile;
+  artist_id?: string | null;
+  artist_is_verified?: boolean | null;
   likes_count: number;
   comments_count: number;
   is_liked: boolean;

@@ -29,7 +29,7 @@ import { toast } from '@/hooks/use-toast';
 export default function AudienceProfile() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
-  const { user, audienceProfile: myProfile } = useAuth();
+  const { user, audienceProfile: myProfile, isArtist, artistId } = useAuth();
   const {
     posts,
     isLoading: postsLoading,
@@ -249,7 +249,7 @@ export default function AudienceProfile() {
             <Button
               variant="outline"
               className="mt-6"
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate(isArtist && artistId ? `/artist/${artistId}` : '/profile')}
             >
               Edit Profile
             </Button>

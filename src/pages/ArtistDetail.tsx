@@ -1,11 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Headphones, Heart, Users, Share2, Copy, Check, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Headphones, Heart, Users, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2 } from 'lucide-react';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { SongCard } from '@/components/SongCard';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useAuth } from '@/context/AuthContext';
 import { useSongPopularity } from '@/hooks/usePopularity';
@@ -13,6 +15,10 @@ import { useShare } from '@/hooks/useShare';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useSocial } from '@/hooks/useSocial';
+import { PostComposer } from '@/components/social/PostComposer';
+import { PostCard } from '@/components/social/PostCard';
+import type { SocialPostWithProfile } from '@/types/social';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,15 +29,24 @@ import { toast } from 'sonner';
 
 export default function ArtistDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isArtist, artistId } = useAuth();
   const { isArtistLiked, toggleLikeArtist } = useAudienceInteractions();
   const { data: popularityData } = useSongPopularity();
   const { copyToClipboard, getShareUrl, shareToX, nativeShare, copied } = useShare();
   const queryClient = useQueryClient();
+  const {
+    createPost,
+    deletePost,
+    toggleLikePost,
+    followUser,
+    isFollowing: isFollowingUser,
+    getPostComments,
+    addComment,
+  } = useSocial();
   
   const artist = ARTISTS.find(a => a.id === id);
   const artistSongs = SONGS.filter(s => s.artistId === id);
-  const isFollowing = id ? isArtistLiked(id) : false;
+  const isFollowingArtist = id ? isArtistLiked(id) : false;
 
   const { data: artistAccount } = useQuery({
     queryKey: ['artist-account', id],
@@ -49,10 +64,49 @@ export default function ArtistDetail() {
     staleTime: 1000 * 10,
   });
 
+  const shouldAutoCreateArtistAccount = !!id && !!user && isArtist && artistId === id;
+
+  useEffect(() => {
+    if (!shouldAutoCreateArtistAccount) return;
+    if (artistAccount?.user_id) return;
+
+    let cancelled = false;
+
+    const upsertArtistAccount = async () => {
+      const { error } = await (supabase as any)
+        .from('artist_accounts')
+        .upsert(
+          {
+            artist_id: id,
+            user_id: user.id,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'artist_id' }
+        );
+
+      if (cancelled) return;
+      if (error) return;
+
+      queryClient.invalidateQueries({ queryKey: ['artist-account', id] });
+    };
+
+    upsertArtistAccount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [artistAccount?.user_id, id, queryClient, shouldAutoCreateArtistAccount, user?.id]);
+
+  const ownerUserId = useMemo(() => {
+    if (artistAccount?.user_id) return artistAccount.user_id;
+    if (shouldAutoCreateArtistAccount && user) return user.id;
+    return null;
+  }, [artistAccount?.user_id, shouldAutoCreateArtistAccount, user]);
+
   const { data: artistProfile } = useQuery({
-    queryKey: ['artist-public-profile', artistAccount?.user_id],
+    queryKey: ['artist-public-profile', ownerUserId],
     queryFn: async () => {
-      const userId = artistAccount?.user_id;
+      const userId = ownerUserId;
       if (!userId) return null;
       const { data } = await supabase
         .from('audience_profiles')
@@ -61,28 +115,38 @@ export default function ArtistDetail() {
         .maybeSingle();
       return (data as any) ?? null;
     },
-    enabled: !!artistAccount?.user_id,
+    enabled: !!ownerUserId,
     staleTime: 1000 * 10,
   });
 
   const displayName = (artistProfile as any)?.profile_name || artist?.name;
   const displayBio = (artistProfile as any)?.bio || artist?.bio;
   const displayProfileImage = (artistProfile as any)?.profile_picture_url || artist?.profileImage;
-  const isOwner = !!user && !!artistAccount?.user_id && user.id === artistAccount.user_id;
+  const displayCoverPhoto = (artistProfile as any)?.cover_photo_url || null;
+  const isOwner = !!user && !!ownerUserId && user.id === ownerUserId;
   const isVerified = artistAccount?.is_verified ?? true;
   const profileTheme = (artistAccount?.profile_theme || 'default').toLowerCase();
 
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
+  const [isUploadingCoverPhoto, setIsUploadingCoverPhoto] = useState(false);
   const profilePictureObjectUrlRef = useRef<string | null>(null);
+  const coverPhotoObjectUrlRef = useRef<string | null>(null);
+  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileNameDraft, setProfileNameDraft] = useState('');
+  const [bioDraft, setBioDraft] = useState('');
 
   const uploadProfilePicture = useCallback(async (file: File) => {
-    if (!artistAccount?.user_id) return;
+    if (!ownerUserId) return;
 
     setIsUploadingProfilePicture(true);
     try {
       const extRaw = file.name.split('.').pop() || '';
       const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
-      const path = `artists/${artistAccount.user_id}/profile-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+      const path = `artists/${ownerUserId}/profile-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
       const uploadRes = await supabase.storage
         .from('artist-posts')
         .upload(path, file, { contentType: file.type, upsert: true });
@@ -93,14 +157,14 @@ export default function ArtistDetail() {
       const { error: updateError } = await supabase
         .from('audience_profiles')
         .update({ profile_picture_url: publicUrl })
-        .eq('user_id', artistAccount.user_id);
+        .eq('user_id', ownerUserId);
       if (updateError) throw updateError;
 
-      queryClient.setQueryData(['artist-public-profile', artistAccount.user_id], (prev: any) => {
+      queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
         if (!prev) return prev;
         return { ...prev, profile_picture_url: publicUrl };
       });
-      queryClient.invalidateQueries({ queryKey: ['artist-public-profile', artistAccount.user_id] });
+      queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
       queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
       toast.success('Profile picture updated');
     } catch (err: any) {
@@ -108,13 +172,52 @@ export default function ArtistDetail() {
     } finally {
       setIsUploadingProfilePicture(false);
     }
-  }, [artistAccount?.user_id, queryClient]);
+  }, [ownerUserId, queryClient]);
+
+  const uploadCoverPhoto = useCallback(async (file: File) => {
+    if (!ownerUserId) return;
+
+    setIsUploadingCoverPhoto(true);
+    try {
+      const extRaw = file.name.split('.').pop() || '';
+      const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
+      const path = `artists/${ownerUserId}/cover-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+      const uploadRes = await supabase.storage
+        .from('artist-posts')
+        .upload(path, file, { contentType: file.type, upsert: true });
+      if (uploadRes.error) throw uploadRes.error;
+
+      const publicUrl = supabase.storage.from('artist-posts').getPublicUrl(path).data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from('audience_profiles')
+        .update({ cover_photo_url: publicUrl })
+        .eq('user_id', ownerUserId);
+      if (updateError) throw updateError;
+
+      queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
+        if (!prev) return prev;
+        return { ...prev, cover_photo_url: publicUrl };
+      });
+      queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
+      queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
+      toast.success('Cover photo updated');
+    } catch (err: any) {
+      toast.error('Failed to update cover photo', { description: err?.message });
+    } finally {
+      setIsUploadingCoverPhoto(false);
+    }
+  }, [ownerUserId, queryClient]);
 
   useEffect(() => {
     return () => {
       if (profilePictureObjectUrlRef.current) {
         URL.revokeObjectURL(profilePictureObjectUrlRef.current);
         profilePictureObjectUrlRef.current = null;
+      }
+      if (coverPhotoObjectUrlRef.current) {
+        URL.revokeObjectURL(coverPhotoObjectUrlRef.current);
+        coverPhotoObjectUrlRef.current = null;
       }
     };
   }, []);
@@ -124,6 +227,8 @@ export default function ArtistDetail() {
     e.target.value = '';
     if (!file) return;
     if (!isOwner) return;
+    const userId = ownerUserId;
+    if (!userId) return;
 
     if (file.size > 10 * 1024 * 1024) {
       toast.error('Image too large', { description: 'Max size is 10MB.' });
@@ -135,13 +240,89 @@ export default function ArtistDetail() {
       profilePictureObjectUrlRef.current = null;
     }
     profilePictureObjectUrlRef.current = URL.createObjectURL(file);
-    queryClient.setQueryData(['artist-public-profile', artistAccount.user_id], (prev: any) => {
+    queryClient.setQueryData(['artist-public-profile', userId], (prev: any) => {
       if (!prev) return prev;
       return { ...prev, profile_picture_url: profilePictureObjectUrlRef.current };
     });
 
     await uploadProfilePicture(file);
-  }, [artistAccount?.user_id, isOwner, queryClient, uploadProfilePicture]);
+  }, [isOwner, ownerUserId, queryClient, uploadProfilePicture]);
+
+  const handleCoverPhotoChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!isOwner) return;
+    const userId = ownerUserId;
+    if (!userId) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image too large', { description: 'Max size is 10MB.' });
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid file', { description: 'Please select an image file.' });
+      return;
+    }
+
+    if (coverPhotoObjectUrlRef.current) {
+      URL.revokeObjectURL(coverPhotoObjectUrlRef.current);
+      coverPhotoObjectUrlRef.current = null;
+    }
+    coverPhotoObjectUrlRef.current = URL.createObjectURL(file);
+    queryClient.setQueryData(['artist-public-profile', userId], (prev: any) => {
+      if (!prev) return prev;
+      return { ...prev, cover_photo_url: coverPhotoObjectUrlRef.current };
+    });
+
+    await uploadCoverPhoto(file);
+  }, [isOwner, ownerUserId, queryClient, uploadCoverPhoto]);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    if (isEditingProfile) return;
+    setProfileNameDraft(((artistProfile as any)?.profile_name || artist?.name || '').toString());
+    setBioDraft(((artistProfile as any)?.bio || artist?.bio || '').toString());
+  }, [artist?.bio, artist?.name, artistProfile, isEditingProfile, isOwner]);
+
+  const saveProfile = useCallback(async () => {
+    if (!isOwner) return;
+    if (!ownerUserId) return;
+    const nextName = profileNameDraft.trim();
+    if (!nextName) {
+      toast.error('Name is required');
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('audience_profiles')
+        .upsert(
+          {
+            user_id: ownerUserId,
+            profile_name: nextName,
+            bio: bioDraft.trim() || null,
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: 'user_id' }
+        );
+      if (error) throw error;
+
+      queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
+        if (!prev) return prev;
+        return { ...prev, profile_name: nextName, bio: bioDraft.trim() || null };
+      });
+      queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
+      queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
+      setIsEditingProfile(false);
+      toast.success('Artist page updated');
+    } catch (err: any) {
+      toast.error('Failed to update artist page', { description: err?.message });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }, [bioDraft, isOwner, ownerUserId, profileNameDraft, queryClient]);
 
   const updateProfileTheme = useCallback(async (nextTheme: string) => {
     if (!id) return;
@@ -212,6 +393,101 @@ export default function ArtistDetail() {
     queryClient.invalidateQueries({ queryKey: ['artist-followers', id] });
     queryClient.invalidateQueries({ queryKey: ['all-artist-followers'] });
   };
+
+  const timelineUserId = ownerUserId;
+
+  const { data: timelinePosts = [], isLoading: isTimelineLoading } = useQuery({
+    queryKey: ['artist-timeline-posts', timelineUserId, user?.id],
+    queryFn: async (): Promise<SocialPostWithProfile[]> => {
+      if (!timelineUserId) return [];
+
+      const { data: postsData } = await supabase
+        .from('social_posts')
+        .select('*')
+        .eq('user_id', timelineUserId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const rows = (postsData as any[]) || [];
+      if (rows.length === 0) return [];
+
+      const postIds = rows.map((p) => p.id);
+
+      const [profileRes, likesRes, commentsRes, userLikesRes] = await Promise.all([
+        supabase
+          .from('audience_profiles')
+          .select('*')
+          .eq('user_id', timelineUserId)
+          .maybeSingle(),
+        supabase
+          .from('post_likes')
+          .select('post_id')
+          .in('post_id', postIds),
+        supabase
+          .from('post_comments')
+          .select('post_id')
+          .in('post_id', postIds),
+        user
+          ? supabase
+              .from('post_likes')
+              .select('post_id')
+              .eq('user_id', user.id)
+              .in('post_id', postIds)
+          : Promise.resolve({ data: [] } as any),
+      ]);
+
+      const likesCount = new Map<string, number>();
+      likesRes.data?.forEach((l) => {
+        likesCount.set(l.post_id, (likesCount.get(l.post_id) || 0) + 1);
+      });
+
+      const commentsCount = new Map<string, number>();
+      commentsRes.data?.forEach((c) => {
+        commentsCount.set(c.post_id, (commentsCount.get(c.post_id) || 0) + 1);
+      });
+
+      const userLikedPosts = new Set<string>((userLikesRes.data || []).map((l: any) => l.post_id));
+
+      return rows.map((post) => ({
+        artist_id: id ?? null,
+        artist_is_verified: isVerified,
+        id: post.id,
+        user_id: post.user_id,
+        content: post.content,
+        song_id: post.song_id,
+        playlist_id: post.playlist_id,
+        image_url: (post as any).image_url ?? null,
+        image_path: (post as any).image_path ?? null,
+        post_type: post.post_type as SocialPostWithProfile['post_type'],
+        created_at: post.created_at,
+        updated_at: post.updated_at,
+        profile: (profileRes.data as any) || undefined,
+        likes_count: likesCount.get(post.id) || 0,
+        comments_count: commentsCount.get(post.id) || 0,
+        is_liked: userLikedPosts.has(post.id),
+      }));
+    },
+    enabled: !!timelineUserId,
+    staleTime: 1000 * 10,
+  });
+
+  useEffect(() => {
+    if (!timelineUserId) return;
+    const channel = supabase
+      .channel(`artist-timeline-${timelineUserId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'social_posts', filter: `user_id=eq.${timelineUserId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['artist-timeline-posts', timelineUserId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, timelineUserId]);
 
   // Calculate real stats from database
   const artistStats = useMemo(() => {
@@ -295,6 +571,39 @@ export default function ArtistDetail() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-10"
         >
+          <div className="relative h-48 md:h-64 rounded-3xl overflow-hidden mb-8 bg-gradient-to-br from-primary/20 to-background">
+            <input
+              ref={coverPhotoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCoverPhotoChange}
+              disabled={isUploadingCoverPhoto}
+              className="hidden"
+            />
+            {displayCoverPhoto && (
+              <img
+                src={displayCoverPhoto}
+                alt="Cover"
+                className="w-full h-full object-cover"
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
+            {isOwner && (
+              <div className="absolute top-3 right-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  disabled={isUploadingCoverPhoto}
+                  onClick={() => coverPhotoInputRef.current?.click()}
+                  className="bg-background/80 backdrop-blur"
+                >
+                  {isUploadingCoverPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                </Button>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-col md:flex-row gap-8 items-start">
             {/* Profile Image */}
             <div className="w-48 flex-shrink-0">
@@ -316,13 +625,23 @@ export default function ArtistDetail() {
               {isOwner && (
                 <div className="mt-3 space-y-2">
                   <input
-                    id="artist-profile-picture-upload"
+                    ref={profilePictureInputRef}
                     type="file"
                     accept="image/*"
                     onChange={handleProfilePictureChange}
                     disabled={isUploadingProfilePicture}
-                    className="w-full text-sm"
+                    className="hidden"
                   />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    disabled={isUploadingProfilePicture}
+                    onClick={() => profilePictureInputRef.current?.click()}
+                  >
+                    {isUploadingProfilePicture ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Camera className="w-4 h-4 mr-2" />}
+                    Change Photo
+                  </Button>
                 </div>
               )}
             </div>
@@ -330,19 +649,33 @@ export default function ArtistDetail() {
             {/* Info */}
             <div className="flex-1">
               <div className="flex items-start justify-between gap-4 mb-2">
-                <h1 className="font-heading text-4xl font-bold text-foreground">
-                  <span className="inline-flex items-center gap-2">
-                    <span>{displayName}</span>
-                    {isVerified && <CheckCircle2 className="w-5 h-5 text-yellow-400" />}
-                  </span>
-                </h1>
+                <div className="flex-1 min-w-0">
+                  {isOwner && isEditingProfile ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={profileNameDraft}
+                        onChange={(e) => setProfileNameDraft(e.target.value)}
+                        maxLength={50}
+                        className="font-heading text-2xl md:text-4xl font-bold"
+                        disabled={isSavingProfile}
+                      />
+                    </div>
+                  ) : (
+                    <h1 className="font-heading text-4xl font-bold text-foreground">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="truncate">{displayName}</span>
+                        {isVerified && <CheckCircle2 className="w-5 h-5 text-yellow-400" />}
+                      </span>
+                    </h1>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {user && (
                     <Button
                       onClick={handleToggleFollow}
-                      variant={isFollowing ? "secondary" : "default"}
+                      variant={isFollowingArtist ? "secondary" : "default"}
                     >
-                      {isFollowing ? (
+                      {isFollowingArtist ? (
                         <>
                           <UserCheck className="w-4 h-4 mr-2" />
                           Following
@@ -355,20 +688,43 @@ export default function ArtistDetail() {
                       )}
                     </Button>
                   )}
-                  {artistAccount?.user_id && (
-                    <Button variant="outline" asChild>
-                      <Link to={`/audience/${artistAccount.user_id}`}>Social</Link>
-                    </Button>
-                  )}
                   {isOwner && (
                     <>
-                      <Button variant="outline" asChild>
-                        <Link to="/profile">Edit Profile</Link>
-                      </Button>
+                      {isEditingProfile ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            disabled={isSavingProfile}
+                            onClick={() => {
+                              setIsEditingProfile(false);
+                              setProfileNameDraft(((artistProfile as any)?.profile_name || artist?.name || '').toString());
+                              setBioDraft(((artistProfile as any)?.bio || artist?.bio || '').toString());
+                            }}
+                          >
+                            <XIcon className="w-4 h-4 mr-2" />
+                            Cancel
+                          </Button>
+                          <Button
+                            disabled={isSavingProfile}
+                            onClick={() => void saveProfile()}
+                          >
+                            {isSavingProfile ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            Save
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsEditingProfile(true)}
+                        >
+                          <Edit3 className="w-4 h-4 mr-2" />
+                          Edit
+                        </Button>
+                      )}
                       <select
                         value={profileTheme}
                         onChange={(e) => void updateProfileTheme(e.target.value)}
-                        disabled={isUploadingProfilePicture}
+                        disabled={isUploadingProfilePicture || isUploadingCoverPhoto || isSavingProfile}
                         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                       >
                         <option value="default">Default</option>
@@ -417,9 +773,25 @@ export default function ArtistDetail() {
                 </div>
               </div>
 
-              <p className="text-muted-foreground mb-6 max-w-2xl">
-                {displayBio}
-              </p>
+              {isOwner && isEditingProfile ? (
+                <div className="mb-6 max-w-2xl space-y-2">
+                  <Textarea
+                    value={bioDraft}
+                    onChange={(e) => setBioDraft(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    disabled={isSavingProfile}
+                    placeholder="Tell listeners about you..."
+                  />
+                  <div className="text-xs text-muted-foreground text-right">
+                    {bioDraft.length}/500
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground mb-6 max-w-2xl">
+                  {displayBio}
+                </p>
+              )}
 
               {/* Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -461,16 +833,62 @@ export default function ArtistDetail() {
           </div>
         </motion.section>
 
+        <section className="mb-10">
+          <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Timeline</h2>
+          {isOwner && (
+            <PostComposer
+              onPost={async (content, type, songId, image) => {
+                await createPost(content, type, songId, undefined, image);
+                if (timelineUserId) {
+                  queryClient.invalidateQueries({ queryKey: ['artist-timeline-posts', timelineUserId] });
+                }
+              }}
+            />
+          )}
+          <div className="mt-4 space-y-4">
+            {isTimelineLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : timelinePosts.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                No posts yet.
+              </div>
+            ) : (
+              timelinePosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onLike={toggleLikePost}
+                  onDelete={deletePost}
+                  onFollow={followUser}
+                  isFollowing={timelineUserId ? isFollowingUser(timelineUserId) : false}
+                  onGetComments={getPostComments}
+                  onAddComment={addComment}
+                />
+              ))
+            )}
+          </div>
+        </section>
+
         {/* Songs */}
         <section>
           <h2 className="font-heading text-xl font-semibold text-foreground mb-6">
-            Discography
+            {isOwner ? 'My Music' : 'Discography'}
           </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {artistSongs.map((song, index) => (
-              <SongCard key={song.id} song={song} index={index} />
-            ))}
-          </div>
+          {isOwner ? (
+            <div className="space-y-2">
+              {artistSongs.map((song, index) => (
+                <SongCard key={song.id} song={song} index={index} variant="compact" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {artistSongs.map((song, index) => (
+                <SongCard key={song.id} song={song} index={index} />
+              ))}
+            </div>
+          )}
         </section>
       </main>
 

@@ -35,6 +35,8 @@ interface MusicFeedCardProps {
   onLike: (postId: string) => void;
   onFollow: (userId: string) => void;
   isFollowing: boolean;
+  onFollowArtist?: (artistId: string) => void;
+  isFollowingArtist?: boolean;
   onComment: () => void;
   isVisible?: boolean;
 }
@@ -44,6 +46,8 @@ export function MusicFeedCard({
   onLike, 
   onFollow, 
   isFollowing,
+  onFollowArtist,
+  isFollowingArtist = false,
   onComment,
   isVisible = true
 }: MusicFeedCardProps) {
@@ -56,6 +60,8 @@ export function MusicFeedCard({
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
   const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
+  const postArtist = post.artist_id ? ARTISTS.find(a => a.id === post.artist_id) : null;
+  const displayName = post.profile?.profile_name || postArtist?.name || 'Anonymous';
   const isOwnPost = user?.id === post.user_id;
   const isThisSongPlaying = currentSong?.id === song?.id && isPlaying;
   const isWelcomePost = post.post_type === 'welcome';
@@ -119,6 +125,10 @@ export function MusicFeedCard({
   };
 
   const goToProfile = () => {
+    if (post.artist_id) {
+      navigate(`/artist/${post.artist_id}`);
+      return;
+    }
     navigate(`/audience/${post.user_id}`);
   };
 

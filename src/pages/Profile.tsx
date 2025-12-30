@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Edit3, Save, X as XIcon, ExternalLink, Heart, ListMusic, Loader2, Gift, Star, Users } from 'lucide-react';
+import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,8 @@ import { Navigation } from '@/components/Navigation';
 import { SONGS } from '@/data/musicData';
 import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
+import { Link, Navigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 
 // X (Twitter) and Base icons
 const XTwitterIcon = () => (
@@ -29,11 +31,15 @@ const BaseIcon = () => (
 );
 
 export default function Profile() {
-  const { user, audienceProfile, refreshProfile } = useAuth();
+  const { user, audienceProfile, refreshProfile, isArtist, artistId } = useAuth();
   const { likedSongs, playlists } = useAudienceInteractions();
   const { points, completedReferrals, shareInviteLink } = useReferrals();
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
+  const [isUploadingCoverPhoto, setIsUploadingCoverPhoto] = useState(false);
   
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -51,6 +57,90 @@ export default function Profile() {
       setBaseProfileLink(audienceProfile.base_profile_link || '');
     }
   }, [audienceProfile]);
+
+  const uploadAndUpdateProfileImage = useCallback(
+    async (file: File, field: 'profile_picture_url' | 'cover_photo_url') => {
+      if (!user) return;
+      if (!isArtist) {
+        toast({ title: 'Only artists can change images right now', variant: 'destructive' });
+        return;
+      }
+
+      const extRaw = file.name.split('.').pop() || '';
+      const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
+      const kind = field === 'profile_picture_url' ? 'profile' : 'cover';
+      const path = `artists/${user.id}/${kind}-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+
+      const uploadRes = await supabase.storage
+        .from('artist-posts')
+        .upload(path, file, { contentType: file.type, upsert: true });
+      if (uploadRes.error) throw uploadRes.error;
+
+      const publicUrl = supabase.storage.from('artist-posts').getPublicUrl(path).data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from('audience_profiles')
+        .update({ [field]: publicUrl } as any)
+        .eq('user_id', user.id);
+      if (updateError) throw updateError;
+
+      await refreshProfile();
+      toast({ title: field === 'profile_picture_url' ? 'Profile picture updated!' : 'Cover photo updated!' });
+    },
+    [isArtist, refreshProfile, toast, user]
+  );
+
+  const handleProfilePictureChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: 'Image too large (max 10MB)', variant: 'destructive' });
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast({ title: 'Please select an image file', variant: 'destructive' });
+        return;
+      }
+
+      setIsUploadingProfilePicture(true);
+      try {
+        await uploadAndUpdateProfileImage(file, 'profile_picture_url');
+      } catch (err: any) {
+        toast({ title: 'Failed to update profile picture', variant: 'destructive' });
+      } finally {
+        setIsUploadingProfilePicture(false);
+      }
+    },
+    [toast, uploadAndUpdateProfileImage]
+  );
+
+  const handleCoverPhotoChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: 'Image too large (max 10MB)', variant: 'destructive' });
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast({ title: 'Please select an image file', variant: 'destructive' });
+        return;
+      }
+
+      setIsUploadingCoverPhoto(true);
+      try {
+        await uploadAndUpdateProfileImage(file, 'cover_photo_url');
+      } catch (err: any) {
+        toast({ title: 'Failed to update cover photo', variant: 'destructive' });
+      } finally {
+        setIsUploadingCoverPhoto(false);
+      }
+    },
+    [toast, uploadAndUpdateProfileImage]
+  );
 
   const handleSave = async () => {
     if (!user || !profileName.trim()) {
@@ -84,6 +174,25 @@ export default function Profile() {
   };
 
   const likedSongsData = SONGS.filter(s => likedSongs.includes(s.id));
+  const artistSongsData = isArtist && artistId ? SONGS.filter(s => s.artistId === artistId) : [];
+  const { data: artistFollowerCount = 0 } = useQuery({
+    queryKey: ['artist-followers', artistId],
+    queryFn: async () => {
+      if (!artistId) return 0;
+      const { data, error } = await supabase.rpc('get_artist_follower_count', { p_artist_id: artistId });
+      if (error) return 0;
+      const raw = data as any;
+      const parsed = typeof raw === 'string' ? Number(raw) : (raw ?? 0);
+      return Number.isFinite(parsed) ? parsed : 0;
+    },
+    enabled: !!isArtist && !!artistId,
+    staleTime: 1000 * 10,
+    refetchInterval: 15000,
+  });
+
+  if (isArtist && artistId) {
+    return <Navigate to={`/artist/${artistId}`} replace />;
+  }
 
   if (!audienceProfile) {
     return (
@@ -97,6 +206,13 @@ export default function Profile() {
     <div className="min-h-screen bg-background pb-32">
       {/* Cover Photo */}
       <div className="relative h-48 bg-gradient-to-br from-primary/30 to-primary/10">
+        <input
+          ref={coverPhotoInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleCoverPhotoChange}
+          className="hidden"
+        />
         {audienceProfile.cover_photo_url && (
           <img
             src={audienceProfile.cover_photo_url}
@@ -104,12 +220,33 @@ export default function Profile() {
             className="w-full h-full object-cover"
           />
         )}
+        {isArtist && (
+          <div className="absolute top-3 right-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              disabled={isUploadingCoverPhoto}
+              onClick={() => coverPhotoInputRef.current?.click()}
+              className="bg-background/80 backdrop-blur"
+            >
+              {isUploadingCoverPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="px-4 -mt-16 max-w-2xl mx-auto">
         {/* Profile Picture & Info */}
         <div className="flex items-end gap-4 mb-6">
           <div className="relative">
+            <input
+              ref={profilePictureInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleProfilePictureChange}
+              className="hidden"
+            />
             <div className="w-28 h-28 rounded-full border-4 border-background overflow-hidden bg-secondary">
               {audienceProfile.profile_picture_url ? (
                 <img
@@ -123,6 +260,18 @@ export default function Profile() {
                 </div>
               )}
             </div>
+            {isArtist && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                disabled={isUploadingProfilePicture}
+                onClick={() => profilePictureInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 rounded-full bg-background/90 backdrop-blur"
+              >
+                {isUploadingProfilePicture ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              </Button>
+            )}
           </div>
 
           <div className="flex-1">
@@ -138,7 +287,14 @@ export default function Profile() {
                 {audienceProfile.profile_name}
               </h1>
             )}
-            <p className="text-sm text-muted-foreground">Audience Member</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">{isArtist ? 'Artist' : 'Audience Member'}</p>
+              {isArtist && artistId && (
+                <Link to={`/artist/${artistId}`} className="text-sm text-primary hover:underline">
+                  View Artist Page
+                </Link>
+              )}
+            </div>
           </div>
 
           <div>
@@ -248,8 +404,35 @@ export default function Profile() {
           </div>
         )}
 
+        {isArtist && artistSongsData.length > 0 && (
+          <div className="mb-8">
+            <h2 className="font-heading text-lg font-semibold text-foreground mb-4">My Music</h2>
+            <div className="space-y-2">
+              {artistSongsData.map(song => (
+                <Link
+                  key={song.id}
+                  to={`/song/${song.id}`}
+                  className="flex items-center gap-3 p-3 bg-card border border-border rounded-xl hover:bg-card/70 transition-colors"
+                >
+                  <img
+                    src={song.coverImage}
+                    alt={song.title}
+                    className="w-12 h-12 rounded-lg object-cover"
+                    loading="lazy"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{song.title}</p>
+                    <p className="text-sm text-muted-foreground truncate">{song.townSquare}</p>
+                  </div>
+                  <ListMusic className="w-4 h-4 text-muted-foreground" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Activity Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <Heart className="w-5 h-5 mx-auto text-primary mb-2" />
             <p className="text-2xl font-bold text-foreground">{likedSongs.length}</p>
@@ -260,6 +443,13 @@ export default function Profile() {
             <p className="text-2xl font-bold text-foreground">{playlists.length}</p>
             <p className="text-sm text-muted-foreground">Playlists</p>
           </div>
+          {isArtist && (
+            <div className="bg-card border border-border rounded-xl p-4 text-center">
+              <Users className="w-5 h-5 mx-auto text-primary mb-2" />
+              <p className="text-2xl font-bold text-foreground">{artistFollowerCount.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">Followers</p>
+            </div>
+          )}
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <Star className="w-5 h-5 mx-auto text-primary mb-2" />
             <p className="text-2xl font-bold text-foreground">{points?.total_points || 0}</p>

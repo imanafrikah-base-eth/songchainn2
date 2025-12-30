@@ -131,7 +131,7 @@ export default function Social() {
           return;
         }
 
-        const [profileRes, likesRes, commentsRes, userLikeRes] = await Promise.all([
+        const [profileRes, likesRes, commentsRes, userLikeRes, artistAccountRes] = await Promise.all([
           supabase
             .from('audience_profiles')
             .select('*')
@@ -151,10 +151,17 @@ export default function Social() {
                 .select('post_id')
                 .eq('user_id', user.id)
                 .eq('post_id', postData.id)
-            : Promise.resolve({ data: [] } as any)
+            : Promise.resolve({ data: [] } as any),
+          (supabase as any)
+            .from('artist_accounts')
+            .select('artist_id, is_verified')
+            .eq('user_id', postData.user_id)
+            .maybeSingle()
         ]);
 
         const enrichedPost: SocialPostWithProfile = {
+          artist_id: (artistAccountRes as any)?.data?.artist_id ?? null,
+          artist_is_verified: (artistAccountRes as any)?.data?.is_verified ?? null,
           id: postData.id,
           user_id: postData.user_id,
           content: postData.content,
@@ -214,7 +221,16 @@ export default function Social() {
     }
   }, [currentPostIndex, filteredPosts.length, sharedPostId]);
 
-  const goToProfile = (userId: string) => {
+  const goToProfile = async (userId: string) => {
+    const { data } = await (supabase as any)
+      .from('artist_accounts')
+      .select('artist_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (data?.artist_id) {
+      navigate(`/artist/${data.artist_id}`);
+      return;
+    }
     navigate(`/audience/${userId}`);
   };
 
@@ -293,7 +309,7 @@ export default function Social() {
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted transition-colors cursor-pointer"
-                            onClick={() => goToProfile(profile.user_id)}
+                            onClick={() => void goToProfile(profile.user_id)}
                           >
                             <Avatar className="w-12 h-12">
                               <AvatarImage src={profile.profile_picture_url || ''} />

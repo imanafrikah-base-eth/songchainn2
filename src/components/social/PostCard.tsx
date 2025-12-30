@@ -8,6 +8,7 @@ import { SONGS, ARTISTS } from '@/data/musicData';
 import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { Input } from '@/components/ui/input';
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +39,7 @@ export function PostCard({
 }: PostCardProps) {
   const { user } = useAuth();
   const { playSong } = usePlayer();
+  const navigate = useNavigate();
   const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard, shareToX } = useShare();
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -46,7 +48,17 @@ export function PostCard({
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
   const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
+  const postArtist = post.artist_id ? ARTISTS.find(a => a.id === post.artist_id) : null;
+  const displayName = post.profile?.profile_name || postArtist?.name || 'Anonymous';
   const isOwnPost = user?.id === post.user_id;
+
+  const goToProfile = () => {
+    if (post.artist_id) {
+      navigate(`/artist/${post.artist_id}`);
+      return;
+    }
+    navigate(`/audience/${post.user_id}`);
+  };
 
   const handleShare = () => {
     if (song && artist) {
@@ -106,17 +118,17 @@ export function PostCard({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10">
+          <Avatar className="w-10 h-10 cursor-pointer" onClick={goToProfile}>
             <AvatarImage src={post.profile?.profile_picture_url || ''} />
             <AvatarFallback className="bg-primary/20 text-primary">
-              {post.profile?.profile_name?.charAt(0) || '?'}
+              {displayName.charAt(0) || '?'}
             </AvatarFallback>
           </Avatar>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-foreground">
-                {post.profile?.profile_name || 'Anonymous'}
-              </span>
+              <button type="button" className="font-semibold text-foreground hover:underline" onClick={goToProfile}>
+                {displayName}
+              </button>
               {!isOwnPost && (
                 <Button
                   variant="ghost"
