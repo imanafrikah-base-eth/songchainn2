@@ -109,6 +109,20 @@ export default function Room() {
   const typingTimeoutRef = useRef<number | null>(null);
   const typingSentRef = useRef(false);
 
+  const broadcastRoomMessage = useCallback((message: RoomMessage) => {
+    const channel = presenceChannelRef.current;
+    if (!channel) return;
+    channel
+      .send({
+        type: 'broadcast',
+        event: 'message',
+        payload: message,
+      })
+      .catch(() => {
+        void 0;
+      });
+  }, []);
+
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
@@ -310,6 +324,18 @@ export default function Room() {
       });
     });
 
+    channel.on('broadcast', { event: 'message' }, payload => {
+      const next = (payload as any)?.payload as RoomMessage | undefined;
+      if (!next?.id) return;
+      setMessages(prev => {
+        if (prev.some(m => m.id === next.id)) return prev;
+        const updated = [...prev, next];
+        if (updated.length > 50) updated.shift();
+        if (chatBackend === 'local') persistLocalMessages(updated);
+        return updated;
+      });
+    });
+
     channel.subscribe(async status => {
       if (status !== 'SUBSCRIBED') return;
       const storedNameRaw = localStorage.getItem(`room_username:${user.id}`) || '';
@@ -330,7 +356,32 @@ export default function Room() {
       presenceChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [roomName, user]);
+  }, [chatBackend, persistLocalMessages, roomName, user]);
+
+  const mergeRecentMessages = useCallback((incoming: RoomMessage[]) => {
+    setMessages(prev => {
+      const byId = new Map<string, RoomMessage>();
+      for (const m of prev) byId.set(m.id, m);
+      for (const m of incoming) byId.set(m.id, m);
+      const merged = [...byId.values()]
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .slice(-50);
+      return merged;
+    });
+  }, []);
+
+  const fetchRecentMessages = useCallback(async () => {
+    const cutoffIso = new Date(Date.now() - ROOM_TTL_MS).toISOString();
+    const messagesRes = await (supabase as any)
+      .from('room_messages')
+      .select('id, user_id, room_name, message, created_at, reply_to_message_id')
+      .gte('created_at', cutoffIso)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (messagesRes?.error) return;
+    const loaded = (messagesRes?.data as RoomMessage[] | undefined) ?? [];
+    mergeRecentMessages(loaded);
+  }, [mergeRecentMessages]);
 
   useEffect(() => {
     const channel = presenceChannelRef.current;
@@ -343,27 +394,37 @@ export default function Room() {
     if (!user) return;
     if (chatBackend !== 'supabase') return;
 
-    const channel = supabase
-      .channel('room-messages-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'room_messages' },
-        payload => {
-          const next = payload.new as RoomMessage;
-          setMessages(prev => {
-            if (prev.some(m => m.id === next.id)) return prev;
-            const updated = [...prev, next];
-            if (updated.length > 50) updated.shift();
-            return updated;
-          });
-        }
-      )
-      .subscribe();
+    const channel = supabase.channel('room-messages-realtime');
+
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'room_messages' }, payload => {
+      const eventType = (payload as any)?.eventType as string | undefined;
+      if (eventType === 'INSERT' || eventType === 'UPDATE') {
+        const next = (payload as any)?.new as RoomMessage | undefined;
+        if (!next?.id) return;
+        mergeRecentMessages([next]);
+        return;
+      }
+      if (eventType === 'DELETE') {
+        const deletedId = (payload as any)?.old?.id as string | undefined;
+        if (!deletedId) return;
+        setMessages(prev => prev.filter(m => m.id !== deletedId));
+      }
+    });
+
+    channel.subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        void fetchRecentMessages();
+        return;
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        void fetchRecentMessages();
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatBackend, user]);
+  }, [chatBackend, fetchRecentMessages, mergeRecentMessages, user]);
 
   useEffect(() => {
     if (!shouldAutoScrollRef.current) return;
@@ -508,6 +569,7 @@ export default function Room() {
         return updated;
       });
       broadcastRef.current?.postMessage({ type: 'message', message: newMessage });
+      broadcastRoomMessage(newMessage);
       setDraft('');
       setReplyTo(null);
       shouldAutoScrollRef.current = true;
@@ -545,6 +607,7 @@ export default function Room() {
           return updated;
         });
         broadcastRef.current?.postMessage({ type: 'message', message: newMessage });
+        broadcastRoomMessage(newMessage);
         setDraft('');
         setReplyTo(null);
         shouldAutoScrollRef.current = true;
@@ -555,6 +618,7 @@ export default function Room() {
     }
     const inserted = res?.data as RoomMessage | undefined;
     if (inserted) {
+      broadcastRoomMessage(inserted);
       setMessages(prev => {
         if (prev.some(m => m.id === inserted.id)) return prev;
         const updated = [...prev, inserted];
@@ -567,7 +631,7 @@ export default function Room() {
     setReplyTo(null);
     shouldAutoScrollRef.current = true;
     void createMentionNotifications(cleaned);
-  }, [chatBackend, createMentionNotifications, draft, persistLocalMessages, replyTo, roomName, user]);
+  }, [broadcastRoomMessage, chatBackend, createMentionNotifications, draft, persistLocalMessages, replyTo, roomName, user]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
