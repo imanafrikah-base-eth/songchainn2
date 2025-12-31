@@ -27,6 +27,26 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
+let resolvedArtistDetailStorageBucket: Promise<string> | null = null;
+
+async function resolveStorageBucket(preferredBucket: string) {
+  if (!resolvedArtistDetailStorageBucket) {
+    resolvedArtistDetailStorageBucket = (async () => {
+      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
+      if (!listBuckets) return preferredBucket;
+      const { data, error } = await listBuckets();
+      if (error || !Array.isArray(data)) return preferredBucket;
+      const names = new Set<string>(data.map((b: any) => String(b?.name)));
+      if (names.has(preferredBucket)) return preferredBucket;
+      if (names.has('public')) return 'public';
+      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
+      return first || preferredBucket;
+    })();
+  }
+
+  return resolvedArtistDetailStorageBucket;
+}
+
 export default function ArtistDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, isArtist, artistId } = useAuth();
@@ -124,7 +144,7 @@ export default function ArtistDetail() {
   const displayProfileImage = (artistProfile as any)?.profile_picture_url || artist?.profileImage;
   const displayCoverPhoto = (artistProfile as any)?.cover_photo_url || null;
   const isOwner = !!user && !!ownerUserId && user.id === ownerUserId;
-  const isVerified = artistAccount?.is_verified ?? true;
+  const isVerified = artistAccount?.is_verified ?? false;
   const profileTheme = (artistAccount?.profile_theme || 'default').toLowerCase();
 
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
@@ -147,12 +167,39 @@ export default function ArtistDetail() {
       const extRaw = file.name.split('.').pop() || '';
       const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
       const path = `artists/${ownerUserId}/profile-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+      const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
+      const bucket = await resolveStorageBucket(preferredBucket);
       const uploadRes = await supabase.storage
-        .from('artist-posts')
+        .from(bucket)
         .upload(path, file, { contentType: file.type, upsert: true });
-      if (uploadRes.error) throw uploadRes.error;
+      if (uploadRes.error) {
+        const msg = String(uploadRes.error.message || '');
+        if (msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found')) {
+          resolvedArtistDetailStorageBucket = null;
+          const retryBucket = await resolveStorageBucket(preferredBucket);
+          const retryRes = await supabase.storage
+            .from(retryBucket)
+            .upload(path, file, { contentType: file.type, upsert: true });
+          if (retryRes.error) throw retryRes.error;
+          const publicUrl = supabase.storage.from(retryBucket).getPublicUrl(path).data.publicUrl;
+          const { error: updateError } = await supabase
+            .from('audience_profiles')
+            .update({ profile_picture_url: publicUrl })
+            .eq('user_id', ownerUserId);
+          if (updateError) throw updateError;
+          queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
+            if (!prev) return prev;
+            return { ...prev, profile_picture_url: publicUrl };
+          });
+          queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
+          queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
+          toast.success('Profile picture updated');
+          return;
+        }
+        throw uploadRes.error;
+      }
 
-      const publicUrl = supabase.storage.from('artist-posts').getPublicUrl(path).data.publicUrl;
+      const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
@@ -182,12 +229,39 @@ export default function ArtistDetail() {
       const extRaw = file.name.split('.').pop() || '';
       const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
       const path = `artists/${ownerUserId}/cover-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+      const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
+      const bucket = await resolveStorageBucket(preferredBucket);
       const uploadRes = await supabase.storage
-        .from('artist-posts')
+        .from(bucket)
         .upload(path, file, { contentType: file.type, upsert: true });
-      if (uploadRes.error) throw uploadRes.error;
+      if (uploadRes.error) {
+        const msg = String(uploadRes.error.message || '');
+        if (msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found')) {
+          resolvedArtistDetailStorageBucket = null;
+          const retryBucket = await resolveStorageBucket(preferredBucket);
+          const retryRes = await supabase.storage
+            .from(retryBucket)
+            .upload(path, file, { contentType: file.type, upsert: true });
+          if (retryRes.error) throw retryRes.error;
+          const publicUrl = supabase.storage.from(retryBucket).getPublicUrl(path).data.publicUrl;
+          const { error: updateError } = await supabase
+            .from('audience_profiles')
+            .update({ cover_photo_url: publicUrl })
+            .eq('user_id', ownerUserId);
+          if (updateError) throw updateError;
+          queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
+            if (!prev) return prev;
+            return { ...prev, cover_photo_url: publicUrl };
+          });
+          queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
+          queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
+          toast.success('Cover photo updated');
+          return;
+        }
+        throw uploadRes.error;
+      }
 
-      const publicUrl = supabase.storage.from('artist-posts').getPublicUrl(path).data.publicUrl;
+      const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
@@ -344,25 +418,12 @@ export default function ArtistDetail() {
     queryKey: ['artist-followers', id],
     queryFn: async () => {
       if (!id) return 0;
-      const { data, error } = await supabase.rpc('get_artist_follower_count', { p_artist_id: id });
-      if (error) {
-        const fallback = await supabase.functions.invoke('artist-follow-counts', {
-          body: { artist_ids: [id] },
-        });
-        if (fallback.error) {
-          console.error('Error fetching follower count:', error);
-          return 0;
-        }
-        const rows = (fallback.data as any)?.data ?? (fallback.data as any);
-        const arr = Array.isArray(rows) ? rows : [];
-        const row = arr.find((r: any) => String(r?.artist_id) === String(id)) || arr[0];
-        const raw = row?.follower_count;
-        const parsed = typeof raw === 'string' ? Number(raw) : (raw ?? 0);
-        return Number.isFinite(parsed) ? parsed : 0;
-      }
-      const raw = data as any;
-      const parsed = typeof raw === 'string' ? Number(raw) : (raw ?? 0);
-      return Number.isFinite(parsed) ? parsed : 0;
+      const { data, count, error } = await supabase
+        .from('liked_artists')
+        .select('artist_id', { count: 'exact' })
+        .eq('artist_id', id);
+      if (error) return 0;
+      return count ?? data?.length ?? 0;
     },
     enabled: !!id,
     refetchInterval: 15000,

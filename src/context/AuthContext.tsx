@@ -77,6 +77,22 @@ async function fetchArtistIdFromArtistAccounts(userId: string): Promise<string |
   return artistId != null ? String(artistId) : null;
 }
 
+async function ensureArtistAccountMapping(userId: string, resolvedArtistId: string, artistIdFromDb: string | null) {
+  if (!resolvedArtistId) return;
+  if (artistIdFromDb) return;
+
+  try {
+    await (supabase as any)
+      .from('artist_accounts')
+      .upsert(
+        { artist_id: resolvedArtistId, user_id: userId, updated_at: new Date().toISOString() },
+        { onConflict: 'artist_id' }
+      );
+  } catch {
+    return;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -158,6 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             void (async () => {
               const artistIdFromDb = await fetchArtistIdFromArtistAccounts(session.user.id);
               const resolvedArtistId = artistIdFromDb ?? resolveArtistIdFromUser(session.user);
+              if (resolvedArtistId) {
+                await ensureArtistAccountMapping(session.user.id, resolvedArtistId, artistIdFromDb);
+              }
               setIsArtist(Boolean(resolvedArtistId));
               setArtistId(resolvedArtistId);
               fetchUserRole(session.user.id);
@@ -190,6 +209,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void (async () => {
           const artistIdFromDb = await fetchArtistIdFromArtistAccounts(session.user.id);
           const resolvedArtistId = artistIdFromDb ?? resolveArtistIdFromUser(session.user);
+          if (resolvedArtistId) {
+            await ensureArtistAccountMapping(session.user.id, resolvedArtistId, artistIdFromDb);
+          }
           setIsArtist(Boolean(resolvedArtistId));
           setArtistId(resolvedArtistId);
           fetchUserRole(session.user.id);

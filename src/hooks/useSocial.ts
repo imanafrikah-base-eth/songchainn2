@@ -216,20 +216,25 @@ export function useSocial() {
       return;
     }
 
+    const payload: Record<string, any> = {
+      user_id: user.id,
+      content,
+      post_type: postType,
+      song_id: songId || null,
+      playlist_id: playlistId || null,
+    };
+
+    if (image) {
+      payload.image_url = image.url;
+      payload.image_path = image.path;
+    }
+
     const { error } = await supabase
       .from('social_posts')
-      .insert({
-        user_id: user.id,
-        content,
-        post_type: postType,
-        song_id: songId || null,
-        playlist_id: playlistId || null,
-        image_url: image?.url || null,
-        image_path: image?.path || null,
-      });
+      .insert(payload as any);
 
     if (error) {
-      toast({ title: 'Error creating post', variant: 'destructive' });
+      toast({ title: 'Error creating post', description: error.message, variant: 'destructive' });
       return;
     }
 
@@ -325,18 +330,36 @@ export function useSocial() {
     if (!commentsData || commentsData.length === 0) return [];
 
     const userIds = [...new Set(commentsData.map(c => c.user_id))];
-    const { data: profilesData } = await supabase
-      .from('audience_profiles')
-      .select('*')
-      .in('user_id', userIds);
+    const [profilesRes, artistAccountsRes] = await Promise.all([
+      supabase
+        .from('audience_profiles')
+        .select('*')
+        .in('user_id', userIds),
+      (supabase as any)
+        .from('artist_accounts')
+        .select('user_id, artist_id, is_verified')
+        .in('user_id', userIds),
+    ]);
 
     const profilesMap = new Map(
-      profilesData?.map(p => [p.user_id, p as AudienceProfile]) || []
+      profilesRes.data?.map(p => [p.user_id, p as AudienceProfile]) || []
+    );
+
+    const artistAccountMap = new Map<
+      string,
+      { artist_id: string; is_verified?: boolean | null }
+    >(
+      ((artistAccountsRes as any)?.data as any[] | undefined)?.map(row => [
+        String(row.user_id),
+        { artist_id: String(row.artist_id), is_verified: (row as any).is_verified ?? null },
+      ]) || []
     );
 
     return commentsData.map(c => ({
       ...c,
-      profile: profilesMap.get(c.user_id)
+      profile: profilesMap.get(c.user_id),
+      artist_id: artistAccountMap.get(c.user_id)?.artist_id ?? null,
+      artist_is_verified: artistAccountMap.get(c.user_id)?.is_verified ?? null,
     }));
   }, []);
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Heart, MoreHorizontal, Reply } from 'lucide-react';
+import { X, Send, Heart, MoreHorizontal, Reply, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCommentLikes } from '@/hooks/useCommentLikes';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { ARTISTS } from '@/data/musicData';
 
 interface CommentSheetProps {
   isOpen: boolean;
@@ -114,8 +115,12 @@ export function CommentSheet({
     setReplyingTo(null);
   };
 
-  const goToProfile = async (userId: string) => {
+  const goToProfile = async (userId: string, artistId?: string | null) => {
     onClose();
+    if (artistId) {
+      navigate(`/artist/${artistId}`);
+      return;
+    }
     const { data } = await (supabase as any)
       .from('artist_accounts')
       .select('artist_id')
@@ -144,7 +149,7 @@ export function CommentSheet({
               const mentionedUser = localComments.find(
                 c => c.profile?.profile_name?.toLowerCase() === part.toLowerCase()
               );
-              if (mentionedUser) void goToProfile(mentionedUser.user_id);
+              if (mentionedUser) void goToProfile(mentionedUser.user_id, mentionedUser.artist_id);
             }}
           >
             @{part}
@@ -202,70 +207,83 @@ export function CommentSheet({
                 </div>
               ) : (
                 <div className="py-4 space-y-4">
-                  {localComments.map((comment) => (
-                    <motion.div
-                      key={comment.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex gap-3"
-                    >
-                      <button onClick={() => void goToProfile(comment.user_id)}>
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src={comment.profile?.profile_picture_url || ''} />
-                          <AvatarFallback className="bg-primary/20 text-primary">
-                            {comment.profile?.profile_name?.charAt(0) || '?'}
-                          </AvatarFallback>
-                        </Avatar>
-                      </button>
-                      
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <button 
-                              onClick={() => void goToProfile(comment.user_id)}
-                              className="font-semibold text-sm hover:underline"
-                            >
-                              {comment.profile?.profile_name || 'Anonymous'}
-                            </button>
-                            <span className="text-xs text-muted-foreground ml-2">
-                              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                            </span>
+                  {localComments.map((comment) => {
+                    const isArtistComment = !!comment.artist_id;
+                    const artist = comment.artist_id ? ARTISTS.find(a => a.id === comment.artist_id) : null;
+                    const displayName = artist?.name || comment.profile?.profile_name || 'Anonymous';
+                    const isVerifiedArtist = !!comment.artist_is_verified;
+                    const avatarSrc = isArtistComment ? (artist?.profileImage || comment.profile?.profile_picture_url || '') : (comment.profile?.profile_picture_url || '');
+
+                    return (
+                      <motion.div
+                        key={comment.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex gap-3"
+                      >
+                        <button onClick={() => void goToProfile(comment.user_id, comment.artist_id)}>
+                          <Avatar className="w-10 h-10">
+                            <AvatarImage src={avatarSrc} />
+                            <AvatarFallback className="bg-primary/20 text-primary">
+                              {displayName.charAt(0) || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                        </button>
+
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <button 
+                                onClick={() => void goToProfile(comment.user_id, comment.artist_id)}
+                                className="font-semibold text-sm hover:underline"
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  <span>{displayName}</span>
+                                  {isArtistComment && isVerifiedArtist && (
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-yellow-400" />
+                                  )}
+                                </span>
+                              </button>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                              </span>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
                           </div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
+                          <p className="text-sm text-foreground/90 mt-1">
+                            {renderCommentContent(comment.content)}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2">
+                            <button 
+                              className={cn(
+                                "flex items-center gap-1 transition-colors",
+                                comment.is_liked 
+                                  ? "text-red-500" 
+                                  : "text-muted-foreground hover:text-red-500",
+                                likingCommentId === comment.id && "opacity-50"
+                              )}
+                              onClick={() => handleLikeComment(comment)}
+                              disabled={likingCommentId === comment.id}
+                            >
+                              <Heart className={cn("w-4 h-4", comment.is_liked && "fill-current")} />
+                              <span className="text-xs">
+                                {(comment.likes_count || 0) > 0 ? comment.likes_count : 'Like'}
+                              </span>
+                            </button>
+                            <button 
+                              className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
+                              onClick={() => handleReply(comment.user_id, comment.profile?.profile_name || 'Anonymous')}
+                            >
+                              <Reply className="w-4 h-4" />
+                              <span className="text-xs">Reply</span>
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-sm text-foreground/90 mt-1">
-                          {renderCommentContent(comment.content)}
-                        </p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <button 
-                            className={cn(
-                              "flex items-center gap-1 transition-colors",
-                              comment.is_liked 
-                                ? "text-red-500" 
-                                : "text-muted-foreground hover:text-red-500",
-                              likingCommentId === comment.id && "opacity-50"
-                            )}
-                            onClick={() => handleLikeComment(comment)}
-                            disabled={likingCommentId === comment.id}
-                          >
-                            <Heart className={cn("w-4 h-4", comment.is_liked && "fill-current")} />
-                            <span className="text-xs">
-                              {(comment.likes_count || 0) > 0 ? comment.likes_count : 'Like'}
-                            </span>
-                          </button>
-                          <button 
-                            className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
-                            onClick={() => handleReply(comment.user_id, comment.profile?.profile_name || 'Anonymous')}
-                          >
-                            <Reply className="w-4 h-4" />
-                            <span className="text-xs">Reply</span>
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>

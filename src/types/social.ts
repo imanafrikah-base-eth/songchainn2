@@ -43,6 +43,8 @@ export interface PostComment {
   content: string;
   created_at: string;
   profile?: AudienceProfile;
+  artist_id?: string | null;
+  artist_is_verified?: boolean | null;
   likes_count?: number;
   is_liked?: boolean;
 }

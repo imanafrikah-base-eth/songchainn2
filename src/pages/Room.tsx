@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Link2, Settings } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Link2, ListMusic, Settings, Share2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { ARTISTS, SONGS } from '@/data/musicData';
+import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 
@@ -16,6 +19,22 @@ type RoomMessage = {
   message: string;
   created_at: string;
   reply_to_message_id: string | null;
+};
+
+const QUICK_REACTIONS = ['🔥', '👀', '💯'] as const;
+const TEXT_EMOJIS = ['🔥', '👀', '💯', '😂', '😍', '😤', '🤝', '🎧', '🚀', '🫡', '🙏', '⚡'] as const;
+const CUSTOM_EMOJI_TOKENS = [':BASED:', ':LFB!:', ':MALAKAS:', ':TWEAKING:'] as const;
+
+const BASED_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="b" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#4cc9ff"/><stop offset="1" stop-color="#1b54ff"/></linearGradient></defs><path d="M36 6c7 10 18 18 18 30 0 11-8 21-18 21S18 47 18 36C18 24 29 16 36 6z" fill="url(#b)"/><path d="M36 18c4 7 10 11 10 19 0 6-4 11-10 11s-10-5-10-11c0-8 6-12 10-19z" fill="#bff2ff" opacity=".35"/><text x="36" y="58" text-anchor="middle" font-size="14" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto" font-weight="900" fill="#ffffff" stroke="#00206e" stroke-width="1.6" paint-order="stroke">BASED</text></svg>`;
+const LFB_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ff8a00"/></linearGradient></defs><path d="M36 7c7 10 18 18 18 30 0 11-8 21-18 21S18 48 18 37C18 25 29 17 36 7z" fill="url(#g)"/><path d="M36 19c4 7 10 11 10 19 0 6-4 11-10 11s-10-5-10-11c0-8 6-12 10-19z" fill="#fff3c6" opacity=".4"/><text x="36" y="58" text-anchor="middle" font-size="16" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto" font-weight="900" fill="#1b1400" stroke="#fff2c2" stroke-width="1.4" paint-order="stroke">LFB!</text></svg>`;
+const MALAKAS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="72" viewBox="0 0 96 72"><defs><linearGradient id="m1" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#00a3ff"/><stop offset="1" stop-color="#ffffff"/></linearGradient><linearGradient id="m2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#0a2a6a"/><stop offset="1" stop-color="#00a3ff"/></linearGradient></defs><circle cx="48" cy="30" r="22" fill="url(#m2)" opacity=".25"/><circle cx="48" cy="30" r="22" fill="none" stroke="url(#m1)" stroke-width="6"/><circle cx="40" cy="27" r="2.6" fill="#ffffff"/><circle cx="56" cy="27" r="2.6" fill="#ffffff"/><path d="M38 34c3.5 6 16.5 6 20 0" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/><text x="48" y="64" text-anchor="middle" font-size="14" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto" font-weight="900" fill="#ffffff" stroke="#0a2a6a" stroke-width="1.6" paint-order="stroke">MALAKAS</text></svg>`;
+const TWEAKING_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="72" viewBox="0 0 96 72"><defs><linearGradient id="t1" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#00a3ff"/><stop offset="1" stop-color="#ffffff"/></linearGradient><linearGradient id="t2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#00a3ff"/><stop offset="1" stop-color="#0a2a6a"/></linearGradient></defs><circle cx="48" cy="30" r="22" fill="url(#t2)" opacity=".22"/><circle cx="48" cy="30" r="22" fill="none" stroke="url(#t1)" stroke-width="6"/><path d="M36 16l8-6 8 6" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="48" cy="9" r="3" fill="#ffffff"/><circle cx="40" cy="27" r="2.6" fill="#ffffff"/><circle cx="56" cy="27" r="2.6" fill="#ffffff"/><path d="M38 36c3-3 17-3 20 0" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/><text x="48" y="64" text-anchor="middle" font-size="14" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto" font-weight="900" fill="#ffffff" stroke="#0a2a6a" stroke-width="1.6" paint-order="stroke">TWEAKING</text></svg>`;
+
+const CUSTOM_EMOJI_URI_BY_TOKEN: Record<(typeof CUSTOM_EMOJI_TOKENS)[number], string> = {
+  ':BASED:': `data:image/svg+xml;utf8,${encodeURIComponent(BASED_SVG)}`,
+  ':LFB!:': `data:image/svg+xml;utf8,${encodeURIComponent(LFB_SVG)}`,
+  ':MALAKAS:': `data:image/svg+xml;utf8,${encodeURIComponent(MALAKAS_SVG)}`,
+  ':TWEAKING:': `data:image/svg+xml;utf8,${encodeURIComponent(TWEAKING_SVG)}`,
 };
 
 const LOCAL_MESSAGES_KEY = 'room:local_messages:v1';
@@ -73,11 +92,70 @@ function extractMentions(text: string) {
   return [...names];
 }
 
+function formatCountdownSeconds(totalSeconds: number) {
+  const clamped = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(clamped / 60);
+  const seconds = clamped % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function renderMessageWithCustomEmojis(text: string) {
+  const tokens = Object.keys(CUSTOM_EMOJI_URI_BY_TOKEN) as Array<keyof typeof CUSTOM_EMOJI_URI_BY_TOKEN>;
+  const firstIndex = tokens
+    .map(token => ({ token, index: text.indexOf(token) }))
+    .filter(x => x.index >= 0)
+    .sort((a, b) => a.index - b.index)[0];
+
+  if (!firstIndex) return text;
+
+  const nodes: Array<string | JSX.Element> = [];
+  let cursor = 0;
+  let key = 0;
+  while (cursor < text.length) {
+    const next = tokens
+      .map(token => ({ token, index: text.indexOf(token, cursor) }))
+      .filter(x => x.index >= 0)
+      .sort((a, b) => a.index - b.index)[0];
+
+    if (!next) {
+      nodes.push(text.slice(cursor));
+      break;
+    }
+
+    if (next.index > cursor) nodes.push(text.slice(cursor, next.index));
+    const uri = CUSTOM_EMOJI_URI_BY_TOKEN[next.token as (typeof CUSTOM_EMOJI_TOKENS)[number]];
+    nodes.push(
+      <img
+        key={`ce-${key++}`}
+        src={uri}
+        alt={next.token}
+        className="inline-block align-[-2px] h-5 w-5"
+        loading="lazy"
+      />
+    );
+    cursor = next.index + next.token.length;
+  }
+
+  return nodes;
+}
+
+function getMentionTrigger(text: string, cursorIndex: number) {
+  const safeCursor = Math.max(0, Math.min(cursorIndex, text.length));
+  const beforeCursor = text.slice(0, safeCursor);
+  const atIndex = beforeCursor.lastIndexOf('@');
+  if (atIndex < 0) return null;
+  if (atIndex > 0 && /[a-z0-9_-]/i.test(beforeCursor[atIndex - 1] ?? '')) return null;
+  const query = beforeCursor.slice(atIndex + 1);
+  if (query.includes(' ') || query.includes('\n') || query.includes('\t')) return null;
+  return { atIndex, query };
+}
+
 export default function Room() {
   const navigate = useNavigate();
   const { user, isArtist, artistId } = useAuth();
   const { isPlaying, isRoomMode, currentSong } = usePlayerState();
   const { enterRoomMode, exitRoomMode, setVolume, volume, play } = usePlayerActions();
+  const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
 
   const playlist = useMemo(() => {
     return SONGS;
@@ -89,6 +167,8 @@ export default function Room() {
   const [isSending, setIsSending] = useState(false);
   const [replyTo, setReplyTo] = useState<RoomMessage | null>(null);
   const [chatBackend, setChatBackend] = useState<'supabase' | 'local'>('supabase');
+  const [activeRoomNames, setActiveRoomNames] = useState<string[]>([]);
+  const [mentionState, setMentionState] = useState<{ atIndex: number; query: string; activeIndex: number } | null>(null);
 
   const [isNamePromptOpen, setIsNamePromptOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -99,8 +179,14 @@ export default function Room() {
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [segmentNowMs, setSegmentNowMs] = useState(() => Date.now());
+  const [reactionsByMessageId, setReactionsByMessageId] = useState<Record<string, Record<string, number>>>({});
+  const [myReactionsByMessageId, setMyReactionsByMessageId] = useState<Record<string, Record<string, boolean>>>({});
 
   const listRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const draftRef = useRef('');
+  const lastCursorRef = useRef(0);
   const shouldAutoScrollRef = useRef(true);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
   const isPlayingRef = useRef(false);
@@ -111,6 +197,10 @@ export default function Room() {
   const beepCtxRef = useRef<AudioContext | null>(null);
   const beepUnlockedRef = useRef(false);
   const lastBeepAtRef = useRef(0);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   const unlockBeep = useCallback(async () => {
     if (beepUnlockedRef.current) return;
@@ -178,9 +268,44 @@ export default function Room() {
       });
   }, []);
 
+  const broadcastRoomReaction = useCallback((reaction: { message_id: string; emoji: string; delta: number; user_id: string }) => {
+    const channel = presenceChannelRef.current;
+    if (!channel) return;
+    channel
+      .send({
+        type: 'broadcast',
+        event: 'reaction',
+        payload: reaction,
+      })
+      .catch(() => {
+        void 0;
+      });
+  }, []);
+
+  const applyReactionDelta = useCallback((messageId: string, emoji: string, delta: number) => {
+    setReactionsByMessageId(prev => {
+      const existing = prev[messageId] ?? {};
+      const nextCount = Math.max(0, (existing[emoji] ?? 0) + delta);
+      return {
+        ...prev,
+        [messageId]: {
+          ...existing,
+          [emoji]: nextCount,
+        },
+      };
+    });
+  }, []);
+
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setSegmentNowMs(Date.now());
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -245,21 +370,30 @@ export default function Room() {
     const channel = new BroadcastChannel(LOCAL_CHAT_CHANNEL);
     broadcastRef.current = channel;
     channel.onmessage = event => {
-      const payload = event.data as { type: 'message'; message: RoomMessage } | undefined;
-      if (!payload || payload.type !== 'message') return;
-      setMessages(prev => {
-        if (prev.some(m => m.id === payload.message.id)) return prev;
-        const updated = [...prev, payload.message];
-        if (updated.length > 50) updated.shift();
-        persistLocalMessages(updated);
-        return updated;
-      });
+      const payload = event.data as
+        | { type: 'message'; message: RoomMessage }
+        | { type: 'reaction'; reaction: { message_id: string; emoji: string; delta: number; user_id: string } }
+        | undefined;
+      if (!payload) return;
+      if (payload.type === 'message') {
+        setMessages(prev => {
+          if (prev.some(m => m.id === payload.message.id)) return prev;
+          const updated = [...prev, payload.message];
+          if (updated.length > 50) updated.shift();
+          persistLocalMessages(updated);
+          return updated;
+        });
+        return;
+      }
+      if (payload.type === 'reaction') {
+        applyReactionDelta(payload.reaction.message_id, payload.reaction.emoji, payload.reaction.delta);
+      }
     };
     return () => {
       channel.close();
       broadcastRef.current = null;
     };
-  }, [chatBackend, persistLocalMessages]);
+  }, [applyReactionDelta, chatBackend, persistLocalMessages]);
 
   useEffect(() => {
     if (!user) return;
@@ -359,10 +493,17 @@ export default function Room() {
     const syncPresence = () => {
       const state = channel.presenceState() as Record<string, Array<{ room_name?: string; in_room?: boolean }>>;
       let count = 0;
+      const names = new Set<string>();
       for (const metas of Object.values(state)) {
-        if (Array.isArray(metas) && metas.some(m => Boolean(m?.in_room))) count += 1;
+        if (!Array.isArray(metas)) continue;
+        if (metas.some(m => Boolean(m?.in_room))) count += 1;
+        for (const meta of metas) {
+          const name = normalizeRoomName(meta?.room_name || '');
+          if (name && name.toLowerCase() !== 'guest') names.add(name);
+        }
       }
       setOnlineCount(count);
+      setActiveRoomNames([...names].sort((a, b) => a.localeCompare(b)).slice(0, 40));
     };
 
     channel.on('presence', { event: 'sync' }, syncPresence);
@@ -398,6 +539,15 @@ export default function Room() {
       }
     });
 
+    channel.on('broadcast', { event: 'reaction' }, payload => {
+      const data = (payload as any)?.payload as { message_id?: string; emoji?: string; delta?: number; user_id?: string } | undefined;
+      const messageId = data?.message_id;
+      const emoji = typeof data?.emoji === 'string' ? data.emoji : '';
+      const delta = typeof data?.delta === 'number' && Number.isFinite(data.delta) ? data.delta : 0;
+      if (!messageId || !emoji || !delta) return;
+      applyReactionDelta(messageId, emoji, delta);
+    });
+
     channel.subscribe(async status => {
       if (status !== 'SUBSCRIBED') return;
       const storedNameRaw = localStorage.getItem(`room_username:${user.id}`) || '';
@@ -418,7 +568,7 @@ export default function Room() {
       presenceChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [chatBackend, persistLocalMessages, playBeep, roomName, user]);
+  }, [applyReactionDelta, chatBackend, persistLocalMessages, playBeep, roomName, user]);
 
   const mergeRecentMessages = useCallback((incoming: RoomMessage[]) => {
     setMessages(prev => {
@@ -727,6 +877,31 @@ export default function Room() {
     void createMentionNotifications(cleaned);
   }, [broadcastRoomMessage, chatBackend, createMentionNotifications, draft, persistLocalMessages, replyTo, roomName, user]);
 
+  const toggleQuickReaction = useCallback((messageId: string, emoji: string) => {
+    if (!user) return;
+    const already = Boolean(myReactionsByMessageId[messageId]?.[emoji]);
+    const delta = already ? -1 : 1;
+
+    setMyReactionsByMessageId(prev => {
+      const existing = prev[messageId] ?? {};
+      return {
+        ...prev,
+        [messageId]: {
+          ...existing,
+          [emoji]: !already,
+        },
+      };
+    });
+
+    applyReactionDelta(messageId, emoji, delta);
+
+    const payload = { message_id: messageId, emoji, delta, user_id: user.id };
+    broadcastRoomReaction(payload);
+    if (chatBackend === 'local') {
+      broadcastRef.current?.postMessage({ type: 'reaction', reaction: payload });
+    }
+  }, [applyReactionDelta, broadcastRoomReaction, chatBackend, myReactionsByMessageId, user]);
+
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     void sendMessage();
@@ -761,7 +936,60 @@ export default function Room() {
       });
   }, [roomName, user]);
 
-  const handleDraftChange = useCallback((value: string) => {
+  const insertTextAtCursor = useCallback((textToInsert: string) => {
+    const input = inputRef.current;
+    const draftValue = draftRef.current;
+    const cursor = input?.selectionStart ?? lastCursorRef.current ?? draftValue.length;
+    const safeCursor = Math.max(0, Math.min(cursor, draftValue.length));
+    const nextValue = `${draftValue.slice(0, safeCursor)}${textToInsert}${draftValue.slice(safeCursor)}`;
+    const nextCursor = safeCursor + textToInsert.length;
+
+    setDraft(nextValue);
+    setMentionState(null);
+
+    window.requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      try {
+        el.setSelectionRange(nextCursor, nextCursor);
+      } catch {
+        void 0;
+      }
+      lastCursorRef.current = nextCursor;
+    });
+  }, []);
+
+  const applyMentionSuggestion = useCallback((name: string) => {
+    const input = inputRef.current;
+    const draftValue = draftRef.current;
+    const cursor = input?.selectionStart ?? lastCursorRef.current ?? draftValue.length;
+    const trigger = getMentionTrigger(draftValue, cursor);
+    if (!trigger) return;
+
+    const before = draftValue.slice(0, trigger.atIndex + 1);
+    const after = draftValue.slice(cursor);
+    const nextValue = `${before}${name} ${after}`;
+    const nextCursor = before.length + name.length + 1;
+
+    setDraft(nextValue);
+    setMentionState(null);
+
+    window.requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      try {
+        el.setSelectionRange(nextCursor, nextCursor);
+      } catch {
+        void 0;
+      }
+      lastCursorRef.current = nextCursor;
+    });
+  }, []);
+
+  const handleDraftChange = useCallback((value: string, cursorIndex: number) => {
+    lastCursorRef.current = cursorIndex;
     setDraft(value);
     if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
 
@@ -770,10 +998,34 @@ export default function Room() {
     if (shouldType) setTyping(true);
     else setTyping(false);
 
+    const trigger = getMentionTrigger(value, cursorIndex);
+    if (!trigger) {
+      setMentionState(null);
+    } else {
+      setMentionState(prev => {
+        const nextQuery = trigger.query;
+        const keepIndex = prev?.query === nextQuery ? prev.activeIndex : 0;
+        return { atIndex: trigger.atIndex, query: nextQuery, activeIndex: keepIndex };
+      });
+    }
+
     typingTimeoutRef.current = window.setTimeout(() => {
       setTyping(false);
     }, TYPING_IDLE_MS);
   }, [autoplayBlocked, handleRetryAutoplay, setTyping]);
+
+  const mentionSuggestions = useMemo(() => {
+    if (!mentionState) return [];
+    const q = mentionState.query.trim().toLowerCase();
+    const normalized = activeRoomNames
+      .map(n => normalizeRoomName(n))
+      .filter(Boolean);
+    const uniq = Array.from(new Set(normalized));
+    const matches = q.length === 0
+      ? uniq
+      : uniq.filter(n => n.toLowerCase().startsWith(q));
+    return matches.slice(0, 7);
+  }, [activeRoomNames, mentionState]);
 
   const messageById = useMemo(() => {
     const map = new Map<string, RoomMessage>();
@@ -781,12 +1033,46 @@ export default function Room() {
     return map;
   }, [messages]);
 
+  const currentPlaylistIndex = useMemo(() => {
+    if (!currentSong) return -1;
+    return playlist.findIndex(s => s.id === currentSong.id);
+  }, [currentSong, playlist]);
+
+  const upNextSongs = useMemo(() => {
+    if (playlist.length === 0) return [];
+    if (currentPlaylistIndex < 0) return playlist.slice(0, 6);
+    const after = playlist.slice(currentPlaylistIndex + 1);
+    const before = playlist.slice(0, currentPlaylistIndex + 1);
+    return [...after, ...before].slice(0, 6);
+  }, [currentPlaylistIndex, playlist]);
+
+  const currentArtist = useMemo(() => {
+    if (!currentSong?.artistId) return null;
+    return ARTISTS.find(a => a.id === currentSong.artistId) ?? null;
+  }, [currentSong?.artistId]);
+
+  const isCurrentArtistFollowed = useMemo(() => {
+    if (!currentArtist?.id) return false;
+    return isArtistLiked(currentArtist.id);
+  }, [currentArtist?.id, isArtistLiked]);
+
+  const segmentProgress = useMemo(() => {
+    const nowSeconds = segmentNowMs / 1000;
+    const elapsed = nowSeconds % ROOM_SEGMENT_SECONDS;
+    const remaining = ROOM_SEGMENT_SECONDS - elapsed;
+    return {
+      elapsed,
+      remaining,
+      progress: ROOM_SEGMENT_SECONDS > 0 ? elapsed / ROOM_SEGMENT_SECONDS : 0,
+    };
+  }, [segmentNowMs]);
+
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-black text-zinc-100">
       <div className="fixed top-0 left-0 right-0 z-20 bg-black/60 backdrop-blur border-b border-white/10">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -814,6 +1100,24 @@ export default function Room() {
             </button>
             <button
               type="button"
+              onClick={async () => {
+                if (!currentSong) return;
+                const songUrl = `${window.location.origin}/song/${currentSong.id}`;
+                const roomUrl = `${window.location.origin}/room`;
+                try {
+                  await navigator.clipboard.writeText(`${songUrl}\n${roomUrl}`);
+                  toast.success('Song link copied');
+                } catch {
+                  toast.error('Could not copy song link');
+                }
+              }}
+              className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+            >
+              <Share2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Share song</span>
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 if (isArtist) {
                   setIsIdentityPromptOpen(true);
@@ -829,45 +1133,255 @@ export default function Room() {
             </button>
           </div>
         </div>
-        <div className="max-w-3xl mx-auto px-4 pb-2 text-xs text-zinc-400">
+        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 pb-2 text-xs text-zinc-400">
           {onlineCount} online
+        </div>
+        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 pb-3">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              if (!currentSong) return;
+              navigate(`/song/${currentSong.id}`);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              if (!currentSong) return;
+              e.preventDefault();
+              navigate(`/song/${currentSong.id}`);
+            }}
+            className="relative w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10 transition-colors overflow-hidden"
+          >
+            <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-white/10">
+              <div
+                className="h-full bg-primary/80"
+                style={{ width: `${Math.min(100, Math.max(0, segmentProgress.progress * 100))}%` }}
+              />
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-white/10 overflow-hidden flex-shrink-0">
+              {currentSong?.coverImage ? (
+                <img
+                  src={currentSong.coverImage}
+                  alt={currentSong.title}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] text-zinc-400">Now playing in The Room</div>
+              <div className="text-sm text-zinc-100 truncate">
+                {currentSong ? currentSong.title : 'Syncing…'}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400 min-w-0">
+                {currentArtist ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full bg-white/10 hover:bg-white/15 transition-colors px-2 py-0.5 max-w-full"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      navigate(`/artist/${currentArtist.id}`);
+                    }}
+                  >
+                    <span className="truncate">{currentSong?.artist}</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                  </button>
+                ) : (
+                  <div className="truncate">
+                    {currentSong ? currentSong.artist : 'The playlist starts when you enter'}
+                  </div>
+                )}
+
+                {currentArtist ? (
+                  <button
+                    type="button"
+                    disabled={isAudienceInteractionsLoading}
+                    className={[
+                      'inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 transition-colors',
+                      isCurrentArtistFollowed ? 'bg-primary/15 text-primary hover:bg-primary/20' : 'bg-white/5 text-zinc-200 hover:bg-white/10',
+                      isAudienceInteractionsLoading ? 'opacity-60 cursor-not-allowed' : '',
+                    ].join(' ')}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void toggleLikeArtist(currentArtist.id);
+                    }}
+                  >
+                    {isCurrentArtistFollowed ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Following</span>
+                      </>
+                    ) : (
+                      <span>Follow</span>
+                    )}
+                  </button>
+                ) : null}
+
+                <div className="text-zinc-500">•</div>
+                <div className="flex-shrink-0 tabular-nums text-zinc-400">
+                  Next in {formatCountdownSeconds(segmentProgress.remaining)}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 px-3 text-zinc-300 hover:text-zinc-100 lg:hidden"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                  >
+                    <ListMusic className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Queue</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="px-4 pt-4 pb-6">
+                  <SheetHeader>
+                    <SheetTitle>Up next</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-3 space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                    {upNextSongs.map(song => (
+                      <button
+                        key={song.id}
+                        type="button"
+                        className="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/5 transition-colors"
+                        onClick={() => navigate(`/song/${song.id}`)}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
+                          {song.coverImage ? (
+                            <img
+                              src={song.coverImage}
+                              alt={song.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm text-zinc-100 truncate">{song.title}</div>
+                          <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
+                        </div>
+                      </button>
+                    ))}
+                    {upNextSongs.length === 0 ? (
+                      <div className="text-sm text-zinc-400">Queue unavailable.</div>
+                    ) : null}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="pt-14 pb-24">
-        <div
-          ref={listRef}
-          onScroll={handleListScroll}
-          className="max-w-3xl mx-auto px-4 h-[calc(100vh-14rem)] overflow-y-auto"
-        >
-          <div className="space-y-2 py-4">
-            {messages.map(m => {
-              const parent = m.reply_to_message_id ? messageById.get(m.reply_to_message_id) : undefined;
-              return (
-                <SwipeToReplyMessage
-                  key={m.id}
-                  message={m}
-                  parent={parent}
-                  onReply={() => setReplyTo(m)}
-                />
-              );
-            })}
+      <div className="pt-32 pb-24">
+        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4">
+          <div className="lg:flex lg:gap-6">
+            <div
+              ref={listRef}
+              onScroll={handleListScroll}
+              className="h-[calc(100vh-14rem)] overflow-y-auto lg:flex-1"
+            >
+              <div className="space-y-2 py-4">
+                {messages.map(m => {
+                  const parent = m.reply_to_message_id ? messageById.get(m.reply_to_message_id) : undefined;
+                  return (
+                    <SwipeToReplyMessage
+                      key={m.id}
+                      message={m}
+                      parent={parent}
+                      onReply={() => setReplyTo(m)}
+                      reactions={reactionsByMessageId[m.id]}
+                      myReactions={myReactionsByMessageId[m.id]}
+                      onReact={(emoji) => toggleQuickReaction(m.id, emoji)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            <aside className="hidden lg:flex lg:flex-col lg:w-80 lg:h-[calc(100vh-14rem)] lg:py-4 lg:gap-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs text-zinc-400">Now playing</div>
+                {currentSong ? (
+                  <div className="mt-3 flex gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
+                      {currentSong.coverImage ? (
+                        <img
+                          src={currentSong.coverImage}
+                          alt={currentSong.title}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-zinc-100 truncate">{currentSong.title}</div>
+                      <div className="text-xs text-zinc-400 truncate">{currentSong.artist}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-sm text-zinc-400">Loading…</div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 min-h-0 flex flex-col">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs text-zinc-400">Up next</div>
+                  <div className="text-xs text-zinc-500">{onlineCount} online</div>
+                </div>
+                <div className="mt-3 space-y-2 overflow-y-auto pr-1">
+                  {upNextSongs.map(song => (
+                    <div key={song.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                      <div className="w-9 h-9 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
+                        {song.coverImage ? (
+                          <img
+                            src={song.coverImage}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm text-zinc-100 truncate">{song.title}</div>
+                        <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {upNextSongs.length === 0 ? (
+                    <div className="text-sm text-zinc-400">Queue unavailable.</div>
+                  ) : null}
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-black/70 backdrop-blur border-t border-white/10">
-        <div className="max-w-3xl mx-auto px-4 py-3 space-y-2">
+        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 space-y-2">
           {typingUsers.length > 0 && (
             <div className="text-[11px] text-zinc-500 truncate">
               {typingUsers.join(' • ')}
+            </div>
+          )}
+          {!replyTo && (
+            <div className="text-[11px] text-zinc-600 truncate">
+              Slide a message to reply
             </div>
           )}
           {replyTo && (
             <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
               <div className="min-w-0">
                 <div className="text-xs text-zinc-400">Replying to {replyTo.room_name}</div>
-                <div className="text-xs text-zinc-300 truncate">{replyTo.message}</div>
+                <div className="text-xs text-zinc-300 truncate">{renderMessageWithCustomEmojis(replyTo.message)}</div>
               </div>
               <Button
                 type="button"
@@ -887,16 +1401,121 @@ export default function Room() {
             </div>
 
             <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-2">
-              <input
-                value={draft}
-                onChange={e => handleDraftChange(e.target.value)}
-                onFocus={() => void unlockBeep()}
-                onPointerDown={() => void unlockBeep()}
-                placeholder="Say something..."
-                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-white/20"
-                disabled={isSending}
-                autoComplete="off"
-              />
+              <div className="relative flex-1">
+                {mentionState && mentionSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 bottom-12 z-30 rounded-xl border border-white/10 bg-zinc-950/95 backdrop-blur p-1 shadow-lg">
+                    {mentionSuggestions.map((name, idx) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                        }}
+                        onClick={() => applyMentionSuggestion(name)}
+                        className={[
+                          'w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                          idx === mentionState.activeIndex ? 'bg-white/10 text-white' : 'hover:bg-white/5 text-zinc-200',
+                        ].join(' ')}
+                      >
+                        <span className="truncate">@{name}</span>
+                        <span className="text-xs text-zinc-500">Mention</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  ref={inputRef}
+                  value={draft}
+                  onChange={e => handleDraftChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+                  onClick={(e) => {
+                    lastCursorRef.current = e.currentTarget.selectionStart ?? e.currentTarget.value.length;
+                  }}
+                  onKeyUp={(e) => {
+                    lastCursorRef.current = e.currentTarget.selectionStart ?? e.currentTarget.value.length;
+                  }}
+                  onKeyDown={(e) => {
+                    if (!mentionState || mentionSuggestions.length === 0) return;
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setMentionState(prev => {
+                        if (!prev) return prev;
+                        return { ...prev, activeIndex: (prev.activeIndex + 1) % mentionSuggestions.length };
+                      });
+                      return;
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setMentionState(prev => {
+                        if (!prev) return prev;
+                        return { ...prev, activeIndex: (prev.activeIndex - 1 + mentionSuggestions.length) % mentionSuggestions.length };
+                      });
+                      return;
+                    }
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                      const name = mentionSuggestions[mentionState.activeIndex];
+                      if (!name) return;
+                      e.preventDefault();
+                      applyMentionSuggestion(name);
+                      return;
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setMentionState(null);
+                    }
+                  }}
+                  onFocus={() => void unlockBeep()}
+                  onPointerDown={() => void unlockBeep()}
+                  placeholder="Say something..."
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-white/20"
+                  disabled={isSending}
+                  autoComplete="off"
+                />
+              </div>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-10 w-10 p-0 bg-white/5 hover:bg-white/10 text-zinc-200"
+                    onClick={() => {
+                      lastCursorRef.current = inputRef.current?.selectionStart ?? draftRef.current.length;
+                    }}
+                  >
+                    🙂
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-3 bg-zinc-950 border-white/10 text-zinc-100">
+                  <div className="grid grid-cols-6 gap-2">
+                    {TEXT_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className="h-10 w-10 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xl"
+                        onClick={() => insertTextAtCursor(emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                    {(CUSTOM_EMOJI_TOKENS as readonly string[]).map((token) => (
+                      <button
+                        key={token}
+                        type="button"
+                        className="h-10 w-10 rounded-lg bg-white/5 hover:bg-white/10 transition-colors flex items-center justify-center"
+                        onClick={() => insertTextAtCursor(` ${token} `)}
+                      >
+                        <img
+                          src={CUSTOM_EMOJI_URI_BY_TOKEN[token as (typeof CUSTOM_EMOJI_TOKENS)[number]]}
+                          alt={token}
+                          className="h-7 w-7"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <Button
                 type="submit"
                 className="h-10 px-4 bg-white/10 hover:bg-white/15 text-zinc-100"
@@ -1072,24 +1691,35 @@ function SwipeToReplyMessage({
   message,
   parent,
   onReply,
+  reactions,
+  myReactions,
+  onReact,
 }: {
   message: RoomMessage;
   parent?: RoomMessage;
   onReply: () => void;
+  reactions?: Record<string, number>;
+  myReactions?: Record<string, boolean>;
+  onReact: (emoji: string) => void;
 }) {
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const modeRef = useRef<'undecided' | 'swipe' | 'scroll'>('undecided');
+  const pointerTypeRef = useRef<string | null>(null);
+  const didCaptureRef = useRef(false);
   const [offsetX, setOffsetX] = useState(0);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if ((e.target as HTMLElement | null)?.closest('button')) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     startRef.current = { x: e.clientX, y: e.clientY };
     modeRef.current = 'undecided';
+    pointerTypeRef.current = e.pointerType;
+    didCaptureRef.current = false;
     setOffsetX(0);
-    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (pointerTypeRef.current === 'mouse' && e.buttons === 0) return;
     const start = startRef.current;
     if (!start) return;
     const dx = e.clientX - start.x;
@@ -1101,6 +1731,10 @@ function SwipeToReplyMessage({
     }
 
     if (modeRef.current !== 'swipe') return;
+    if (!didCaptureRef.current) {
+      (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+      didCaptureRef.current = true;
+    }
     if (dx <= 0) {
       setOffsetX(0);
       return;
@@ -1115,30 +1749,77 @@ function SwipeToReplyMessage({
     }
     startRef.current = null;
     modeRef.current = 'undecided';
+    pointerTypeRef.current = null;
+    didCaptureRef.current = false;
     setOffsetX(0);
   }, [offsetX, onReply]);
 
   return (
-    <div
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      className="text-sm leading-relaxed text-zinc-200"
-      style={{ transform: offsetX ? `translateX(${offsetX}px)` : undefined, transition: offsetX ? undefined : 'transform 120ms ease-out' }}
-    >
-      {parent && (
-        <div className="mb-1 pl-2 border-l border-white/15 text-xs text-zinc-500 truncate">
-          Reply to {parent.room_name}: {parent.message}
-        </div>
-      )}
-      <span className="text-zinc-100 inline-flex items-center gap-1">
-        <span>{message.room_name}:</span>
-        {KNOWN_ARTIST_NAMES.has(message.room_name.trim().toLowerCase()) && (
-          <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+    <div className="relative">
+      <div
+        className={[
+          'pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 rounded-full border px-2 py-0.5 text-[11px] transition-opacity',
+          offsetX > 12 ? 'opacity-100 border-primary/30 bg-primary/15 text-primary' : 'opacity-0 border-white/10 bg-white/5 text-zinc-400',
+        ].join(' ')}
+      >
+        Reply
+      </div>
+      <div
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onClick={(e) => {
+          if ((e.target as HTMLElement | null)?.closest('button')) return;
+          if (typeof window === 'undefined') return;
+          if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+          onReply();
+        }}
+        className="group flex items-start gap-2 text-sm leading-relaxed text-zinc-200"
+        style={{ transform: offsetX ? `translateX(${offsetX}px)` : undefined, transition: offsetX ? undefined : 'transform 120ms ease-out' }}
+      >
+      <div className="min-w-0 flex-1">
+        {parent && (
+          <div className="mb-1 pl-2 border-l border-white/15 text-xs text-zinc-500 truncate">
+            Reply to {parent.room_name}: {parent.message}
+          </div>
         )}
-      </span>{' '}
-      <span className="text-zinc-300">{message.message}</span>
+        <span className="text-zinc-100 inline-flex items-center gap-1">
+          <span>{message.room_name}:</span>
+          {KNOWN_ARTIST_NAMES.has(message.room_name.trim().toLowerCase()) && (
+            <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+          )}
+        </span>{' '}
+        <span className="text-zinc-300">{renderMessageWithCustomEmojis(message.message)}</span>
+        <div className="mt-1 flex items-center gap-1.5">
+          {QUICK_REACTIONS.map((emoji) => {
+            const count = reactions?.[emoji] ?? 0;
+            const active = Boolean(myReactions?.[emoji]);
+            return (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => onReact(emoji)}
+                className={[
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors',
+                  active ? 'border-primary/30 bg-primary/15 text-primary' : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10',
+                ].join(' ')}
+              >
+                <span>{emoji}</span>
+                {count > 0 ? <span className="tabular-nums">{count}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onReply}
+        className="hidden md:inline-flex px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        Reply
+      </button>
+      </div>
     </div>
   );
 }

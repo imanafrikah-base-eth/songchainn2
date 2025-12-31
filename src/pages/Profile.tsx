@@ -16,6 +16,26 @@ import { NotificationSettings } from '@/components/NotificationSettings';
 import { Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
+let resolvedProfileStorageBucket: Promise<string> | null = null;
+
+async function resolveStorageBucket(preferredBucket: string) {
+  if (!resolvedProfileStorageBucket) {
+    resolvedProfileStorageBucket = (async () => {
+      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
+      if (!listBuckets) return preferredBucket;
+      const { data, error } = await listBuckets();
+      if (error || !Array.isArray(data)) return preferredBucket;
+      const names = new Set<string>(data.map((b: any) => String(b?.name)));
+      if (names.has(preferredBucket)) return preferredBucket;
+      if (names.has('public')) return 'public';
+      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
+      return first || preferredBucket;
+    })();
+  }
+
+  return resolvedProfileStorageBucket;
+}
+
 // X (Twitter) and Base icons
 const XTwitterIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
@@ -71,12 +91,34 @@ export default function Profile() {
       const kind = field === 'profile_picture_url' ? 'profile' : 'cover';
       const path = `artists/${user.id}/${kind}-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
 
+      const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
+      const bucket = await resolveStorageBucket(preferredBucket);
       const uploadRes = await supabase.storage
-        .from('artist-posts')
+        .from(bucket)
         .upload(path, file, { contentType: file.type, upsert: true });
-      if (uploadRes.error) throw uploadRes.error;
+      if (uploadRes.error) {
+        const msg = String(uploadRes.error.message || '');
+        if (msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found')) {
+          resolvedProfileStorageBucket = null;
+          const retryBucket = await resolveStorageBucket(preferredBucket);
+          const retryRes = await supabase.storage
+            .from(retryBucket)
+            .upload(path, file, { contentType: file.type, upsert: true });
+          if (retryRes.error) throw retryRes.error;
+          const publicUrl = supabase.storage.from(retryBucket).getPublicUrl(path).data.publicUrl;
+          const { error: updateError } = await supabase
+            .from('audience_profiles')
+            .update({ [field]: publicUrl } as any)
+            .eq('user_id', user.id);
+          if (updateError) throw updateError;
+          await refreshProfile();
+          toast({ title: field === 'profile_picture_url' ? 'Profile picture updated!' : 'Cover photo updated!' });
+          return;
+        }
+        throw uploadRes.error;
+      }
 
-      const publicUrl = supabase.storage.from('artist-posts').getPublicUrl(path).data.publicUrl;
+      const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
@@ -179,11 +221,12 @@ export default function Profile() {
     queryKey: ['artist-followers', artistId],
     queryFn: async () => {
       if (!artistId) return 0;
-      const { data, error } = await supabase.rpc('get_artist_follower_count', { p_artist_id: artistId });
+      const { data, count, error } = await supabase
+        .from('liked_artists')
+        .select('artist_id', { count: 'exact' })
+        .eq('artist_id', artistId);
       if (error) return 0;
-      const raw = data as any;
-      const parsed = typeof raw === 'string' ? Number(raw) : (raw ?? 0);
-      return Number.isFinite(parsed) ? parsed : 0;
+      return count ?? data?.length ?? 0;
     },
     enabled: !!isArtist && !!artistId,
     staleTime: 1000 * 10,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShare } from '@/hooks/useShare';
+import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 
 interface PostCardProps {
   post: SocialPostWithProfile;
@@ -41,6 +42,7 @@ export function PostCard({
   const { playSong } = usePlayer();
   const navigate = useNavigate();
   const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard, shareToX } = useShare();
+  const { isArtistLiked, toggleLikeArtist } = useAudienceInteractions();
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -49,7 +51,11 @@ export function PostCard({
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
   const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
   const postArtist = post.artist_id ? ARTISTS.find(a => a.id === post.artist_id) : null;
-  const displayName = post.profile?.profile_name || postArtist?.name || 'Anonymous';
+  const displayName = postArtist?.name || post.profile?.profile_name || 'Anonymous';
+  const avatarUrl = post.profile?.profile_picture_url || postArtist?.profileImage || '';
+  const isArtistPost = !!post.artist_id;
+  const isVerifiedArtist = !!post.artist_is_verified;
+  const isFollowingArtist = post.artist_id ? isArtistLiked(post.artist_id) : false;
   const isOwnPost = user?.id === post.user_id;
 
   const goToProfile = () => {
@@ -119,7 +125,7 @@ export function PostCard({
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10 cursor-pointer" onClick={goToProfile}>
-            <AvatarImage src={post.profile?.profile_picture_url || ''} />
+            <AvatarImage src={avatarUrl} />
             <AvatarFallback className="bg-primary/20 text-primary">
               {displayName.charAt(0) || '?'}
             </AvatarFallback>
@@ -129,15 +135,32 @@ export function PostCard({
               <button type="button" className="font-semibold text-foreground hover:underline" onClick={goToProfile}>
                 {displayName}
               </button>
+              {isArtistPost && isVerifiedArtist && (
+                <CheckCircle2 className="w-4 h-4 text-yellow-400" />
+              )}
               {!isOwnPost && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => onFollow(post.user_id)}
-                >
-                  {isFollowing ? 'Following' : 'Follow'}
-                </Button>
+                isArtistPost ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      if (!post.artist_id) return;
+                      void toggleLikeArtist(post.artist_id);
+                    }}
+                  >
+                    {isFollowingArtist ? 'Following' : 'Follow'}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => onFollow(post.user_id)}
+                  >
+                    {isFollowing ? 'Following' : 'Follow'}
+                  </Button>
+                )
               )}
             </div>
             <span className="text-xs text-muted-foreground">

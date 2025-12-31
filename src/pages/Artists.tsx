@@ -33,33 +33,21 @@ export default function Artists() {
     queryKey: ['all-artist-followers'],
     queryFn: async () => {
       const counts: Record<string, number> = {};
-      const { data, error } = await supabase.rpc('get_artist_follow_counts', { artist_ids: artistIds });
+      if (artistIds.length === 0) return counts;
 
-      if (error) {
-        const fallback = await supabase.functions.invoke('artist-follow-counts', {
-          body: { artist_ids: artistIds },
-        });
+      const { data, error } = await supabase
+        .from('liked_artists')
+        .select('artist_id', { count: 'exact' })
+        .in('artist_id', artistIds);
 
-        if (fallback.error) {
-          console.error('Error fetching follower counts:', error);
-          return counts;
-        }
+      if (error) return counts;
 
-        const rows = (fallback.data as any)?.data ?? (fallback.data as any);
-        const arr = Array.isArray(rows) ? rows : [];
-        arr.forEach((row: any) => {
-          const raw = row?.follower_count;
-          const parsed = typeof raw === 'string' ? Number(raw) : (raw ?? 0);
-          counts[String(row?.artist_id)] = Number.isFinite(parsed) ? parsed : 0;
-        });
-        return counts;
-      }
-
-      data?.forEach(row => {
-        const raw = (row as any).follower_count;
-        const parsed = typeof raw === 'string' ? Number(raw) : (raw ?? 0);
-        counts[(row as any).artist_id] = Number.isFinite(parsed) ? parsed : 0;
+      (data || []).forEach(row => {
+        const key = String((row as any).artist_id);
+        if (!key) return;
+        counts[key] = (counts[key] || 0) + 1;
       });
+
       return counts;
     },
     enabled: artistIds.length > 0,

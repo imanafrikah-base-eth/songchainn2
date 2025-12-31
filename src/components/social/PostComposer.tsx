@@ -14,6 +14,26 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+let resolvedArtistStorageBucket: Promise<string> | null = null;
+
+async function resolveStorageBucket(preferredBucket: string) {
+  if (!resolvedArtistStorageBucket) {
+    resolvedArtistStorageBucket = (async () => {
+      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
+      if (!listBuckets) return preferredBucket;
+      const { data, error } = await listBuckets();
+      if (error || !Array.isArray(data)) return preferredBucket;
+      const names = new Set<string>(data.map((b: any) => String(b?.name)));
+      if (names.has(preferredBucket)) return preferredBucket;
+      if (names.has('public')) return 'public';
+      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
+      return first || preferredBucket;
+    })();
+  }
+
+  return resolvedArtistStorageBucket;
+}
+
 interface PostComposerProps {
   onPost: (
     content: string,
@@ -57,33 +77,55 @@ export function PostComposer({ onPost }: PostComposerProps) {
   }, [selectedImage]);
 
   const handlePost = async () => {
-    if (!content.trim() && postType === 'text') return;
+    if (!content.trim() && postType === 'text' && !selectedImage) return;
     if (postType === 'song_share' && !selectedSong) return;
 
     setIsPosting(true);
-    let image: { url: string; path: string } | undefined;
-    if (isArtist && user && selectedImage) {
-      const extRaw = selectedImage.name.split('.').pop() || '';
-      const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
-      const path = `artists/${user.id}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-      const uploadRes = await supabase.storage
-        .from('artist-posts')
-        .upload(path, selectedImage, { contentType: selectedImage.type, upsert: false });
-      if (uploadRes.error) {
-        toast.error('Image upload failed', { description: uploadRes.error.message });
-        setIsPosting(false);
-        return;
+    try {
+      let image: { url: string; path: string } | undefined;
+      if (isArtist && user && selectedImage) {
+        const extRaw = selectedImage.name.split('.').pop() || '';
+        const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
+        const path = `artists/${user.id}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+        const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
+        const bucket = await resolveStorageBucket(preferredBucket);
+        const uploadRes = await supabase.storage
+          .from(bucket)
+          .upload(path, selectedImage, { contentType: selectedImage.type, upsert: false });
+        if (uploadRes.error) {
+          const msg = String(uploadRes.error.message || '');
+          if (msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found')) {
+            resolvedArtistStorageBucket = null;
+            const retryBucket = await resolveStorageBucket(preferredBucket);
+            const retryRes = await supabase.storage
+              .from(retryBucket)
+              .upload(path, selectedImage, { contentType: selectedImage.type, upsert: false });
+            if (retryRes.error) {
+              toast.error('Image upload failed', { description: retryRes.error.message });
+              return;
+            }
+            const publicUrl = supabase.storage.from(retryBucket).getPublicUrl(path).data.publicUrl;
+            image = { url: publicUrl, path };
+          } else {
+            toast.error('Image upload failed', { description: uploadRes.error.message });
+            return;
+          }
+        } else {
+          const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+          image = { url: publicUrl, path };
+        }
       }
-      const publicUrl = supabase.storage.from('artist-posts').getPublicUrl(path).data.publicUrl;
-      image = { url: publicUrl, path };
-    }
 
-    await onPost(content, postType, postType === 'song_share' ? selectedSong : undefined, image);
-    setContent('');
-    setSelectedSong('');
-    setPostType('text');
-    setSelectedImage(null);
-    setIsPosting(false);
+      await onPost(content, postType, postType === 'song_share' ? selectedSong : undefined, image);
+      setContent('');
+      setSelectedSong('');
+      setPostType('text');
+      setSelectedImage(null);
+    } catch (err: any) {
+      toast.error('Error creating post', { description: err?.message ? String(err.message) : undefined });
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const getArtistName = (artistId: string) => {
@@ -183,7 +225,7 @@ export function PostComposer({ onPost }: PostComposerProps) {
           onClick={handlePost} 
           disabled={
             isPosting ||
-            (!content.trim() && postType === 'text') ||
+            (!content.trim() && postType === 'text' && !selectedImage) ||
             (postType === 'song_share' && !selectedSong)
           }
           size="sm"

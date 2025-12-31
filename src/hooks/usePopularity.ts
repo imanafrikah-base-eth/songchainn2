@@ -54,40 +54,29 @@ function usePopularityRealtime() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    console.log('Setting up real-time popularity subscriptions...');
-    
     const channel = supabase
       .channel('popularity-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'song_analytics' }, () => {
-        console.log('Song analytics changed, refreshing popularity...');
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'liked_songs' }, () => {
-        console.log('Liked songs changed, refreshing popularity...');
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
-        console.log('Post likes changed, refreshing popularity...');
         queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => {
-        console.log('Post comments changed, refreshing popularity...');
         queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_follows' }, () => {
-        console.log('User follows changed, refreshing popularity...');
         queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_views' }, () => {
-        console.log('Profile views changed, refreshing popularity...');
         queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
       })
-      .subscribe((status) => {
-        console.log('Popularity realtime subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('Cleaning up popularity realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
@@ -104,7 +93,6 @@ export function useSongPopularity() {
         .rpc('get_song_popularity');
       
       if (error) {
-        console.error('Error fetching song popularity:', error);
         // Fallback to direct query for unauthenticated users (will return empty if RLS blocks)
         const { data: fallbackData } = await supabase
           .from('song_popularity')
@@ -128,7 +116,6 @@ export function useProfilePopularity() {
         .order('popularity_score', { ascending: false });
       
       if (error) {
-        console.error('Error fetching profile popularity:', error);
         return [];
       }
       
