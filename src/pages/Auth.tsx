@@ -66,6 +66,7 @@ export default function Auth() {
     [normalizeArtistKey('IMan Afrikah')]: '05',
     [normalizeArtistKey('DenaJah')]: '06',
     [normalizeArtistKey('7ROO7H BASED')]: '07',
+    [normalizeArtistKey('FAITH')]: '08',
   };
 
   const resolveArtistLogin = (usernameRaw: string) => {
@@ -162,18 +163,48 @@ export default function Auth() {
           options: { emailRedirectTo: `${window.location.origin}/` },
         });
         if (error) throw error;
-        toast.success('Account created! Now connect your Base Wallet.');
-        setPendingWalletConnection(true);
-        setAuthView('connect-wallet');
+        toast.success('Account created!');
+        setPendingWalletConnection(false);
+        setAuthMode('signin');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success('Signed in! Now connect your Base Wallet.');
-        setPendingWalletConnection(true);
-        setAuthView('connect-wallet');
+        const signInRes = await supabase.auth.signInWithPassword({ email, password });
+        if (signInRes.error) throw signInRes.error;
+        toast.success('Signed in!');
+        setPendingWalletConnection(false);
+        navigate('/', { replace: true });
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('invalid login credentials')) {
+        setError('Invalid email or password');
+      } else {
+        setError(msg || 'Authentication failed');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendEmailLink = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Enter your email first');
+      return;
+    }
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: trimmedEmail,
+        options: { emailRedirectTo: `${window.location.origin}/` },
+      });
+      if (error) throw error;
+      toast.success('Check your email for a sign-in link');
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      setError(msg || 'Failed to send sign-in link');
     } finally {
       setIsLoading(false);
     }
@@ -211,9 +242,9 @@ export default function Auth() {
         type: 'sms',
       });
       if (error) throw error;
-      toast.success('Verified! Now connect your Base Wallet.');
-      setPendingWalletConnection(true);
-      setAuthView('connect-wallet');
+      toast.success('Signed in!');
+      setPendingWalletConnection(false);
+      navigate('/', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
     } finally {
@@ -448,11 +479,11 @@ export default function Auth() {
                   </p>
                 </div>
 
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 mb-6">
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 mb-6">
                   <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Your wallet supports culture, identity, and future ownership on $ongChainn. 
-                    Music streaming requires wallet verification on Base network.
+                    Your wallet supports culture, identity, and future ownership on $ongChainn.
+                    You can connect it now or later.
                   </p>
                 </div>
 
@@ -552,10 +583,10 @@ export default function Auth() {
                 <div className="text-center mb-6">
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass text-xs font-medium text-primary mb-4">
                     <Shield className="w-3.5 h-3.5" />
-                    Base Network Wallet Required
+                    Base Wallet (optional)
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Connect with any wallet that supports Base network — MetaMask, Coinbase Wallet, Rainbow, etc.
+                    Connect a wallet to unlock on-chain features — MetaMask, Coinbase Wallet, Rainbow, etc.
                   </p>
                 </div>
 
@@ -643,7 +674,7 @@ export default function Auth() {
                       >
                         <div className="pt-4 space-y-3">
                           <p className="text-xs text-center text-muted-foreground mb-3">
-                            Phone can be used alongside Base Wallet. You'll still need to connect your wallet to access music.
+                            Phone sign-in works without a wallet. You can connect one later.
                           </p>
                           <button
                             onClick={() => setAuthView('phone')}
@@ -672,7 +703,7 @@ export default function Auth() {
                   {authMode === 'signup' ? 'Create Account' : 'Sign In'}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-6">
-                  You'll still need to connect Base Wallet after signing in.
+                  Connect a Base wallet later if you want on-chain features.
                 </p>
 
                 <form onSubmit={handleEmailAuth} className="space-y-4">
@@ -735,6 +766,18 @@ export default function Auth() {
                   >
                     {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : authMode === 'signup' ? 'Create Account' : 'Sign In'}
                   </Button>
+
+                  {authMode === 'signin' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isLoading}
+                      onClick={handleSendEmailLink}
+                      className="w-full h-12 rounded-xl border-border/50 hover:bg-secondary/30 text-foreground font-medium"
+                    >
+                      Email me a sign-in link
+                    </Button>
+                  )}
                 </form>
               </motion.div>
             ) : authView === 'artist' ? (

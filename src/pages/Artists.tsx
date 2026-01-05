@@ -23,6 +23,15 @@ const itemVariants = {
   show: { opacity: 1, y: 0, scale: 1 },
 };
 
+const NEW_ARTIST_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
+
+function isArtistNew(addedAt?: string) {
+  if (!addedAt) return false;
+  const ts = new Date(addedAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts < NEW_ARTIST_WINDOW_MS;
+}
+
 export default function Artists() {
   const { data: popularityData } = useSongPopularity();
   const artistIds = useMemo(() => ARTISTS.map(a => a.id), []);
@@ -207,6 +216,14 @@ export default function Artists() {
                             'bg-amber-600 text-amber-100'
                           }`}>
                             #{index + 1}
+                          </div>
+                        </div>
+                      )}
+
+                      {isArtistNew(artist.addedAt) && (
+                        <div className="absolute top-3 right-3">
+                          <div className="px-2 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+                            NEW
                           </div>
                         </div>
                       )}

@@ -47,6 +47,15 @@ async function resolveStorageBucket(preferredBucket: string) {
   return resolvedArtistDetailStorageBucket;
 }
 
+const NEW_ARTIST_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
+
+function isArtistNew(addedAt?: string) {
+  if (!addedAt) return false;
+  const ts = new Date(addedAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts < NEW_ARTIST_WINDOW_MS;
+}
+
 export default function ArtistDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, isArtist, artistId } = useAuth();
@@ -146,6 +155,7 @@ export default function ArtistDetail() {
   const isOwner = !!user && !!ownerUserId && user.id === ownerUserId;
   const isVerified = artistAccount?.is_verified ?? false;
   const profileTheme = (artistAccount?.profile_theme || 'default').toLowerCase();
+  const isNewArtist = isArtistNew(artist?.addedAt);
 
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isUploadingCoverPhoto, setIsUploadingCoverPhoto] = useState(false);
@@ -725,6 +735,11 @@ export default function ArtistDetail() {
                     <h1 className="font-heading text-4xl font-bold text-foreground">
                       <span className="inline-flex items-center gap-2">
                         <span className="truncate">{displayName}</span>
+                        {isNewArtist && (
+                          <span className="px-2 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+                            NEW
+                          </span>
+                        )}
                         {isVerified && <CheckCircle2 className="w-5 h-5 text-yellow-400" />}
                       </span>
                     </h1>

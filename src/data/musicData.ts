@@ -37,6 +37,7 @@ export interface Artist {
   townSquare: string;
   profileImage?: string;
   songs: string[];
+  addedAt?: string;
 }
 
 export interface AudienceProfile {
@@ -59,18 +60,27 @@ export interface AdminUser {
   isAdmin: boolean;
 }
 
+function makeProfileSvgDataUri(label: string, background: { from: string; to: string }) {
+  const initial = (label.trim()[0] || '?').toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${background.from}"/><stop offset="1" stop-color="${background.to}"/></linearGradient></defs><rect width="512" height="512" rx="96" fill="url(#g)"/><circle cx="256" cy="220" r="92" fill="rgba(255,255,255,0.18)"/><path d="M128 436c20-78 70-120 128-120s108 42 128 120" fill="rgba(255,255,255,0.18)"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="160" font-weight="800" fill="rgba(255,255,255,0.92)">${initial}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const FAITH_PROFILE_IMAGE = makeProfileSvgDataUri('FAITH', { from: '#7c3aed', to: '#ec4899' });
+
 const ARTWORK_BY_ARTIST: Record<string, string> = {
-  '7ROO7H BASED': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/7ROO7H%20BASED.jpg',
+  '7ROO7H BASED': artist7roo7hBased,
   Denajah: artistDenajah,
   DENAJAH: artistDenajah,
-  NDA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA.jpg',
-  PRP: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/PRP.jpg',
-  'IMan Afrikah': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
-  'IMAN AFRIKAH': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
-  Sanchy: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg',
-  SANCHY: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg',
-  Santana: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANTANA.png',
-  SANTANA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANTANA.png',
+  NDA: artistNda,
+  PRP: artistPrp,
+  'IMan Afrikah': artistImanAfrikah,
+  'IMAN AFRIKAH': artistImanAfrikah,
+  Sanchy: artistSanchy,
+  SANCHY: artistSanchy,
+  Santana: artistSantana,
+  SANTANA: artistSantana,
+  FAITH: FAITH_PROFILE_IMAGE,
 };
 
 export const SONGS: Song[] = [
@@ -662,6 +672,90 @@ export const SONGS: Song[] = [
     townSquare: 'Livingstone Town Square',
     genre: 'Afro',
   },
+  {
+    id: '50',
+    title: 'UNTAMED',
+    artist: 'FAITH',
+    artistId: '8',
+    audioUrl: 'https://pub-be3ea97c3c05482f8b21ccc8d973bfd0.r2.dev/FAITH%20-%20UNTAMED.wav',
+    coverImage: ARTWORK_BY_ARTIST.FAITH,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+  },
+  {
+    id: '51',
+    title: 'RISE',
+    artist: 'FAITH',
+    artistId: '8',
+    audioUrl: 'https://pub-be3ea97c3c05482f8b21ccc8d973bfd0.r2.dev/FAITH%20-%20RISE.wav',
+    coverImage: ARTWORK_BY_ARTIST.FAITH,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+  },
+  {
+    id: '52',
+    title: 'LION HEART',
+    artist: 'FAITH',
+    artistId: '8',
+    audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/FAITH%20-%20LION%20HEART.wav',
+    coverImage: ARTWORK_BY_ARTIST.FAITH,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+  },
+  {
+    id: '53',
+    title: 'GOLD AURA',
+    artist: 'FAITH',
+    artistId: '8',
+    audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/FAITH%20-%20GOLD%20AURA.wav',
+    coverImage: ARTWORK_BY_ARTIST.FAITH,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+  },
+  {
+    id: '54',
+    title: 'CROWN UP',
+    artist: 'FAITH',
+    artistId: '8',
+    audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/FAITH%20-%20CROWN%20UP.wav',
+    coverImage: ARTWORK_BY_ARTIST.FAITH,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+  },
+  {
+    id: '55',
+    title: 'RADIANT',
+    artist: 'FAITH',
+    artistId: '8',
+    audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/FAITH%20-%20RADIANT.wav',
+    coverImage: ARTWORK_BY_ARTIST.FAITH,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+  },
+  {
+    id: '56',
+    title: 'NO SEATS',
+    artist: 'FAITH',
+    artistId: '8',
+    audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/FAITH%20-%20NO%20SEATS.wav',
+    coverImage: ARTWORK_BY_ARTIST.FAITH,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+  },
 ];
 
 export const ARTISTS: Artist[] = [
@@ -728,6 +822,16 @@ export const ARTISTS: Artist[] = [
     profileImage: artistSantana,
     songs: ['7', '43', '44', '45', '46', '47', '48'],
   },
+  {
+    id: '8',
+    name: 'FAITH',
+    bio: 'FAITH brings soulful energy and a fearless voice, blending modern Afro rhythms with heartfelt storytelling.',
+    location: 'Zambia',
+    townSquare: 'Livingstone Town Square',
+    profileImage: FAITH_PROFILE_IMAGE,
+    songs: ['50', '51', '52', '53', '54', '55', '56'],
+    addedAt: '2026-01-05T00:00:00.000Z',
+  },
 ];
 
 export const TOWN_SQUARES = [
@@ -736,6 +840,6 @@ export const TOWN_SQUARES = [
     name: 'Livingstone Town Square',
     location: 'Zambia',
     description: 'Pioneer chapter of Create On Base Town Squares',
-    artistCount: 7,
+    artistCount: 8,
   },
 ];
