@@ -51,7 +51,7 @@ const BaseIcon = () => (
 );
 
 export default function Profile() {
-  const { user, audienceProfile, refreshProfile, isArtist, artistId } = useAuth();
+  const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding } = useAuth();
   const { likedSongs, playlists } = useAudienceInteractions();
   const { points, completedReferrals, shareInviteLink } = useReferrals();
   const { toast } = useToast();
@@ -238,6 +238,21 @@ export default function Profile() {
   }
 
   if (!audienceProfile) {
+    if (!needsOnboarding) {
+      return (
+        <div className="min-h-screen bg-background pb-24">
+          <div className="container mx-auto px-4 py-8 max-w-2xl">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
+              <p className="text-sm text-destructive">
+                Profile storage is not available right now. If you just deployed, run the Supabase migrations (the app is trying to use the table <span className="font-medium">public.audience_profiles</span>).
+              </p>
+            </div>
+          </div>
+          <Navigation />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

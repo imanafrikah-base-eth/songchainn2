@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 import { AudienceProfile } from '@/types/database';
@@ -66,6 +66,32 @@ function resolveArtistIdFromUser(user: User | null) {
   return null;
 }
 
+function shouldRequireOnboardingFromStorage() {
+  try {
+    return localStorage.getItem('songchainn_needs_onboarding') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function isAudienceProfilesUnavailableError(err: unknown) {
+  const anyErr = err as any;
+  const code = String(anyErr?.code || '');
+  const status = Number(anyErr?.status || 0);
+  const message = String(anyErr?.message || '');
+  const messageLower = message.toLowerCase();
+
+  return (
+    code === 'PGRST205' ||
+    code === '42501' ||
+    status === 401 ||
+    status === 403 ||
+    messageLower.includes('permission denied for table') ||
+    (messageLower.includes('audience_profiles') && messageLower.includes('schema cache')) ||
+    (messageLower.includes('could not find the table') && messageLower.includes('audience_profiles'))
+  );
+}
+
 async function fetchArtistIdFromArtistAccounts(userId: string): Promise<string | null> {
   try {
     const { data } = await (supabase as any)
@@ -108,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isWalletDetected, setIsWalletDetected] = useState(false);
+  const bootstrapIdRef = useRef(0);
 
   // Check for any wallet provider (keep it fresh when the app regains focus)
   useEffect(() => {
@@ -126,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const fetchUserRole = async (userId: string) => {
+  const fetchUserRole = useCallback(async (userId: string) => {
     if (!isSupabaseConfigured) return;
     try {
       const { data } = await supabase
@@ -141,9 +168,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return;
     }
-  };
+  }, []);
 
-  const fetchAudienceProfile = async (userId: string, options?: { skipOnboarding?: boolean }) => {
+  const fetchAudienceProfile = useCallback(async (userId: string, options?: { skipOnboarding?: boolean }) => {
     if (!isSupabaseConfigured) return;
     try {
       const { data } = await supabase
@@ -154,118 +181,103 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (data) {
         setAudienceProfile(data as AudienceProfile);
+        if ((data as any)?.onboarding_completed) {
+          try {
+            localStorage.removeItem('songchainn_needs_onboarding');
+          } catch {
+            void 0;
+          }
+        }
         setNeedsOnboarding(options?.skipOnboarding ? false : !data.onboarding_completed);
       } else {
         setAudienceProfile(null);
-        setNeedsOnboarding(options?.skipOnboarding ? false : true);
+        setNeedsOnboarding(options?.skipOnboarding ? false : shouldRequireOnboardingFromStorage());
       }
-    } catch {
+    } catch (err) {
+      if (isAudienceProfilesUnavailableError(err)) {
+        setAudienceProfile(null);
+        setNeedsOnboarding(false);
+        try {
+          localStorage.removeItem('songchainn_needs_onboarding');
+        } catch {
+          void 0;
+        }
+        return;
+      }
+
       setAudienceProfile(null);
-      setNeedsOnboarding(options?.skipOnboarding ? false : true);
+      setNeedsOnboarding(false);
     }
-  };
+  }, []);
 
   const refreshProfile = useCallback(async () => {
     if (user) {
       await fetchAudienceProfile(user.id, { skipOnboarding: isArtist });
     }
-  }, [isArtist, user]);
+  }, [fetchAudienceProfile, isArtist, user]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setIsLoading(false);
       return;
     }
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Extract wallet address from user metadata
-        if (session?.user?.user_metadata?.base_wallet_address) {
-          setWalletAddress(session.user.user_metadata.base_wallet_address);
-        }
-        
-        if (session?.user) {
-          // Defer data fetching with setTimeout to prevent deadlock
-          setTimeout(() => {
-            void (async () => {
-              try {
-                const artistIdFromDb = await fetchArtistIdFromArtistAccounts(session.user.id);
-                const resolvedArtistId = artistIdFromDb ?? resolveArtistIdFromUser(session.user);
-                if (resolvedArtistId) {
-                  await ensureArtistAccountMapping(session.user.id, resolvedArtistId, artistIdFromDb);
-                }
-                setIsArtist(Boolean(resolvedArtistId));
-                setArtistId(resolvedArtistId);
-                fetchUserRole(session.user.id);
-                fetchAudienceProfile(session.user.id, { skipOnboarding: Boolean(resolvedArtistId) });
-              } catch {
-                setIsAdmin(false);
-                setIsArtist(false);
-                setArtistId(null);
-                setAudienceProfile(null);
-                setNeedsOnboarding(false);
-              }
-            })();
-          }, 0);
-        } else {
-          setIsAdmin(false);
-          setIsArtist(false);
-          setArtistId(null);
-          setAudienceProfile(null);
-          setNeedsOnboarding(false);
-          setWalletAddress(null);
-        }
-        
-        setIsLoading(false);
-      }
-    );
+    const bootstrapFromSession = async (nextSession: Session | null) => {
+      const currentId = ++bootstrapIdRef.current;
+      setIsLoading(true);
 
-    // THEN check for existing session
-    supabase.auth
-      .getSession()
-      .then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user?.user_metadata?.base_wallet_address) {
-          setWalletAddress(session.user.user_metadata.base_wallet_address);
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      const baseWalletAddress =
+        (nextSession?.user?.user_metadata as any)?.base_wallet_address != null
+          ? String((nextSession?.user?.user_metadata as any)?.base_wallet_address)
+          : null;
+      setWalletAddress(baseWalletAddress);
+
+      if (!nextSession?.user) {
+        setIsAdmin(false);
+        setIsArtist(false);
+        setArtistId(null);
+        setAudienceProfile(null);
+        setNeedsOnboarding(false);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const artistIdFromDb = await fetchArtistIdFromArtistAccounts(nextSession.user.id);
+        const resolvedArtistId = artistIdFromDb ?? resolveArtistIdFromUser(nextSession.user);
+        if (resolvedArtistId) {
+          await ensureArtistAccountMapping(nextSession.user.id, resolvedArtistId, artistIdFromDb);
         }
-        
-        if (session?.user) {
-          void (async () => {
-            try {
-              const artistIdFromDb = await fetchArtistIdFromArtistAccounts(session.user.id);
-              const resolvedArtistId = artistIdFromDb ?? resolveArtistIdFromUser(session.user);
-              if (resolvedArtistId) {
-                await ensureArtistAccountMapping(session.user.id, resolvedArtistId, artistIdFromDb);
-              }
-              setIsArtist(Boolean(resolvedArtistId));
-              setArtistId(resolvedArtistId);
-              fetchUserRole(session.user.id);
-              fetchAudienceProfile(session.user.id, { skipOnboarding: Boolean(resolvedArtistId) });
-            } catch {
-              setIsAdmin(false);
-              setIsArtist(false);
-              setArtistId(null);
-              setAudienceProfile(null);
-              setNeedsOnboarding(false);
-            } finally {
-              setIsLoading(false);
-            }
-          })();
-        } else {
+        setIsArtist(Boolean(resolvedArtistId));
+        setArtistId(resolvedArtistId);
+        await fetchUserRole(nextSession.user.id);
+        await fetchAudienceProfile(nextSession.user.id, { skipOnboarding: Boolean(resolvedArtistId) });
+      } catch {
+        setIsAdmin(false);
+        setIsArtist(false);
+        setArtistId(null);
+        setAudienceProfile(null);
+        setNeedsOnboarding(false);
+      } finally {
+        if (bootstrapIdRef.current === currentId) {
           setIsLoading(false);
         }
-      })
-      .catch(() => {
-        setIsLoading(false);
-      });
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      void bootstrapFromSession(nextSession);
+    });
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: existingSession } }) => bootstrapFromSession(existingSession))
+      .catch(() => setIsLoading(false));
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchAudienceProfile, fetchUserRole]);
 
   /**
    * Wallet Sign-In Flow with SIWE Signature Verification
@@ -349,6 +361,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           refresh_token: verifyData.session.refresh_token,
         });
         setWalletAddress(verifyData.walletAddress);
+      }
+
+      try {
+        localStorage.setItem('songchainn_needs_onboarding', '1');
+      } catch {
+        void 0;
       }
 
       return { error: null };

@@ -164,6 +164,7 @@ export default function Auth() {
         });
         if (error) throw error;
         toast.success('Account created!');
+        localStorage.setItem('songchainn_needs_onboarding', '1');
         setPendingWalletConnection(false);
         setAuthMode('signin');
       } else {

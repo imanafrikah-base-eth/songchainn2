@@ -81,12 +81,26 @@ export default function Onboarding() {
       }
       
       toast({ title: 'Welcome to the Audience!' });
+      try {
+        localStorage.removeItem('songchainn_needs_onboarding');
+      } catch {
+        void 0;
+      }
       await refreshProfile();
     } catch (err: any) {
       console.error('Onboarding error:', err);
+      const msg = String(err?.message || '');
+      const msgLower = msg.toLowerCase();
+      const isMissingAudienceProfiles =
+        String(err?.code || '') === 'PGRST205' ||
+        (msgLower.includes('audience_profiles') && msgLower.includes('schema cache')) ||
+        (msgLower.includes('could not find the table') && msgLower.includes('audience_profiles'));
+
       toast({ 
         title: 'Error creating profile', 
-        description: err.message,
+        description: isMissingAudienceProfiles
+          ? "Database table 'audience_profiles' is missing. Apply Supabase migrations to enable account creation."
+          : msg,
         variant: 'destructive' 
       });
     } finally {
