@@ -295,7 +295,7 @@ export default function Profile() {
                 <img
                   src={audienceProfile.profile_picture_url}
                   alt={audienceProfile.profile_name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-muted-foreground">
@@ -460,7 +460,7 @@ export default function Profile() {
                   <img
                     src={song.coverImage}
                     alt={song.title}
-                    className="w-12 h-12 rounded-lg object-cover"
+                    className="w-12 h-12 rounded-lg object-contain"
                     loading="lazy"
                   />
                   <div className="flex-1 min-w-0">
@@ -560,7 +560,7 @@ export default function Profile() {
                   <img
                     src={song.coverImage}
                     alt={song.title}
-                    className="w-12 h-12 rounded-lg object-cover"
+                    className="w-12 h-12 rounded-lg object-contain"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">{song.title}</p>

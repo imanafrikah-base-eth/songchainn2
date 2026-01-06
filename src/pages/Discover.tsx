@@ -355,7 +355,7 @@ export default function Discover() {
                     <img
                       src={song.coverImage}
                       alt={song.title}
-                      className="w-10 h-10 rounded-lg object-cover"
+                      className="w-10 h-10 rounded-lg object-contain"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{song.title}</p>

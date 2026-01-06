@@ -1163,7 +1163,7 @@ export default function Room() {
                 <img
                   src={currentSong.coverImage}
                   alt={currentSong.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                   loading="lazy"
                 />
               ) : null}
@@ -1258,7 +1258,7 @@ export default function Room() {
                             <img
                               src={song.coverImage}
                               alt={song.title}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                               loading="lazy"
                             />
                           ) : null}
@@ -1316,7 +1316,7 @@ export default function Room() {
                         <img
                           src={currentSong.coverImage}
                           alt={currentSong.title}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                           loading="lazy"
                         />
                       ) : null}
@@ -1344,7 +1344,7 @@ export default function Room() {
                           <img
                             src={song.coverImage}
                             alt={song.title}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                             loading="lazy"
                           />
                         ) : null}

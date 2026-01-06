@@ -212,7 +212,7 @@ export function UnlockSongModal({
                   <img
                     src={song.coverImage}
                     alt={song.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 ) : (
                   <div className="w-full h-full bg-muted flex items-center justify-center">

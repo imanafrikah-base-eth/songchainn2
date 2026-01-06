@@ -1,6 +1,6 @@
 // $ongChainn Push Notification Service Worker
-const CACHE_NAME = 'songchainn-v1';
-const AUDIO_CACHE = 'songchainn-audio-v1';
+const CACHE_NAME = 'songchainn-v2';
+const AUDIO_CACHE = 'songchainn-audio-v2';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
@@ -29,6 +29,20 @@ self.addEventListener('activate', (event) => {
   );
   clients.claim();
 });
+
+const cachePutIfOk = (cacheName, request, response) => {
+  if (!response || !response.ok) return;
+  caches.open(cacheName).then((cache) => cache.put(request, response.clone())).catch(() => {});
+};
+
+const networkFirst = (request, cacheName) => {
+  return fetch(request)
+    .then((response) => {
+      cachePutIfOk(cacheName, request, response);
+      return response;
+    })
+    .catch(() => caches.match(request));
+};
 
 // Handle messages from the main thread
 self.addEventListener('message', (event) => {
@@ -77,6 +91,26 @@ self.addEventListener('message', (event) => {
 // Fetch handler with offline support
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  const request = event.request;
+  const destination = request.destination;
+  
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          cachePutIfOk(CACHE_NAME, request, response);
+          cachePutIfOk(CACHE_NAME, '/', response);
+          return response;
+        })
+        .catch(() => caches.match('/'))
+    );
+    return;
+  }
+  
+  if (destination === 'script' || destination === 'style') {
+    event.respondWith(networkFirst(request, CACHE_NAME));
+    return;
+  }
   
   // Handle audio files from cache first
   if (url.pathname.includes('.wav') || url.pathname.includes('.mp3')) {
@@ -98,10 +132,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetchPromise = fetch(event.request).then((response) => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
+        cachePutIfOk(CACHE_NAME, event.request, response);
         return response;
       }).catch(() => cached);
       return cached || fetchPromise;

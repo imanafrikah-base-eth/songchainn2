@@ -94,7 +94,7 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
             <img 
               src={song.coverImage} 
               alt={song.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              className="w-full h-full object-contain"
             />
           ) : (
             <div className="w-full h-full gradient-primary opacity-40" />

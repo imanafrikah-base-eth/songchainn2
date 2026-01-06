@@ -172,7 +172,7 @@ export function MusicFeedCard({
             <img 
               src={song.coverImage} 
               alt={song.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/20" />
             
@@ -229,7 +229,7 @@ export function MusicFeedCard({
             <img 
               src={song.coverImage} 
               alt={song.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/20" />
             
@@ -371,7 +371,7 @@ export function MusicFeedCard({
           className="w-12 h-12 rounded-full border-2 border-white/50 overflow-hidden"
         >
           {song ? (
-            <img src={song.coverImage} alt="" className="w-full h-full object-cover" />
+            <img src={song.coverImage} alt="" className="w-full h-full object-contain" />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center">
               <Disc3 className="w-6 h-6 text-white" />

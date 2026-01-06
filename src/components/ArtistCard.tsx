@@ -35,12 +35,19 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
       >
         <div className="aspect-square bg-secondary relative overflow-hidden">
           {artist.profileImage ? (
-            <img 
-              src={artist.profileImage} 
-              alt={artist.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              loading="lazy"
-            />
+            <div className="relative w-full h-full">
+              <img
+                src={artist.profileImage}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110"
+              />
+              <img 
+                src={artist.profileImage} 
+                alt={artist.name}
+                className="relative w-full h-full object-contain"
+                loading="lazy"
+              />
+            </div>
           ) : (
             <>
               <div className="absolute inset-0 gradient-primary opacity-20 group-hover:opacity-30 transition-opacity" />

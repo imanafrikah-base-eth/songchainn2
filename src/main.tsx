@@ -65,7 +65,17 @@ if (typeof window !== "undefined") {
   const tryAutoReload = () => {
     if (!canAutoReload()) return;
     markAutoReload();
-    window.location.reload();
+    const reload = () => window.location.reload();
+    if (import.meta.env.PROD && "serviceWorker" in navigator) {
+      Promise.all([
+        navigator.serviceWorker.getRegistrations().then((regs) => Promise.all(regs.map((r) => r.unregister()))),
+        typeof caches !== "undefined" && caches.keys ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))) : Promise.resolve([]),
+      ])
+        .catch(() => {})
+        .finally(reload);
+      return;
+    }
+    reload();
   };
 
   window.addEventListener("error", (event) => {

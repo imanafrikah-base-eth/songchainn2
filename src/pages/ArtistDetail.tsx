@@ -150,7 +150,10 @@ export default function ArtistDetail() {
 
   const displayName = (artistProfile as any)?.profile_name || artist?.name;
   const displayBio = (artistProfile as any)?.bio || artist?.bio;
-  const displayProfileImage = (artistProfile as any)?.profile_picture_url || artist?.profileImage;
+  const preferStaticProfileImage = !!artist?.id && ['1', '2', '3', '4', '5', '6', '7', '8'].includes(artist.id);
+  const displayProfileImage = preferStaticProfileImage
+    ? artist?.profileImage || (artistProfile as any)?.profile_picture_url
+    : (artistProfile as any)?.profile_picture_url || artist?.profileImage;
   const displayCoverPhoto = (artistProfile as any)?.cover_photo_url || null;
   const isOwner = !!user && !!ownerUserId && user.id === ownerUserId;
   const isVerified = artistAccount?.is_verified ?? false;
@@ -680,11 +683,18 @@ export default function ArtistDetail() {
             <div className="w-48 flex-shrink-0">
               <div className="w-48 h-48 rounded-2xl bg-secondary overflow-hidden">
               {displayProfileImage ? (
-                <img 
-                  src={displayProfileImage} 
-                  alt={displayName || artist.name}
-                  className="w-full h-full object-cover"
-                />
+                <div className="relative w-full h-full">
+                  <img
+                    src={displayProfileImage}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110"
+                  />
+                  <img 
+                    src={displayProfileImage} 
+                    alt={displayName || artist.name}
+                    className="relative w-full h-full object-contain"
+                  />
+                </div>
               ) : (
                 <div className="w-full h-full gradient-primary opacity-40 flex items-center justify-center">
                   <span className="text-6xl font-heading font-bold text-foreground">

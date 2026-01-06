@@ -86,7 +86,7 @@ export function AIArtwork({
             <img
               src={imageUrl}
               alt={`AI generated artwork for ${songTitle}`}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               onError={() => setShowFallback(true)}
             />
             {/* AI badge */}
@@ -112,7 +112,7 @@ export function AIArtwork({
               <img
                 src={fallbackImage}
                 alt={songTitle}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-primary/30 via-secondary to-cyan-400/20 flex items-center justify-center">

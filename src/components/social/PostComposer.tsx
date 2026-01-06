@@ -142,7 +142,7 @@ export function PostComposer({ onPost }: PostComposerProps) {
             <img 
               src={audienceProfile.profile_picture_url} 
               alt="Profile" 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           ) : (
             <span className="text-primary font-bold">
@@ -177,7 +177,7 @@ export function PostComposer({ onPost }: PostComposerProps) {
               />
               {selectedImageUrl && (
                 <div className="w-28 h-28 rounded-lg overflow-hidden border border-border/50">
-                  <img src={selectedImageUrl} alt="" className="w-full h-full object-cover" />
+                  <img src={selectedImageUrl} alt="" className="w-full h-full object-contain" />
                 </div>
               )}
             </div>

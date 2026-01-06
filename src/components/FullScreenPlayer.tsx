@@ -430,7 +430,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                               <img
                                 src={song.coverImage}
                                 alt={song.title}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                               />
                             ) : (
                               <div className="w-full h-full gradient-primary opacity-60" />

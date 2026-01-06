@@ -1,11 +1,3 @@
-import artist7roo7hBased from '@/assets/artist-7roo7h-based.png';
-import artistDenajah from '@/assets/artist-denajah.png';
-import artistImanAfrikah from '@/assets/artist-iman-afrikah.png';
-import artistNda from '@/assets/artist-nda.png';
-import artistPrp from '@/assets/artist-prp.png';
-import artistSanchy from '@/assets/artist-sanchy.png';
-import artistSantana from '@/assets/artist-santana.png';
-
 export type Genre = 'Trap' | 'Afro' | 'Dancehall' | 'Kalind-Rock' | 'Kali-Funk' | 'ZamRock-Fusion';
 
 export const GENRES: Genre[] = ['Trap', 'Afro', 'Dancehall', 'Kalind-Rock', 'Kali-Funk', 'ZamRock-Fusion'];
@@ -60,27 +52,20 @@ export interface AdminUser {
   isAdmin: boolean;
 }
 
-function makeProfileSvgDataUri(label: string, background: { from: string; to: string }) {
-  const initial = (label.trim()[0] || '?').toUpperCase();
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${background.from}"/><stop offset="1" stop-color="${background.to}"/></linearGradient></defs><rect width="512" height="512" rx="96" fill="url(#g)"/><circle cx="256" cy="220" r="92" fill="rgba(255,255,255,0.18)"/><path d="M128 436c20-78 70-120 128-120s108 42 128 120" fill="rgba(255,255,255,0.18)"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="160" font-weight="800" fill="rgba(255,255,255,0.92)">${initial}</text></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-const FAITH_PROFILE_IMAGE = makeProfileSvgDataUri('FAITH', { from: '#7c3aed', to: '#ec4899' });
-
 const ARTWORK_BY_ARTIST: Record<string, string> = {
-  '7ROO7H BASED': artist7roo7hBased,
-  Denajah: artistDenajah,
-  DENAJAH: artistDenajah,
-  NDA: artistNda,
-  PRP: artistPrp,
-  'IMan Afrikah': artistImanAfrikah,
-  'IMAN AFRIKAH': artistImanAfrikah,
-  Sanchy: artistSanchy,
-  SANCHY: artistSanchy,
-  Santana: artistSantana,
-  SANTANA: artistSantana,
-  FAITH: FAITH_PROFILE_IMAGE,
+  '7ROO7H BASED': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/7ROO7H%20BASED.jpg',
+  DenaJah: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/DENAJAH.jpg',
+  Denajah: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/DENAJAH.jpg',
+  DENAJAH: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/DENAJAH.jpg',
+  NDA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA.jpg',
+  PRP: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/PRP.jpg',
+  'IMan Afrikah': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
+  'IMAN AFRIKAH': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
+  Sanchy: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg',
+  SANCHY: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg',
+  Santana: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANTANA.png',
+  SANTANA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANTANA.png',
+  FAITH: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/FAITH%20ART%20WORK.png',
 };
 
 export const SONGS: Song[] = [
@@ -174,7 +159,7 @@ export const SONGS: Song[] = [
     artist: 'DenaJah',
     artistId: '2',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/Denajah%20-%20Dance.wav',
-    coverImage: artistDenajah,
+    coverImage: ARTWORK_BY_ARTIST.DenaJah,
     plays: 892,
     likes: 256,
     townSquare: 'Livingstone Town Square',
@@ -186,7 +171,7 @@ export const SONGS: Song[] = [
     artist: 'DenaJah',
     artistId: '2',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/Denajah%20-%20Alone.wav',
-    coverImage: artistDenajah,
+    coverImage: ARTWORK_BY_ARTIST.DenaJah,
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -198,7 +183,7 @@ export const SONGS: Song[] = [
     artist: 'DenaJah',
     artistId: '2',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/Denajah%20%20-%20Hunter.wav',
-    coverImage: artistDenajah,
+    coverImage: ARTWORK_BY_ARTIST.DenaJah,
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -210,7 +195,7 @@ export const SONGS: Song[] = [
     artist: 'DenaJah',
     artistId: '2',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/Denajah%20-%20Empress.wav',
-    coverImage: artistDenajah,
+    coverImage: ARTWORK_BY_ARTIST.DenaJah,
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -222,7 +207,7 @@ export const SONGS: Song[] = [
     artist: 'DenaJah',
     artistId: '2',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/Denajah%20-%20Lovie.wav',
-    coverImage: artistDenajah,
+    coverImage: ARTWORK_BY_ARTIST.DenaJah,
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -234,7 +219,7 @@ export const SONGS: Song[] = [
     artist: 'DenaJah',
     artistId: '2',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/Denajah%20-%20My%20Baby.wav',
-    coverImage: artistDenajah,
+    coverImage: ARTWORK_BY_ARTIST.DenaJah,
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -246,7 +231,7 @@ export const SONGS: Song[] = [
     artist: 'DenaJah',
     artistId: '2',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/Denajah%20-%20Closer.wav',
-    coverImage: artistDenajah,
+    coverImage: ARTWORK_BY_ARTIST.DenaJah,
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -765,7 +750,7 @@ export const ARTISTS: Artist[] = [
     bio: 'A visionary artist from Zambia blending traditional African rhythms with contemporary electronic sounds. 7ROO7H BASED creates music that speaks to the soul and moves the body.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artist7roo7hBased,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20%20Based/7ROO7H%20Based%20(1).png',
     songs: ['1', '8', '10', '11', '12', '13', '49'],
   },
   {
@@ -774,7 +759,7 @@ export const ARTISTS: Artist[] = [
     bio: 'DenaJah brings infectious energy to every track, fusing reggae influences with modern Afrobeats. Their sound is a celebration of African heritage and global connection.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistDenajah,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/DenaJah/DenaJah.png',
     songs: ['2', '9', '14', '15', '16', '17', '18'],
   },
   {
@@ -783,7 +768,7 @@ export const ARTISTS: Artist[] = [
     bio: 'A pioneer of the Zambian music scene, IMan Afrikah creates timeless melodies that resonate across borders. Their music is a journey through sound and emotion.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistImanAfrikah,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/IMan%20Afrikah/IMan%20Afrikah%20(4).png',
     songs: ['3', '31', '32', '33', '34', '35', '36'],
   },
   {
@@ -792,7 +777,7 @@ export const ARTISTS: Artist[] = [
     bio: 'NDA explores the depths of introspective music, creating soundscapes that encourage reflection and growth. Their artistry pushes boundaries while staying rooted in authenticity.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistNda,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/NDA/NDA%20(2).png',
     songs: ['4', '19', '20', '21', '22', '23', '24'],
   },
   {
@@ -801,7 +786,7 @@ export const ARTISTS: Artist[] = [
     bio: 'PRP delivers high-energy tracks that get crowds moving. With a unique blend of hip-hop and African influences, their music is both fresh and deeply rooted.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistPrp,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP/PRP%20(2).png',
     songs: ['5', '25', '26', '27', '28', '29', '30'],
   },
   {
@@ -810,7 +795,7 @@ export const ARTISTS: Artist[] = [
     bio: 'Sanchy creates atmospheric music that paints pictures with sound. Their late-night vibes and smooth production make every track a sonic experience.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistSanchy,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sanchy/Sanchy%20(1).png',
     songs: ['6', '37', '38', '39', '40', '41', '42'],
   },
   {
@@ -819,7 +804,7 @@ export const ARTISTS: Artist[] = [
     bio: 'Santana builds their music brick by brick, layering sounds to create powerful compositions. Their dedication to craft shines through in every release.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistSantana,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Santana/Santana%20(1).png',
     songs: ['7', '43', '44', '45', '46', '47', '48'],
   },
   {
@@ -828,7 +813,7 @@ export const ARTISTS: Artist[] = [
     bio: 'FAITH brings soulful energy and a fearless voice, blending modern Afro rhythms with heartfelt storytelling.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: FAITH_PROFILE_IMAGE,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/FAITH/Faith%20(2).png',
     songs: ['50', '51', '52', '53', '54', '55', '56'],
     addedAt: '2026-01-05T00:00:00.000Z',
   },

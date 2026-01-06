@@ -96,7 +96,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   <img 
                     src={song.coverImage} 
                     alt={song.title} 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     loading="lazy"
                   />
                 ) : (
@@ -301,7 +301,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               <img 
                 src={song.coverImage} 
                 alt={song.title} 
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 loading="lazy"
               />
             ) : (

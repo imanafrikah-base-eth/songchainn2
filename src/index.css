@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Sora:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 
 /* Safe area padding for bottom navigation on devices with home indicator */
@@ -72,8 +70,8 @@
     --shadow-inner-glow: inset 0 1px 1px hsl(210 40% 98% / 0.05);
 
     /* Typography */
-    --font-heading: 'Sora', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
+    --font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
 
     --sidebar-background: 222 47% 6%;
     --sidebar-foreground: 210 40% 98%;

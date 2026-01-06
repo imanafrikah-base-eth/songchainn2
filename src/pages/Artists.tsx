@@ -190,12 +190,19 @@ export default function Artists() {
                     {/* Artist Image */}
                     <div className="aspect-square relative overflow-hidden">
                       {artist.profileImage ? (
-                        <img
-                          src={artist.profileImage}
-                          alt={artist.name}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          loading="lazy"
-                        />
+                        <div className="relative w-full h-full">
+                          <img
+                            src={artist.profileImage}
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110"
+                          />
+                          <img
+                            src={artist.profileImage}
+                            alt={artist.name}
+                            className="relative w-full h-full object-contain"
+                            loading="lazy"
+                          />
+                        </div>
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-primary/30 to-secondary/50 flex items-center justify-center">
                           <span className="text-5xl font-heading font-bold text-foreground/80">

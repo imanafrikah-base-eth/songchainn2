@@ -198,7 +198,7 @@ export function PostCard({
           onClick={handlePlaySong}
         >
           <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
-            <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
+            <img src={song.coverImage} alt={song.title} className="w-full h-full object-contain" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
               <Play className="w-5 h-5 text-white fill-white" />
             </div>

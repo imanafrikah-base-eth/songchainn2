@@ -152,7 +152,7 @@ export default function SongDetail() {
                 <img 
                   src={song.coverImage} 
                   alt={song.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
               ) : (
                 <div className="w-full h-full gradient-primary opacity-40 flex items-center justify-center">
@@ -174,7 +174,7 @@ export default function SongDetail() {
               >
                 <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">
                   {artist.profileImage ? (
-                    <img src={artist.profileImage} alt={artist.name} className="w-full h-full object-cover" />
+                    <img src={artist.profileImage} alt={artist.name} className="w-full h-full object-contain" />
                   ) : (
                     <div className="w-full h-full gradient-primary opacity-40 flex items-center justify-center">
                       <span className="text-sm font-bold">{artist.name.charAt(0)}</span>
