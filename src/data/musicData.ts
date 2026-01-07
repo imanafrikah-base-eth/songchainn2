@@ -542,7 +542,7 @@ export const SONGS: Song[] = [
     title: 'NO APOLOGY',
     artist: 'Sanchy',
     artistId: '6',
-    audioUrl: 'https://pub-be3ea97c3c05482f8b21ccc8d973bfd0.r2.dev/Sanchy%20-%20No%20Apology%20Needed.wav',
+    audioUrl: 'https://pub-be3ea97c3c05482f8b21ccc8d973bfd0.r2.dev/Sanchy%20-%20No%20Apology.wav',
     coverImage: ARTWORK_BY_ARTIST.SANCHY,
     plays: 0,
     likes: 0,

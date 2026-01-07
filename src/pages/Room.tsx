@@ -1071,7 +1071,7 @@ export default function Room() {
 
   return (
     <div className="min-h-screen bg-black text-zinc-100">
-      <div className="fixed top-0 left-0 right-0 z-20 bg-black/60 backdrop-blur border-b border-white/10">
+      <div className="sticky top-0 z-20 bg-black/60 backdrop-blur border-b border-white/10">
         <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             type="button"
@@ -1280,7 +1280,7 @@ export default function Room() {
         </div>
       </div>
 
-      <div className="pt-32 pb-24">
+      <div className="pt-4 pb-24">
         <div className="max-w-3xl lg:max-w-5xl mx-auto px-4">
           <div className="lg:flex lg:gap-6">
             <div
