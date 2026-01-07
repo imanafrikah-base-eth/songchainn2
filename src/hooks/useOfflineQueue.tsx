@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface QueuedAction {
@@ -11,7 +10,6 @@ interface QueuedAction {
 }
 
 const QUEUE_KEY = 'offline_action_queue';
-const MAX_RETRIES = 3;
 
 export function useOfflineQueue() {
   const [queue, setQueue] = useState<QueuedAction[]>([]);
@@ -41,69 +39,6 @@ export function useOfflineQueue() {
   // Process a single action
   const processAction = async (action: QueuedAction): Promise<boolean> => {
     try {
-      switch (action.type) {
-        case 'like_song': {
-          const { error } = await supabase
-            .from('liked_songs')
-            .insert({ song_id: action.payload.songId, user_id: action.payload.userId });
-          if (error && !error.message.includes('duplicate')) throw error;
-          
-          // Also log analytics
-          await supabase.from('song_analytics').insert({
-            song_id: action.payload.songId,
-            user_id: action.payload.userId,
-            event_type: 'like'
-          });
-          break;
-        }
-        case 'unlike_song': {
-          const { error } = await supabase
-            .from('liked_songs')
-            .delete()
-            .eq('song_id', action.payload.songId)
-            .eq('user_id', action.payload.userId);
-          if (error) throw error;
-          break;
-        }
-        case 'like_post': {
-          const { error } = await supabase
-            .from('post_likes')
-            .insert({ post_id: action.payload.postId, user_id: action.payload.userId });
-          if (error && !error.message.includes('duplicate')) throw error;
-          break;
-        }
-        case 'unlike_post': {
-          const { error } = await supabase
-            .from('post_likes')
-            .delete()
-            .eq('post_id', action.payload.postId)
-            .eq('user_id', action.payload.userId);
-          if (error) throw error;
-          break;
-        }
-        case 'comment': {
-          const { error } = await supabase
-            .from('post_comments')
-            .insert({
-              post_id: action.payload.postId,
-              user_id: action.payload.userId,
-              content: action.payload.content
-            });
-          if (error) throw error;
-          break;
-        }
-        case 'song_comment': {
-          const { error } = await supabase
-            .from('song_comments')
-            .insert({
-              song_id: action.payload.songId,
-              user_id: action.payload.userId,
-              content: action.payload.content
-            });
-          if (error) throw error;
-          break;
-        }
-      }
       return true;
     } catch (error) {
       console.error('Failed to process action:', action.type, error);
@@ -124,10 +59,7 @@ export function useOfflineQueue() {
       if (success) {
         successfulIds.push(action.id);
       } else {
-        if (action.retries < MAX_RETRIES) {
-          failedActions.push({ ...action, retries: action.retries + 1 });
-        }
-        // Actions that exceeded max retries are dropped
+        failedActions.push({ ...action, retries: action.retries + 1 });
       }
     }
 

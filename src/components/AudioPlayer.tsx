@@ -7,7 +7,6 @@ import { Slider } from '@/components/ui/slider';
 import { FullScreenPlayer } from './FullScreenPlayer';
 import { SpinningSongArt } from './SpinningSongArt';
 import { ShareSongButton } from './ShareSongButton';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
 function formatTime(seconds: number): string {
@@ -88,18 +87,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
     
     // Update local engagement state
     addPlay(songId);
-    
-    // Record to database
-    try {
-      await supabase.from('song_analytics').insert({
-        song_id: songId,
-        event_type: 'play',
-        user_id: user?.id || null,
-      });
-    } catch (error) {
-      void error;
-    }
-  }, [addPlay, user?.id]);
+  }, [addPlay]);
 
   // Reset tracking when song changes
   useEffect(() => {

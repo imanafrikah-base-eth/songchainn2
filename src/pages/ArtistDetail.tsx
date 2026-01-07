@@ -140,7 +140,7 @@ export default function ArtistDetail() {
       const { data } = await supabase
         .from('audience_profiles')
         .select('*')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .maybeSingle();
       return (data as any) ?? null;
     },
@@ -198,7 +198,7 @@ export default function ArtistDetail() {
           const { error: updateError } = await supabase
             .from('audience_profiles')
             .update({ profile_picture_url: publicUrl })
-            .eq('user_id', ownerUserId);
+            .eq('id', ownerUserId);
           if (updateError) throw updateError;
           queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
             if (!prev) return prev;
@@ -217,7 +217,7 @@ export default function ArtistDetail() {
       const { error: updateError } = await supabase
         .from('audience_profiles')
         .update({ profile_picture_url: publicUrl })
-        .eq('user_id', ownerUserId);
+        .eq('id', ownerUserId);
       if (updateError) throw updateError;
 
       queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
@@ -260,7 +260,7 @@ export default function ArtistDetail() {
           const { error: updateError } = await supabase
             .from('audience_profiles')
             .update({ cover_photo_url: publicUrl })
-            .eq('user_id', ownerUserId);
+            .eq('id', ownerUserId);
           if (updateError) throw updateError;
           queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
             if (!prev) return prev;
@@ -279,7 +279,7 @@ export default function ArtistDetail() {
       const { error: updateError } = await supabase
         .from('audience_profiles')
         .update({ cover_photo_url: publicUrl })
-        .eq('user_id', ownerUserId);
+        .eq('id', ownerUserId);
       if (updateError) throw updateError;
 
       queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
@@ -387,12 +387,12 @@ export default function ArtistDetail() {
         .from('audience_profiles')
         .upsert(
           {
-            user_id: ownerUserId,
+            id: ownerUserId,
             profile_name: nextName,
             bio: bioDraft.trim() || null,
             updated_at: new Date().toISOString(),
           } as any,
-          { onConflict: 'user_id' }
+          { onConflict: 'id' }
         );
       if (error) throw error;
 
@@ -491,7 +491,7 @@ export default function ArtistDetail() {
         supabase
           .from('audience_profiles')
           .select('*')
-          .eq('user_id', timelineUserId)
+          .eq('id', timelineUserId)
           .maybeSingle(),
         supabase
           .from('post_likes')

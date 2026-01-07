@@ -12,6 +12,7 @@ export interface UserRole {
 export interface AudienceProfile {
   id: string;
   user_id: string;
+  username?: string | null;
   profile_name: string;
   bio: string | null;
   profile_picture_url: string | null;

@@ -8,7 +8,7 @@ import { useSongPopularity } from '@/hooks/usePopularity';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
-import { supabase } from '@/integrations/supabase/client';
+import { listAllLikedArtistsMap } from '@/lib/localDb';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -35,7 +35,6 @@ function isArtistNew(addedAt?: string) {
 export default function Artists() {
   const { data: popularityData } = useSongPopularity();
   const artistIds = useMemo(() => ARTISTS.map(a => a.id), []);
-  const queryClient = useQueryClient();
   
   // Fetch follower counts for all artists
   const { data: followerCounts = {} } = useQuery({
@@ -43,19 +42,14 @@ export default function Artists() {
     queryFn: async () => {
       const counts: Record<string, number> = {};
       if (artistIds.length === 0) return counts;
-
-      const { data, error } = await supabase
-        .from('liked_artists')
-        .select('artist_id', { count: 'exact' })
-        .in('artist_id', artistIds);
-
-      if (error) return counts;
-
-      (data || []).forEach(row => {
-        const key = String((row as any).artist_id);
-        if (!key) return;
-        counts[key] = (counts[key] || 0) + 1;
-      });
+      const liked = listAllLikedArtistsMap();
+      for (const userId of Object.keys(liked)) {
+        const artistList = liked[userId] || [];
+        for (const artistId of artistList) {
+          if (!artistId) continue;
+          counts[artistId] = (counts[artistId] || 0) + 1;
+        }
+      }
 
       return counts;
     },
@@ -63,23 +57,6 @@ export default function Artists() {
     staleTime: 1000 * 10,
     refetchInterval: 15000,
   });
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('artist-followers-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'liked_artists' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['all-artist-followers'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   // Calculate stats for each artist
   const artistsWithStats = useMemo(() => {

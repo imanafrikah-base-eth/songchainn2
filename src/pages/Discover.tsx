@@ -10,8 +10,8 @@ import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { getLikedSongs } from '@/lib/localDb';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -34,14 +34,7 @@ function useUserLikes() {
     queryKey: ['user-likes', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      
-      const { data, error } = await supabase
-        .from('liked_songs')
-        .select('song_id')
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
-      return data.map(item => item.song_id);
+      return getLikedSongs(user.id);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2,

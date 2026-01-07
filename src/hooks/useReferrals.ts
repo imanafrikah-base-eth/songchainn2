@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/hooks/use-toast';
 
@@ -15,6 +14,24 @@ interface Referral {
 
 interface UserPoints {
   total_points: number;
+}
+
+const REFERRAL_CODE_KEY = 'songchainn:referralCodesByUserId';
+const USER_POINTS_KEY = 'songchainn:userPointsByUserId';
+const REFERRALS_KEY = 'songchainn:referralsByReferrerId';
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson<T>(key: string, value: T) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
 export function useReferrals() {
@@ -39,50 +56,22 @@ export function useReferrals() {
     if (!user) return;
 
     try {
-      // Check if user already has a referral code
-      const { data: existingReferral, error: fetchError } = await supabase
-        .from('referrals')
-        .select('referral_code')
-        .eq('referrer_id', user.id)
-        .eq('status', 'pending')
-        .limit(1)
-        .maybeSingle();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching referral:', fetchError);
+      const map = readJson<Record<string, string>>(REFERRAL_CODE_KEY, {});
+      const existing = map[user.id];
+      if (existing) {
+        setReferralCode(existing);
         return;
       }
 
-      if (existingReferral) {
-        setReferralCode(existingReferral.referral_code);
-      } else {
-        // Create a new referral code
-        const newCode = generateReferralCode();
-        const { error: insertError } = await supabase
-          .from('referrals')
-          .insert({
-            referrer_id: user.id,
-            referral_code: newCode,
-          });
-
-        if (insertError) {
-          // If duplicate, try again with new code
-          if (insertError.code === '23505') {
-            const retryCode = generateReferralCode();
-            await supabase
-              .from('referrals')
-              .insert({
-                referrer_id: user.id,
-                referral_code: retryCode,
-              });
-            setReferralCode(retryCode);
-          } else {
-            console.error('Error creating referral:', insertError);
-          }
-        } else {
-          setReferralCode(newCode);
-        }
+      let next = generateReferralCode();
+      const used = new Set(Object.values(map));
+      for (let i = 0; i < 20 && used.has(next); i++) {
+        next = generateReferralCode();
       }
+
+      map[user.id] = next;
+      writeJson(REFERRAL_CODE_KEY, map);
+      setReferralCode(next);
     } catch (error) {
       console.error('Error in fetchOrCreateReferralCode:', error);
     }
@@ -94,17 +83,9 @@ export function useReferrals() {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .from('referrals')
-        .select('*')
-        .eq('referrer_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching referrals:', error);
-      } else {
-        setReferrals(data || []);
-      }
+      const byReferrer = readJson<Record<string, Referral[]>>(REFERRALS_KEY, {});
+      const list = byReferrer[user.id] || [];
+      setReferrals([...list].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)));
     } catch (error) {
       console.error('Error in fetchReferrals:', error);
     } finally {
@@ -117,17 +98,8 @@ export function useReferrals() {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('user_points')
-        .select('total_points')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching points:', error);
-      } else {
-        setPoints(data || { total_points: 0 });
-      }
+      const map = readJson<Record<string, number>>(USER_POINTS_KEY, {});
+      setPoints({ total_points: map[user.id] || 0 });
     } catch (error) {
       console.error('Error in fetchPoints:', error);
     }

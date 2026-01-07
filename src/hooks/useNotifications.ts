@@ -38,10 +38,15 @@ export function useNotifications() {
       const { data: profilesData } = await supabase
         .from('audience_profiles')
         .select('*')
-        .in('user_id', fromUserIds);
+        .in('id', fromUserIds);
+
+      const normalizedProfiles = ((profilesData as any[]) || []).map((p) => ({
+        ...p,
+        user_id: p?.user_id ?? p?.id,
+      })) as AudienceProfile[];
 
       const profilesMap = new Map(
-        profilesData?.map(p => [p.user_id, p as AudienceProfile]) || []
+        normalizedProfiles.map((p) => [p.user_id, p])
       );
 
       const enrichedNotifications: Notification[] = notificationsData.map(n => ({
@@ -156,13 +161,18 @@ export function useNotifications() {
           const { data: profileData } = await supabase
             .from('audience_profiles')
             .select('*')
-            .eq('user_id', newNotification.from_user_id)
+            .eq('id', newNotification.from_user_id)
             .single();
 
           const enrichedNotification: Notification = {
             ...newNotification,
             type: newNotification.type as 'follow' | 'like' | 'comment' | 'mention',
-            from_profile: profileData as AudienceProfile,
+            from_profile: profileData
+              ? ({
+                  ...(profileData as any),
+                  user_id: (profileData as any)?.user_id ?? (profileData as any)?.id ?? newNotification.from_user_id,
+                } as AudienceProfile)
+              : undefined,
           };
 
           setNotifications(prev => [enrichedNotification, ...prev]);

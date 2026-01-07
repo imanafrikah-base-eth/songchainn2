@@ -89,8 +89,21 @@ export default function Community() {
         return;
       }
 
+      const normalizedProfiles = ((profiles as any[]) || [])
+        .map((p) => ({
+          ...p,
+          user_id: p?.user_id ?? p?.id,
+        }))
+        .filter((p) => p?.user_id) as UserProfile[];
+
+      const dedupedByUserId = new Map<string, UserProfile>();
+      normalizedProfiles.forEach((p) => {
+        if (!dedupedByUserId.has(p.user_id)) dedupedByUserId.set(p.user_id, p);
+      });
+      const uniqueProfiles = Array.from(dedupedByUserId.values());
+
       // Get follower counts and post counts
-      const userIds = profiles.map(p => p.user_id);
+      const userIds = uniqueProfiles.map(p => p.user_id);
       
       const [followersRes, postsRes] = await Promise.all([
         supabase
@@ -113,7 +126,7 @@ export default function Community() {
         postCounts.set(p.user_id, (postCounts.get(p.user_id) || 0) + 1);
       });
 
-      const enrichedUsers: UserProfile[] = profiles.map(profile => ({
+      const enrichedUsers: UserProfile[] = uniqueProfiles.map(profile => ({
         ...profile,
         follower_count: followerCounts.get(profile.user_id) || 0,
         post_count: postCounts.get(profile.user_id) || 0,

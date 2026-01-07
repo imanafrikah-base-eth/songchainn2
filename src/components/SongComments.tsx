@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { getAllProfiles, listSongComments, saveSongComments } from '@/lib/localDb';
 
 interface SongCommentsProps {
   songId: string;
@@ -38,26 +38,20 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
   const { data: comments = [], isLoading } = useQuery({
     queryKey: ['song-comments', songId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('song_comments')
-        .select('*')
-        .eq('song_id', songId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Fetch profiles for all unique user IDs
-      const userIds = [...new Set(data.map(c => c.user_id))];
-      const { data: profiles } = await supabase
-        .from('audience_profiles')
-        .select('user_id, profile_name, profile_picture_url')
-        .in('user_id', userIds);
-
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-
-      return data.map(comment => ({
-        ...comment,
-        profile: profileMap.get(comment.user_id),
+      const map = listSongComments();
+      const rows = (map[songId] || []).slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const profiles = getAllProfiles();
+      return rows.map((comment) => ({
+        id: comment.id,
+        content: comment.content,
+        created_at: comment.created_at,
+        user_id: comment.user_id,
+        profile: profiles[comment.user_id]
+          ? {
+              profile_name: profiles[comment.user_id].profile_name,
+              profile_picture_url: profiles[comment.user_id].profile_picture_url,
+            }
+          : undefined,
       })) as CommentWithProfile[];
     },
     enabled: !!songId,
@@ -67,29 +61,18 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
   const addComment = useMutation({
     mutationFn: async (content: string) => {
       if (!user) throw new Error('Must be logged in');
-
-      // First, moderate the comment
-      const moderationResponse = await supabase.functions.invoke('moderate-comment', {
-        body: { comment: content, songTitle, artistName },
-      });
-
-      if (moderationResponse.error) {
-        console.error('Moderation error:', moderationResponse.error);
-        // Continue anyway if moderation fails
-      } else if (!moderationResponse.data?.approved) {
-        throw new Error(moderationResponse.data?.reason || 'Comment not approved');
-      }
-
-      // If approved, insert the comment
-      const { error } = await supabase
-        .from('song_comments')
-        .insert({
-          song_id: songId,
-          user_id: user.id,
-          content,
-        });
-
-      if (error) throw error;
+      const map = listSongComments();
+      const now = new Date().toISOString();
+      const next = {
+        id: crypto.randomUUID(),
+        song_id: songId,
+        user_id: user.id,
+        content,
+        created_at: now,
+        updated_at: now,
+      };
+      map[songId] = [next, ...(map[songId] || [])];
+      saveSongComments(map);
     },
     onSuccess: () => {
       setNewComment('');
@@ -97,25 +80,16 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
       toast.success('Comment posted!');
     },
     onError: (error: Error) => {
-      if (error.message.includes('not approved')) {
-        toast.error('Comment not posted', {
-          description: error.message,
-        });
-      } else {
-        toast.error('Failed to post comment');
-      }
+      toast.error('Failed to post comment', { description: error.message });
     },
   });
 
   // Delete comment mutation
   const deleteComment = useMutation({
     mutationFn: async (commentId: string) => {
-      const { error } = await supabase
-        .from('song_comments')
-        .delete()
-        .eq('id', commentId);
-
-      if (error) throw error;
+      const map = listSongComments();
+      map[songId] = (map[songId] || []).filter((c) => c.id !== commentId);
+      saveSongComments(map);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['song-comments', songId] });

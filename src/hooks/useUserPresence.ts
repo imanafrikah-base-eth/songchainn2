@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
 type PresenceMeta = {
@@ -12,63 +11,32 @@ type UseUserPresenceOptions = {
   includeNowPlayingFallback?: boolean;
 };
 
-let sharedChannel: ReturnType<typeof supabase.channel> | null = null;
-let sharedSelfUserId: string | null = null;
-let sharedRefs = 0;
-const sharedListeners = new Set<() => void>();
+const PRESENCE_KEY = 'songchainn:presence';
+const ONLINE_WINDOW_MS = 45_000;
+const HEARTBEAT_MS = 15_000;
 
-function getPresenceState(channel: ReturnType<typeof supabase.channel>) {
-  return channel.presenceState() as Record<string, PresenceMeta[]>;
-}
-
-function notifyPresenceChange() {
-  for (const listener of sharedListeners) listener();
-}
-
-async function ensurePresenceChannel(selfUserId: string) {
-  if (sharedChannel && sharedSelfUserId === selfUserId) return sharedChannel;
-
-  if (sharedChannel) {
-    supabase.removeChannel(sharedChannel);
-    sharedChannel = null;
+function readPresence(): Record<string, PresenceMeta> {
+  try {
+    const raw = localStorage.getItem(PRESENCE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, PresenceMeta>;
+  } catch {
+    return {};
   }
-
-  sharedSelfUserId = selfUserId;
-
-  const channel = supabase.channel('global-presence', {
-    config: {
-      presence: { key: selfUserId },
-    },
-  });
-  sharedChannel = channel;
-
-  const sync = () => notifyPresenceChange();
-  channel.on('presence', { event: 'sync' }, sync);
-  channel.on('presence', { event: 'join' }, sync);
-  channel.on('presence', { event: 'leave' }, sync);
-
-  await new Promise<void>(resolve => {
-    channel.subscribe(async status => {
-      if (status !== 'SUBSCRIBED') return;
-      try {
-        await channel.track({ last_seen_at: Date.now(), now_playing_song_id: null });
-      } catch {
-        void 0;
-      }
-      sync();
-      resolve();
-    });
-  });
-
-  return channel;
 }
 
-function releasePresenceChannel() {
-  if (sharedRefs > 0) return;
-  if (!sharedChannel) return;
-  supabase.removeChannel(sharedChannel);
-  sharedChannel = null;
-  sharedSelfUserId = null;
+function writePresence(map: Record<string, PresenceMeta>) {
+  try {
+    localStorage.setItem(PRESENCE_KEY, JSON.stringify(map));
+  } catch {
+    void 0;
+  }
+}
+
+function touchPresence(selfUserId: string) {
+  const map = readPresence();
+  map[selfUserId] = { ...(map[selfUserId] || {}), last_seen_at: Date.now() };
+  writePresence(map);
 }
 
 export function useUserPresence(targetUserId: string | null | undefined, options?: UseUserPresenceOptions) {
@@ -80,31 +48,31 @@ export function useUserPresence(targetUserId: string | null | undefined, options
 
   useEffect(() => {
     if (!selfUserId) return;
+    touchPresence(selfUserId);
+    const interval = window.setInterval(() => {
+      touchPresence(selfUserId);
+      setPresenceVersion(v => v + 1);
+    }, HEARTBEAT_MS);
 
-    sharedRefs += 1;
-    const listener = () => setPresenceVersion(v => v + 1);
-    sharedListeners.add(listener);
-
-    void ensurePresenceChannel(selfUserId);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === PRESENCE_KEY) setPresenceVersion(v => v + 1);
+    };
+    window.addEventListener('storage', onStorage);
 
     return () => {
-      sharedListeners.delete(listener);
-      sharedRefs = Math.max(0, sharedRefs - 1);
-      if (sharedRefs === 0) releasePresenceChannel();
+      window.clearInterval(interval);
+      window.removeEventListener('storage', onStorage);
+      touchPresence(selfUserId);
     };
   }, [selfUserId]);
 
   const computed = (() => {
-    if (!targetUserId || !sharedChannel) return { isOnline: false, lastSeenAt: null as number | null };
-
-    const state = getPresenceState(sharedChannel);
-    const metas = state[targetUserId];
-    const isOnline = Array.isArray(metas) && metas.length > 0;
-    const lastSeenAt = includeLastSeen
-      ? (metas?.map(m => m?.last_seen_at).filter((t): t is number => typeof t === 'number').sort((a, b) => b - a)[0] ?? null)
-      : null;
-
-    return { isOnline, lastSeenAt };
+    if (!targetUserId) return { isOnline: false, lastSeenAt: null as number | null };
+    const map = readPresence();
+    const meta = map[targetUserId];
+    const lastSeen = typeof meta?.last_seen_at === 'number' ? meta.last_seen_at : null;
+    const isOnline = lastSeen !== null && Date.now() - lastSeen <= ONLINE_WINDOW_MS;
+    return { isOnline, lastSeenAt: includeLastSeen ? lastSeen : null };
   })();
 
   return {

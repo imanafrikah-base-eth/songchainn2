@@ -4,27 +4,25 @@ import { Wallet, ExternalLink, Loader2, Shield, Music, Users, CheckCircle2, Mail
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/songchainn-logo.webp';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { CountryCodeSelector } from '@/components/CountryCodeSelector';
 import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
-import { ARTISTS } from '@/data/musicData';
 import { cn } from '@/lib/utils';
 import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
 import { useNavigate } from 'react-router-dom';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
-type AuthView = 'main' | 'email' | 'phone' | 'verify-otp' | 'connect-wallet' | 'artist';
+type AuthView = 'main' | 'email' | 'phone' | 'verify-otp' | 'connect-wallet';
 
 // Default to Zambia
 const DEFAULT_COUNTRY = COUNTRY_CODES.find(c => c.code === 'ZM') || COUNTRY_CODES[0];
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { signInWithWallet, isWalletDetected, walletAddress, user } = useAuth();
+  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail } = useAuth();
   const { openConnectModal, isConnected, address: web3Address } = useWeb3Wallet();
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +40,6 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [resendTimer, setResendTimer] = useState(0);
-  const [artistUsername, setArtistUsername] = useState('');
-  const [artistPassword, setArtistPassword] = useState('');
 
   // Track if user signed in via email/phone but needs wallet
   const [pendingWalletConnection, setPendingWalletConnection] = useState(false);
@@ -55,57 +51,6 @@ export default function Auth() {
   })();
 
   const fullPhoneNumber = `${selectedCountry.dialCode}${phoneNumber.replace(/\D/g, '')}`;
-
-  const normalizeArtistKey = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
-
-  const ARTIST_LOGIN_CODES: Record<string, string> = {
-    [normalizeArtistKey('Santana')]: '01',
-    [normalizeArtistKey('Sanchy')]: '02',
-    [normalizeArtistKey('PRP')]: '999',
-    [normalizeArtistKey('NDA')]: '666',
-    [normalizeArtistKey('IMan Afrikah')]: '05',
-    [normalizeArtistKey('DenaJah')]: '06',
-    [normalizeArtistKey('7ROO7H BASED')]: '07',
-    [normalizeArtistKey('FAITH')]: '08',
-  };
-
-  const resolveArtistLogin = (usernameRaw: string) => {
-    const key = normalizeArtistKey(usernameRaw);
-    const baseKey = key.replace(/\d+$/, '');
-    const artist =
-      ARTISTS.find(a => normalizeArtistKey(a.name) === key) ??
-      ARTISTS.find(a => normalizeArtistKey(a.name) === baseKey);
-    if (!artist) return null;
-    const code = ARTIST_LOGIN_CODES[normalizeArtistKey(artist.name)];
-    if (!code) return null;
-    const email = `artist+${artist.id}@songchainn.app`;
-    const base = artist.name.replace(/\s+/g, '');
-    const password = `${base}${code}`;
-    return { artist, email, password };
-  };
-
-  const upsertArtistAudienceProfile = async (artist: (typeof ARTISTS)[number]) => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData?.session?.user?.id;
-    if (!userId) return;
-    await supabase
-      .from('audience_profiles')
-      .upsert(
-        {
-          user_id: userId,
-          profile_name: artist.name,
-          bio: artist.bio || null,
-          profile_picture_url: artist.profileImage || null,
-          cover_photo_url: null,
-          x_profile_link: null,
-          base_profile_link: null,
-          location: artist.location || null,
-          onboarding_completed: true,
-          updated_at: new Date().toISOString(),
-        } as any,
-        { onConflict: 'user_id' }
-      );
-  };
 
   const handleWalletSignIn = useCallback(async () => {
     setError(null);
@@ -145,6 +90,10 @@ export default function Auth() {
     }
   }, [isConnected, web3Address, connectionState, handleWalletSignIn]);
 
+  useEffect(() => {
+    if (user) navigate('/', { replace: true });
+  }, [user, navigate]);
+
   const handleWalletConnect = async () => {
     setError(null);
     await openConnectModal();
@@ -157,19 +106,15 @@ export default function Auth() {
 
     try {
       if (authMode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/` },
-        });
-        if (error) throw error;
+        const result = await signUpWithEmail(email, password);
+        if (result.error) throw result.error;
         toast.success('Account created!');
         localStorage.setItem('songchainn_needs_onboarding', '1');
         setPendingWalletConnection(false);
         setAuthMode('signin');
       } else {
-        const signInRes = await supabase.auth.signInWithPassword({ email, password });
-        if (signInRes.error) throw signInRes.error;
+        const result = await signInWithEmail(email, password);
+        if (result.error) throw result.error;
         toast.success('Signed in!');
         setPendingWalletConnection(false);
         navigate('/', { replace: true });
@@ -187,133 +132,32 @@ export default function Auth() {
   };
 
   const handleSendEmailLink = async () => {
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setError('Enter your email first');
-      return;
-    }
-
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: trimmedEmail,
-        options: { emailRedirectTo: `${window.location.origin}/` },
-      });
-      if (error) throw error;
-      toast.success('Check your email for a sign-in link');
-    } catch (err: any) {
-      const msg = String(err?.message || '');
-      setError(msg || 'Failed to send sign-in link');
-    } finally {
-      setIsLoading(false);
-    }
+    setError('Email link sign-in is currently unavailable.');
+    toast.error('Email link sign-in is currently unavailable.');
   };
 
-  const handlePhoneAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePhoneAuth = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setError(null);
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: fullPhoneNumber });
-      if (error) throw error;
-      toast.success('OTP sent to your phone!');
-      setAuthView('verify-otp');
-      startResendTimer();
-    } catch (err: any) {
-      setError(err.message || 'Failed to send OTP');
+      setError('Phone sign-in is currently unavailable.');
+      toast.error('Phone sign-in is currently unavailable.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleVerifyOtp = async () => {
-    const code = otpCode.join('');
-    if (code.length !== 6) return;
-
     setIsLoading(true);
     setError(null);
 
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: fullPhoneNumber,
-        token: code,
-        type: 'sms',
-      });
-      if (error) throw error;
-      toast.success('Signed in!');
-      setPendingWalletConnection(false);
-      navigate('/', { replace: true });
+      setError('Phone sign-in is currently unavailable.');
+      toast.error('Phone sign-in is currently unavailable.');
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleArtistLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const resolved = resolveArtistLogin(artistUsername);
-      if (!resolved) {
-        throw new Error('Unknown artist username');
-      }
-
-      const typed = artistPassword.trim().replace(/\s+/g, '');
-      const expected = resolved.password;
-      if (normalizeArtistKey(typed) !== normalizeArtistKey(expected)) {
-        throw new Error('Incorrect artist password');
-      }
-
-      const signInRes = await supabase.auth.signInWithPassword({
-        email: resolved.email,
-        password: expected,
-      });
-
-      const signInError = signInRes?.error;
-      if (signInError) {
-        const signUpRes = await supabase.auth.signUp({
-          email: resolved.email,
-          password: expected,
-          options: {
-            data: { artist_id: resolved.artist.id, artist_name: resolved.artist.name },
-            emailRedirectTo: `${window.location.origin}/`,
-          },
-        });
-
-        if (signUpRes?.error) {
-          throw signInError;
-        }
-
-        const retryRes = await supabase.auth.signInWithPassword({
-          email: resolved.email,
-          password: expected,
-        });
-        if (retryRes?.error) throw retryRes.error;
-      }
-
-      await supabase.auth.updateUser({
-        data: { artist_id: resolved.artist.id, artist_name: resolved.artist.name },
-      });
-      await supabase.auth.refreshSession();
-
-      await upsertArtistAudienceProfile(resolved.artist);
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
-      if (userId) {
-        await (supabase as any)
-          .from('artist_accounts')
-          .upsert({ artist_id: resolved.artist.id, user_id: userId }, { onConflict: 'artist_id' });
-      }
-      toast.success(`Signed in as ${resolved.artist.name}`);
-      navigate(`/artist/${resolved.artist.id}`, { replace: true });
-    } catch (err: any) {
-      setError(err?.message || 'Artist login failed');
     } finally {
       setIsLoading(false);
     }
@@ -567,19 +411,6 @@ export default function Auth() {
                   <span className="text-foreground font-medium">Sign in with Email</span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setArtistUsername('');
-                    setArtistPassword('');
-                    setAuthView('artist');
-                    setError(null);
-                  }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect mb-4"
-                >
-                  <Music className="w-5 h-5 text-muted-foreground" />
-                  <span className="text-foreground font-medium">Log in as Artist</span>
-                </button>
-
                 {/* Wallet Primary CTA */}
                 <div className="text-center mb-6">
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass text-xs font-medium text-primary mb-4">
@@ -779,64 +610,6 @@ export default function Auth() {
                       Email me a sign-in link
                     </Button>
                   )}
-                </form>
-              </motion.div>
-            ) : authView === 'artist' ? (
-              <motion.div key="artist" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <button
-                  onClick={() => { setAuthView('main'); setError(null); }}
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="text-sm">Back</span>
-                </button>
-
-                <h3 className="font-heading text-xl font-semibold text-foreground mb-1">Log in as Artist</h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                  No sign up. Use your artist name and password.
-                </p>
-
-                <form onSubmit={handleArtistLogin} className="space-y-4">
-                  <Input
-                    placeholder="Username"
-                    value={artistUsername}
-                    onChange={(e) => setArtistUsername(e.target.value)}
-                    required
-                    className="h-12 rounded-xl glass border-border/50"
-                    autoComplete="username"
-                  />
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Password"
-                      value={artistPassword}
-                      onChange={(e) => setArtistPassword(e.target.value)}
-                      required
-                      className="h-12 rounded-xl glass border-border/50 pr-10"
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-
-                  {error && (
-                    <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3">
-                      <p className="text-sm text-destructive text-center">{error}</p>
-                    </div>
-                  )}
-
-                  <Button
-                    type="submit"
-                    disabled={isLoading || !artistUsername.trim() || !artistPassword.trim()}
-                    className="w-full gradient-primary text-primary-foreground font-semibold h-12 rounded-xl"
-                  >
-                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Log In'}
-                  </Button>
                 </form>
               </motion.div>
             ) : authView === 'phone' ? (

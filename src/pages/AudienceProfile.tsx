@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef, type ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -11,7 +11,9 @@ import {
   Heart,
   MessageCircle,
   Share2,
-  MoreHorizontal
+  MoreHorizontal,
+  Camera,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -25,6 +27,26 @@ import { AudienceProfile as AudienceProfileType } from '@/types/database';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+
+let resolvedAudienceProfileBucket: Promise<string> | null = null;
+
+async function resolveAudienceProfileBucket(preferredBucket: string) {
+  if (!resolvedAudienceProfileBucket) {
+    resolvedAudienceProfileBucket = (async () => {
+      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
+      if (!listBuckets) return preferredBucket;
+      const { data, error } = await listBuckets();
+      if (error || !Array.isArray(data)) return preferredBucket;
+      const names = new Set<string>(data.map((b: any) => String(b?.name)));
+      if (names.has(preferredBucket)) return preferredBucket;
+      if (names.has('public')) return 'public';
+      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
+      return first || preferredBucket;
+    })();
+  }
+
+  return resolvedAudienceProfileBucket;
+}
 
 export default function AudienceProfile() {
   const { userId } = useParams<{ userId: string }>();
@@ -48,58 +70,136 @@ export default function AudienceProfile() {
   const [profileFollowers, setProfileFollowers] = useState<string[]>([]);
   const [profileFollowing, setProfileFollowing] = useState<string[]>([]);
   const [likedSongsCount, setLikedSongsCount] = useState(0);
+  const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
+  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
   const isOwnProfile = userId === user?.id;
   const amFollowing = userId ? isFollowing(userId) : false;
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!userId) return;
+  const fetchProfile = useCallback(async () => {
+    if (!userId) return;
 
-      setLoading(true);
-      
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from('audience_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+    setLoading(true);
 
-      if (profileData) {
-        setProfile(profileData as AudienceProfileType);
-      }
+    const { data: profileData } = await supabase
+      .from('audience_profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
 
-      // Fetch followers
-      const { data: followersData } = await supabase
-        .from('user_follows')
-        .select('follower_id')
-        .eq('following_id', userId);
-      
-      setProfileFollowers(followersData?.map(f => f.follower_id) || []);
+    if (profileData) {
+      setProfile(profileData as AudienceProfileType);
+    }
 
-      // Fetch following
-      const { data: followingData } = await supabase
-        .from('user_follows')
-        .select('following_id')
-        .eq('follower_id', userId);
-      
-      setProfileFollowing(followingData?.map(f => f.following_id) || []);
+    const { data: followersData } = await supabase
+      .from('user_follows')
+      .select('follower_id')
+      .eq('following_id', userId);
 
-      // Fetch liked songs count
-      const { count } = await supabase
-        .from('liked_songs')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-      
-      setLikedSongsCount(count || 0);
+    setProfileFollowers(followersData?.map((f) => f.follower_id) || []);
 
-      setLoading(false);
-    };
+    const { data: followingData } = await supabase
+      .from('user_follows')
+      .select('following_id')
+      .eq('follower_id', userId);
 
-    fetchProfile();
+    setProfileFollowing(followingData?.map((f) => f.following_id) || []);
+
+    const { count } = await supabase
+      .from('liked_songs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    setLikedSongsCount(count || 0);
+
+    setLoading(false);
   }, [userId]);
 
-  const userPosts = posts.filter(p => p.user_id === userId);
+  useEffect(() => {
+    void fetchProfile();
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`audience-profile-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_follows', filter: `following_id=eq.${userId}` },
+        () => {
+          void fetchProfile();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_follows', filter: `follower_id=eq.${userId}` },
+        () => {
+          void fetchProfile();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'liked_songs', filter: `user_id=eq.${userId}` },
+        () => {
+          void fetchProfile();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, fetchProfile]);
+
+  const userPosts = posts.filter((p) => p.user_id === userId);
+
+  const handleProfilePictureChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!isOwnProfile || !userId) return;
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: 'Image too large (max 10MB)' });
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast({ title: 'Please select an image file' });
+        return;
+      }
+
+      setIsUploadingProfilePicture(true);
+      try {
+        const extRaw = file.name.split('.').pop() || '';
+        const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
+        const path = `audience/${userId}/profile-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+        const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
+        const bucket = await resolveAudienceProfileBucket(preferredBucket);
+
+        const uploadRes = await supabase.storage
+          .from(bucket)
+          .upload(path, file, { contentType: file.type, upsert: true });
+        if (uploadRes.error) throw uploadRes.error;
+
+        const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+
+        const { error: updateError } = await supabase
+          .from('audience_profiles')
+          .update({ profile_picture_url: publicUrl })
+          .eq('id', userId);
+        if (updateError) throw updateError;
+
+        setProfile((prev) => (prev ? { ...prev, profile_picture_url: publicUrl } : prev));
+        toast({ title: 'Profile picture updated' });
+      } catch (err: any) {
+        toast({ title: 'Failed to update profile picture' });
+      } finally {
+        setIsUploadingProfilePicture(false);
+      }
+    },
+    [isOwnProfile, userId]
+  );
 
   if (loading) {
     return (
@@ -165,12 +265,39 @@ export default function AudienceProfile() {
           className="text-center"
         >
           {/* Avatar */}
-          <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl">
-            <AvatarImage src={profile.profile_picture_url || ''} />
-            <AvatarFallback className="text-4xl bg-primary/20 text-primary">
-              {profile.profile_name?.charAt(0) || '?'}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative inline-block">
+            <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl">
+              <AvatarImage src={profile.profile_picture_url || ''} />
+              <AvatarFallback className="text-4xl bg-primary/20 text-primary">
+                {profile.profile_name?.charAt(0) || '?'}
+              </AvatarFallback>
+            </Avatar>
+            {isOwnProfile && (
+              <>
+                <input
+                  ref={profilePictureInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePictureChange}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  disabled={isUploadingProfilePicture}
+                  onClick={() => profilePictureInputRef.current?.click()}
+                  className="absolute bottom-0 right-0 rounded-full bg-background/90 backdrop-blur"
+                >
+                  {isUploadingProfilePicture ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
+                </Button>
+              </>
+            )}
+          </div>
 
           {/* Name & Bio */}
           <h1 className="text-2xl font-bold mt-4">{profile.profile_name}</h1>

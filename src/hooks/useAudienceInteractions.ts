@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { LikedSong, LikedArtist, Playlist, PlaylistSong, SongComment } from '@/types/database';
+import { Playlist } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export function useAudienceInteractions() {
   const { user } = useAuth();
@@ -24,23 +24,15 @@ export function useAudienceInteractions() {
 
     const fetchData = async () => {
       setIsLoading(true);
-      
       const [songsRes, artistsRes, playlistsRes] = await Promise.all([
         supabase.from('liked_songs').select('song_id').eq('user_id', user.id),
         supabase.from('liked_artists').select('artist_id').eq('user_id', user.id),
-        supabase.from('playlists').select('*').eq('user_id', user.id)
+        supabase.from('playlists').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
       ]);
 
-      if (songsRes.data) {
-        setLikedSongs(songsRes.data.map(s => s.song_id));
-      }
-      if (artistsRes.data) {
-        setLikedArtists(artistsRes.data.map(a => a.artist_id));
-      }
-      if (playlistsRes.data) {
-        setPlaylists(playlistsRes.data as Playlist[]);
-      }
-      
+      setLikedSongs((songsRes.data || []).map((r: any) => r.song_id).filter(Boolean));
+      setLikedArtists((artistsRes.data || []).map((r: any) => r.artist_id).filter(Boolean));
+      setPlaylists((playlistsRes.data as any) || []);
       setIsLoading(false);
     };
 
@@ -52,28 +44,16 @@ export function useAudienceInteractions() {
     if (!user) return;
 
     const isLiked = likedSongs.includes(songId);
+    const next = isLiked ? likedSongs.filter((id) => id !== songId) : [...likedSongs, songId];
 
     if (isLiked) {
-      const { error } = await supabase
-        .from('liked_songs')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('song_id', songId);
-      
-      if (!error) {
-        setLikedSongs(prev => prev.filter(id => id !== songId));
-        toast({ title: 'Song removed from likes' });
-      }
+      await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
     } else {
-      const { error } = await supabase
-        .from('liked_songs')
-        .insert({ user_id: user.id, song_id: songId });
-      
-      if (!error) {
-        setLikedSongs(prev => [...prev, songId]);
-        toast({ title: 'Song liked!' });
-      }
+      await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
     }
+
+    setLikedSongs(next);
+    toast({ title: isLiked ? 'Song removed from likes' : 'Song liked!' });
   }, [user, likedSongs, toast]);
 
   // Like/Unlike Artist
@@ -81,47 +61,40 @@ export function useAudienceInteractions() {
     if (!user) return;
 
     const isLiked = likedArtists.includes(artistId);
+    const next = isLiked ? likedArtists.filter((id) => id !== artistId) : [...likedArtists, artistId];
 
     if (isLiked) {
-      const { error } = await supabase
-        .from('liked_artists')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('artist_id', artistId);
-      
-      if (!error) {
-        setLikedArtists(prev => prev.filter(id => id !== artistId));
-        toast({ title: 'Artist unfollowed' });
-      }
+      await supabase.from('liked_artists').delete().eq('user_id', user.id).eq('artist_id', artistId);
     } else {
-      const { error } = await supabase
-        .from('liked_artists')
-        .insert({ user_id: user.id, artist_id: artistId });
-      
-      if (!error) {
-        setLikedArtists(prev => [...prev, artistId]);
-        toast({ title: 'Artist followed!' });
-      }
+      await supabase.from('liked_artists').insert({ user_id: user.id, artist_id: artistId } as any);
     }
+
+    setLikedArtists(next);
+    toast({ title: isLiked ? 'Artist unfollowed' : 'Artist followed!' });
   }, [user, likedArtists, toast]);
 
   // Create Playlist
   const createPlaylist = useCallback(async (name: string, description?: string) => {
     if (!user) return null;
-
     const { data, error } = await supabase
       .from('playlists')
-      .insert({ user_id: user.id, name, description })
-      .select()
-      .single();
-    
-    if (error) {
-      toast({ title: 'Error creating playlist', variant: 'destructive' });
+      .insert({
+        user_id: user.id,
+        name,
+        description: description || null,
+        is_public: false,
+        is_collaborative: false,
+      } as any)
+      .select('*')
+      .maybeSingle();
+
+    if (error || !data) {
+      toast({ title: 'Failed to create playlist', variant: 'destructive' });
       return null;
     }
-    
-    const playlist = data as Playlist;
-    setPlaylists(prev => [...prev, playlist]);
+
+    const playlist = data as any as Playlist;
+    setPlaylists((prev) => [playlist, ...prev]);
     toast({ title: 'Playlist created!' });
     return playlist;
   }, [user, toast]);
@@ -129,51 +102,39 @@ export function useAudienceInteractions() {
   // Delete Playlist
   const deletePlaylist = useCallback(async (playlistId: string) => {
     if (!user) return;
-
-    const { error } = await supabase
-      .from('playlists')
-      .delete()
-      .eq('id', playlistId)
-      .eq('user_id', user.id);
-    
-    if (!error) {
-      setPlaylists(prev => prev.filter(p => p.id !== playlistId));
-      toast({ title: 'Playlist deleted' });
-    }
-  }, [user, toast]);
+    await supabase.from('playlist_songs').delete().eq('playlist_id', playlistId);
+    await supabase.from('playlists').delete().eq('id', playlistId).eq('user_id', user.id);
+    const next = playlists.filter((p) => p.id !== playlistId);
+    setPlaylists(next);
+    toast({ title: 'Playlist deleted' });
+  }, [user, toast, playlists]);
 
   // Add Song to Playlist
   const addSongToPlaylist = useCallback(async (playlistId: string, songId: string) => {
     if (!user) return;
-
-    const { error } = await supabase
+    const { data: existing } = await supabase
       .from('playlist_songs')
-      .insert({ playlist_id: playlistId, song_id: songId });
-    
-    if (error) {
-      if (error.code === '23505') {
-        toast({ title: 'Song already in playlist' });
-      } else {
-        toast({ title: 'Error adding song', variant: 'destructive' });
-      }
-    } else {
-      toast({ title: 'Song added to playlist!' });
+      .select('song_id')
+      .eq('playlist_id', playlistId);
+
+    const songIds = (existing || []).map((r: any) => r.song_id).filter(Boolean);
+    if (songIds.includes(songId)) {
+      toast({ title: 'Song already in playlist' });
+      return;
     }
+
+    const position = songIds.length;
+    await supabase
+      .from('playlist_songs')
+      .insert({ playlist_id: playlistId, song_id: songId, position } as any);
+    toast({ title: 'Song added to playlist!' });
   }, [user, toast]);
 
   // Remove Song from Playlist
   const removeSongFromPlaylist = useCallback(async (playlistId: string, songId: string) => {
     if (!user) return;
-
-    const { error } = await supabase
-      .from('playlist_songs')
-      .delete()
-      .eq('playlist_id', playlistId)
-      .eq('song_id', songId);
-    
-    if (!error) {
-      toast({ title: 'Song removed from playlist' });
-    }
+    await supabase.from('playlist_songs').delete().eq('playlist_id', playlistId).eq('song_id', songId);
+    toast({ title: 'Song removed from playlist' });
   }, [user, toast]);
 
   // Get Playlist Songs
@@ -182,9 +143,8 @@ export function useAudienceInteractions() {
       .from('playlist_songs')
       .select('song_id')
       .eq('playlist_id', playlistId)
-      .order('position');
-    
-    return data?.map(s => s.song_id) || [];
+      .order('position', { ascending: true });
+    return (data || []).map((r: any) => r.song_id).filter(Boolean);
   }, []);
 
   // Check if song is liked

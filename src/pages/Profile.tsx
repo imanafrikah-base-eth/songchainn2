@@ -7,34 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/context/AuthContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useReferrals } from '@/hooks/useReferrals';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Navigation } from '@/components/Navigation';
 import { SONGS } from '@/data/musicData';
 import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { Link, Navigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-
-let resolvedProfileStorageBucket: Promise<string> | null = null;
-
-async function resolveStorageBucket(preferredBucket: string) {
-  if (!resolvedProfileStorageBucket) {
-    resolvedProfileStorageBucket = (async () => {
-      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
-      if (!listBuckets) return preferredBucket;
-      const { data, error } = await listBuckets();
-      if (error || !Array.isArray(data)) return preferredBucket;
-      const names = new Set<string>(data.map((b: any) => String(b?.name)));
-      if (names.has(preferredBucket)) return preferredBucket;
-      if (names.has('public')) return 'public';
-      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
-      return first || preferredBucket;
-    })();
-  }
-
-  return resolvedProfileStorageBucket;
-}
+import { supabase } from '@/integrations/supabase/client';
 
 // X (Twitter) and Base icons
 const XTwitterIcon = () => (
@@ -49,6 +28,26 @@ const BaseIcon = () => (
     <path d="M12 6a6 6 0 100 12 6 6 0 000-12z" fill="hsl(var(--background))" />
   </svg>
 );
+
+let resolvedAudienceStorageBucket: Promise<string> | null = null;
+
+async function resolveStorageBucket(preferredBucket: string) {
+  if (!resolvedAudienceStorageBucket) {
+    resolvedAudienceStorageBucket = (async () => {
+      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
+      if (!listBuckets) return preferredBucket;
+      const { data, error } = await listBuckets();
+      if (error || !Array.isArray(data)) return preferredBucket;
+      const names = new Set<string>(data.map((b: any) => String(b?.name)));
+      if (names.has(preferredBucket)) return preferredBucket;
+      if (names.has('public')) return 'public';
+      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
+      return first || preferredBucket;
+    })();
+  }
+
+  return resolvedAudienceStorageBucket;
+}
 
 export default function Profile() {
   const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding } = useAuth();
@@ -81,55 +80,29 @@ export default function Profile() {
   const uploadAndUpdateProfileImage = useCallback(
     async (file: File, field: 'profile_picture_url' | 'cover_photo_url') => {
       if (!user) return;
-      if (!isArtist) {
-        toast({ title: 'Only artists can change images right now', variant: 'destructive' });
-        return;
-      }
-
       const extRaw = file.name.split('.').pop() || '';
       const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
-      const kind = field === 'profile_picture_url' ? 'profile' : 'cover';
-      const path = `artists/${user.id}/${kind}-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-
+      const path = `audience/${user.id}/${field}-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
       const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
       const bucket = await resolveStorageBucket(preferredBucket);
+
       const uploadRes = await supabase.storage
         .from(bucket)
         .upload(path, file, { contentType: file.type, upsert: true });
-      if (uploadRes.error) {
-        const msg = String(uploadRes.error.message || '');
-        if (msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found')) {
-          resolvedProfileStorageBucket = null;
-          const retryBucket = await resolveStorageBucket(preferredBucket);
-          const retryRes = await supabase.storage
-            .from(retryBucket)
-            .upload(path, file, { contentType: file.type, upsert: true });
-          if (retryRes.error) throw retryRes.error;
-          const publicUrl = supabase.storage.from(retryBucket).getPublicUrl(path).data.publicUrl;
-          const { error: updateError } = await supabase
-            .from('audience_profiles')
-            .update({ [field]: publicUrl } as any)
-            .eq('user_id', user.id);
-          if (updateError) throw updateError;
-          await refreshProfile();
-          toast({ title: field === 'profile_picture_url' ? 'Profile picture updated!' : 'Cover photo updated!' });
-          return;
-        }
-        throw uploadRes.error;
-      }
+      if (uploadRes.error) throw uploadRes.error;
 
       const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
         .update({ [field]: publicUrl } as any)
-        .eq('user_id', user.id);
+        .or(`id.eq.${user.id},user_id.eq.${user.id}`);
       if (updateError) throw updateError;
 
       await refreshProfile();
       toast({ title: field === 'profile_picture_url' ? 'Profile picture updated!' : 'Cover photo updated!' });
     },
-    [isArtist, refreshProfile, toast, user]
+    [refreshProfile, toast, user]
   );
 
   const handleProfilePictureChange = useCallback(
@@ -199,10 +172,9 @@ export default function Profile() {
           profile_name: profileName.trim(),
           bio: bio.trim() || null,
           x_profile_link: xProfileLink.trim() || null,
-          base_profile_link: baseProfileLink.trim() || null
-        })
-        .eq('user_id', user.id);
-      
+          base_profile_link: baseProfileLink.trim() || null,
+        } as any)
+        .or(`id.eq.${user.id},user_id.eq.${user.id}`);
       if (error) throw error;
       
       await refreshProfile();
@@ -217,42 +189,13 @@ export default function Profile() {
 
   const likedSongsData = SONGS.filter(s => likedSongs.includes(s.id));
   const artistSongsData = isArtist && artistId ? SONGS.filter(s => s.artistId === artistId) : [];
-  const { data: artistFollowerCount = 0 } = useQuery({
-    queryKey: ['artist-followers', artistId],
-    queryFn: async () => {
-      if (!artistId) return 0;
-      const { data, count, error } = await supabase
-        .from('liked_artists')
-        .select('artist_id', { count: 'exact' })
-        .eq('artist_id', artistId);
-      if (error) return 0;
-      return count ?? data?.length ?? 0;
-    },
-    enabled: !!isArtist && !!artistId,
-    staleTime: 1000 * 10,
-    refetchInterval: 15000,
-  });
+  const artistFollowerCount = 0;
 
   if (isArtist && artistId) {
     return <Navigate to={`/artist/${artistId}`} replace />;
   }
 
   if (!audienceProfile) {
-    if (!needsOnboarding) {
-      return (
-        <div className="min-h-screen bg-background pb-24">
-          <div className="container mx-auto px-4 py-8 max-w-2xl">
-            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
-              <p className="text-sm text-destructive">
-                Profile storage is not available right now. If you just deployed, run the Supabase migrations (the app is trying to use the table <span className="font-medium">public.audience_profiles</span>).
-              </p>
-            </div>
-          </div>
-          <Navigation />
-        </div>
-      );
-    }
-
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -278,7 +221,7 @@ export default function Profile() {
             className="w-full h-full object-cover"
           />
         )}
-        {isArtist && (
+        {user && (
           <div className="absolute top-3 right-3">
             <Button
               type="button"
@@ -318,7 +261,7 @@ export default function Profile() {
                 </div>
               )}
             </div>
-            {isArtist && (
+            {user && (
               <Button
                 type="button"
                 variant="secondary"

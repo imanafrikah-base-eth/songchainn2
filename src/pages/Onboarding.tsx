@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Headphones, User, FileText, Link2, Loader2, MapPin } from 'lucide-react';
+import { ArrowLeft, Headphones, User, FileText, Link2, Loader2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import logo from '@/assets/songchainn-logo.webp';
 import { z } from 'zod';
+import { useNavigate } from 'react-router-dom';
 
 // Validation schema
 const profileSchema = z.object({
@@ -21,8 +22,9 @@ const profileSchema = z.object({
 });
 
 export default function Onboarding() {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, signOut } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -31,6 +33,19 @@ export default function Onboarding() {
   const [location, setLocation] = useState('');
   const [xProfileLink, setXProfileLink] = useState('');
   const [baseProfileLink, setBaseProfileLink] = useState('');
+
+  const handleBackToSignIn = useCallback(async () => {
+    try {
+      await signOut();
+      try {
+        localStorage.removeItem('songchainn_needs_onboarding');
+      } catch {
+        void 0;
+      }
+    } finally {
+      navigate('/auth', { replace: true });
+    }
+  }, [navigate, signOut]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,23 +77,38 @@ export default function Onboarding() {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase
-        .from('audience_profiles')
-        .insert({
-          user_id: user.id,
-          profile_name: profileName.trim(),
-          bio: bio.trim() || null,
-          location: location.trim(),
-          profile_picture_url: null,
-          cover_photo_url: null,
-          x_profile_link: xProfileLink.trim() || null,
-          base_profile_link: baseProfileLink.trim() || null,
-          onboarding_completed: true
-        });
-      
-      if (error) {
-        throw error;
+      const userRes = await supabase.auth.getUser();
+      const authedUser = userRes.data?.user;
+      if (!authedUser) {
+        throw userRes.error || new Error('Not authenticated');
       }
+
+      const [existingByUserIdRes, existingByIdRes] = await Promise.all([
+        (supabase as any).from('audience_profiles').select('id').eq('user_id', authedUser.id).maybeSingle(),
+        (supabase as any).from('audience_profiles').select('id').eq('id', authedUser.id).maybeSingle(),
+      ]);
+
+      const targetProfileId =
+        existingByUserIdRes?.data?.id || existingByIdRes?.data?.id || authedUser.id;
+
+      const primaryRes = await (supabase as any)
+        .from('audience_profiles')
+        .upsert(
+          {
+            id: targetProfileId,
+            user_id: authedUser.id,
+            profile_name: profileName.trim(),
+            bio: bio.trim() || null,
+            location: location.trim(),
+            x_profile_link: xProfileLink.trim() || null,
+            base_profile_link: baseProfileLink.trim() || null,
+            onboarding_completed: true,
+          },
+          { onConflict: 'id' }
+        );
+
+      const primaryError = primaryRes?.error;
+      if (primaryError) throw primaryError;
       
       toast({ title: 'Welcome to the Audience!' });
       try {
@@ -111,6 +141,12 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-lg mx-auto pt-8">
+        <div className="mb-4">
+          <Button type="button" variant="ghost" onClick={handleBackToSignIn}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        </div>
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

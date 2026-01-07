@@ -20,7 +20,6 @@ import { CommentSheet } from '@/components/social/CommentSheet';
 import { UserCard } from '@/components/social/UserCard';
 import { useSocial } from '@/hooks/useSocial';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { AudienceProfile } from '@/types/database';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,6 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Social() {
   const { user, audienceProfile } = useAuth();
@@ -78,15 +78,12 @@ export default function Social() {
       const { data } = await supabase
         .from('audience_profiles')
         .select('*')
-        .neq('user_id', user.id)
-        .limit(10);
+        .order('created_at', { ascending: false })
+        .limit(30);
 
-      if (data) {
-        const notFollowing = data.filter(
-          p => !following.includes(p.user_id)
-        ) as AudienceProfile[];
-        setSuggestedUsers(notFollowing.slice(0, 5));
-      }
+      const profiles = ((data as any[]) || []).filter((p) => p?.id && p.id !== user.id) as AudienceProfile[];
+      const notFollowing = profiles.filter((p) => !following.includes(p.id));
+      setSuggestedUsers(notFollowing.slice(0, 5));
       setLoadingSuggestions(false);
     };
 
@@ -120,65 +117,8 @@ export default function Social() {
     const fetchSharedPost = async () => {
       setIsLoadingSharedPost(true);
       try {
-        const { data: postData } = await supabase
-          .from('social_posts')
-          .select('*')
-          .eq('id', sharedPostId)
-          .maybeSingle();
-
-        if (!postData) {
-          setSharedPost(null);
-          return;
-        }
-
-        const [profileRes, likesRes, commentsRes, userLikeRes, artistAccountRes] = await Promise.all([
-          supabase
-            .from('audience_profiles')
-            .select('*')
-            .eq('user_id', postData.user_id)
-            .maybeSingle(),
-          supabase
-            .from('post_likes')
-            .select('post_id')
-            .eq('post_id', postData.id),
-          supabase
-            .from('post_comments')
-            .select('post_id')
-            .eq('post_id', postData.id),
-          user
-            ? supabase
-                .from('post_likes')
-                .select('post_id')
-                .eq('user_id', user.id)
-                .eq('post_id', postData.id)
-            : Promise.resolve({ data: [] } as any),
-          (supabase as any)
-            .from('artist_accounts')
-            .select('artist_id, is_verified')
-            .eq('user_id', postData.user_id)
-            .maybeSingle()
-        ]);
-
-        const enrichedPost: SocialPostWithProfile = {
-          artist_id: (artistAccountRes as any)?.data?.artist_id ?? null,
-          artist_is_verified: (artistAccountRes as any)?.data?.is_verified ?? null,
-          id: postData.id,
-          user_id: postData.user_id,
-          content: postData.content,
-          song_id: postData.song_id,
-          playlist_id: postData.playlist_id,
-          image_url: (postData as any).image_url ?? null,
-          image_path: (postData as any).image_path ?? null,
-          post_type: postData.post_type as 'text' | 'song_share' | 'playlist_share' | 'listening' | 'welcome' | 'song_like',
-          created_at: postData.created_at,
-          updated_at: postData.updated_at,
-          profile: (profileRes.data as AudienceProfile) || undefined,
-          likes_count: likesRes.data?.length || 0,
-          comments_count: commentsRes.data?.length || 0,
-          is_liked: (userLikeRes.data?.length || 0) > 0,
-        };
-
-        setSharedPost(enrichedPost);
+        const candidate = posts.find((p) => p.id === sharedPostId) || null;
+        setSharedPost(candidate);
         setCurrentPostIndex(0);
       } finally {
         setIsLoadingSharedPost(false);
@@ -222,15 +162,6 @@ export default function Social() {
   }, [currentPostIndex, filteredPosts.length, sharedPostId]);
 
   const goToProfile = async (userId: string) => {
-    const { data } = await (supabase as any)
-      .from('artist_accounts')
-      .select('artist_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (data?.artist_id) {
-      navigate(`/artist/${data.artist_id}`);
-      return;
-    }
     navigate(`/audience/${userId}`);
   };
 

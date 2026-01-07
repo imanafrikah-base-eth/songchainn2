@@ -1,17 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { AudienceProfile } from '@/types/database';
-import { 
-  hasWalletProvider, 
-  connectWallet,
-  signMessage,
-  generateNonce 
-} from '@/lib/baseWallet';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { hasWalletProvider } from '@/lib/baseWallet';
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isArtist: boolean;
@@ -22,49 +15,13 @@ interface AuthContextType {
   walletAddress: string | null;
   isWalletDetected: boolean;
   signInWithWallet: () => Promise<{ error: Error | null }>;
+  signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-/**
- * Create a SIWE message for wallet signing
- */
-function createSIWEMessage(
-  address: string,
-  nonce: string,
-  domain: string = window.location.host,
-  uri: string = window.location.origin
-): string {
-  const issuedAt = new Date().toISOString();
-  
-  return `${domain} wants you to sign in with your Ethereum account:
-${address}
-
-Sign in to $ongChainn with your wallet.
-
-URI: ${uri}
-Version: 1
-Chain ID: 8453
-Nonce: ${nonce}
-Issued At: ${issuedAt}`;
-}
-
-function resolveArtistIdFromUser(user: User | null) {
-  if (!user) return null;
-
-  const metaArtistIdRaw = (user.user_metadata as any)?.artist_id as string | number | undefined | null;
-  const metaArtistId = metaArtistIdRaw != null ? String(metaArtistIdRaw) : null;
-  if (metaArtistId) return metaArtistId;
-
-  const email = user.email || '';
-  const match = email.match(/^artist\+(\d+)@/i);
-  const fromEmail = match?.[1] || null;
-  if (fromEmail) return fromEmail;
-
-  return null;
-}
 
 function shouldRequireOnboardingFromStorage() {
   try {
@@ -74,58 +31,8 @@ function shouldRequireOnboardingFromStorage() {
   }
 }
 
-function isAudienceProfilesUnavailableError(err: unknown) {
-  const anyErr = err as any;
-  const code = String(anyErr?.code || '');
-  const status = Number(anyErr?.status || 0);
-  const message = String(anyErr?.message || '');
-  const messageLower = message.toLowerCase();
-
-  return (
-    code === 'PGRST205' ||
-    code === '42501' ||
-    status === 401 ||
-    status === 403 ||
-    messageLower.includes('permission denied for table') ||
-    (messageLower.includes('audience_profiles') && messageLower.includes('schema cache')) ||
-    (messageLower.includes('could not find the table') && messageLower.includes('audience_profiles'))
-  );
-}
-
-async function fetchArtistIdFromArtistAccounts(userId: string): Promise<string | null> {
-  try {
-    const { data } = await (supabase as any)
-      .from('artist_accounts')
-      .select('artist_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    const artistId = (data as any)?.artist_id;
-    return artistId != null ? String(artistId) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function ensureArtistAccountMapping(userId: string, resolvedArtistId: string, artistIdFromDb: string | null) {
-  if (!resolvedArtistId) return;
-  if (artistIdFromDb) return;
-
-  try {
-    await (supabase as any)
-      .from('artist_accounts')
-      .upsert(
-        { artist_id: resolvedArtistId, user_id: userId, updated_at: new Date().toISOString() },
-        { onConflict: 'artist_id' }
-      );
-  } catch {
-    return;
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<{ id: string; email?: string | null; user_metadata?: Record<string, any> } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isArtist, setIsArtist] = useState(false);
@@ -134,7 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isWalletDetected, setIsWalletDetected] = useState(false);
-  const bootstrapIdRef = useRef(0);
 
   // Check for any wallet provider (keep it fresh when the app regains focus)
   useEffect(() => {
@@ -153,131 +59,134 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const fetchUserRole = useCallback(async (userId: string) => {
-    if (!isSupabaseConfigured) return;
-    try {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      if (data) {
-        setIsAdmin(data.role === 'admin');
-      }
-    } catch {
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    if (!isSupabaseConfigured) {
+      setAudienceProfile(null);
+      setNeedsOnboarding(false);
       return;
     }
-  }, []);
 
-  const fetchAudienceProfile = useCallback(async (userId: string, options?: { skipOnboarding?: boolean }) => {
-    if (!isSupabaseConfigured) return;
-    try {
-      const { data } = await supabase
-        .from('audience_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      if (data) {
-        setAudienceProfile(data as AudienceProfile);
-        if ((data as any)?.onboarding_completed) {
-          try {
-            localStorage.removeItem('songchainn_needs_onboarding');
-          } catch {
-            void 0;
-          }
-        }
-        setNeedsOnboarding(options?.skipOnboarding ? false : !data.onboarding_completed);
-      } else {
-        setAudienceProfile(null);
-        setNeedsOnboarding(options?.skipOnboarding ? false : shouldRequireOnboardingFromStorage());
-      }
-    } catch (err) {
-      if (isAudienceProfilesUnavailableError(err)) {
-        setAudienceProfile(null);
-        setNeedsOnboarding(false);
+    const [byUserIdRes, byIdRes] = await Promise.all([
+      supabase.from('audience_profiles').select('*').eq('user_id', user.id).maybeSingle(),
+      supabase.from('audience_profiles').select('*').eq('id', user.id).maybeSingle(),
+    ]);
+
+    const profileData = (byUserIdRes.data as any) || (byIdRes.data as any) || null;
+    const profileError = byUserIdRes.error || byIdRes.error;
+
+    if (profileError) {
+      setAudienceProfile(null);
+      setNeedsOnboarding(shouldRequireOnboardingFromStorage());
+      return;
+    }
+
+    if (profileData) {
+      setAudienceProfile(profileData as any);
+      const completed = (profileData as any).onboarding_completed;
+      const needs = completed === false;
+      setNeedsOnboarding(needs);
+      if (!needs) {
         try {
           localStorage.removeItem('songchainn_needs_onboarding');
         } catch {
           void 0;
         }
-        return;
       }
-
-      setAudienceProfile(null);
-      setNeedsOnboarding(false);
-    }
-  }, []);
-
-  const refreshProfile = useCallback(async () => {
-    if (user) {
-      await fetchAudienceProfile(user.id, { skipOnboarding: isArtist });
-    }
-  }, [fetchAudienceProfile, isArtist, user]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setIsLoading(false);
       return;
     }
-    const bootstrapFromSession = async (nextSession: Session | null) => {
-      const currentId = ++bootstrapIdRef.current;
-      setIsLoading(true);
 
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
+    const fallbackName =
+      (user.email ? user.email.split('@')[0] : null) ||
+      (user.user_metadata?.full_name as string | undefined) ||
+      'Listener';
 
-      const baseWalletAddress =
-        (nextSession?.user?.user_metadata as any)?.base_wallet_address != null
-          ? String((nextSession?.user?.user_metadata as any)?.base_wallet_address)
-          : null;
-      setWalletAddress(baseWalletAddress);
+    const { data: created, error: createError } = await supabase
+      .from('audience_profiles')
+      .upsert(
+        {
+          id: user.id,
+          user_id: user.id,
+          profile_name: fallbackName,
+          bio: null,
+          profile_picture_url: null,
+          cover_photo_url: null,
+          x_profile_link: null,
+          base_profile_link: null,
+          location: null,
+          onboarding_completed: false,
+        } as any,
+        { onConflict: 'id' }
+      )
+      .select('*')
+      .maybeSingle();
 
-      if (!nextSession?.user) {
+    if (createError) {
+      setAudienceProfile(null);
+      setNeedsOnboarding(true);
+      return;
+    }
+
+    setAudienceProfile((created as any) ?? null);
+    setNeedsOnboarding(true);
+  }, [user]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const bootstrap = async () => {
+      if (!isSupabaseConfigured) {
+        if (!mounted) return;
+        setUser(null);
+        setAudienceProfile(null);
+        setNeedsOnboarding(false);
+        setWalletAddress(null);
         setIsAdmin(false);
         setIsArtist(false);
         setArtistId(null);
-        setAudienceProfile(null);
-        setNeedsOnboarding(false);
         setIsLoading(false);
         return;
       }
 
-      try {
-        const artistIdFromDb = await fetchArtistIdFromArtistAccounts(nextSession.user.id);
-        const resolvedArtistId = artistIdFromDb ?? resolveArtistIdFromUser(nextSession.user);
-        if (resolvedArtistId) {
-          await ensureArtistAccountMapping(nextSession.user.id, resolvedArtistId, artistIdFromDb);
-        }
-        setIsArtist(Boolean(resolvedArtistId));
-        setArtistId(resolvedArtistId);
-        await fetchUserRole(nextSession.user.id);
-        await fetchAudienceProfile(nextSession.user.id, { skipOnboarding: Boolean(resolvedArtistId) });
-      } catch {
-        setIsAdmin(false);
-        setIsArtist(false);
-        setArtistId(null);
-        setAudienceProfile(null);
-        setNeedsOnboarding(false);
-      } finally {
-        if (bootstrapIdRef.current === currentId) {
-          setIsLoading(false);
-        }
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      const u = data.session?.user ?? null;
+      if (u) {
+        setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+      } else {
+        setUser(null);
       }
+      setIsAdmin(false);
+      setIsArtist(false);
+      setArtistId(null);
+      setIsLoading(false);
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      void bootstrapFromSession(nextSession);
+    bootstrap();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null;
+      setUser(u ? { id: u.id, email: u.email, user_metadata: u.user_metadata as any } : null);
+      setIsAdmin(false);
+      setIsArtist(false);
+      setArtistId(null);
+      setWalletAddress(null);
     });
 
-    supabase.auth
-      .getSession()
-      .then(({ data: { session: existingSession } }) => bootstrapFromSession(existingSession))
-      .catch(() => setIsLoading(false));
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
-    return () => subscription.unsubscribe();
-  }, [fetchAudienceProfile, fetchUserRole]);
+  useEffect(() => {
+    if (!user) {
+      setAudienceProfile(null);
+      setNeedsOnboarding(false);
+      return;
+    }
+    void refreshProfile();
+  }, [user, refreshProfile]);
 
   /**
    * Wallet Sign-In Flow with SIWE Signature Verification
@@ -290,97 +199,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * - And any other Web3 wallet
    */
   const signInWithWallet = useCallback(async () => {
+    return { error: new Error('Wallet sign-in is currently unavailable.') };
+  }, []);
+
+  const signUpWithEmail = useCallback(async (email: string, password: string) => {
     try {
-      // Check if wallet is available
-      if (!hasWalletProvider()) {
-        return {
-          error: new Error(
-            'No wallet detected. Please install MetaMask, Coinbase Wallet, or another Web3 wallet.'
-          ),
-        };
-      }
+      if (!isSupabaseConfigured) return { error: new Error('Supabase is not configured') };
 
-      // Connect wallet and get address
-      const connectionResult = await connectWallet();
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return { error };
+      const u = data.user;
+      if (!u) return { error: new Error('Failed to create user') };
 
-      if (!connectionResult.success || !connectionResult.address) {
-        return {
-          error: new Error(
-            connectionResult.error || 'Failed to connect wallet. Please try again.'
-          ),
-        };
-      }
+      setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+      setIsAdmin(false);
+      setIsArtist(false);
+      setArtistId(null);
 
-      const address = connectionResult.address;
+      const username = email.split('@')[0] || 'listener';
+      await supabase
+        .from('audience_profiles')
+        .upsert(
+          {
+            id: u.id,
+            user_id: u.id,
+            profile_name: username,
+            bio: null,
+            profile_picture_url: null,
+            cover_photo_url: null,
+            x_profile_link: null,
+            base_profile_link: null,
+            location: null,
+            onboarding_completed: false,
+          } as any,
+          { onConflict: 'id' }
+        );
 
-      // Generate nonce for SIWE message
-      const nonce = generateNonce();
-
-      // Create SIWE message
-      const message = createSIWEMessage(address, nonce);
-
-      // Request signature from wallet
-      const signResult = await signMessage(message, address);
-
-      if (signResult.error || !signResult.signature) {
-        return {
-          error: new Error(
-            signResult.error || 'Signature request was rejected. Please try again.'
-          ),
-        };
-      }
-
-      const signature = signResult.signature;
-
-      // Verify signature and authenticate via edge function
-      const { data: verifyData, error: verifyError } = await supabase.functions.invoke(
-        'verify-base-signature',
-        {
-          body: {
-            action: 'verify',
-            address,
-            message,
-            signature,
-            nonce,
-          },
-        }
-      );
-
-      if (verifyError || !verifyData?.success) {
-        return {
-          error: new Error(
-            verifyData?.error || 'Wallet signature verification failed. Please try again.'
-          ),
-        };
-      }
-
-      // Set session from edge function response
-      if (verifyData.session) {
-        await supabase.auth.setSession({
-          access_token: verifyData.session.access_token,
-          refresh_token: verifyData.session.refresh_token,
-        });
-        setWalletAddress(verifyData.walletAddress);
-      }
-
+      await refreshProfile();
       try {
         localStorage.setItem('songchainn_needs_onboarding', '1');
       } catch {
         void 0;
       }
-
       return { error: null };
     } catch (err: any) {
-      return {
-        error: new Error(err?.message || 'Wallet connection failed. Please try again.'),
-      };
+      return { error: new Error(err?.message || 'Sign up failed') };
     }
-  }, []);
+  }, [refreshProfile]);
+
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    try {
+      if (!isSupabaseConfigured) return { error: new Error('Supabase is not configured') };
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error };
+      const u = data.user;
+      if (!u) return { error: new Error('Failed to sign in') };
+
+      setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+      setIsAdmin(false);
+      setIsArtist(false);
+      setArtistId(null);
+      await refreshProfile();
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(err?.message || 'Sign in failed') };
+    }
+  }, [refreshProfile]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
     setUser(null);
-    setSession(null);
     setIsAdmin(false);
     setIsArtist(false);
     setArtistId(null);
@@ -392,8 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{ 
       user,
-      session,
-      isAuthenticated: !!session, 
+      isAuthenticated: !!user, 
       isAdmin,
       isArtist,
       artistId,
@@ -403,6 +293,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       walletAddress,
       isWalletDetected,
       signInWithWallet,
+      signUpWithEmail,
+      signInWithEmail,
       signOut,
       refreshProfile,
     }}>

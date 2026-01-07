@@ -4,10 +4,10 @@ import { MapPin, Loader2, X, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
+import { updateProfile } from '@/lib/localDb';
 
 const locationSchema = z.string()
   .trim()
@@ -42,17 +42,11 @@ export function LocationPrompt({ isOpen, onClose, onSuccess }: LocationPromptPro
     setIsLoading(true);
 
     try {
-      const { error: updateError } = await supabase
-        .from('audience_profiles')
-        .update({ location: location.trim() })
-        .eq('user_id', user.id);
-
-      if (updateError) throw updateError;
+      updateProfile(user.id, { location: location.trim() });
 
       toast({ title: 'Location updated!', description: 'Thanks for sharing where you listen from.' });
       onSuccess();
     } catch (err: any) {
-      console.error('Error updating location:', err);
       toast({ title: 'Error updating location', variant: 'destructive' });
     } finally {
       setIsLoading(false);

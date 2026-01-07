@@ -12,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { useShare } from '@/hooks/useShare';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 interface ShareSongButtonProps {
   songId: string;
@@ -89,14 +88,6 @@ export function ShareSongButton({
       }
       setCopied(true);
       toast.success('Link copied!');
-      
-      // Record share event
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('song_analytics').insert({
-        song_id: songId,
-        user_id: user?.id || null,
-        event_type: 'share'
-      });
 
       setTimeout(() => {
         setCopied(false);
@@ -105,7 +96,7 @@ export function ShareSongButton({
     } catch {
       toast.error('Failed to copy link');
     }
-  }, [copyText, shareUrl, songId]);
+  }, [copyText, shareUrl]);
 
   const handleNativeShare = useCallback(async () => {
     if (navigator.share) {
@@ -116,13 +107,6 @@ export function ShareSongButton({
           url: shareUrl
         });
 
-        const { data: { user } } = await supabase.auth.getUser();
-        await supabase.from('song_analytics').insert({
-          song_id: songId,
-          user_id: user?.id || null,
-          event_type: 'share'
-        });
-
         setShowDropdown(false);
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -131,51 +115,24 @@ export function ShareSongButton({
     } else {
       await handleCopyLink();
     }
-  }, [songTitle, artistName, shareText, shareUrl, songId, handleCopyLink]);
+  }, [songTitle, artistName, shareText, shareUrl, handleCopyLink]);
 
   const handleShareToX = useCallback(async () => {
     shareToX(shareText, shareUrl);
-    
-    // Record share event
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('song_analytics').insert({
-      song_id: songId,
-      user_id: user?.id || null,
-      event_type: 'share'
-    });
-    
     setShowDropdown(false);
-  }, [shareToX, shareText, shareUrl, songId]);
+  }, [shareToX, shareText, shareUrl]);
 
   const handleShareToWhatsApp = useCallback(async () => {
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`;
     window.open(whatsappUrl, '_blank');
-    
-    // Record share event
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('song_analytics').insert({
-      song_id: songId,
-      user_id: user?.id || null,
-      event_type: 'share'
-    });
-    
     setShowDropdown(false);
-  }, [shareText, shareUrl, songId]);
+  }, [shareText, shareUrl]);
 
   const handleShareToTelegram = useCallback(async () => {
     const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
     window.open(telegramUrl, '_blank');
-    
-    // Record share event
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('song_analytics').insert({
-      song_id: songId,
-      user_id: user?.id || null,
-      event_type: 'share'
-    });
-    
     setShowDropdown(false);
-  }, [shareUrl, shareText, songId]);
+  }, [shareUrl, shareText]);
 
   const shareOptions = [
     { icon: <Link2 className="w-4 h-4" />, label: 'Copy Link', action: handleCopyLink, highlight: copied },

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EngagementContextType {
   engagementPoints: number;
@@ -51,7 +51,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     return saved ? parseInt(saved, 10) : 0;
   });
   
-  const [likedSongs, setLikedSongs] = useState<Set<string>>(new Set());
+  const [likedSongs, setLikedSongsState] = useState<Set<string>>(new Set());
   const [isInitialized, setIsInitialized] = useState(false);
   const lastPlayRef = useRef<{ songId: string; at: number } | null>(null);
 
@@ -72,18 +72,12 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const syncLikesFromDatabase = async () => {
       if (user) {
-        const { data, error } = await supabase
-          .from('liked_songs')
-          .select('song_id')
-          .eq('user_id', user.id);
-        
-        if (!error && data) {
-          setLikedSongs(new Set(data.map(item => item.song_id)));
-        }
+        const { data } = await supabase.from('liked_songs').select('song_id').eq('user_id', user.id);
+        setLikedSongsState(new Set((data || []).map((r: any) => r.song_id).filter(Boolean)));
       } else {
         // Fall back to localStorage for non-authenticated users
         const saved = localStorage.getItem('songchainn_likes');
-        setLikedSongs(saved ? new Set(JSON.parse(saved)) : new Set());
+        setLikedSongsState(saved ? new Set(JSON.parse(saved)) : new Set());
       }
       setIsInitialized(true);
     };
@@ -131,7 +125,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     const isCurrentlyLiked = likedSongs.has(songId);
     
     // Optimistically update UI
-    setLikedSongs(prev => {
+    setLikedSongsState(prev => {
       const newLikes = new Set(prev);
       if (isCurrentlyLiked) {
         newLikes.delete(songId);
@@ -143,59 +137,11 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       return newLikes;
     });
 
-    // Persist to database if user is authenticated
     if (user) {
-      // Check if offline - queue the action for later
-      if (!navigator.onLine) {
-        const queue = JSON.parse(localStorage.getItem('offline_action_queue') || '[]');
-        queue.push({
-          id: crypto.randomUUID(),
-          type: isCurrentlyLiked ? 'unlike_song' : 'like_song',
-          payload: { songId, userId: user.id },
-          timestamp: Date.now(),
-          retries: 0
-        });
-        localStorage.setItem('offline_action_queue', JSON.stringify(queue));
-        return;
-      }
-
       if (isCurrentlyLiked) {
-        // Unlike: remove from liked_songs table
-        const { error } = await supabase
-          .from('liked_songs')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('song_id', songId);
-        
-        if (error) {
-          console.error('Error unliking song:', error);
-          // Revert optimistic update on error
-          setLikedSongs(prev => new Set([...prev, songId]));
-          setEngagementPoints(p => p + POINTS_PER_LIKE);
-        }
+        await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
       } else {
-        // Like: add to liked_songs table
-        const { error } = await supabase
-          .from('liked_songs')
-          .insert({ user_id: user.id, song_id: songId });
-        
-        if (error) {
-          console.error('Error liking song:', error);
-          // Revert optimistic update on error
-          setLikedSongs(prev => {
-            const newLikes = new Set(prev);
-            newLikes.delete(songId);
-            return newLikes;
-          });
-          setEngagementPoints(p => Math.max(0, p - POINTS_PER_LIKE));
-        } else {
-          // Also record a like event in song_analytics for popularity tracking
-          await supabase.from('song_analytics').insert({
-            song_id: songId,
-            user_id: user.id,
-            event_type: 'like'
-          });
-        }
+        await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
       }
     }
   }, [user, likedSongs]);
