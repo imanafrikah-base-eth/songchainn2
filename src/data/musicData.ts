@@ -63,8 +63,8 @@ const ARTWORK_BY_ARTIST: Record<string, string> = {
   'IMAN AFRIKAH': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
   Sanchy: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg',
   SANCHY: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg',
-  Santana: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANTANA.png',
-  SANTANA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANTANA.png',
+  Santana: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/file_00000000106871fd889daaa509fd5a14.png',
+  SANTANA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/file_00000000106871fd889daaa509fd5a14.png',
   FAITH: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/FAITH%20ART%20WORK.png',
 };
 
