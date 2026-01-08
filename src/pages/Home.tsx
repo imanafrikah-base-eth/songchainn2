@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins } from 'lucide-react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
 import { useRankedSongs, useRankedArtists } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
+import { useSafePlayerState } from '@/context/PlayerContext';
 import { SongCard } from '@/components/SongCard';
 import { ArtistCard } from '@/components/ArtistCard';
 import { EngagementPanel } from '@/components/EngagementPanel';
@@ -38,10 +39,24 @@ export default function Home() {
   const { rankedArtists } = useRankedArtists();
   const { audienceProfile, refreshProfile, user } = useAuth();
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
-  const roomOnlineCount = useRoomOnlineCount(user?.id);
+  const playerState = useSafePlayerState();
+  const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
   
   const featuredSongs = rankedSongs.slice(0, 3);
   const allSongs = rankedSongs;
+  const displayName =
+    audienceProfile?.profile_name ||
+    (user && typeof user.email === 'string'
+      ? user.email.split('@')[0]
+      : null);
+
+  const allSongsCardRef = useRef<HTMLDivElement | null>(null);
+  const { scrollYProgress: allSongsScrollProgress } = useScroll({
+    target: allSongsCardRef,
+    offset: ['start 0.9', 'end 0.1'],
+  });
+  const allSongsGlowY = useTransform(allSongsScrollProgress, [0, 1], [24, -24]);
+  const allSongsGlowOpacity = useTransform(allSongsScrollProgress, [0, 1], [0.12, 0.35]);
 
   // Check if user needs to add location
   useEffect(() => {
@@ -69,6 +84,43 @@ export default function Home() {
       <DownloadAppBanner />
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 relative z-10">
+        {playerState?.isRoomMode && playerState.currentSong && (
+          <div className="mb-4 sm:mb-6">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/40 overflow-hidden flex-shrink-0">
+                {playerState.currentSong.coverImage ? (
+                  <img
+                    src={playerState.currentSong.coverImage}
+                    alt={playerState.currentSong.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-[11px] sm:text-xs text-primary mb-0.5">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    <span>Now Playing in The Room</span>
+                  </span>
+                </div>
+                <div className="text-sm sm:text-base font-medium text-foreground truncate">
+                  {playerState.currentSong.title}
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                  {playerState.currentSong.artist}
+                </div>
+              </div>
+              <Link to="/room" className="flex-shrink-0">
+                <Button size="sm" className="text-xs sm:text-sm gap-1.5">
+                  <Headphones className="w-3.5 h-3.5" />
+                  <span>Jump into Room</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
         {/* Hero Section */}
         <motion.section
           initial={{ opacity: 0, y: 30 }}
@@ -105,14 +157,27 @@ export default function Home() {
                 <span>Audience Edition</span>
               </motion.div>
 
+              {displayName && (
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 }}
+                  className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3"
+                >
+                  Hey {displayName}.
+                </motion.p>
+              )}
+
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
                 className="font-heading text-xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-3 sm:mb-4 leading-tight"
               >
-                Discover Curated Music from{' '}
-                <span className="text-gradient">Livingstone Town Square</span>
+                Welcome to <span className="text-gradient">$ongChainn</span>
+                <span className="block text-sm sm:text-base md:text-lg text-muted-foreground mt-2">
+                  Your on-chain listening home for artists from Create On Base Local Town Squares around the world.
+                </span>
               </motion.h1>
 
               <motion.p
@@ -121,22 +186,36 @@ export default function Home() {
                 transition={{ delay: 0.4 }}
                 className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mb-3 sm:mb-4 leading-relaxed"
               >
-                Stream original music from artists in the Create On Base pioneer chapter.
-                Your listening activity builds culture and unlocks future ownership.
+                Think of this as your shared living room for onchain music.
+                Settle in, explore the town squares, and let your listening build culture and future ownership.
               </motion.p>
 
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
                 <Link to="/room">
-                  <Button className="gradient-primary text-primary-foreground shadow-glow gap-2">
-                    <Headphones className="w-4 h-4" />
-                    <span>Enter The Room</span>
-                    {roomOnlineCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-black/25 text-primary-foreground text-[11px] font-semibold">
-                        {roomOnlineCount}
-                      </span>
-                    )}
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  <motion.div
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.98 }}
+                    animate={{ boxShadow: ['0 0 0 0 rgba(16,185,129,0.4)', '0 0 40px 0 rgba(16,185,129,0.9)', '0 0 0 0 rgba(16,185,129,0.4)'] }}
+                    transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+                    className="inline-block rounded-full"
+                  >
+                    <Button className="gradient-primary text-primary-foreground shadow-glow gap-2">
+                      <Headphones className="w-4 h-4" />
+                      <span>Enter The Room</span>
+                      {roomOnlineCount > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-black/30 text-primary-foreground text-[10px] font-semibold px-2 py-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>Live now</span>
+                        </span>
+                      )}
+                      {roomOnlineCount > 0 && (
+                        <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-black/25 text-primary-foreground text-[11px] font-semibold">
+                          {roomOnlineCount}
+                        </span>
+                      )}
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </motion.div>
                 </Link>
               </div>
 
@@ -176,11 +255,36 @@ export default function Home() {
 
             {/* All Songs */}
             <motion.section variants={itemVariants}>
-              <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-6">All Songs</h2>
-              <div className="space-y-1 sm:space-y-2">
-                {allSongs.map((song, index) => (
-                  <SongCard key={song.id} song={song} index={index} variant="compact" />
-                ))}
+              <div
+                ref={allSongsCardRef}
+                className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden"
+              >
+                <motion.div
+                  aria-hidden="true"
+                  style={{ y: allSongsGlowY, opacity: allSongsGlowOpacity }}
+                  className="pointer-events-none absolute -inset-x-10 -top-16 h-24 bg-gradient-to-r from-primary/40 via-cyan-400/25 to-emerald-400/35 blur-3xl"
+                />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
+                    <div>
+                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                        All Songs
+                      </h2>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Every track in $ongChainn, neatly stacked for deep listening.
+                      </p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+                      <Music className="w-4 h-4 text-primary" />
+                      <span>{allSongs.length} tracks</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1 sm:space-y-2 max-h-[520px] sm:max-h-[600px] overflow-y-auto pr-1">
+                    {allSongs.map((song, index) => (
+                      <SongCard key={song.id} song={song} index={index} variant="compact" />
+                    ))}
+                  </div>
+                </div>
               </div>
             </motion.section>
 
@@ -348,7 +452,20 @@ export default function Home() {
                     <Headphones className="w-5 h-5 text-zinc-100" />
                   </div>
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    {roomOnlineCount > 0 ? (
+                      <>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>Live now</span>
+                        </span>
+                        <span>{roomOnlineCount} listening</span>
+                      </>
+                    ) : (
+                      <span>Be the first to start the room</span>
+                    )}
+                  </div>
                   <Button className="w-full bg-white text-black hover:bg-white/90">
                     Enter
                   </Button>
@@ -384,6 +501,51 @@ export default function Home() {
             </div>
           </motion.aside>
         </div>
+
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="container mx-auto px-3 sm:px-4 mt-8 sm:mt-12 mb-4 sm:mb-8"
+        >
+          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shine-overlay relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 opacity-25">
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle, hsl(var(--primary) / 0.7) 0%, transparent 70%)',
+                  filter: 'blur(40px)',
+                }}
+                animate={{ scale: [1, 1.1, 1], x: [0, 8, 0], y: [0, -6, 0] }}
+                transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </div>
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-8">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 rounded-2xl gradient-primary shadow-glow-intense flex-shrink-0">
+                  <HomeIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
+                </div>
+                <div>
+                  <h2 className="font-heading text-lg sm:text-2xl md:text-3xl font-semibold text-foreground">
+                    Want the full $ongChainn story?
+                  </h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xl mt-1">
+                    Learn how listening, markets, and culture intersect, and why this
+                    is more than just another music app.
+                  </p>
+                </div>
+              </div>
+              <div className="w-full md:w-auto flex md:justify-end">
+                <Link to="/about" className="w-full md:w-auto">
+                  <Button className="w-full md:w-auto gradient-primary text-primary-foreground shadow-glow gap-2">
+                    <span>About $ongChainn</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </motion.section>
       </main>
 
       <AudioPlayer />

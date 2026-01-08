@@ -58,7 +58,7 @@ const ARTWORK_BY_ARTIST: Record<string, string> = {
   Denajah: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/DENAJAH.jpg',
   DENAJAH: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/DENAJAH.jpg',
   NDA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA.jpg',
-  PRP: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/PRP.jpg',
+  PRP: '',
   'IMan Afrikah': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
   'IMAN AFRIKAH': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
   Sanchy: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg',
@@ -786,7 +786,7 @@ export const ARTISTS: Artist[] = [
     bio: 'PRP delivers high-energy tracks that get crowds moving. With a unique blend of hip-hop and African influences, their music is both fresh and deeply rooted.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP/PRP%20(2).png',
+    profileImage: '',
     songs: ['5', '25', '26', '27', '28', '29', '30'],
   },
   {
@@ -824,7 +824,7 @@ export const TOWN_SQUARES = [
     id: 'livingstone',
     name: 'Livingstone Town Square',
     location: 'Zambia',
-    description: 'Pioneer chapter of Create On Base Town Squares',
+    description: 'Pioneer town square of Create On Base Town Squares',
     artistCount: 8,
   },
 ];

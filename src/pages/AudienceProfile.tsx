@@ -233,20 +233,18 @@ export default function AudienceProfile() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Cover Photo */}
       <div className="relative h-48 md:h-64">
         {profile.cover_photo_url ? (
-          <img 
-            src={profile.cover_photo_url} 
-            alt="Cover" 
+          <img
+            src={profile.cover_photo_url}
+            alt="Cover"
             className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-background" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-        
-        {/* Back Button */}
+
         <Button
           variant="ghost"
           size="icon"

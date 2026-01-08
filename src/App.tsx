@@ -27,6 +27,7 @@ const AudienceProfile = lazy(() => import("./pages/AudienceProfile"));
 const Install = lazy(() => import("./pages/Install"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Room = lazy(() => import("./pages/Room"));
+const About = lazy(() => import("./pages/About"));
 
 
 // Loading spinner component
@@ -78,6 +79,7 @@ function AppShell() {
           <Route path="/social" element={<Social />} />
           <Route path="/community" element={<Community />} />
           <Route path="/audience/:userId" element={<AudienceProfile />} />
+          <Route path="/about" element={<About />} />
           <Route path="/install" element={<Install />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/room" element={<Room />} />

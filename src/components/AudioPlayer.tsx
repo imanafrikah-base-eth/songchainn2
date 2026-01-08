@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronUp } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronUp, Headphones } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
 import { Slider } from '@/components/ui/slider';
@@ -8,6 +8,7 @@ import { FullScreenPlayer } from './FullScreenPlayer';
 import { SpinningSongArt } from './SpinningSongArt';
 import { ShareSongButton } from './ShareSongButton';
 import { useAuth } from '@/context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -65,17 +66,19 @@ const TimeDisplay = memo(function TimeDisplay({
 });
 
 export const AudioPlayer = memo(function AudioPlayer() {
-  const { currentSong, isPlaying } = usePlayerState();
+  const { currentSong, isPlaying, isRoomMode, isRoomHidden } = usePlayerState();
   const { currentTime, duration } = usePlayerTime();
-  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume } = usePlayerActions();
+  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume, showRoom } = usePlayerActions();
   const { addPlay } = useEngagement();
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   const hasCountedPlay = useRef(false);
   const playStartTime = useRef<number | null>(null);
   const accumulatedPlayTime = useRef(0);
   const lastSongId = useRef<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const showReturnToRoom = isRoomMode && isRoomHidden;
 
   const PLAY_THRESHOLD_SECONDS = 3;
 
@@ -188,6 +191,21 @@ export const AudioPlayer = memo(function AudioPlayer() {
       >
         {/* Glass background with safe area padding for mobile */}
         <div className="glass-surface border-t border-border/50 pb-safe">
+          {showReturnToRoom && (
+            <div className="container mx-auto px-3 sm:px-4 pt-2 pb-1 md:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  showRoom();
+                  navigate('/room');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary text-xs px-3 py-1"
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span>Return to Room</span>
+              </button>
+            </div>
+          )}
           <ProgressBar currentTime={currentTime} duration={duration} onSeek={seekTo} />
 
           <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
@@ -201,6 +219,17 @@ export const AudioPlayer = memo(function AudioPlayer() {
                   <SpinningSongArt isPlaying={isPlaying} size="md" className="shadow-soft" />
                 </div>
                 <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-[10px] px-1.5 py-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                      <span>Now Playing</span>
+                    </span>
+                    {isRoomMode && (
+                      <span className="text-[10px] text-muted-foreground">
+                        The Room
+                      </span>
+                    )}
+                  </div>
                   <p className="font-medium text-foreground truncate text-sm sm:text-base group-hover:text-primary transition-colors">
                     {currentSong.title}
                   </p>

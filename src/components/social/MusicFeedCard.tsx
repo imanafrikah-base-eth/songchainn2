@@ -134,7 +134,9 @@ export function MusicFeedCard({
 
   return (
     <motion.div 
-      className="relative w-full h-[calc(100vh-180px)] min-h-[500px] max-h-[800px] bg-card rounded-3xl overflow-hidden"
+      className={`relative w-full h-[calc(100vh-180px)] min-h-[500px] max-h-[800px] bg-card rounded-3xl overflow-hidden ${
+        isVisible ? 'ring-2 ring-primary/60 shadow-2xl shadow-primary/30' : ''
+      }`}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
@@ -442,6 +444,9 @@ export function MusicFeedCard({
         {/* Timestamp */}
         <p className="text-white/50 text-xs mt-2">
           {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+        </p>
+        <p className="text-white/70 text-[11px] mt-1">
+          Thanks for listening early. Your plays earn points toward future ownership drops.
         </p>
       </div>
     </motion.div>

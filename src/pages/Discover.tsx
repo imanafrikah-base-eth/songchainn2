@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight } from 'lucide-react';
+import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { SONGS, GENRES, Genre } from '@/data/musicData';
@@ -9,9 +9,11 @@ import { SongCard } from '@/components/SongCard';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { getLikedSongs } from '@/lib/localDb';
+import { useSafePlayerState } from '@/context/PlayerContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -45,6 +47,7 @@ export default function Discover() {
   const [selectedGenre, setSelectedGenre] = useState<Genre | 'all'>('all');
   const [showFilters, setShowFilters] = useState(true);
   const { rankedSongs } = useRankedSongs();
+  const playerState = useSafePlayerState();
   const { data: likedSongIds = [] } = useUserLikes();
 
   // Get user's preferred genres based on likes
@@ -124,22 +127,91 @@ export default function Discover() {
       <Navigation />
 
       <main className="container mx-auto px-4 py-8 relative z-10">
-        {/* Page Header */}
-        <motion.div
+        {playerState?.isRoomMode && playerState.currentSong && (
+          <div className="mb-6">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/40 overflow-hidden flex-shrink-0">
+                {playerState.currentSong.coverImage ? (
+                  <img
+                    src={playerState.currentSong.coverImage}
+                    alt={playerState.currentSong.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-[11px] sm:text-xs text-primary mb-0.5">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    <span>Now Playing in The Room</span>
+                  </span>
+                </div>
+                <div className="text-sm sm:text-base font-medium text-foreground truncate">
+                  {playerState.currentSong.title}
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                  {playerState.currentSong.artist}
+                </div>
+              </div>
+              <Link to="/room" className="flex-shrink-0">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs sm:text-sm px-3 py-1.5"
+                >
+                  <Headphones className="w-3.5 h-3.5" />
+                  <span>Jump into Room</span>
+                </button>
+              </Link>
+            </div>
+          </div>
+        )}
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2.5 rounded-xl gradient-primary">
-              <Compass className="w-6 h-6 text-primary-foreground" />
+          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl glass-card p-4 sm:p-6 md:p-8 shine-overlay">
+            <div className="absolute -top-16 -right-10 w-40 h-40 opacity-40">
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    'radial-gradient(circle, hsl(var(--primary) / 0.8) 0%, transparent 70%)',
+                  filter: 'blur(40px)',
+                }}
+                animate={{ scale: [1, 1.1, 1], x: [0, 10, 0], y: [0, -10, 0] }}
+                transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+              />
             </div>
-            <h1 className="font-heading text-3xl font-bold text-foreground">Discover</h1>
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2.5 rounded-xl gradient-primary shadow-glow-intense">
+                    <Compass className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
+                    Discover
+                  </h1>
+                </div>
+                <p className="text-sm sm:text-base text-muted-foreground max-w-xl">
+                  Explore new music, filter by genre, and get personalized recommendations
+                  based on what you actually like.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs sm:text-sm">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Discovery mode
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs sm:text-sm">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  Live taste signals
+                </span>
+              </div>
+            </div>
           </div>
-          <p className="text-muted-foreground">
-            Explore new music, filter by genre, and get personalized recommendations
-          </p>
-        </motion.div>
+        </motion.section>
 
         {/* Meet the Artists CTA */}
         <motion.section
@@ -250,27 +322,59 @@ export default function Discover() {
               initial="hidden"
               animate="show"
             >
-              <motion.div variants={itemVariants} className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-primary" />
-                <h2 className="font-heading text-xl font-semibold text-foreground">For You</h2>
-                {preferredGenres.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    Based on your {preferredGenres[0]} likes
-                  </Badge>
-                )}
-              </motion.div>
-              <div className="grid gap-3">
-                {recommendedSongs.map((song, index) => (
-                  <motion.div key={song.id} variants={itemVariants}>
-                    <SongCard song={song} index={index} variant="compact" />
+              <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shine-overlay overflow-hidden">
+                <div className="pointer-events-none absolute -inset-x-10 -top-12 h-20 bg-gradient-to-r from-primary/35 via-cyan-400/20 to-emerald-400/25 blur-3xl opacity-60" />
+                <div className="relative z-10">
+                  {recommendedSongs.length > 0 && (
+                    <motion.div
+                      variants={itemVariants}
+                      className="flex items-center gap-2 mb-4"
+                    >
+                      {recommendedSongs.slice(0, 3).map((song) => (
+                        <div
+                          key={song.id}
+                          className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-black/40 border border-white/10"
+                        >
+                          <img
+                            src={song.coverImage}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                  <motion.div variants={itemVariants} className="flex items-center justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-primary" />
+                      <h2 className="font-heading text-xl font-semibold text-foreground">For You</h2>
+                      {preferredGenres.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          Based on your {preferredGenres[0]} likes
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
+                      <Heart className="w-3.5 h-3.5 text-primary" />
+                      <span>Personalized picks</span>
+                    </div>
                   </motion.div>
-                ))}
+                  <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                    {recommendedSongs.map((song, index) => (
+                      <motion.div key={song.id} variants={itemVariants}>
+                        <SongCard song={song} index={index} variant="compact" />
+                      </motion.div>
+                    ))}
+                  </div>
+                  {recommendedSongs.length === 0 && (
+                    <motion.p variants={itemVariants} className="text-muted-foreground text-sm py-4">
+                      Like some songs to get personalized recommendations!
+                    </motion.p>
+                  )}
+                </div>
               </div>
-              {recommendedSongs.length === 0 && (
-                <motion.p variants={itemVariants} className="text-muted-foreground text-sm py-4">
-                  Like some songs to get personalized recommendations!
-                </motion.p>
-              )}
             </motion.section>
 
             {/* Filtered Songs / All Songs */}
@@ -279,44 +383,71 @@ export default function Discover() {
               initial="hidden"
               animate="show"
             >
-              <motion.div variants={itemVariants} className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  <h2 className="font-heading text-xl font-semibold text-foreground">
-                    {selectedGenre === 'all' ? 'Trending Now' : selectedGenre}
-                  </h2>
-                  <span className="text-sm text-muted-foreground">
-                    ({filteredSongs.length} songs)
-                  </span>
-                </div>
-              </motion.div>
-
-              <AnimatePresence mode="popLayout">
-                <div className="space-y-2">
-                  {filteredSongs.map((song, index) => (
+              <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shine-overlay overflow-hidden">
+                <div className="pointer-events-none absolute -inset-x-10 -top-12 h-20 bg-gradient-to-r from-primary/30 via-purple-500/25 to-cyan-400/30 blur-3xl opacity-70" />
+                <div className="relative z-10">
+                  {filteredSongs.length > 0 && (
                     <motion.div
-                      key={song.id}
                       variants={itemVariants}
-                      initial="hidden"
-                      animate="show"
-                      exit={{ opacity: 0, x: -20 }}
-                      layout
+                      className="flex items-center gap-2 mb-4"
                     >
-                      <SongCard song={song} index={index} variant="compact" />
+                      {filteredSongs.slice(0, 3).map((song) => (
+                        <div
+                          key={song.id}
+                          className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-black/40 border border-white/10"
+                        >
+                          <img
+                            src={song.coverImage}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        </div>
+                      ))}
                     </motion.div>
-                  ))}
-                </div>
-              </AnimatePresence>
+                  )}
+                  <motion.div variants={itemVariants} className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-primary" />
+                      <h2 className="font-heading text-xl font-semibold text-foreground">
+                        {selectedGenre === 'all' ? 'Trending Now' : selectedGenre}
+                      </h2>
+                      <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                        <Music className="w-3.5 h-3.5 text-primary" />
+                        <span>{filteredSongs.length} songs</span>
+                      </span>
+                    </div>
+                  </motion.div>
 
-              {filteredSongs.length === 0 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center py-12 glass-card rounded-2xl"
-                >
-                  <p className="text-muted-foreground">No songs in this genre yet</p>
-                </motion.div>
-              )}
+                  <AnimatePresence mode="popLayout">
+                    <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                      {filteredSongs.map((song, index) => (
+                        <motion.div
+                          key={song.id}
+                          variants={itemVariants}
+                          initial="hidden"
+                          animate="show"
+                          exit={{ opacity: 0, x: -20 }}
+                          layout
+                        >
+                          <SongCard song={song} index={index} variant="compact" />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </AnimatePresence>
+
+                  {filteredSongs.length === 0 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-center py-12"
+                    >
+                      <p className="text-muted-foreground">No songs in this genre yet</p>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
             </motion.section>
           </div>
 
@@ -415,6 +546,69 @@ export default function Discover() {
             )}
           </motion.aside>
         </div>
+
+        <motion.footer
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="mt-10 sm:mt-12 mb-2"
+        >
+          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-7 shine-overlay relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 opacity-25">
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle, hsl(var(--primary) / 0.7) 0%, transparent 70%)',
+                  filter: 'blur(40px)',
+                }}
+                animate={{ scale: [1, 1.1, 1], x: [0, 8, 0], y: [0, -6, 0] }}
+                transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </div>
+            <div className="absolute -bottom-16 -left-10 w-40 h-40 opacity-20">
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle, hsl(210 100% 70% / 0.7) 0%, transparent 70%)',
+                  filter: 'blur(40px)',
+                }}
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+              />
+            </div>
+            <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
+              <div className="space-y-2 sm:space-y-3 max-w-xl">
+                <p className="text-xs sm:text-sm uppercase tracking-wide text-primary font-semibold flex items-center gap-2">
+                  <Compass className="w-4 h-4" />
+                  <span>Keep exploring</span>
+                </p>
+                <h2 className="font-heading text-lg sm:text-xl md:text-2xl font-semibold text-foreground">
+                  Shuffle the catalog, follow your taste, and let new sounds find you.
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Use genres, For You picks, and surprise cards to map out your corner of $ongChainn.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                <Link to="/">
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                    <span>Back Home</span>
+                  </Button>
+                </Link>
+                <Link to="/about">
+                  <Button className="w-full sm:w-auto gradient-primary text-primary-foreground shadow-glow gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>About $ongChainn</span>
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </motion.footer>
       </main>
 
       <AudioPlayer />

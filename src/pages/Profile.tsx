@@ -14,6 +14,7 @@ import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { Link, Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // X (Twitter) and Base icons
 const XTwitterIcon = () => (
@@ -59,6 +60,30 @@ export default function Profile() {
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isUploadingCoverPhoto, setIsUploadingCoverPhoto] = useState(false);
+  const [isCoverCropOpen, setIsCoverCropOpen] = useState(false);
+  const [coverDraftFile, setCoverDraftFile] = useState<File | null>(null);
+  const [coverDraftUrl, setCoverDraftUrl] = useState<string | null>(null);
+  const [coverCropOffsetY, setCoverCropOffsetY] = useState(0);
+  const [coverCropMaxOffset, setCoverCropMaxOffset] = useState(0);
+  const [isSavingCroppedCover, setIsSavingCroppedCover] = useState(false);
+  const coverPreviewRef = useRef<HTMLDivElement | null>(null);
+  const coverPreviewImageRef = useRef<HTMLImageElement | null>(null);
+  const coverDragStateRef = useRef<{ startY: number; startOffset: number } | null>(null);
+  const [isAvatarCropOpen, setIsAvatarCropOpen] = useState(false);
+  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
+  const [avatarDraftUrl, setAvatarDraftUrl] = useState<string | null>(null);
+  const [avatarOffsetX, setAvatarOffsetX] = useState(0);
+  const [avatarOffsetY, setAvatarOffsetY] = useState(0);
+  const [avatarMaxOffsetX, setAvatarMaxOffsetX] = useState(0);
+  const [avatarMaxOffsetY, setAvatarMaxOffsetY] = useState(0);
+  const [isSavingCroppedAvatar, setIsSavingCroppedAvatar] = useState(false);
+  const avatarPreviewRef = useRef<HTMLDivElement | null>(null);
+  const avatarDragStateRef = useRef<{
+    startX: number;
+    startY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+  } | null>(null);
   
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -106,7 +131,7 @@ export default function Profile() {
   );
 
   const handleProfilePictureChange = useCallback(
-    async (e: ChangeEvent<HTMLInputElement>) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       e.target.value = '';
       if (!file) return;
@@ -119,20 +144,23 @@ export default function Profile() {
         return;
       }
 
-      setIsUploadingProfilePicture(true);
-      try {
-        await uploadAndUpdateProfileImage(file, 'profile_picture_url');
-      } catch (err: any) {
-        toast({ title: 'Failed to update profile picture', variant: 'destructive' });
-      } finally {
-        setIsUploadingProfilePicture(false);
-      }
+      const url = URL.createObjectURL(file);
+      setAvatarDraftFile(file);
+      setAvatarDraftUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+      setAvatarOffsetX(0);
+      setAvatarOffsetY(0);
+      setAvatarMaxOffsetX(0);
+      setAvatarMaxOffsetY(0);
+      setIsAvatarCropOpen(true);
     },
-    [toast, uploadAndUpdateProfileImage]
+    [toast]
   );
 
   const handleCoverPhotoChange = useCallback(
-    async (e: ChangeEvent<HTMLInputElement>) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       e.target.value = '';
       if (!file) return;
@@ -145,17 +173,201 @@ export default function Profile() {
         return;
       }
 
+      const url = URL.createObjectURL(file);
+      setCoverDraftFile(file);
+      setCoverDraftUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+      setCoverCropOffsetY(0);
+      setCoverCropMaxOffset(0);
+      setIsCoverCropOpen(true);
+    },
+    [toast]
+  );
+
+  const closeCoverCrop = useCallback(() => {
+    setIsCoverCropOpen(false);
+    setCoverDraftFile(null);
+    setCoverCropOffsetY(0);
+    setCoverCropMaxOffset(0);
+    if (coverDraftUrl) {
+      URL.revokeObjectURL(coverDraftUrl);
+    }
+    setCoverDraftUrl(null);
+  }, [coverDraftUrl]);
+
+  const closeAvatarCrop = useCallback(() => {
+    setIsAvatarCropOpen(false);
+    setAvatarDraftFile(null);
+    setAvatarOffsetX(0);
+    setAvatarOffsetY(0);
+    setAvatarMaxOffsetX(0);
+    setAvatarMaxOffsetY(0);
+    if (avatarDraftUrl) {
+      URL.revokeObjectURL(avatarDraftUrl);
+    }
+    setAvatarDraftUrl(null);
+  }, [avatarDraftUrl]);
+
+  const cropAndUploadCover = useCallback(async () => {
+    if (!coverDraftFile || !user) return;
+    const imgUrl = URL.createObjectURL(coverDraftFile);
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = (err) => reject(err);
+        img.src = imgUrl;
+      });
+
+      const container = coverPreviewRef.current;
+      if (!container) throw new Error('missing-container');
+
+      const rect = container.getBoundingClientRect();
+      const containerWidth = rect.width || 800;
+      const containerHeight = rect.height || 240;
+
+      const scale = containerWidth / image.naturalWidth;
+      const displayedHeight = image.naturalHeight * scale;
+      const maxOffset = Math.max(0, (displayedHeight - containerHeight) / 2);
+      const clampedOffset = Math.min(maxOffset, Math.max(-maxOffset, coverCropOffsetY));
+
+      const centerDisplayedY = displayedHeight / 2 + clampedOffset;
+      const topDisplayed = centerDisplayedY - containerHeight / 2;
+      const topOriginal = topDisplayed / scale;
+      const cropHeightOriginal = containerHeight / scale;
+
+      const outputWidth = 1600;
+      const outputHeight = Math.round((containerHeight / containerWidth) * outputWidth);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('missing-context');
+
+      ctx.drawImage(
+        image,
+        0,
+        topOriginal,
+        image.naturalWidth,
+        cropHeightOriginal,
+        0,
+        0,
+        outputWidth,
+        outputHeight
+      );
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.9)
+      );
+      if (!blob) throw new Error('missing-blob');
+
+      const croppedFile = new File([blob], coverDraftFile.name || 'cover.jpg', {
+        type: 'image/jpeg',
+      });
+
       setIsUploadingCoverPhoto(true);
       try {
-        await uploadAndUpdateProfileImage(file, 'cover_photo_url');
-      } catch (err: any) {
-        toast({ title: 'Failed to update cover photo', variant: 'destructive' });
+        await uploadAndUpdateProfileImage(croppedFile, 'cover_photo_url');
       } finally {
         setIsUploadingCoverPhoto(false);
       }
-    },
-    [toast, uploadAndUpdateProfileImage]
-  );
+    } finally {
+      URL.revokeObjectURL(imgUrl);
+    }
+  }, [coverCropOffsetY, coverDraftFile, uploadAndUpdateProfileImage, user]);
+
+  const cropAndUploadAvatar = useCallback(async () => {
+    if (!avatarDraftFile || !user) return;
+    const imgUrl = URL.createObjectURL(avatarDraftFile);
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = (err) => reject(err);
+        img.src = imgUrl;
+      });
+
+      const container = avatarPreviewRef.current;
+      if (!container) throw new Error('missing-container');
+
+      const rect = container.getBoundingClientRect();
+      const containerWidth = rect.width || 240;
+      const containerHeight = rect.height || 240;
+
+      const scale = containerWidth / image.naturalWidth;
+      const displayedWidth = image.naturalWidth * scale;
+      const displayedHeight = image.naturalHeight * scale;
+
+      const maxOffsetX = Math.max(0, (displayedWidth - containerWidth) / 2);
+      const maxOffsetY = Math.max(0, (displayedHeight - containerHeight) / 2);
+      const clampedOffsetX = Math.min(
+        maxOffsetX,
+        Math.max(-maxOffsetX, avatarOffsetX)
+      );
+      const clampedOffsetY = Math.min(
+        maxOffsetY,
+        Math.max(-maxOffsetY, avatarOffsetY)
+      );
+
+      const centerDisplayedX = displayedWidth / 2 + clampedOffsetX;
+      const centerDisplayedY = displayedHeight / 2 + clampedOffsetY;
+
+      const leftDisplayed = centerDisplayedX - containerWidth / 2;
+      const topDisplayed = centerDisplayedY - containerHeight / 2;
+
+      const leftOriginal = leftDisplayed / scale;
+      const topOriginal = topDisplayed / scale;
+      const cropSizeOriginal = containerWidth / scale;
+
+      const outputSize = 600;
+      const canvas = document.createElement('canvas');
+      canvas.width = outputSize;
+      canvas.height = outputSize;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('missing-context');
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(outputSize / 2, outputSize / 2, outputSize / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      ctx.drawImage(
+        image,
+        leftOriginal,
+        topOriginal,
+        cropSizeOriginal,
+        cropSizeOriginal,
+        0,
+        0,
+        outputSize,
+        outputSize
+      );
+
+      ctx.restore();
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/png', 0.9)
+      );
+      if (!blob) throw new Error('missing-blob');
+
+      const croppedFile = new File([blob], avatarDraftFile.name || 'avatar.png', {
+        type: 'image/png',
+      });
+
+      setIsUploadingProfilePicture(true);
+      try {
+        await uploadAndUpdateProfileImage(croppedFile, 'profile_picture_url');
+      } finally {
+        setIsUploadingProfilePicture(false);
+      }
+    } finally {
+      URL.revokeObjectURL(imgUrl);
+    }
+  }, [avatarDraftFile, avatarOffsetX, avatarOffsetY, uploadAndUpdateProfileImage, user]);
 
   const handleSave = async () => {
     if (!user || !profileName.trim()) {
@@ -236,6 +448,260 @@ export default function Profile() {
           </div>
         )}
       </div>
+
+      <Dialog open={isCoverCropOpen} onOpenChange={(open) => !open && !isSavingCroppedCover && closeCoverCrop()}>
+        <DialogContent className="max-w-lg w-[95vw] sm:w-full">
+          <DialogHeader>
+            <DialogTitle>Adjust cover photo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div
+              ref={coverPreviewRef}
+              className="relative w-full h-48 overflow-hidden rounded-xl bg-muted touch-pan-y"
+              onPointerDown={(e) => {
+                if (!coverDraftUrl) return;
+                coverDragStateRef.current = { startY: e.clientY, startOffset: coverCropOffsetY };
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              }}
+              onPointerMove={(e) => {
+                if (!coverDragStateRef.current) return;
+                const deltaY = e.clientY - coverDragStateRef.current.startY;
+                const nextOffset = coverDragStateRef.current.startOffset + deltaY;
+                const clamped = Math.min(
+                  coverCropMaxOffset,
+                  Math.max(-coverCropMaxOffset, nextOffset)
+                );
+                setCoverCropOffsetY(clamped);
+              }}
+              onPointerUp={(e) => {
+                if (!coverDragStateRef.current) return;
+                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                coverDragStateRef.current = null;
+              }}
+              onPointerLeave={(e) => {
+                if (!coverDragStateRef.current) return;
+                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                coverDragStateRef.current = null;
+              }}
+            >
+              {coverDraftUrl && (
+                <>
+                  <img
+                    ref={coverPreviewImageRef}
+                    src={coverDraftUrl}
+                    alt="Cover preview"
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2"
+                    onLoad={(event) => {
+                      const img = event.currentTarget;
+                      const container = coverPreviewRef.current;
+                      if (!container) return;
+                      const rect = container.getBoundingClientRect();
+                      const containerWidth = rect.width || 800;
+                      const containerHeight = rect.height || 240;
+                      const scale = containerWidth / img.naturalWidth;
+                      const displayedHeight = img.naturalHeight * scale;
+                      const maxOffset = Math.max(0, (displayedHeight - containerHeight) / 2);
+                      setCoverCropMaxOffset(maxOffset);
+                      setCoverCropOffsetY(0);
+                    }}
+                    style={{
+                      transform: `translate(-50%, ${coverCropOffsetY}px)`,
+                      width: '100%',
+                      height: 'auto',
+                    }}
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex items-end justify-center pb-3">
+                    <div className="px-3 py-1 rounded-full bg-background/70 text-[10px] font-medium tracking-wide text-foreground/80">
+                      Drag to reposition
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Drag the photo up or down to choose which part shows in your cover. You
+              can change the photo before saving.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => coverPhotoInputRef.current?.click()}
+              disabled={isSavingCroppedCover}
+            >
+              Change photo
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                if (isSavingCroppedCover) return;
+                closeCoverCrop();
+              }}
+              disabled={isSavingCroppedCover}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!coverDraftFile || isSavingCroppedCover) return;
+                setIsSavingCroppedCover(true);
+                try {
+                  await cropAndUploadCover();
+                  closeCoverCrop();
+                } catch (err) {
+                  toast({ title: 'Failed to update cover photo', variant: 'destructive' });
+                } finally {
+                  setIsSavingCroppedCover(false);
+                }
+              }}
+              disabled={!coverDraftFile || isSavingCroppedCover}
+            >
+              {isSavingCroppedCover ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                'Save photo'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAvatarCropOpen} onOpenChange={(open) => !open && !isSavingCroppedAvatar && closeAvatarCrop()}>
+        <DialogContent className="max-w-sm w-[95vw] sm:w-full">
+          <DialogHeader>
+            <DialogTitle>Adjust profile picture</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div
+              ref={avatarPreviewRef}
+              className="relative w-full max-w-xs mx-auto aspect-square overflow-hidden rounded-full bg-muted touch-pan-y"
+              onPointerDown={(e) => {
+                if (!avatarDraftUrl) return;
+                avatarDragStateRef.current = {
+                  startX: e.clientX,
+                  startY: e.clientY,
+                  startOffsetX: avatarOffsetX,
+                  startOffsetY: avatarOffsetY,
+                };
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              }}
+              onPointerMove={(e) => {
+                if (!avatarDragStateRef.current) return;
+                const deltaX = e.clientX - avatarDragStateRef.current.startX;
+                const deltaY = e.clientY - avatarDragStateRef.current.startY;
+                const nextX = avatarDragStateRef.current.startOffsetX + deltaX;
+                const nextY = avatarDragStateRef.current.startOffsetY + deltaY;
+                const clampedX = Math.min(
+                  avatarMaxOffsetX,
+                  Math.max(-avatarMaxOffsetX, nextX)
+                );
+                const clampedY = Math.min(
+                  avatarMaxOffsetY,
+                  Math.max(-avatarMaxOffsetY, nextY)
+                );
+                setAvatarOffsetX(clampedX);
+                setAvatarOffsetY(clampedY);
+              }}
+              onPointerUp={(e) => {
+                if (!avatarDragStateRef.current) return;
+                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                avatarDragStateRef.current = null;
+              }}
+              onPointerLeave={(e) => {
+                if (!avatarDragStateRef.current) return;
+                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                avatarDragStateRef.current = null;
+              }}
+            >
+              {avatarDraftUrl && (
+                <>
+                  <img
+                    src={avatarDraftUrl}
+                    alt="Profile preview"
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                    onLoad={(event) => {
+                      const img = event.currentTarget;
+                      const container = avatarPreviewRef.current;
+                      if (!container) return;
+                      const rect = container.getBoundingClientRect();
+                      const containerWidth = rect.width || 240;
+                      const containerHeight = rect.height || 240;
+                      const scale = containerWidth / img.naturalWidth;
+                      const displayedHeight = img.naturalHeight * scale;
+                      const displayedWidth = img.naturalWidth * scale;
+                      const maxOffsetX = Math.max(0, (displayedWidth - containerWidth) / 2);
+                      const maxOffsetY = Math.max(0, (displayedHeight - containerHeight) / 2);
+                      setAvatarMaxOffsetX(maxOffsetX);
+                      setAvatarMaxOffsetY(maxOffsetY);
+                      setAvatarOffsetX(0);
+                      setAvatarOffsetY(0);
+                    }}
+                    style={{
+                      transform: `translate(-50%, -50%) translate(${avatarOffsetX}px, ${avatarOffsetY}px)`,
+                      width: '100%',
+                      height: 'auto',
+                    }}
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex items-end justify-center pb-3">
+                    <div className="px-3 py-1 rounded-full bg-background/70 text-[10px] font-medium tracking-wide text-foreground/80">
+                      Drag to reposition
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Drag the photo to choose how it appears in your profile picture.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => profilePictureInputRef.current?.click()}
+              disabled={isSavingCroppedAvatar}
+            >
+              Change photo
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                if (isSavingCroppedAvatar) return;
+                closeAvatarCrop();
+              }}
+              disabled={isSavingCroppedAvatar}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!avatarDraftFile || isSavingCroppedAvatar) return;
+                setIsSavingCroppedAvatar(true);
+                try {
+                  await cropAndUploadAvatar();
+                  closeAvatarCrop();
+                } catch (err) {
+                  toast({ title: 'Failed to update profile picture', variant: 'destructive' });
+                } finally {
+                  setIsSavingCroppedAvatar(false);
+                }
+              }}
+              disabled={!avatarDraftFile || isSavingCroppedAvatar}
+            >
+              {isSavingCroppedAvatar ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                'Save photo'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="px-4 -mt-16 max-w-2xl mx-auto">
         {/* Profile Picture & Info */}

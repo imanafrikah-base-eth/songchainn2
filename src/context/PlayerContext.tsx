@@ -7,6 +7,7 @@ interface PlayerStateContext {
   isPlaying: boolean;
   queue: Song[];
   isRoomMode: boolean;
+  isRoomHidden: boolean;
 }
 
 interface PlayerTimeContext {
@@ -27,6 +28,8 @@ interface PlayerActionsContext {
   volume: number;
   enterRoomMode: (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => Promise<boolean>;
   exitRoomMode: () => Promise<void>;
+  hideRoom: () => void;
+  showRoom: () => void;
 }
 
 const PlayerStateCtx = createContext<PlayerStateContext | undefined>(undefined);
@@ -43,6 +46,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [isCrossfading, setIsCrossfading] = useState(false);
   const [audioVersion, setAudioVersion] = useState(0);
   const [isRoomMode, setIsRoomMode] = useState(false);
+   const [isRoomHidden, setIsRoomHidden] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -64,8 +68,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     isPlaying: boolean;
     currentTime: number;
   } | null>(null);
-  const crossfadeDuration = 2000; // 2 second crossfade
-  const crossfadeThreshold = 2; // Start crossfade 2 seconds before song ends
+  const crossfadeDuration = 2600;
+  const crossfadeThreshold = 2.6;
 
   // Initialize audio elements - runs once on mount
   useEffect(() => {
@@ -253,8 +257,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     song: Song,
     options?: { startTime?: number; shouldPlay?: boolean }
   ) => {
-    const audio = audioRef.current;
-    if (!audio) return false;
+    let audio = audioRef.current;
+    if (!audio) {
+      audio = new Audio();
+      audio.preload = 'auto';
+      audio.volume = volumeRef.current;
+      audioRef.current = audio;
+      setAudioVersion(v => v + 1);
+    }
 
     setCurrentSong(song);
     setCurrentTime(0);
@@ -450,6 +460,29 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [isCrossfading]);
 
+  const fadeVolume = useCallback((from: number, to: number, durationMs: number) => {
+    const audio = audioRef.current;
+    if (!audio) return Promise.resolve();
+    const clampedFrom = Math.max(0, Math.min(1, from));
+    const clampedTo = Math.max(0, Math.min(1, to));
+    const steps = 12;
+    const stepDuration = durationMs / steps;
+    let step = 0;
+    audio.volume = clampedFrom;
+    return new Promise<void>((resolve) => {
+      const interval = window.setInterval(() => {
+        step += 1;
+        const progress = step / steps;
+        const v = clampedFrom + (clampedTo - clampedFrom) * progress;
+        audio.volume = Math.max(0, Math.min(1, v));
+        if (step >= steps) {
+          window.clearInterval(interval);
+          resolve();
+        }
+      }, stepDuration);
+    });
+  }, []);
+
   const advanceToNext = useCallback(() => {
     if (currentSong && queue.length > 0) {
       const currentIndex = queue.findIndex(s => s.id === currentSong.id);
@@ -507,6 +540,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       };
     }
 
+    setIsRoomHidden(false);
     setIsRoomMode(true);
     setQueue(playlist);
     setIsCrossfading(false);
@@ -524,11 +558,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [forceSetSong]);
 
   const exitRoomMode = useCallback(async () => {
+    const previousVolume = volumeRef.current;
+    const audio = audioRef.current;
+    if (audio && !audio.paused && previousVolume > 0) {
+      await fadeVolume(audio.volume, 0, 220);
+    }
+
     setIsRoomMode(false);
+    setIsRoomHidden(false);
     const snapshot = roomRestoreRef.current;
     roomRestoreRef.current = null;
 
-    if (!snapshot) return;
+    if (!snapshot) {
+      if (audio) {
+        audio.volume = previousVolume;
+      }
+      return;
+    }
 
     setQueue(snapshot.queue);
     setIsCrossfading(false);
@@ -540,14 +586,46 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentSong(null);
       setIsPlaying(false);
       setCurrentTime(0);
+      if (audioRef.current) {
+        audioRef.current.volume = previousVolume;
+      }
       return;
     }
 
     await forceSetSong(snapshot.currentSong, {
-      shouldPlay: snapshot.isPlaying,
+      shouldPlay: false,
       startTime: snapshot.currentTime,
     });
-  }, [forceSetSong]);
+
+    const restoredAudio = audioRef.current;
+    if (!restoredAudio) return;
+
+    if (!snapshot.isPlaying) {
+      restoredAudio.pause();
+      restoredAudio.volume = previousVolume;
+      setIsPlaying(false);
+      return;
+    }
+
+    restoredAudio.volume = 0;
+    try {
+      await restoredAudio.play();
+      setIsPlaying(true);
+      await fadeVolume(0, previousVolume, 220);
+    } catch {
+      restoredAudio.volume = previousVolume;
+      setIsPlaying(false);
+    }
+  }, [fadeVolume, forceSetSong]);
+
+  const hideRoom = useCallback(() => {
+    if (!isRoomModeRef.current) return;
+    setIsRoomHidden(true);
+  }, []);
+
+  const showRoom = useCallback(() => {
+    setIsRoomHidden(false);
+  }, []);
 
   // Memoize context values to prevent unnecessary re-renders
   const stateValue = useMemo(() => ({
@@ -555,7 +633,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     isPlaying,
     queue,
     isRoomMode,
-  }), [currentSong, isPlaying, isRoomMode, queue]);
+    isRoomHidden,
+  }), [currentSong, isPlaying, isRoomMode, isRoomHidden, queue]);
 
   const timeValue = useMemo(() => ({
     currentTime,
@@ -575,7 +654,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     volume,
     enterRoomMode,
     exitRoomMode,
-  }), [addToQueue, enterRoomMode, exitRoomMode, pause, play, playNext, playPrevious, playSong, seekTo, setVolume, togglePlay, volume]);
+    hideRoom,
+    showRoom,
+  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, pause, play, playNext, playPrevious, playSong, seekTo, setVolume, togglePlay, volume]);
 
   return (
     <PlayerStateCtx.Provider value={stateValue}>

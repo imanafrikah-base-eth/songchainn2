@@ -20,7 +20,7 @@ export function BottomTabBar() {
   const playerState = useSafePlayerState();
   const currentSong = playerState?.currentSong;
   const { user, isArtist, artistId } = useAuth();
-  const roomOnlineCount = useRoomOnlineCount(user?.id);
+  const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
   const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
   const effectiveTabItems = tabItems.map((item) =>
     item.path === '/profile' ? { ...item, path: profilePath } : item
@@ -62,9 +62,12 @@ export function BottomTabBar() {
                       isActive && "scale-110"
                     )} />
                     {item.path === '/room' && roomOnlineCount > 0 && (
-                      <span className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
-                        {roomOnlineCount}
-                      </span>
+                      <>
+                        <span className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
+                          {roomOnlineCount}
+                        </span>
+                        <span className="absolute -top-1.5 -left-1.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                      </>
                     )}
                     {isActive && (
                       <motion.div

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones } from 'lucide-react';
+import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones, Sparkles } from 'lucide-react';
 import { useEngagement } from '@/context/EngagementContext';
 import { useAuth } from '@/context/AuthContext';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
+import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/songchainn-logo.webp';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
@@ -30,11 +31,15 @@ export function Navigation() {
   const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const [showInvite, setShowInvite] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const roomOnlineCount = useRoomOnlineCount(user?.id);
+  const playerState = useSafePlayerState();
+  const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
+  const { showRoom } = usePlayerActions();
   const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
   const effectiveNavItems = navItems.map((item) =>
     item.path === '/profile' ? { ...item, path: profilePath } : item
   );
+  const showReturnToRoom =
+    Boolean(playerState?.isRoomMode) && Boolean(playerState?.isRoomHidden) && location.pathname !== '/room';
   
   // Enable swipe gestures for mobile navigation
   useSwipeNavigation();
@@ -95,9 +100,15 @@ export function Navigation() {
                       <item.icon className="w-4 h-4" />
                       {item.label}
                       {item.path === '/room' && roomOnlineCount > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
-                          {roomOnlineCount}
-                        </span>
+                        <>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                            <span>LIVE</span>
+                          </span>
+                          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
+                            {roomOnlineCount}
+                          </span>
+                        </>
                       )}
                     </span>
                     {isActive && (
@@ -114,6 +125,20 @@ export function Navigation() {
 
             {/* Right side actions */}
             <div className="flex items-center gap-1 sm:gap-2">
+              {showReturnToRoom && (
+                <motion.button
+                  onClick={() => {
+                    showRoom();
+                    navigate('/room');
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-primary/10 text-primary text-xs sm:text-sm font-medium"
+                >
+                  <Headphones className="w-4 h-4" />
+                  <span>Return to Room</span>
+                </motion.button>
+              )}
               {/* Wallet Balance - shown when connected */}
               {walletAddress && (
                 <motion.div
@@ -138,6 +163,8 @@ export function Navigation() {
               <div className="hidden md:flex items-center gap-2">
                 <motion.div
                   whileHover={{ scale: 1.05 }}
+                  animate={{ scale: [1, 1.04, 1] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl glass text-xs sm:text-sm"
                 >
                   <Flame className="w-3.5 h-3.5 text-orange-500" />
@@ -145,10 +172,19 @@ export function Navigation() {
                 </motion.div>
                 <motion.div
                   whileHover={{ scale: 1.05 }}
+                  animate={{ boxShadow: ['0 0 0 0 rgba(139,92,246,0.7)', '0 0 30px 0 rgba(139,92,246,0.9)', '0 0 0 0 rgba(139,92,246,0.7)'] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                   className="px-2.5 py-1.5 rounded-xl gradient-primary text-primary-foreground font-semibold text-xs sm:text-sm shadow-glow"
                 >
                   {engagementPoints.toLocaleString()} pts
                 </motion.div>
+                <Link
+                  to="/about"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass text-xs sm:text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  <span>About $ongChainn</span>
+                </Link>
               </div>
 
               {/* Invite button */}
@@ -299,9 +335,15 @@ export function Navigation() {
                       <span className="flex items-center gap-2">
                         {item.label}
                         {item.path === '/room' && roomOnlineCount > 0 && (
-                          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
-                            {roomOnlineCount}
-                          </span>
+                          <>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                              <span>LIVE</span>
+                            </span>
+                            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
+                              {roomOnlineCount}
+                            </span>
+                          </>
                         )}
                       </span>
                     </motion.button>
@@ -323,6 +365,22 @@ export function Navigation() {
                 >
                   <Download className="w-5 h-5" />
                   <span>Install App</span>
+                </motion.button>
+
+                <motion.button
+                  onClick={() => handleNavClick('/about')}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: (navItems.length + 1) * 0.05 }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left transition-all",
+                    location.pathname === '/about'
+                      ? "bg-primary/10 text-primary border border-primary/20"
+                      : "glass text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  <span>About $ongChainn</span>
                 </motion.button>
 
                 {/* Logout Button */}

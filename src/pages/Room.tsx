@@ -154,7 +154,7 @@ export default function Room() {
   const navigate = useNavigate();
   const { user, isArtist, artistId } = useAuth();
   const { isPlaying, isRoomMode, currentSong } = usePlayerState();
-  const { enterRoomMode, exitRoomMode, setVolume, volume, play } = usePlayerActions();
+  const { enterRoomMode, exitRoomMode, setVolume, volume, play, hideRoom } = usePlayerActions();
   const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
 
   const playlist = useMemo(() => {
@@ -178,6 +178,7 @@ export default function Room() {
 
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [viewingCount, setViewingCount] = useState(0);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [segmentNowMs, setSegmentNowMs] = useState(() => Date.now());
   const [reactionsByMessageId, setReactionsByMessageId] = useState<Record<string, Record<string, number>>>({});
@@ -310,6 +311,7 @@ export default function Room() {
   useEffect(() => {
     if (!user) return;
     if (playlist.length === 0) return;
+    if (isRoomMode) return;
 
     let isActive = true;
     const nowSeconds = Date.now() / 1000;
@@ -324,9 +326,8 @@ export default function Room() {
 
     return () => {
       isActive = false;
-      void exitRoomMode();
     };
-  }, [enterRoomMode, exitRoomMode, playlist, user]);
+  }, [enterRoomMode, isRoomMode, playlist, user]);
 
   useEffect(() => {
     if (!isRoomMode) return;
@@ -491,18 +492,23 @@ export default function Room() {
     presenceChannelRef.current = channel;
 
     const syncPresence = () => {
-      const state = channel.presenceState() as Record<string, Array<{ room_name?: string; in_room?: boolean }>>;
-      let count = 0;
+      const state = channel.presenceState() as Record<string, Array<{ room_name?: string; in_room?: boolean; viewing?: boolean }>>;
+      let listeningCount = 0;
+      let activeViewingCount = 0;
       const names = new Set<string>();
       for (const metas of Object.values(state)) {
         if (!Array.isArray(metas)) continue;
-        if (metas.some(m => Boolean(m?.in_room))) count += 1;
+        const isListening = metas.some(m => Boolean(m?.in_room));
+        const isViewing = metas.some(m => Boolean((m as any)?.viewing));
+        if (isListening) listeningCount += 1;
+        if (isViewing) activeViewingCount += 1;
         for (const meta of metas) {
           const name = normalizeRoomName(meta?.room_name || '');
           if (name && name.toLowerCase() !== 'guest') names.add(name);
         }
       }
-      setOnlineCount(count);
+      setOnlineCount(listeningCount);
+      setViewingCount(activeViewingCount);
       setActiveRoomNames([...names].sort((a, b) => a.localeCompare(b)).slice(0, 40));
     };
 
@@ -553,7 +559,7 @@ export default function Room() {
       const storedNameRaw = localStorage.getItem(`room_username:${user.id}`) || '';
       const storedName = storedNameRaw ? normalizeRoomName(storedNameRaw) : '';
       const toTrack = normalizeRoomName(roomName || storedName || '');
-      await channel.track({ room_name: toTrack || 'Guest', in_room: true });
+      await channel.track({ room_name: toTrack || 'Guest', in_room: true, viewing: true });
       syncPresence();
     });
 
@@ -628,7 +634,7 @@ export default function Room() {
     const channel = presenceChannelRef.current;
     if (!channel || !user) return;
     const toTrack = normalizeRoomName(roomName || '');
-    void channel.track({ room_name: toTrack || 'Guest', in_room: true });
+    void channel.track({ room_name: toTrack || 'Guest', in_room: true, viewing: true });
   }, [roomName, user]);
 
   useEffect(() => {
@@ -1067,6 +1073,12 @@ export default function Room() {
     };
   }, [segmentNowMs]);
 
+  useEffect(() => {
+    return () => {
+      void exitRoomMode();
+    };
+  }, [exitRoomMode]);
+
   if (!user) return null;
 
   return (
@@ -1075,13 +1087,26 @@ export default function Room() {
         <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => {
+              hideRoom();
+              navigate('/');
+            }}
             className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Leave Room</span>
+            <span>Hide Room</span>
           </button>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                await exitRoomMode();
+                navigate('/');
+              }}
+              className="hidden sm:inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-red-400 transition-colors"
+            >
+              <span>Leave Room</span>
+            </button>
             <button
               type="button"
               onClick={async () => {
@@ -1133,10 +1158,24 @@ export default function Room() {
             </button>
           </div>
         </div>
-        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 pb-2 text-xs text-zinc-400">
-          {onlineCount} online
-        </div>
-        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 pb-3">
+        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 pb-3 space-y-2">
+          <div className="flex items-center justify-between text-xs text-zinc-400">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Live room</span>
+              </span>
+              <span className="hidden sm:inline text-zinc-500">
+                One shared playlist for everyone in here.
+              </span>
+            </div>
+            <div className="text-zinc-400">
+              <span>{onlineCount} listening</span>
+              {viewingCount > 0 && (
+                <span className="ml-2 text-zinc-500">• {viewingCount} viewing</span>
+              )}
+            </div>
+          </div>
           <div
             role="button"
             tabIndex={0}
@@ -1169,9 +1208,17 @@ export default function Room() {
               ) : null}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] text-zinc-400">Now playing in The Room</div>
+              <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-1.5 py-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  <span>Now playing in The Room</span>
+                </span>
+                <span className="text-zinc-500 truncate">
+                  {onlineCount > 0 ? `${onlineCount} listening together` : 'Be the first to listen'}
+                </span>
+              </div>
               <div className="text-sm text-zinc-100 truncate">
-                {currentSong ? currentSong.title : 'Syncing…'}
+                {currentSong ? currentSong.title : 'Syncing playlist…'}
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400 min-w-0">
                 {currentArtist ? (
@@ -1192,33 +1239,6 @@ export default function Room() {
                     {currentSong ? currentSong.artist : 'The playlist starts when you enter'}
                   </div>
                 )}
-
-                {currentArtist ? (
-                  <button
-                    type="button"
-                    disabled={isAudienceInteractionsLoading}
-                    className={[
-                      'inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 transition-colors',
-                      isCurrentArtistFollowed ? 'bg-primary/15 text-primary hover:bg-primary/20' : 'bg-white/5 text-zinc-200 hover:bg-white/10',
-                      isAudienceInteractionsLoading ? 'opacity-60 cursor-not-allowed' : '',
-                    ].join(' ')}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void toggleLikeArtist(currentArtist.id);
-                    }}
-                  >
-                    {isCurrentArtistFollowed ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Following</span>
-                      </>
-                    ) : (
-                      <span>Follow</span>
-                    )}
-                  </button>
-                ) : null}
-
                 <div className="text-zinc-500">•</div>
                 <div className="flex-shrink-0 tabular-nums text-zinc-400">
                   Next in {formatCountdownSeconds(segmentProgress.remaining)}
@@ -1226,55 +1246,18 @@ export default function Room() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-9 px-3 text-zinc-300 hover:text-zinc-100 lg:hidden"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                  >
-                    <ListMusic className="w-4 h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Queue</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="px-4 pt-4 pb-6">
-                  <SheetHeader>
-                    <SheetTitle>Up next</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-3 space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-                    {upNextSongs.map(song => (
-                      <button
-                        key={song.id}
-                        type="button"
-                        className="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/5 transition-colors"
-                        onClick={() => navigate(`/song/${song.id}`)}
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
-                          {song.coverImage ? (
-                            <img
-                              src={song.coverImage}
-                              alt={song.title}
-                              className="w-full h-full object-contain"
-                              loading="lazy"
-                            />
-                          ) : null}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm text-zinc-100 truncate">{song.title}</div>
-                          <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
-                        </div>
-                      </button>
-                    ))}
-                    {upNextSongs.length === 0 ? (
-                      <div className="text-sm text-zinc-400">Queue unavailable.</div>
-                    ) : null}
-                  </div>
-                </SheetContent>
-              </Sheet>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 px-3 text-zinc-300 hover:text-zinc-100"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate('/');
+                }}
+              >
+                <span className="text-xs sm:text-sm">Invite friends from Home</span>
+              </Button>
             </div>
           </div>
         </div>

@@ -47,13 +47,8 @@ async function ensureSharedChannel(userId: string) {
   channel.on('presence', { event: 'leave' }, sync);
 
   await new Promise<void>(resolve => {
-    channel.subscribe(async status => {
+    channel.subscribe(status => {
       if (status !== 'SUBSCRIBED') return;
-      try {
-        await channel.track({ in_room: false });
-      } catch {
-        void 0;
-      }
       sync();
       resolve();
     });
@@ -71,7 +66,7 @@ function releaseSharedChannel() {
   sharedCount = 0;
 }
 
-export function useRoomOnlineCount(userId: string | null | undefined) {
+export function useRoomOnlineCount(userId: string | null | undefined, inRoom: boolean | null | undefined) {
   const [count, setCount] = useState(sharedCount);
 
   useEffect(() => {
@@ -94,6 +89,17 @@ export function useRoomOnlineCount(userId: string | null | undefined) {
     };
   }, [userId]);
 
+  useEffect(() => {
+    if (!userId) return;
+    void (async () => {
+      const channel = await ensureSharedChannel(userId);
+      try {
+        await channel.track({ in_room: Boolean(inRoom) });
+      } catch {
+        void 0;
+      }
+    })();
+  }, [userId, inRoom]);
+
   return count;
 }
-

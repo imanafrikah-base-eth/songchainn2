@@ -30,6 +30,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AnimatedBackground } from '@/components/ui/animated-background';
 
 interface UserProfile {
   id: string;
@@ -192,31 +193,48 @@ export default function Community() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 relative">
+      <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
-        {/* Header */}
-        <motion.div
+      <main className="container mx-auto px-4 py-6 max-w-4xl relative z-10">
+        <motion.section
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-primary/10">
-              <Users className="w-6 h-6 text-primary" />
+          <div className="relative overflow-hidden rounded-2xl glass-card p-4 sm:p-6 md:p-7 shine-overlay">
+            <div className="absolute -top-16 -right-10 w-40 h-40 opacity-40">
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    'radial-gradient(circle, hsl(var(--primary) / 0.8) 0%, transparent 70%)',
+                  filter: 'blur(40px)',
+                }}
+                animate={{ scale: [1, 1.1, 1], x: [0, 10, 0], y: [0, -10, 0] }}
+                transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+              />
             </div>
-            <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">
-              Community
-            </h1>
-            <Badge variant="secondary" className="ml-2">
-              {users.length} members
-            </Badge>
+            <div className="relative z-10 flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-primary/10">
+                  <Users className="w-6 h-6 text-primary" />
+                </div>
+                <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">
+                  Community
+                </h1>
+                <Badge variant="secondary" className="ml-1">
+                  {users.length} members
+                </Badge>
+              </div>
+              <p className="text-sm sm:text-base text-muted-foreground">
+                Discover and connect with music lovers in the $ongChainn community.
+                Follow listeners, find town square regulars, and watch new profiles appear.
+              </p>
+            </div>
           </div>
-          <p className="text-muted-foreground">
-            Discover and connect with music lovers in the $ongChainn community
-          </p>
-        </motion.div>
+        </motion.section>
 
         {/* Search and Filters */}
         <motion.div

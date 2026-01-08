@@ -119,7 +119,15 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     setTodayPlays(prev => prev + 1);
     setTotalPlays(prev => prev + 1);
     setEngagementPoints(prev => prev + POINTS_PER_PLAY);
-  }, []);
+
+    (async () => {
+      await supabase.from('song_analytics').insert({
+        event_type: 'play',
+        song_id: songId,
+        user_id: user?.id ?? null,
+      } as any);
+    })();
+  }, [user]);
 
   const toggleLike = useCallback(async (songId: string) => {
     const isCurrentlyLiked = likedSongs.has(songId);
