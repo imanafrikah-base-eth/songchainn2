@@ -160,6 +160,8 @@ export default function ArtistDetail() {
   const profileTheme = (artistAccount?.profile_theme || 'default').toLowerCase();
   const isNewArtist = isArtistNew(artist?.addedAt);
 
+  const [profileImageFailed, setProfileImageFailed] = useState(false);
+
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isUploadingCoverPhoto, setIsUploadingCoverPhoto] = useState(false);
   const profilePictureObjectUrlRef = useRef<string | null>(null);
@@ -682,7 +684,7 @@ export default function ArtistDetail() {
             {/* Profile Image */}
             <div className="w-48 flex-shrink-0">
               <div className="w-48 h-48 rounded-2xl bg-secondary overflow-hidden">
-              {displayProfileImage ? (
+              {displayProfileImage && !profileImageFailed ? (
                 <div className="relative w-full h-full">
                   <img
                     src={displayProfileImage}
@@ -693,6 +695,7 @@ export default function ArtistDetail() {
                     src={displayProfileImage} 
                     alt={displayName || artist.name}
                     className="relative w-full h-full object-contain"
+                    onError={() => setProfileImageFailed(true)}
                   />
                 </div>
               ) : (
