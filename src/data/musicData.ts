@@ -58,7 +58,7 @@ const ARTWORK_BY_ARTIST: Record<string, string> = {
   Denajah: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/DENAJAH.jpg',
   DENAJAH: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/DENAJAH.jpg',
   NDA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA.jpg',
-  PRP: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP/PRP%20(2).png',
+  PRP: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/PRP.jpg',
   'IMan Afrikah': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
   'IMAN AFRIKAH': 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg',
   Sanchy: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg',
