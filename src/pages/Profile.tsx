@@ -124,6 +124,18 @@ export default function Profile() {
         .or(`id.eq.${user.id},user_id.eq.${user.id}`);
       if (updateError) throw updateError;
 
+      const prefix = `audience/${user.id}`;
+      const { data: existingFiles } = await supabase.storage.from(bucket).list(prefix, { limit: 100 });
+      const keepName = path.split('/').pop();
+      const typePrefix = field === 'profile_picture_url' ? 'profile-' : 'cover-';
+      const toDelete =
+        existingFiles
+          ?.filter((f) => f.name !== keepName && f.name.startsWith(typePrefix))
+          .map((f) => `${prefix}/${f.name}`) ?? [];
+      if (toDelete.length > 0) {
+        await supabase.storage.from(bucket).remove(toDelete);
+      }
+
       await refreshProfile();
       toast({ title: field === 'profile_picture_url' ? 'Profile picture updated!' : 'Cover photo updated!' });
     },

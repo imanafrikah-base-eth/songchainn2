@@ -190,6 +190,17 @@ export default function AudienceProfile() {
           .eq('id', userId);
         if (updateError) throw updateError;
 
+        const prefix = `audience/${userId}`;
+        const { data: existingFiles } = await supabase.storage.from(bucket).list(prefix, { limit: 100 });
+        const keepName = path.split('/').pop();
+        const toDelete =
+          existingFiles
+            ?.filter((f) => f.name !== keepName && f.name.startsWith('profile-'))
+            .map((f) => `${prefix}/${f.name}`) ?? [];
+        if (toDelete.length > 0) {
+          await supabase.storage.from(bucket).remove(toDelete);
+        }
+
         setProfile((prev) => (prev ? { ...prev, profile_picture_url: publicUrl } : prev));
         toast({ title: 'Profile picture updated' });
       } catch (err: any) {
