@@ -107,7 +107,26 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
       return Promise.resolve(new Response(null, { status: 204 }));
     }
 
-    return originalFetch(input, init);
+    const shouldIgnoreAbortSignal =
+      typeof init?.signal !== "undefined" &&
+      (url.includes(".supabase.co/rest/v1/") || url.includes(".supabase.co/functions/v1/"));
+
+    const nextInit = shouldIgnoreAbortSignal ? { ...init, signal: undefined } : init;
+    return originalFetch(input, nextInit).catch((error: any) => {
+      const isSupabase =
+        url.includes(".supabase.co/rest/v1/") || url.includes(".supabase.co/functions/v1/");
+      const message = String(error?.message ?? error ?? "");
+      const isAbortError =
+        error?.name === "AbortError" ||
+        message.toLowerCase().includes("abort") ||
+        message.toLowerCase().includes("aborted");
+
+      if (isSupabase && isAbortError) {
+        return new Response(null, { status: 499, statusText: "Client Abort Suppressed" });
+      }
+
+      throw error;
+    });
   };
 }
 

@@ -110,8 +110,11 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
   };
 
   const toggleShuffle = () => {
-    setShuffle(prev => !prev);
-    toast({ title: shuffle ? 'Shuffle off' : 'Shuffle on' });
+    setShuffle(prev => {
+      const next = !prev;
+      toast({ title: next ? 'Shuffle on' : 'Shuffle off' });
+      return next;
+    });
   };
 
   // Media Session API for lock screen / notification controls

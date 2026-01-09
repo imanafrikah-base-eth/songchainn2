@@ -270,7 +270,7 @@ export function Navigation() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 w-72 glass-surface border-l border-border/50 z-50 lg:hidden overflow-y-auto"
+              className="fixed top-0 right-0 bottom-0 w-72 glass-surface border-l border-border/50 z-50 lg:hidden"
             >
               <div className="p-4 border-b border-border/50 flex items-center justify-between">
                 <span className="font-heading font-bold text-foreground">Menu</span>
@@ -314,7 +314,7 @@ export function Navigation() {
               </div>
 
               {/* Nav Links */}
-              <div className="p-4 space-y-2">
+              <div className="p-4 space-y-2 h-[calc(100vh-9.5rem)] overflow-y-auto pb-24">
                 {effectiveNavItems.map((item, index) => {
                   const isActive = location.pathname === item.path;
                   return (

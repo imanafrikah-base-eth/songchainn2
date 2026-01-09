@@ -1,4 +1,5 @@
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -413,7 +414,21 @@ export default function Profile() {
 
   const likedSongsData = SONGS.filter(s => likedSongs.includes(s.id));
   const artistSongsData = isArtist && artistId ? SONGS.filter(s => s.artistId === artistId) : [];
-  const artistFollowerCount = 0;
+
+  const { data: artistFollowerCount = 0 } = useQuery({
+    queryKey: ['artist-followers-profile', artistId],
+    queryFn: async () => {
+      if (!isArtist || !artistId) return 0;
+      const { data, error } = await (supabase as any)
+        .from('liked_artists')
+        .select('id', { count: 'exact', head: true })
+        .eq('artist_id', artistId);
+      if (error || typeof data !== 'number') return 0;
+      return data;
+    },
+    enabled: !!isArtist && !!artistId,
+    refetchInterval: 15000,
+  });
 
   if (isArtist && artistId) {
     return <Navigate to={`/artist/${artistId}`} replace />;

@@ -102,7 +102,8 @@ export function useSongPopularity() {
       
       return (data || []) as SongPopularity[];
     },
-    staleTime: 1000 * 60 * 2, // 2 minutes (shorter for real-time updates)
+    staleTime: 1000 * 10,
+    refetchInterval: 10000,
   });
 }
 

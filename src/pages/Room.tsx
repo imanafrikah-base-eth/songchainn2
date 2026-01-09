@@ -129,7 +129,7 @@ function renderMessageWithCustomEmojis(text: string) {
         key={`ce-${key++}`}
         src={uri}
         alt={next.token}
-        className="inline-block align-[-2px] h-5 w-5"
+        className="inline-block align-[-2px] h-6 w-6 sm:h-7 sm:w-7"
         loading="lazy"
       />
     );
@@ -1085,17 +1085,29 @@ export default function Room() {
     <div className="min-h-screen bg-black text-zinc-100">
       <div className="sticky top-0 z-20 bg-black/60 backdrop-blur border-b border-white/10">
         <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              hideRoom();
-              navigate('/');
-            }}
-            className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Hide Room</span>
-          </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  hideRoom();
+                  navigate('/');
+                }}
+                className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Hide Room</span>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await exitRoomMode();
+                  navigate('/');
+                }}
+                className="inline-flex sm:hidden items-center gap-2 text-sm text-zinc-400 hover:text-red-400 transition-colors"
+              >
+                <span>Leave Room</span>
+              </button>
+            </div>
           <div className="flex items-center gap-3">
             <button
               type="button"

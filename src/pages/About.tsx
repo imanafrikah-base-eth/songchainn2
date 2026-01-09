@@ -346,7 +346,10 @@ export default function About() {
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
               <p>
-                $ongChainn is for simply means music thats not just for listening, but for participating.
+                $ongChainn simply means music that's not just for listening.
+              </p>
+              <p>
+                It's for participating.
               </p>
               <p>
                 Music has always moved culture, shaped moments and brought people together. But the value created by
