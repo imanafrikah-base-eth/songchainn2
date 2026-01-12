@@ -38,6 +38,60 @@ export interface RankedProfile extends ProfilePopularity {
   popularity_score: number;
 }
 
+const SONG_BASELINE_PLAYS: Record<string, number> = (() => {
+  const perSong: Record<string, number> = {};
+  ARTISTS.forEach(artist => {
+    const songs = SONGS.filter(s => s.artistId === artist.id);
+    if (!songs.length) return;
+    const total = 2000;
+    const base = Math.floor(total / songs.length);
+    let remainder = total - base * songs.length;
+    songs.forEach(song => {
+      const extra = remainder > 0 ? 1 : 0;
+      if (remainder > 0) remainder -= 1;
+      perSong[song.id] = base + extra;
+    });
+  });
+  return perSong;
+})();
+
+function applyBaselinePlays(rows: any[] | null | undefined): SongPopularity[] {
+  const byId = new Map<string, SongPopularity>();
+  (rows || []).forEach(row => {
+    const r = row as any;
+    const songId = String(r.song_id ?? '');
+    const base = SONG_BASELINE_PLAYS[songId] || 0;
+    const dbPlays = Number(r.play_count ?? 0);
+    const next: SongPopularity = {
+      song_id: songId || null,
+      play_count: dbPlays + base,
+      like_count: typeof r.like_count === 'number' ? r.like_count : null,
+      comment_count: typeof r.comment_count === 'number' ? r.comment_count : null,
+      share_count: typeof r.share_count === 'number' ? r.share_count : null,
+      view_count: typeof r.view_count === 'number' ? r.view_count : null,
+      popularity_score: typeof r.popularity_score === 'number' ? r.popularity_score : null,
+    };
+    if (songId) byId.set(songId, next);
+  });
+
+  SONGS.forEach(song => {
+    if (!byId.has(song.id)) {
+      const base = SONG_BASELINE_PLAYS[song.id] || 0;
+      byId.set(song.id, {
+        song_id: song.id,
+        play_count: base,
+        like_count: 0,
+        comment_count: 0,
+        share_count: 0,
+        view_count: 0,
+        popularity_score: 0,
+      });
+    }
+  });
+
+  return Array.from(byId.values());
+}
+
 // Calculate weighted popularity score for songs using ONLY real database data
 function calculateSongScore(dbData?: SongPopularity): number {
   const plays = dbData?.play_count || 0;
@@ -88,19 +142,12 @@ export function useSongPopularity() {
   return useQuery({
     queryKey: ['song-popularity'],
     queryFn: async () => {
-      // Use secure RPC function that requires authentication
-      const { data, error } = await supabase
-        .rpc('get_song_popularity');
-      
+      const { data, error } = await supabase.rpc('get_song_popularity');
       if (error) {
-        // Fallback to direct query for unauthenticated users (will return empty if RLS blocks)
-        const { data: fallbackData } = await supabase
-          .from('song_popularity')
-          .select('*');
-        return (fallbackData || []) as SongPopularity[];
+        const { data: fallbackData } = await supabase.from('song_popularity').select('*');
+        return applyBaselinePlays(fallbackData);
       }
-      
-      return (data || []) as SongPopularity[];
+      return applyBaselinePlays(data as any[]);
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,

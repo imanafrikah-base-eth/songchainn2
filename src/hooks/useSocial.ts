@@ -253,7 +253,10 @@ export function useSocial() {
   }, []);
 
   const addComment = useCallback(async (postId: string, content: string) => {
-    if (!user) return;
+    if (!user) {
+      toast({ title: 'Please sign in to comment', variant: 'destructive' });
+      return;
+    }
 
     const { error } = await supabase.from('post_comments').insert({
       post_id: postId,
@@ -261,7 +264,7 @@ export function useSocial() {
       content,
     } as any);
     if (error) {
-      toast({ title: 'Failed to add comment', variant: 'destructive' });
+      toast({ title: 'Failed to add comment', description: error.message, variant: 'destructive' });
       return;
     }
 

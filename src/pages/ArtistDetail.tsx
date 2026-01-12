@@ -77,23 +77,6 @@ export default function ArtistDetail() {
   const artistSongs = SONGS.filter(s => s.artistId === id);
   const isFollowingArtist = id ? isArtistLiked(id) : false;
 
-  const [fakeFollowerBase, setFakeFollowerBase] = useState(50);
-
-  useEffect(() => {
-    if (!id) return;
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = window.localStorage.getItem('songchainn_followers_base');
-      const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : {};
-      const stored = typeof parsed[id] === 'number' ? parsed[id] : 50;
-      parsed[id] = stored;
-      window.localStorage.setItem('songchainn_followers_base', JSON.stringify(parsed));
-      setFakeFollowerBase(stored);
-    } catch {
-      setFakeFollowerBase(50);
-    }
-  }, [id]);
-
   const { data: artistAccount } = useQuery({
     queryKey: ['artist-account', id],
     queryFn: async () => {
@@ -904,7 +887,7 @@ export default function ArtistDetail() {
                 <div className="glass-card p-4 rounded-xl text-center">
                   <Users className="w-6 h-6 mx-auto mb-2 text-primary" />
                   <p className="text-2xl font-heading font-bold text-foreground">
-                    {(fakeFollowerBase + (isFollowingArtist ? 1 : 0)).toLocaleString()}
+                    {(82 + (isFollowingArtist ? 1 : 0)).toLocaleString()}
                   </p>
                   <p className="text-sm text-muted-foreground">Followers</p>
                 </div>

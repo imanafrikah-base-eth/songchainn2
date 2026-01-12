@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { useSongPopularity } from '@/hooks/usePopularity';
+import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
@@ -36,6 +37,7 @@ export default function Artists() {
   const { data: popularityData } = useSongPopularity();
   const artistIds = useMemo(() => ARTISTS.map(a => a.id), []);
   const queryClient = useQueryClient();
+  const { isArtistLiked } = useAudienceInteractions();
   
   // Fetch follower counts directly from liked_artists (per current user visibility)
   const { data: followerCounts = {} } = useQuery({
@@ -91,15 +93,18 @@ export default function Artists() {
         totalLikes += songData?.like_count || 0;
       });
       
+    const uiFollowers = 82 + (isArtistLiked(artist.id) ? 1 : 0);
+      
       return {
         ...artist,
         songCount: songs.length,
         totalPlays,
         totalLikes,
         followers: followerCounts[artist.id] || 0,
+        uiFollowers,
       };
     }).sort((a, b) => b.totalPlays - a.totalPlays);
-  }, [popularityData, followerCounts]);
+  }, [popularityData, followerCounts, isArtistLiked]);
 
   // Calculate total stats (followers should match per-artist UI offsets)
   const totalStats = useMemo(() => {
@@ -108,7 +113,7 @@ export default function Artists() {
         artists: acc.artists + 1,
         songs: acc.songs + artist.songCount,
         plays: acc.plays + artist.totalPlays,
-        followers: acc.followers + (artist.followers + 50),
+        followers: acc.followers + (artist.followers + 82),
       }),
       { artists: 0, songs: 0, plays: 0, followers: 0 }
     );
@@ -258,7 +263,7 @@ export default function Artists() {
                             <Heart className="w-3.5 h-3.5" />
                           </div>
                           <div className="text-sm font-semibold text-foreground tabular-nums">
-                            {(artist.followers + 50).toLocaleString()}
+                            {(artist.uiFollowers || 0).toLocaleString()}
                           </div>
                           <div className="text-[10px] text-muted-foreground">Followers</div>
                         </div>

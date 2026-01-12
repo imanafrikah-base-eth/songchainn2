@@ -153,7 +153,7 @@ function getMentionTrigger(text: string, cursorIndex: number) {
 export default function Room() {
   const navigate = useNavigate();
   const { user, isArtist, artistId } = useAuth();
-  const { isPlaying, isRoomMode, currentSong } = usePlayerState();
+  const { isPlaying, isRoomMode, currentSong, isRoomHidden } = usePlayerState();
   const { enterRoomMode, exitRoomMode, setVolume, volume, play, hideRoom } = usePlayerActions();
   const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
 
@@ -1075,9 +1075,11 @@ export default function Room() {
 
   useEffect(() => {
     return () => {
-      void exitRoomMode();
+      if (!isRoomHidden) {
+        void exitRoomMode();
+      }
     };
-  }, [exitRoomMode]);
+  }, [exitRoomMode, isRoomHidden]);
 
   if (!user) return null;
 
