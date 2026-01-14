@@ -38,15 +38,37 @@ export interface RankedProfile extends ProfilePopularity {
   popularity_score: number;
 }
 
+const ARTIST_EXTRA_PLAYS: Record<string, number> = {
+  '1': 2110, // 7ROO7H BASED
+  '3': 2700, // IMan Afrikah
+  '4': 2214, // NDA
+  '5': 1997, // PRP
+  '6': 2000, // SANCHY
+  '7': 2100, // SANTANA
+  '8': 1600, // FAITH
+  '9': 324,  // JMN
+  '10': 348, // SAMMIE
+};
+
 const SONG_BASELINE_PLAYS: Record<string, number> = (() => {
   const perSong: Record<string, number> = {};
-  ARTISTS.forEach(artist => {
-    const songs = SONGS.filter(s => s.artistId === artist.id);
+  ARTISTS.forEach((artist) => {
+    const songs = SONGS.filter((s) => s.artistId === artist.id);
     if (!songs.length) return;
-    const total = 2000;
+
+    let total: number;
+    if (artist.id === '9') {
+      total = 200;
+    } else if (artist.id === '10') {
+      total = 303;
+    } else {
+      total = 2000 + (ARTIST_EXTRA_PLAYS[artist.id] || 0);
+    }
+
     const base = Math.floor(total / songs.length);
     let remainder = total - base * songs.length;
-    songs.forEach(song => {
+
+    songs.forEach((song) => {
       const extra = remainder > 0 ? 1 : 0;
       if (remainder > 0) remainder -= 1;
       perSong[song.id] = base + extra;

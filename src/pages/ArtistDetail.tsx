@@ -960,24 +960,63 @@ export default function ArtistDetail() {
           </div>
         </section>
 
-        {/* Songs */}
         <section>
           <h2 className="font-heading text-xl font-semibold text-foreground mb-6">
             {isOwner ? 'My Music' : 'Discography'}
           </h2>
-          {isOwner ? (
-            <div className="space-y-2">
-              {artistSongs.map((song, index) => (
-                <SongCard key={song.id} song={song} index={index} variant="compact" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {artistSongs.map((song, index) => (
-                <SongCard key={song.id} song={song} index={index} />
-              ))}
-            </div>
-          )}
+          {(() => {
+            const volumeOrder: Array<'Vol1' | 'Vol2' | 'Vol3'> = ['Vol1', 'Vol2', 'Vol3'];
+            const volumeSections = volumeOrder
+              .map((volume) => {
+                const songs = artistSongs.filter((song) => {
+                  if (song.volume) return song.volume === volume;
+                  if (
+                    ['1', '2', '3', '4', '5', '6', '7', '8'].includes(song.artistId) &&
+                    volume === 'Vol1'
+                  ) {
+                    return true;
+                  }
+                  return false;
+                });
+                return songs.length ? { label: volume, songs } : null;
+              })
+              .filter(
+                (section): section is { label: 'Vol1' | 'Vol2' | 'Vol3'; songs: typeof artistSongs } =>
+                  Boolean(section)
+              );
+
+            const singles = artistSongs.filter((song) => {
+              if (song.volume) return false;
+              if (['1', '2', '3', '4', '5', '6', '7', '8'].includes(song.artistId)) return false;
+              return true;
+            });
+
+            const sections = [
+              ...volumeSections,
+              singles.length ? { label: 'Singles', songs: singles } : null,
+            ].filter((section): section is { label: string; songs: typeof artistSongs } => Boolean(section));
+
+            return sections.map((section) => (
+              <div key={section.label} className="mb-6">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+                  {section.label}
+                </h3>
+                {isOwner ? (
+                  <div className="space-y-2">
+                    {section.songs.map((song, index) => (
+                      <SongCard key={song.id} song={song} index={index} variant="compact" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {section.songs.map((song, index) => (
+                      <SongCard key={song.id} song={song} index={index} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ));
+          })()}
         </section>
       </main>
 

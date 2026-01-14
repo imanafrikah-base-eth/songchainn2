@@ -28,6 +28,15 @@ const itemVariants = {
   show: { opacity: 1, y: 0 },
 };
 
+const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
+
+function isSongNew(song: { addedAt?: string }) {
+  if (!song.addedAt) return false;
+  const ts = new Date(song.addedAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts < NEW_SONG_WINDOW_MS;
+}
+
 // Hook to get user's liked songs for recommendations
 function useUserLikes() {
   const { user } = useAuth();
@@ -73,6 +82,8 @@ export default function Discover() {
       .sort((a, b) => b[1] - a[1])
       .map(([genre]) => genre as Genre);
   }, [likedSongIds]);
+
+  const newSongs = useMemo(() => rankedSongs.filter(isSongNew), [rankedSongs]);
 
   // Filter songs by selected genre
   const filteredSongs = useMemo(() => {
@@ -249,6 +260,46 @@ export default function Discover() {
             </motion.div>
           </Link>
         </motion.section>
+
+        {/* New Music */}
+        {newSongs.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            className="mb-8"
+          >
+            <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 shine-overlay overflow-hidden">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div>
+                  <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    <span>New Music</span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Latest uploads from $ongChainn artists, ready to discover.
+                  </p>
+                </div>
+                <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
+                  <Music className="w-4 h-4" />
+                  <span>{newSongs.length} tracks</span>
+                </div>
+                </div>
+              <div className="relative">
+                <div className="space-y-1 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
+                  {newSongs.map((song, index) => (
+                    <SongCard
+                      key={song.id}
+                      song={song}
+                      index={index}
+                      variant="compact"
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        )}
 
         {/* Genre Filters */}
         <motion.section

@@ -20,7 +20,8 @@ interface SongCardProps {
   variant?: 'default' | 'compact' | 'featured';
 }
 
-// Memoized component to prevent unnecessary re-renders
+const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
+
 export const SongCard = memo(function SongCard({ song, index = 0, variant = 'default' }: SongCardProps) {
   const { currentSong, isPlaying } = usePlayerState();
   const { playSong, togglePlay } = usePlayerActions();
@@ -42,6 +43,12 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
   const isCurrentSong = currentSong?.id === song.id;
   const liked = isLiked(song.id);
   const isTokenGated = song.isTokenGated;
+  const isNewSong = (() => {
+    if (!song.addedAt) return false;
+    const ts = new Date(song.addedAt).getTime();
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < NEW_SONG_WINDOW_MS;
+  })();
   
   // Get real play count from database (total across all users)
   const totalPlays = useMemo(() => {
@@ -121,6 +128,11 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               )}>
                 {song.title}
               </p>
+              {isNewSong && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide">
+                  New
+                </span>
+              )}
               {isTokenGated && (
                 <OwnershipBadge 
                   status={ownershipStatus} 
@@ -236,8 +248,13 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
         <div className="relative z-10 p-4">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">
-              <h3 className="text-base font-heading font-semibold text-foreground truncate">
-                {song.title}
+              <h3 className="text-base font-heading font-semibold text-foreground truncate flex items-center gap-2">
+                <span className="truncate">{song.title}</span>
+                {isNewSong && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide flex-shrink-0">
+                    New
+                  </span>
+                )}
               </h3>
               <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
             </div>
@@ -331,10 +348,15 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
 
       <div className="p-4">
         <h3 className={cn(
-          "font-heading font-semibold truncate mb-1 text-base",
+          "font-heading font-semibold truncate mb-1 text-base flex items-center gap-2",
           isCurrentSong ? "text-primary" : "text-foreground"
         )}>
-          {song.title}
+          <span className="truncate">{song.title}</span>
+          {isNewSong && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide flex-shrink-0">
+              New
+            </span>
+          )}
         </h3>
         <p className="text-sm text-muted-foreground truncate mb-3">{song.artist}</p>
 

@@ -34,6 +34,15 @@ const itemVariants = {
   show: { opacity: 1, y: 0 },
 };
 
+const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
+
+function isSongNew(song: { addedAt?: string }) {
+  if (!song.addedAt) return false;
+  const ts = new Date(song.addedAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts < NEW_SONG_WINDOW_MS;
+}
+
 export default function Home() {
   const { rankedSongs } = useRankedSongs();
   const { rankedArtists } = useRankedArtists();
@@ -44,6 +53,7 @@ export default function Home() {
   
   const featuredSongs = rankedSongs.slice(0, 3);
   const allSongs = rankedSongs;
+  const newSongs = rankedSongs.filter(isSongNew);
   const displayName =
     audienceProfile?.profile_name ||
     (user && typeof user.email === 'string'
@@ -248,10 +258,42 @@ export default function Home() {
             initial="hidden"
             animate="show"
           >
-            {/* Featured Songs */}
             <motion.section variants={itemVariants}>
               <FeaturedTracksSection songs={featuredSongs} />
             </motion.section>
+
+            {newSongs.length > 0 && (
+              <motion.section variants={itemVariants}>
+                <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <div>
+                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                        New Music
+                      </h2>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Fresh drops from the town square, just arrived on $ongChainn.
+                      </p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
+                      <Sparkles className="w-4 h-4" />
+                      <span>{newSongs.length} new tracks</span>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <div className="space-y-1 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
+                      {newSongs.map((song, index) => (
+                        <SongCard
+                          key={song.id}
+                          song={song}
+                          index={index}
+                          variant="compact"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.section>
+            )}
 
             {/* All Songs */}
             <motion.section variants={itemVariants}>
