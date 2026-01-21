@@ -965,10 +965,27 @@ export default function ArtistDetail() {
             {isOwner ? 'My Music' : 'Discography'}
           </h2>
           {(() => {
-            const volumeOrder: Array<'Vol1' | 'Vol2' | 'Vol3'> = ['Vol1', 'Vol2', 'Vol3'];
+            const volumeOrder: Array<'Vol1' | 'Vol2' | 'Vol3' | 'Vol4'> = [
+              'Vol4',
+              'Vol3',
+              'Vol2',
+              'Vol1',
+            ];
+
+            const sortByRecent = (songs: typeof artistSongs) =>
+              [...songs].sort((a, b) => {
+                const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+                const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+                if (timeA !== timeB) return timeB - timeA;
+                const idA = Number(a.id) || 0;
+                const idB = Number(b.id) || 0;
+                return idB - idA;
+              });
+
             const volumeSections = volumeOrder
               .map((volume) => {
-                const songs = artistSongs.filter((song) => {
+                const songs = sortByRecent(
+                  artistSongs.filter((song) => {
                   if (song.volume) return song.volume === volume;
                   if (
                     ['1', '2', '3', '4', '5', '6', '7', '8'].includes(song.artistId) &&
@@ -977,19 +994,27 @@ export default function ArtistDetail() {
                     return true;
                   }
                   return false;
-                });
+                  })
+                );
                 return songs.length ? { label: volume, songs } : null;
               })
               .filter(
-                (section): section is { label: 'Vol1' | 'Vol2' | 'Vol3'; songs: typeof artistSongs } =>
+                (
+                  section
+                ): section is {
+                  label: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4';
+                  songs: typeof artistSongs;
+                } =>
                   Boolean(section)
               );
 
-            const singles = artistSongs.filter((song) => {
-              if (song.volume) return false;
-              if (['1', '2', '3', '4', '5', '6', '7', '8'].includes(song.artistId)) return false;
-              return true;
-            });
+            const singles = sortByRecent(
+              artistSongs.filter((song) => {
+                if (song.volume) return false;
+                if (['1', '2', '3', '4', '5', '6', '7', '8'].includes(song.artistId)) return false;
+                return true;
+              })
+            );
 
             const sections = [
               ...volumeSections,
@@ -997,23 +1022,38 @@ export default function ArtistDetail() {
             ].filter((section): section is { label: string; songs: typeof artistSongs } => Boolean(section));
 
             return sections.map((section) => (
-              <div key={section.label} className="mb-6">
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-                  {section.label}
-                </h3>
-                {isOwner ? (
-                  <div className="space-y-2">
-                    {section.songs.map((song, index) => (
-                      <SongCard key={song.id} song={song} index={index} variant="compact" />
-                    ))}
+              <div
+                key={section.label}
+                className="mb-6 last:mb-0 glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay relative overflow-hidden"
+              >
+                <div className="pointer-events-none absolute -inset-x-10 -top-16 h-20 bg-gradient-to-r from-primary/30 via-purple-500/25 to-cyan-400/30 blur-3xl opacity-60" />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
+                        <span>{section.label}</span>
+                        <span className="text-[11px] sm:text-xs text-muted-foreground">
+                          {section.songs.length} tracks
+                        </span>
+                      </h3>
+                    </div>
                   </div>
-                ) : (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {section.songs.map((song, index) => (
-                      <SongCard key={song.id} song={song} index={index} />
-                    ))}
-                  </div>
-                )}
+                  {isOwner ? (
+                    <div className="space-y-1.5 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
+                      {section.songs.map((song, index) => (
+                        <SongCard key={song.id} song={song} index={index} variant="compact" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="max-h-[420px] overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        {section.songs.map((song, index) => (
+                          <SongCard key={song.id} song={song} index={index} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             ));
           })()}

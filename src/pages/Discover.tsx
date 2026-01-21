@@ -62,12 +62,15 @@ export default function Discover() {
   // Get user's preferred genres based on likes
   const preferredGenres = useMemo(() => {
     const genreCounts: Record<Genre, number> = {
-      'Trap': 0,
-      'Afro': 0,
-      'Dancehall': 0,
+      Trap: 0,
+      Afro: 0,
+      Dancehall: 0,
       'Kalind-Rock': 0,
       'Kali-Funk': 0,
       'ZamRock-Fusion': 0,
+      'Afro-Dancehall': 0,
+      Alternative: 0,
+      'Pop-Dancehall': 0,
     };
 
     likedSongIds.forEach(songId => {
@@ -122,12 +125,15 @@ export default function Discover() {
 
   const getGenreColor = (genre: Genre) => {
     const colors: Record<Genre, string> = {
-      'Trap': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-      'Afro': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-      'Dancehall': 'bg-green-500/20 text-green-400 border-green-500/30',
+      Trap: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      Afro: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+      Dancehall: 'bg-green-500/20 text-green-400 border-green-500/30',
       'Kalind-Rock': 'bg-red-500/20 text-red-400 border-red-500/30',
       'Kali-Funk': 'bg-pink-500/20 text-pink-400 border-pink-500/30',
       'ZamRock-Fusion': 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+      'Afro-Dancehall': 'bg-lime-500/20 text-lime-400 border-lime-500/30',
+      Alternative: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+      'Pop-Dancehall': 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
     };
     return colors[genre];
   };

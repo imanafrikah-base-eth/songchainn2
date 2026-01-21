@@ -241,8 +241,9 @@ export const AudioPlayer = memo(function AudioPlayer() {
               {/* Controls - more prominent on mobile */}
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
-                  onClick={playPrevious}
-                  className="p-2 hover:bg-secondary/80 rounded-full transition-colors press-effect hidden sm:flex"
+                  onClick={isRoomMode ? undefined : playPrevious}
+                  className="p-2 hover:bg-secondary/80 rounded-full transition-colors press-effect hidden sm:flex disabled:opacity-40 disabled:hover:bg-transparent"
+                  disabled={isRoomMode}
                 >
                   <SkipBack className="w-4 h-4 sm:w-5 sm:h-5 text-foreground" />
                 </button>

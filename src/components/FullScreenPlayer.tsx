@@ -53,7 +53,7 @@ interface FullScreenPlayerProps {
 }
 
 export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose }: FullScreenPlayerProps) {
-  const { currentSong, isPlaying, queue } = usePlayerState();
+  const { currentSong, isPlaying, queue, isRoomMode } = usePlayerState();
   const { currentTime, duration } = usePlayerTime();
   const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume } = usePlayerActions();
 
@@ -281,8 +281,9 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                 </button>
 
                 <button
-                  onClick={playPrevious}
-                  className="p-3 rounded-full glass hover:bg-secondary/50 transition-all hover-scale press-effect"
+                  onClick={isRoomMode ? undefined : playPrevious}
+                  disabled={isRoomMode}
+                  className="p-3 rounded-full glass hover:bg-secondary/50 transition-all hover-scale press-effect disabled:opacity-40 disabled:hover:bg-transparent"
                 >
                   <SkipBack className="w-6 h-6 text-foreground" />
                 </button>
@@ -301,8 +302,9 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                 </motion.button>
 
                 <button
-                  onClick={playNext}
-                  className="p-3 rounded-full glass hover:bg-secondary/50 transition-all hover-scale press-effect"
+                  onClick={isRoomMode ? undefined : playNext}
+                  disabled={isRoomMode}
+                  className="p-3 rounded-full glass hover:bg-secondary/50 transition-all hover-scale press-effect disabled:opacity-40 disabled:hover:bg-transparent"
                 >
                   <SkipForward className="w-6 h-6 text-foreground" />
                 </button>

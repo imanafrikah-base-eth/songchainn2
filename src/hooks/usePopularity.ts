@@ -50,6 +50,27 @@ const ARTIST_EXTRA_PLAYS: Record<string, number> = {
   '10': 348, // SAMMIE
 };
 
+const SONG_EXTRA_BASELINE_PLAYS: Record<string, number> = {
+  // Boost specific featured tracks
+  '3': 5000,  // IMan Afrikah - Endless (Vol1)
+  '57': 4000, // 7ROO7H BASED - DISCORD (on-chain)
+  '84': 3000, // NDA - STILL
+
+  // IMan Afrikah Vol4 - total 214, unevenly distributed
+  '100': 40,
+  '101': 36,
+  '102': 32,
+  '103': 30,
+  '104': 28,
+  '105': 26,
+  '106': 22,
+
+  // JMN extra 260 streams, uneven distribution across existing songs
+  '92': 90,
+  '93': 85,
+  '94': 85,
+};
+
 const SONG_BASELINE_PLAYS: Record<string, number> = (() => {
   const perSong: Record<string, number> = {};
   ARTISTS.forEach((artist) => {
@@ -71,7 +92,8 @@ const SONG_BASELINE_PLAYS: Record<string, number> = (() => {
     songs.forEach((song) => {
       const extra = remainder > 0 ? 1 : 0;
       if (remainder > 0) remainder -= 1;
-      perSong[song.id] = base + extra;
+      const songExtra = SONG_EXTRA_BASELINE_PLAYS[song.id] || 0;
+      perSong[song.id] = base + extra + songExtra;
     });
   });
   return perSong;
@@ -198,7 +220,7 @@ export function useProfilePopularity() {
 export function useRankedSongs() {
   const { data: popularityData, isLoading } = useSongPopularity();
   
-  const rankedSongs: RankedSong[] = SONGS.map(song => {
+  const rankedSongsBase: RankedSong[] = SONGS.map(song => {
     const dbData = popularityData?.find(p => p.song_id === song.id);
     const score = calculateSongScore(dbData);
     
@@ -214,6 +236,21 @@ export function useRankedSongs() {
       db_shares: dbData?.share_count || 0,
     };
   }).sort((a, b) => b.popularity_score - a.popularity_score);
+
+  const priorityOrder = ['3', '57', '84'];
+  const prioritized: RankedSong[] = [];
+  const used = new Set<string>();
+
+  priorityOrder.forEach((id) => {
+    const match = rankedSongsBase.find((s) => s.id === id);
+    if (match) {
+      prioritized.push(match);
+      used.add(match.id);
+    }
+  });
+
+  const rest = rankedSongsBase.filter((s) => !used.has(s.id));
+  const rankedSongs = [...prioritized, ...rest];
   
   return { rankedSongs, isLoading };
 }
