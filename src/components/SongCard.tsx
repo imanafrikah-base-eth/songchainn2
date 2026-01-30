@@ -2,9 +2,9 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Pause, Heart } from 'lucide-react';
 import { Song } from '@/data/musicData';
-import { usePlayerState, usePlayerActions } from '@/context/PlayerContext';
+import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
-import { useSongPopularity } from '@/hooks/usePopularity';
+import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
 import { cn } from '@/lib/utils';
 import { SpinningSongArt } from './SpinningSongArt';
@@ -13,6 +13,10 @@ import { ShareSongButton } from './ShareSongButton';
 import { OwnershipBadge } from './OwnershipBadge';
 import { UnlockSongModal } from './UnlockSongModal';
 import { useAuth } from '@/context/AuthContext';
+import { useOfflineAudio } from '@/hooks/useOfflineAudio';
+import { Button } from '@/components/ui/button';
+import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
+import { toast } from '@/hooks/use-toast';
 
 interface SongCardProps {
   song: Song;
@@ -25,9 +29,12 @@ const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
 export const SongCard = memo(function SongCard({ song, index = 0, variant = 'default' }: SongCardProps) {
   const { currentSong, isPlaying } = usePlayerState();
   const { playSong, togglePlay } = usePlayerActions();
+  const { currentTime } = usePlayerTime();
   const { toggleLike, isLiked } = useEngagement();
   const { data: popularityData } = useSongPopularity();
+  const { data: pulseCounts } = usePulseCounts();
   const { user } = useAuth();
+  const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
   
   // Song ownership for token-gated songs
   const { 
@@ -43,6 +50,9 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
   const isCurrentSong = currentSong?.id === song.id;
   const liked = isLiked(song.id);
   const isTokenGated = song.isTokenGated;
+  const isSaved = isSongCached(song.id);
+  const isSaving = cachingInProgress === song.id;
+  const hasPlayedEnoughToSave = isCurrentSong && currentTime >= 20;
   const isNewSong = (() => {
     if (!song.addedAt) return false;
     const ts = new Date(song.addedAt).getTime();
@@ -61,6 +71,11 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     return songData?.like_count || 0;
   }, [popularityData, song.id]);
 
+  const totalPulses = useMemo(() => {
+    const pulseData = pulseCounts?.find(p => p.song_id === song.id);
+    return pulseData?.pulse_count || 0;
+  }, [pulseCounts, song.id]);
+
   const handleWalletConnected = useCallback((address: string) => {
     setWalletAddress(address);
   }, []);
@@ -77,6 +92,62 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     e.stopPropagation();
     toggleLike(song.id);
   }, [toggleLike, song.id]);
+
+  const handleKeepThis = useCallback(async () => {
+    if (!isInstalled) {
+      const deferredPrompt = getDeferredInstallPrompt();
+      if (deferredPrompt) {
+        try {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') {
+            toast({
+              title: 'Installing $ongChainn...',
+              description: 'The app will appear on your home screen shortly.',
+            });
+          }
+        } finally {
+          clearDeferredInstallPrompt();
+        }
+      } else {
+        toast({
+          title: 'To keep songs on your device, add $ongChainn to your home screen.',
+        });
+      }
+      return;
+    }
+    if (!hasPlayedEnoughToSave) {
+      toast({
+        title: 'Play this song once to save it.',
+      });
+      return;
+    }
+    if (!isOnline) {
+      toast({
+        title: 'Offline – not saved',
+        description: 'Reconnect to save this song for offline playback.',
+      });
+      return;
+    }
+    if (isSaved || isSaving) return;
+    await cacheSong(song.id, song.audioUrl, {
+      title: song.title,
+      artist: song.artist,
+      duration: song.duration,
+    });
+  }, [
+    isInstalled,
+    hasPlayedEnoughToSave,
+    isOnline,
+    isSaved,
+    isSaving,
+    cacheSong,
+    song.id,
+    song.audioUrl,
+    song.title,
+    song.artist,
+    song.duration,
+  ]);
 
   if (variant === 'compact') {
     return (
@@ -148,6 +219,11 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             <span className="text-[10px] sm:text-xs text-muted-foreground tabular-nums hidden xs:block">
               {totalPlays.toLocaleString()} plays
             </span>
+            {totalPulses > 0 && (
+              <span className="text-[10px] sm:text-xs text-primary tabular-nums hidden xs:block">
+                ❤️‍🔥 {totalPulses.toLocaleString()}
+              </span>
+            )}
             <ShareSongButton 
               songId={song.id} 
               songTitle={song.title} 
@@ -167,6 +243,30 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             </motion.button>
           </div>
         </motion.div>
+        
+        {isCurrentSong && (
+          <div className="flex items-center justify-between px-2 sm:px-3 mt-1">
+            <span className="text-[10px] sm:text-xs text-muted-foreground">
+              {isSaved
+                ? 'Saved for offline'
+                : hasPlayedEnoughToSave
+                  ? 'Tap to keep this on your device'
+                  : 'Play once to keep this offline'}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleKeepThis();
+              }}
+              disabled={isSaved || isSaving}
+              className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 h-auto"
+            >
+              {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Keep this'}
+            </Button>
+          </div>
+        )}
         
         {showUnlockModal && (
           <UnlockSongModal
@@ -281,6 +381,12 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             <span className="tabular-nums">{totalPlays.toLocaleString()} plays</span>
             <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
             <span className="tabular-nums">{totalLikes.toLocaleString()} likes</span>
+            {totalPulses > 0 && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                <span className="tabular-nums text-primary">❤️‍🔥 {totalPulses.toLocaleString()}</span>
+              </>
+            )}
           </div>
         </div>
         </motion.div>
@@ -365,6 +471,11 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             {totalPlays.toLocaleString()} plays
           </span>
           <div className="flex items-center gap-1">
+            {totalPulses > 0 && (
+              <span className="text-xs text-primary tabular-nums mr-1">
+                ❤️‍🔥 {totalPulses.toLocaleString()}
+              </span>
+            )}
             <ShareSongButton 
               songId={song.id} 
               songTitle={song.title} 

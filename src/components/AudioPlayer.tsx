@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, useCallback } from 'react';
+import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronUp, Headphones } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
@@ -66,10 +66,10 @@ const TimeDisplay = memo(function TimeDisplay({
 });
 
 export const AudioPlayer = memo(function AudioPlayer() {
-  const { currentSong, isPlaying, isRoomMode, isRoomHidden } = usePlayerState();
+  const { currentSong, isPlaying, isRoomMode, isRoomHidden, queue } = usePlayerState();
   const { currentTime, duration } = usePlayerTime();
   const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume, showRoom } = usePlayerActions();
-  const { addPlay } = useEngagement();
+  const { addPlay, addOfflinePlay } = useEngagement();
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -80,15 +80,23 @@ export const AudioPlayer = memo(function AudioPlayer() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const showReturnToRoom = isRoomMode && isRoomHidden;
 
-  const PLAY_THRESHOLD_SECONDS = 3;
+  const PLAY_THRESHOLD_SECONDS = 20;
+
+  const nextSong = useMemo(() => {
+    if (!currentSong || !queue || queue.length <= 1) return null;
+    const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+    if (currentIndex === -1) return null;
+    const nextIndex = (currentIndex + 1) % queue.length;
+    const candidate = queue[nextIndex];
+    if (!candidate || candidate.id === currentSong.id) return null;
+    return candidate;
+  }, [currentSong, queue]);
 
   // Record play to database and local state
   const recordPlay = useCallback(async (songId: string) => {
     if (hasCountedPlay.current) return;
     
     hasCountedPlay.current = true;
-    
-    // Update local engagement state
     addPlay(songId);
   }, [addPlay]);
 
@@ -110,12 +118,14 @@ export const AudioPlayer = memo(function AudioPlayer() {
       // Start tracking play time
       playStartTime.current = Date.now();
     } else if (playStartTime.current !== null) {
-      // Pause - accumulate the time played
       const sessionTime = (Date.now() - playStartTime.current) / 1000;
       accumulatedPlayTime.current += sessionTime;
+      if (!navigator.onLine && currentSong) {
+        addOfflinePlay(currentSong.id, sessionTime);
+      }
       playStartTime.current = null;
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentSong, addOfflinePlay]);
 
   // Check if threshold reached during playback
   useEffect(() => {
@@ -234,6 +244,11 @@ export const AudioPlayer = memo(function AudioPlayer() {
                     {currentSong.title}
                   </p>
                   <p className="text-xs sm:text-sm text-muted-foreground truncate">{currentSong.artist}</p>
+                  {nextSong && (
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      Up Next: {nextSong.title} • {nextSong.artist}
+                    </p>
+                  )}
                 </div>
                 <ChevronUp className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
               </button>

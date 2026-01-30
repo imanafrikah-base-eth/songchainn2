@@ -56,12 +56,49 @@ export function PostComposer({ onPost }: PostComposerProps) {
   }, [selectedImage]);
 
   const handlePost = async () => {
+    if (!user) {
+      toast.error('Please sign in to post');
+      return;
+    }
     if (!content.trim() && postType === 'text' && !selectedImage) return;
     if (postType === 'song_share' && !selectedSong) return;
 
     setIsPosting(true);
     try {
-      await onPost(content, postType, postType === 'song_share' ? selectedSong : undefined, undefined);
+      let imagePayload: { url: string; path: string } | undefined;
+
+      if (selectedImage) {
+        const formData = new FormData();
+        formData.append('file', selectedImage);
+        formData.append('userId', user.id);
+        formData.append('type', 'post');
+
+        const response = await fetch('/api/upload/image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to upload image');
+        }
+
+        const data = (await response.json()) as { url?: string; key?: string; path?: string };
+        const imageUrl = data.url;
+        const imagePath = data.path || data.key || '';
+
+        if (!imageUrl) {
+          throw new Error('Missing image URL from upload response');
+        }
+
+        imagePayload = { url: imageUrl, path: imagePath };
+      }
+
+      await onPost(
+        content,
+        postType,
+        postType === 'song_share' ? selectedSong : undefined,
+        imagePayload
+      );
       setContent('');
       setSelectedSong('');
       setPostType('text');

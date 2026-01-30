@@ -183,6 +183,7 @@ export default function Room() {
   const [segmentNowMs, setSegmentNowMs] = useState(() => Date.now());
   const [reactionsByMessageId, setReactionsByMessageId] = useState<Record<string, Record<string, number>>>({});
   const [myReactionsByMessageId, setMyReactionsByMessageId] = useState<Record<string, Record<string, boolean>>>({});
+  const [roomPulseSummary, setRoomPulseSummary] = useState<{ count: number } | null>(null);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -198,6 +199,7 @@ export default function Room() {
   const beepCtxRef = useRef<AudioContext | null>(null);
   const beepUnlockedRef = useRef(false);
   const lastBeepAtRef = useRef(0);
+  const pulseBannerTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     draftRef.current = draft;
@@ -300,6 +302,42 @@ export default function Room() {
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  useEffect(() => {
+    if (!roomName) return;
+    const channel = supabase
+      .channel(`room-pulses-${roomName}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'song_analytics' },
+        payload => {
+          const row = (payload as any)?.new as { event_type?: string; song_id?: string } | undefined;
+          if (!row || row.event_type !== 'pulse') return;
+          if (!currentSong || row.song_id !== currentSong.id) return;
+          setRoomPulseSummary(prev => {
+            if (!prev) {
+              return { count: 1 };
+            }
+            return { count: prev.count + 1 };
+          });
+          if (pulseBannerTimeoutRef.current) {
+            window.clearTimeout(pulseBannerTimeoutRef.current);
+          }
+          pulseBannerTimeoutRef.current = window.setTimeout(() => {
+            setRoomPulseSummary(null);
+          }, 4000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (pulseBannerTimeoutRef.current) {
+        window.clearTimeout(pulseBannerTimeoutRef.current);
+        pulseBannerTimeoutRef.current = null;
+      }
+    };
+  }, [currentSong, roomName]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -1257,6 +1295,14 @@ export default function Room() {
                 <div className="flex-shrink-0 tabular-nums text-zinc-400">
                   Next in {formatCountdownSeconds(segmentProgress.remaining)}
                 </div>
+                {roomPulseSummary && (
+                  <>
+                    <div className="text-zinc-500">•</div>
+                    <div className="flex-shrink-0 tabular-nums text-rose-400">
+                      ❤️‍🔥 {roomPulseSummary.count}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">

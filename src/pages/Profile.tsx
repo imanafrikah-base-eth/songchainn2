@@ -1,7 +1,7 @@
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon } from 'lucide-react';
+import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,7 @@ import { Navigation } from '@/components/Navigation';
 import { SONGS } from '@/data/musicData';
 import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
+import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { Link, Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -31,32 +32,13 @@ const BaseIcon = () => (
   </svg>
 );
 
-let resolvedAudienceStorageBucket: Promise<string> | null = null;
-
-async function resolveStorageBucket(preferredBucket: string) {
-  if (!resolvedAudienceStorageBucket) {
-    resolvedAudienceStorageBucket = (async () => {
-      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
-      if (!listBuckets) return preferredBucket;
-      const { data, error } = await listBuckets();
-      if (error || !Array.isArray(data)) return preferredBucket;
-      const names = new Set<string>(data.map((b: any) => String(b?.name)));
-      if (names.has(preferredBucket)) return preferredBucket;
-      if (names.has('public')) return 'public';
-      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
-      return first || preferredBucket;
-    })();
-  }
-
-  return resolvedAudienceStorageBucket;
-}
-
 export default function Profile() {
   const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding } = useAuth();
   const { likedSongs, playlists } = useAudienceInteractions();
   const { points, completedReferrals, shareInviteLink } = useReferrals();
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const { storageUsedBytes } = useOfflineAudio();
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
@@ -67,6 +49,7 @@ export default function Profile() {
   const [coverCropOffsetY, setCoverCropOffsetY] = useState(0);
   const [coverCropMaxOffset, setCoverCropMaxOffset] = useState(0);
   const [isSavingCroppedCover, setIsSavingCroppedCover] = useState(false);
+  const [pendingCoverUrl, setPendingCoverUrl] = useState<string | null>(null);
   const coverPreviewRef = useRef<HTMLDivElement | null>(null);
   const coverPreviewImageRef = useRef<HTMLImageElement | null>(null);
   const coverDragStateRef = useRef<{ startY: number; startOffset: number } | null>(null);
@@ -78,6 +61,7 @@ export default function Profile() {
   const [avatarMaxOffsetX, setAvatarMaxOffsetX] = useState(0);
   const [avatarMaxOffsetY, setAvatarMaxOffsetY] = useState(0);
   const [isSavingCroppedAvatar, setIsSavingCroppedAvatar] = useState(false);
+  const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
   const avatarPreviewRef = useRef<HTMLDivElement | null>(null);
   const avatarDragStateRef = useRef<{
     startX: number;
@@ -106,36 +90,31 @@ export default function Profile() {
   const uploadAndUpdateProfileImage = useCallback(
     async (file: File, field: 'profile_picture_url' | 'cover_photo_url') => {
       if (!user) return;
-      const extRaw = file.name.split('.').pop() || '';
-      const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
-      const path = `audience/${user.id}/${field}-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-      const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
-      const bucket = await resolveStorageBucket(preferredBucket);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', user.id);
+      formData.append('type', field === 'profile_picture_url' ? 'avatar' : 'cover');
 
-      const uploadRes = await supabase.storage
-        .from(bucket)
-        .upload(path, file, { contentType: file.type, upsert: true });
-      if (uploadRes.error) throw uploadRes.error;
+      const response = await fetch('/api/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
 
-      const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
+      }
+
+      const data = (await response.json()) as { url?: string };
+      const imageUrl = data.url;
+      if (!imageUrl) {
+        throw new Error('Missing image URL from upload response');
+      }
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
-        .update({ [field]: publicUrl } as any)
+        .update({ [field]: imageUrl } as any)
         .or(`id.eq.${user.id},user_id.eq.${user.id}`);
       if (updateError) throw updateError;
-
-      const prefix = `audience/${user.id}`;
-      const { data: existingFiles } = await supabase.storage.from(bucket).list(prefix, { limit: 100 });
-      const keepName = path.split('/').pop();
-      const typePrefix = field === 'profile_picture_url' ? 'profile-' : 'cover-';
-      const toDelete =
-        existingFiles
-          ?.filter((f) => f.name !== keepName && f.name.startsWith(typePrefix))
-          .map((f) => `${prefix}/${f.name}`) ?? [];
-      if (toDelete.length > 0) {
-        await supabase.storage.from(bucket).remove(toDelete);
-      }
 
       await refreshProfile();
       toast({ title: field === 'profile_picture_url' ? 'Profile picture updated!' : 'Cover photo updated!' });
@@ -281,6 +260,12 @@ export default function Profile() {
         type: 'image/jpeg',
       });
 
+      const nextPreviewUrl = URL.createObjectURL(croppedFile);
+      setPendingCoverUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return nextPreviewUrl;
+      });
+
       setIsUploadingCoverPhoto(true);
       try {
         await uploadAndUpdateProfileImage(croppedFile, 'cover_photo_url');
@@ -371,6 +356,12 @@ export default function Profile() {
         type: 'image/png',
       });
 
+      const nextPreviewUrl = URL.createObjectURL(croppedFile);
+      setPendingAvatarUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return nextPreviewUrl;
+      });
+
       setIsUploadingProfilePicture(true);
       try {
         await uploadAndUpdateProfileImage(croppedFile, 'profile_picture_url');
@@ -442,6 +433,9 @@ export default function Profile() {
     );
   }
 
+  const effectiveCoverUrl = pendingCoverUrl || audienceProfile.cover_photo_url;
+  const effectiveAvatarUrl = pendingAvatarUrl || audienceProfile.profile_picture_url;
+
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Cover Photo */}
@@ -453,9 +447,9 @@ export default function Profile() {
           onChange={handleCoverPhotoChange}
           className="hidden"
         />
-        {audienceProfile.cover_photo_url && (
+        {effectiveCoverUrl && (
           <img
-            src={audienceProfile.cover_photo_url}
+            src={effectiveCoverUrl}
             alt="Cover"
             className="w-full h-full object-cover"
           />
@@ -742,9 +736,9 @@ export default function Profile() {
               className="hidden"
             />
             <div className="w-28 h-28 rounded-full border-4 border-background overflow-hidden bg-secondary">
-              {audienceProfile.profile_picture_url ? (
+              {effectiveAvatarUrl ? (
                 <img
-                  src={audienceProfile.profile_picture_url}
+                  src={effectiveAvatarUrl}
                   alt={audienceProfile.profile_name}
                   className="w-full h-full object-contain"
                 />
@@ -988,12 +982,28 @@ export default function Profile() {
           </div>
         </motion.div>
 
-        {/* Notification Settings */}
-        <div className="mb-8">
-          <h2 className="font-heading text-lg font-semibold text-foreground mb-4">
-            Settings
-          </h2>
-          <NotificationSettings />
+        {/* Notification & Offline Settings */}
+        <div className="mb-8 space-y-4">
+          <div>
+            <h2 className="font-heading text-lg font-semibold text-foreground mb-4">
+              Settings
+            </h2>
+            <NotificationSettings />
+          </div>
+          <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                <HardDrive className="w-4 h-4 text-primary" />
+                <span>Offline storage used</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Saved songs stay on this device for offline playback.
+              </p>
+            </div>
+            <p className="text-sm font-semibold text-foreground tabular-nums">
+              {(storageUsedBytes / (1024 * 1024)).toFixed(1)} MB
+            </p>
+          </div>
         </div>
 
         {/* Liked Songs Preview */}

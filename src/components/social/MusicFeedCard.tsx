@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import songArtVideo from '@/assets/song-art.mp4';
+import { usePulseCounts } from '@/hooks/usePopularity';
 
 interface MusicFeedCardProps {
   post: SocialPostWithProfile;
@@ -57,6 +58,7 @@ export function MusicFeedCard({
   const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard, shareToX } = useShare();
   const [showHeart, setShowHeart] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const { data: pulseCounts } = usePulseCounts();
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
   const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
@@ -66,6 +68,10 @@ export function MusicFeedCard({
   const isThisSongPlaying = currentSong?.id === song?.id && isPlaying;
   const isWelcomePost = post.post_type === 'welcome';
   const isSongLikePost = post.post_type === 'song_like';
+
+  const totalPulses = pulseCounts && song
+    ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count || 0)
+    : 0;
 
   const handleShare = () => {
     if (song && artist) {
@@ -428,6 +434,11 @@ export function MusicFeedCard({
               <Heart className="w-4 h-4 text-red-400 fill-red-400" />
             ) : (
               <Music className="w-4 h-4 text-white" />
+            )}
+            {totalPulses > 0 && (
+              <span className="text-[11px] text-white/80 tabular-nums">
+                ❤️‍🔥 {totalPulses.toLocaleString()}
+              </span>
             )}
             <div className="overflow-hidden max-w-[200px]">
               <motion.p 

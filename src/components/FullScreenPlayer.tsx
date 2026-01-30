@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, useRef } from 'react';
+import { memo, useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, Share2, ListMusic, Shuffle, Repeat, Repeat1, Copy, Check, MessageCircle } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
@@ -14,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import songArtVideo from '@/assets/song-art.mp4';
+import { useOfflineAudio } from '@/hooks/useOfflineAudio';
+import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 
 const FullScreenVideoArt = memo(function FullScreenVideoArt({ isPlaying }: { isPlaying: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -57,14 +59,75 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
   const { currentTime, duration } = usePlayerTime();
   const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume } = usePlayerActions();
 
-  const { toggleLike, isLiked } = useEngagement();
+  const { toggleLike, isLiked, sendPulse } = useEngagement();
+  const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
   const { copied, shareSong, copyToClipboard, shareToX, getSongShareUrl } = useShare();
   const [showQueue, setShowQueue] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [shuffle, setShuffle] = useState(false);
+  const [pulseRipples, setPulseRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
+  const [showPulseHint, setShowPulseHint] = useState(false);
+  const [showSoftHint, setShowSoftHint] = useState(false);
+  const [showPulseSent, setShowPulseSent] = useState(false);
+
+  const pulsePointerDownRef = useRef(false);
+  const pulseTimerRef = useRef<number | null>(null);
+  const pulseIdRef = useRef(0);
+  const lastSoftHintAtRef = useRef(0);
+  const lastHintSongIdRef = useRef<string | null>(null);
+  const hasShownInitialHintRef = useRef(false);
+  const hasShownPulseSentRef = useRef(false);
 
   const liked = currentSong ? isLiked(currentSong.id) : false;
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const isSaved = currentSong ? isSongCached(currentSong.id) : false;
+  const isSaving = currentSong ? cachingInProgress === currentSong.id : false;
+  const hasPlayedEnoughToSave = currentTime >= 20;
+
+  const handleKeepThis = useCallback(async () => {
+    if (!currentSong) return;
+    if (!isInstalled) {
+      const deferredPrompt = getDeferredInstallPrompt();
+      if (deferredPrompt) {
+        try {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') {
+            toast({
+              title: 'Installing $ongChainn...',
+              description: 'The app will appear on your home screen shortly.',
+            });
+          }
+        } finally {
+          clearDeferredInstallPrompt();
+        }
+      } else {
+        toast({
+          title: 'To keep songs on your device, add $ongChainn to your home screen.',
+        });
+      }
+      return;
+    }
+    if (!hasPlayedEnoughToSave) {
+      toast({
+        title: 'Play this song once to save it.',
+      });
+      return;
+    }
+    if (!isOnline) {
+      toast({
+        title: 'Offline – not saved',
+        description: 'Reconnect to save this song for offline playback.',
+      });
+      return;
+    }
+    if (isSaved || isSaving) return;
+    await cacheSong(currentSong.id, currentSong.audioUrl, {
+      title: currentSong.title,
+      artist: currentSong.artist,
+      duration,
+    });
+  }, [currentSong, isInstalled, hasPlayedEnoughToSave, isOnline, isSaved, isSaving, cacheSong, duration]);
 
   const handleNativeShare = async () => {
     if (currentSong) {
@@ -148,6 +211,105 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
     }
   }, [isPlaying]);
 
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem('songchainn_pulse_sent_once');
+      if (seen === '1') {
+        hasShownPulseSentRef.current = true;
+      }
+    } catch {
+      void 0;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!currentSong || hasShownInitialHintRef.current) return;
+    try {
+      const seen = localStorage.getItem('songchainn_pulse_hint_seen');
+      if (seen === '1') {
+        hasShownInitialHintRef.current = true;
+        return;
+      }
+    } catch {
+      void 0;
+    }
+    hasShownInitialHintRef.current = true;
+    setShowPulseHint(true);
+    window.setTimeout(() => {
+      setShowPulseHint(false);
+      try {
+        localStorage.setItem('songchainn_pulse_hint_seen', '1');
+      } catch {
+        void 0;
+      }
+    }, 3200);
+  }, [currentSong]);
+
+  useEffect(() => {
+    if (!currentSong) {
+      setShowSoftHint(false);
+      return;
+    }
+    const now = Date.now();
+    const songId = currentSong.id;
+    if (lastHintSongIdRef.current !== songId) {
+      lastHintSongIdRef.current = songId;
+      lastSoftHintAtRef.current = 0;
+    }
+    if (!isPlaying || !duration || duration <= 0) return;
+    const fraction = duration > 0 ? currentTime / duration : 0;
+    if (fraction > 0.25 && fraction < 0.35 && now - lastSoftHintAtRef.current > 90_000) {
+      lastSoftHintAtRef.current = now;
+      setShowSoftHint(true);
+      window.setTimeout(() => setShowSoftHint(false), 2200);
+    }
+  }, [currentSong, currentTime, duration, isPlaying]);
+
+  const handlePulseTrigger = useCallback((clientX: number, clientY: number) => {
+    if (!currentSong || !isPlaying) return;
+    const id = pulseIdRef.current++;
+    setPulseRipples(prev => [...prev, { id, x: clientX, y: clientY }]);
+    window.setTimeout(() => {
+      setPulseRipples(prev => prev.filter(r => r.id !== id));
+    }, 600);
+    sendPulse(currentSong.id);
+    if (!hasShownPulseSentRef.current) {
+      hasShownPulseSentRef.current = true;
+      setShowPulseSent(true);
+      window.setTimeout(() => setShowPulseSent(false), 2200);
+      try {
+        localStorage.setItem('songchainn_pulse_sent_once', '1');
+      } catch {
+        void 0;
+      }
+    }
+  }, [currentSong, isPlaying, sendPulse]);
+
+  const handlePulsePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!currentSong || !isPlaying) return;
+    const target = e.target as HTMLElement | null;
+    if (target && target.closest('button, input, textarea, a, [data-no-pulse]')) return;
+    pulsePointerDownRef.current = true;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    if (pulseTimerRef.current) {
+      window.clearTimeout(pulseTimerRef.current);
+      pulseTimerRef.current = null;
+    }
+    pulseTimerRef.current = window.setTimeout(() => {
+      if (!pulsePointerDownRef.current) return;
+      handlePulseTrigger(startX, startY);
+    }, 1000);
+  }, [currentSong, isPlaying, handlePulseTrigger]);
+
+  const clearPulsePointer = useCallback(() => {
+    pulsePointerDownRef.current = false;
+    if (pulseTimerRef.current) {
+      window.clearTimeout(pulseTimerRef.current);
+      pulseTimerRef.current = null;
+    }
+  }, []);
+
   if (!currentSong) return null;
 
   return (
@@ -181,7 +343,13 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
           </div>
 
           {/* Content */}
-          <div className="relative h-full flex flex-col">
+          <div
+            className="relative h-full flex flex-col"
+            onPointerDown={handlePulsePointerDown}
+            onPointerUp={clearPulsePointer}
+            onPointerCancel={clearPulsePointer}
+            onPointerLeave={clearPulsePointer}
+          >
             {/* Header */}
             <motion.header
               initial={{ opacity: 0, y: -20 }}
@@ -201,6 +369,13 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   {currentSong.townSquare}
                 </p>
               </div>
+                <div className="flex items-center gap-2">
+                  {isSaved && (
+                    <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+                      On device
+                    </span>
+                  )}
+                </div>
               <button
                 onClick={() => setShowQueue(!showQueue)}
                 className={cn(
@@ -213,7 +388,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
             </motion.header>
 
             {/* Main content */}
-            <div className="flex-1 flex flex-col items-center justify-center px-8 pb-8 overflow-hidden">
+            <div className="flex-1 flex flex-col items-center justify-center px-8 pb-8 overflow-hidden relative">
               {/* Album Art */}
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -241,6 +416,25 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   {currentSong.title}
                 </h2>
                 <p className="text-lg text-muted-foreground truncate">{currentSong.artist}</p>
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <button
+                    onClick={handleKeepThis}
+                    disabled={isSaved || isSaving}
+                    className={cn(
+                      "px-4 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                      isSaved
+                        ? "border-primary/30 bg-primary/10 text-primary cursor-default"
+                        : "border-primary/40 bg-primary text-primary-foreground hover:bg-primary/90",
+                    )}
+                  >
+                    {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Keep this'}
+                  </button>
+                  {!hasPlayedEnoughToSave && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Play this song once to save it.
+                    </span>
+                  )}
+                </div>
               </motion.div>
 
               {/* Progress Bar */}
@@ -394,6 +588,90 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   </DropdownMenuContent>
                 </DropdownMenu>
               </motion.div>
+              <div className="mt-6 w-full max-w-[320px] text-xs text-muted-foreground text-center">
+                {queue.length > 1 && (
+                  (() => {
+                    const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+                    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % queue.length : 0;
+                    const nextSong = queue[nextIndex];
+                    if (!nextSong || nextSong.id === currentSong.id) return null;
+                    return (
+                      <div>
+                        <span className="uppercase tracking-wide text-[10px] text-muted-foreground/80">
+                          Up Next
+                        </span>
+                        <div className="mt-1 text-foreground text-sm truncate">
+                          {nextSong.title} <span className="text-muted-foreground">• {nextSong.artist}</span>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+
+              {pulseRipples.map(ripple => (
+                <motion.div
+                  key={ripple.id}
+                  className="pointer-events-none fixed inset-0 z-[1]"
+                  initial={{ opacity: 0.4, scale: 0 }}
+                  animate={{ opacity: 0, scale: 2 }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                  style={{
+                    left: 0,
+                    top: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: ripple.x - 80,
+                      top: ripple.y - 80,
+                      width: 160,
+                      height: 160,
+                      borderRadius: '9999px',
+                      background:
+                        'radial-gradient(circle, rgba(56,189,248,0.35) 0%, rgba(56,189,248,0.0) 70%)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </motion.div>
+              ))}
+
+              <div className="pointer-events-none absolute inset-x-0 bottom-10 flex flex-col items-center gap-1 z-[2]">
+                {showPulseHint && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.3 }}
+                    className="px-3 py-1.5 rounded-full bg-background/80 text-[11px] text-muted-foreground border border-primary/20"
+                  >
+                    Feeling this part? Send a Pulse.
+                  </motion.div>
+                )}
+                {showSoftHint && !showPulseHint && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.3 }}
+                    className="px-3 py-1.5 rounded-full bg-background/80 text-[11px] text-muted-foreground border border-primary/20"
+                  >
+                    Send a Pulse
+                  </motion.div>
+                )}
+                {showPulseSent && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.3 }}
+                    className="px-3 py-1.5 rounded-full bg-background/90 text-[11px] text-foreground border border-primary/40"
+                  >
+                    Pulse sent. Others feel this too.
+                  </motion.div>
+                )}
+              </div>
             </div>
 
             {/* Queue Panel (slide in from right) */}

@@ -9,9 +9,11 @@ interface EngagementContextType {
   totalPlays: number;
   likedSongs: Set<string>;
   addPlay: (songId: string) => void;
+  addOfflinePlay: (songId: string, durationSeconds: number) => void;
   toggleLike: (songId: string) => void;
   isLiked: (songId: string) => boolean;
   getPointsBreakdown: () => PointsBreakdown;
+  sendPulse: (songId: string, options?: { roomName?: string | null }) => void;
 }
 
 interface PointsBreakdown {
@@ -27,6 +29,14 @@ const POINTS_PER_PLAY = 2;
 const POINTS_PER_LIKE = 1;
 const STREAK_BONUS = 5;
 const PLAY_DEDUPE_WINDOW_MS = 30_000;
+const PULSE_DEDUPE_WINDOW_MS = 3 * 60 * 1000;
+const OFFLINE_PLAYS_KEY = 'songchainn_offline_plays_v1';
+
+interface OfflinePlay {
+  songId: string;
+  timestamp: number;
+  durationSeconds: number;
+}
 
 export function EngagementProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -54,6 +64,8 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const [likedSongs, setLikedSongsState] = useState<Set<string>>(new Set());
   const [isInitialized, setIsInitialized] = useState(false);
   const lastPlayRef = useRef<{ songId: string; at: number } | null>(null);
+  const lastPulseBySongRef = useRef<Record<string, number>>({});
+  const offlinePlaysRef = useRef<OfflinePlay[]>([]);
 
   useEffect(() => {
     const raw = localStorage.getItem('songchainn_last_play');
@@ -65,6 +77,25 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       void 0;
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(OFFLINE_PLAYS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as OfflinePlay[];
+      if (Array.isArray(parsed)) {
+        offlinePlaysRef.current = parsed.filter(
+          (p) =>
+            typeof p.songId === 'string' &&
+            typeof p.timestamp === 'number' &&
+            typeof p.durationSeconds === 'number' &&
+            p.durationSeconds > 0,
+        );
+      }
+    } catch {
+      offlinePlaysRef.current = [];
     }
   }, []);
 
@@ -109,6 +140,25 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     }
   }, [likedSongs, user, isInitialized]);
 
+  const ensureAnonymousId = () => {
+    const key = 'songchainn_anon_id';
+    try {
+      const existing = localStorage.getItem(key);
+      if (existing) return existing;
+      const maybeCrypto = globalThis.crypto as Crypto | undefined;
+      let next: string;
+      if (maybeCrypto && 'randomUUID' in maybeCrypto && typeof maybeCrypto.randomUUID === 'function') {
+        next = maybeCrypto.randomUUID();
+      } else {
+        next = `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+      localStorage.setItem(key, next);
+      return next;
+    } catch {
+      return 'anon';
+    }
+  };
+
   const addPlay = useCallback((songId: string) => {
     const now = Date.now();
     const last = lastPlayRef.current;
@@ -128,6 +178,95 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       } as any);
     })();
   }, [user]);
+
+  const addOfflinePlay = useCallback((songId: string, durationSeconds: number) => {
+    if (!songId || !Number.isFinite(durationSeconds) || durationSeconds <= 0) return;
+    try {
+      const now = Date.now();
+      const plays = offlinePlaysRef.current;
+      const thresholdMs = 30_000;
+      const recent = plays.find(
+        (p) => p.songId === songId && now - p.timestamp < thresholdMs,
+      );
+      if (recent) return;
+      const updated: OfflinePlay[] = [
+        ...plays,
+        { songId, timestamp: now, durationSeconds },
+      ].slice(-500);
+      offlinePlaysRef.current = updated;
+      localStorage.setItem(OFFLINE_PLAYS_KEY, JSON.stringify(updated));
+    } catch {
+      void 0;
+    }
+  }, []);
+
+  useEffect(() => {
+    const syncOfflinePlays = async () => {
+      if (offlinePlaysRef.current.length === 0) return;
+      if (!navigator.onLine) return;
+      const batch = offlinePlaysRef.current;
+      offlinePlaysRef.current = [];
+      localStorage.removeItem(OFFLINE_PLAYS_KEY);
+      try {
+        const payload = batch
+          .filter((p) => p.durationSeconds >= 15)
+          .map((p) => ({
+            event_type: 'play',
+            song_id: p.songId,
+            user_id: user?.id ?? null,
+          }));
+        if (payload.length === 0) return;
+        await supabase.from('song_analytics').insert(payload as any);
+      } catch {
+        offlinePlaysRef.current = batch;
+        try {
+          localStorage.setItem(OFFLINE_PLAYS_KEY, JSON.stringify(batch));
+        } catch {
+          void 0;
+        }
+      }
+    };
+
+    const handleOnline = () => {
+      void syncOfflinePlays();
+    };
+
+    window.addEventListener('online', handleOnline);
+    if (navigator.onLine) {
+      void syncOfflinePlays();
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [user]);
+
+  const sendPulse = useCallback((songId: string, options?: { roomName?: string | null }) => {
+    if (!songId) return;
+    const now = Date.now();
+    const lastBySong = lastPulseBySongRef.current;
+    const lastForSong = lastBySong[songId];
+    if (lastForSong && now - lastForSong < PULSE_DEDUPE_WINDOW_MS) return;
+    lastBySong[songId] = now;
+
+    const anonymousUserId = ensureAnonymousId();
+    const payload = {
+      songId,
+      timestamp: new Date(now).toISOString(),
+      anonymousUserId,
+      roomId: options?.roomName || null,
+    };
+
+    void payload;
+
+    (async () => {
+      await supabase.from('song_analytics').insert({
+        event_type: 'pulse',
+        song_id: songId,
+        user_id: null,
+      } as any);
+    })();
+  }, []);
 
   const toggleLike = useCallback(async (songId: string) => {
     const isCurrentlyLiked = likedSongs.has(songId);
@@ -178,9 +317,11 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       totalPlays,
       likedSongs,
       addPlay,
+      addOfflinePlay,
       toggleLike,
       isLiked,
       getPointsBreakdown,
+      sendPulse,
     }}>
       {children}
     </EngagementContext.Provider>

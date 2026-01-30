@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { MapPin, Music } from 'lucide-react';
 import { Artist, SONGS } from '@/data/musicData';
 import { Link } from 'react-router-dom';
-import { useSongPopularity } from '@/hooks/usePopularity';
+import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
 
 interface ArtistCardProps {
   artist: Artist;
@@ -12,17 +12,23 @@ interface ArtistCardProps {
 
 export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: ArtistCardProps) {
   const { data: popularityData } = useSongPopularity();
+  const { data: pulseCounts } = usePulseCounts();
   
   // Calculate real stats from database
-  const { artistSongs, totalPlays } = useMemo(() => {
+  const { artistSongs, totalPlays, totalPulses } = useMemo(() => {
     const songs = SONGS.filter(s => s.artistId === artist.id);
     let plays = 0;
+    let pulses = 0;
     songs.forEach(song => {
       const songData = popularityData?.find(p => p.song_id === song.id);
       plays += songData?.play_count || 0;
     });
-    return { artistSongs: songs, totalPlays: plays };
-  }, [artist.id, popularityData]);
+    songs.forEach(song => {
+      const pulseData = pulseCounts?.find(p => p.song_id === song.id);
+      pulses += pulseData?.pulse_count || 0;
+    });
+    return { artistSongs: songs, totalPlays: plays, totalPulses: pulses };
+  }, [artist.id, popularityData, pulseCounts]);
 
   return (
     <Link to={`/artist/${artist.id}`}>
@@ -86,7 +92,12 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
               <Music className="w-3.5 h-3.5" />
               <span>{artistSongs.length} songs</span>
             </div>
-            <span className="tabular-nums">{totalPlays.toLocaleString()} plays</span>
+            <div className="flex items-center gap-2">
+              {totalPulses > 0 && (
+                <span className="tabular-nums text-primary">❤️‍🔥 {totalPulses.toLocaleString()}</span>
+              )}
+              <span className="tabular-nums">{totalPlays.toLocaleString()} plays</span>
+            </div>
           </div>
 
           <div className="mt-3 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs text-center truncate font-medium">

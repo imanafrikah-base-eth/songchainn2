@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon } from 'lucide-react';
+import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
-import { useRankedSongs, useRankedArtists } from '@/hooks/usePopularity';
+import { useRankedSongs, useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
-import { useSafePlayerState } from '@/context/PlayerContext';
+import { useSafePlayerState, usePlayerTime } from '@/context/PlayerContext';
 import { SongCard } from '@/components/SongCard';
 import { ArtistCard } from '@/components/ArtistCard';
 import { EngagementPanel } from '@/components/EngagementPanel';
@@ -14,11 +14,13 @@ import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { FeaturedTracksSection } from '@/components/FeaturedTracksSection';
-import { DownloadAppBanner } from '@/components/DownloadAppBanner';
+import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { LocationPrompt } from '@/components/LocationPrompt';
 import { Button } from '@/components/ui/button';
+import { useOfflineAudio } from '@/hooks/useOfflineAudio';
+import { toast } from '@/hooks/use-toast';
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -47,13 +49,31 @@ export default function Home() {
   const { rankedSongs } = useRankedSongs();
   const { rankedArtists } = useRankedArtists();
   const { audienceProfile, refreshProfile, user } = useAuth();
+  const { data: todayHotSongs = [] } = useTodayHotSongs(5);
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const playerState = useSafePlayerState();
+  const { currentTime } = usePlayerTime();
+  const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
   const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
   
   const featuredSongs = rankedSongs.slice(0, 3);
   const allSongs = rankedSongs;
   const newSongs = rankedSongs.filter(isSongNew);
+  const curatedHotTodayIds = ['86', '93', '57', '104', '84'];
+  const curatedHotTodaySongs = curatedHotTodayIds
+    .map(id => rankedSongs.find(song => song.id === id))
+    .filter((song): song is typeof rankedSongs[number] => Boolean(song));
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const tomorrowMidnight = new Date(startOfToday);
+  tomorrowMidnight.setDate(startOfToday.getDate() + 1);
+  const useSampleHotToday = now < tomorrowMidnight;
+  const sampleHotToday = curatedHotTodaySongs.map((song) => ({
+    song,
+    playsToday: song.plays || 0,
+  }));
+  const hotTodayEntries = useSampleHotToday ? sampleHotToday : todayHotSongs;
   const displayName =
     audienceProfile?.profile_name ||
     (user && typeof user.email === 'string'
@@ -259,7 +279,139 @@ export default function Home() {
             animate="show"
           >
             <motion.section variants={itemVariants}>
-              <FeaturedTracksSection songs={featuredSongs} />
+              <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
+                  <motion.div
+                    aria-hidden="true"
+                    initial={{ opacity: 0.4, scale: 1 }}
+                    animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.05, 1] }}
+                    transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                    className="pointer-events-none absolute -inset-x-12 -top-20 h-28 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.7),_transparent_65%)] blur-3xl"
+                  />
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-sky-400" />
+                          <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                            Hot Today
+                          </h2>
+                        </div>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                          Most played songs since midnight. Showing sample until real data arrives.
+                        </p>
+                      </div>
+                      <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                          <span>Live Heat</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
+                      {hotTodayEntries.map((entry, index) => {
+                        const isCurrentSong = playerState?.currentSong?.id === entry.song.id;
+                        const isSaved = isSongCached(entry.song.id);
+                        const isSaving = cachingInProgress === entry.song.id;
+                        const hasPlayedEnoughToSave = isCurrentSong && currentTime >= 20;
+
+                        const handleKeepThis = async () => {
+                          if (!isInstalled) {
+                            const deferredPrompt = getDeferredInstallPrompt();
+                            if (deferredPrompt) {
+                              try {
+                                deferredPrompt.prompt();
+                                const { outcome } = await deferredPrompt.userChoice;
+                                if (outcome === 'accepted') {
+                                  toast({
+                                    title: 'Installing $ongChainn...',
+                                    description: 'The app will appear on your home screen shortly.',
+                                  });
+                                }
+                              } finally {
+                                clearDeferredInstallPrompt();
+                              }
+                            } else {
+                              toast({
+                                title: 'To keep songs on your device, add $ongChainn to your home screen.',
+                              });
+                            }
+                            return;
+                          }
+                          if (!hasPlayedEnoughToSave) {
+                            toast({
+                              title: 'Play this song once to save it.',
+                            });
+                            return;
+                          }
+                          if (!isOnline) {
+                            toast({
+                              title: 'Offline – not saved',
+                              description: 'Reconnect to save this song for offline playback.',
+                            });
+                            return;
+                          }
+                          if (isSaved || isSaving) return;
+                          await cacheSong(entry.song.id, entry.song.audioUrl, {
+                            title: entry.song.title,
+                            artist: entry.song.artist,
+                            duration: entry.song.duration,
+                          });
+                        };
+
+                        return (
+                          <div
+                            key={entry.song.id}
+                            className="relative rounded-xl sm:rounded-2xl p-[1.5px] bg-gradient-to-r from-sky-500/80 via-cyan-400/60 to-transparent"
+                          >
+                            <div className="flex items-center justify-between px-2 pt-2 pb-1">
+                              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-sky-50/90">
+                                <span className="px-1.5 py-0.5 rounded-full bg-black/40 font-semibold tabular-nums">
+                                  #{index + 1}
+                                </span>
+                                <Flame className="w-3 h-3 text-sky-300" />
+                                <span className="uppercase tracking-wide">Hot</span>
+                              </div>
+                              <span className="text-[10px] sm:text-xs text-sky-50/85 tabular-nums">
+                                {entry.playsToday.toLocaleString()} plays today
+                              </span>
+                            </div>
+                            <div className="rounded-[0.85rem] sm:rounded-[1.1rem] bg-background/90">
+                              <SongCard
+                                song={entry.song}
+                                index={index}
+                                variant="compact"
+                              />
+                              <div className="flex items-center justify-between px-2.5 pb-2 pt-1">
+                                <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                  {isSaved
+                                    ? 'Saved for offline'
+                                    : isCurrentSong && hasPlayedEnoughToSave
+                                      ? 'Tap to keep this on your device'
+                                      : 'Play once to keep this offline'}
+                                </span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleKeepThis}
+                                  disabled={isSaved || isSaving}
+                                  className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 h-auto"
+                                >
+                                  {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Keep this'}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+            </motion.section>
+
+            <motion.section variants={itemVariants}>
+              <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay border border-primary/20">
+                <FeaturedTracksSection songs={featuredSongs} />
+              </div>
             </motion.section>
 
             {newSongs.length > 0 && (

@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useAuth } from '@/context/AuthContext';
-import { useSongPopularity } from '@/hooks/usePopularity';
+import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
 import { useShare } from '@/hooks/useShare';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,26 +27,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
-let resolvedArtistDetailStorageBucket: Promise<string> | null = null;
-
-async function resolveStorageBucket(preferredBucket: string) {
-  if (!resolvedArtistDetailStorageBucket) {
-    resolvedArtistDetailStorageBucket = (async () => {
-      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
-      if (!listBuckets) return preferredBucket;
-      const { data, error } = await listBuckets();
-      if (error || !Array.isArray(data)) return preferredBucket;
-      const names = new Set<string>(data.map((b: any) => String(b?.name)));
-      if (names.has(preferredBucket)) return preferredBucket;
-      if (names.has('public')) return 'public';
-      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
-      return first || preferredBucket;
-    })();
-  }
-
-  return resolvedArtistDetailStorageBucket;
-}
-
 const NEW_ARTIST_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
 
 function isArtistNew(addedAt?: string) {
@@ -61,6 +41,7 @@ export default function ArtistDetail() {
   const { user, isArtist, artistId } = useAuth();
   const { isArtistLiked, toggleLikeArtist } = useAudienceInteractions();
   const { data: popularityData } = useSongPopularity();
+  const { data: pulseCounts } = usePulseCounts();
   const { copyToClipboard, getShareUrl, shareToX, nativeShare, copied } = useShare();
   const queryClient = useQueryClient();
   const {
@@ -179,52 +160,35 @@ export default function ArtistDetail() {
 
     setIsUploadingProfilePicture(true);
     try {
-      const extRaw = file.name.split('.').pop() || '';
-      const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
-      const path = `artists/${ownerUserId}/profile-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-      const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
-      const bucket = await resolveStorageBucket(preferredBucket);
-      const uploadRes = await supabase.storage
-        .from(bucket)
-        .upload(path, file, { contentType: file.type, upsert: true });
-      if (uploadRes.error) {
-        const msg = String(uploadRes.error.message || '');
-        if (msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found')) {
-          resolvedArtistDetailStorageBucket = null;
-          const retryBucket = await resolveStorageBucket(preferredBucket);
-          const retryRes = await supabase.storage
-            .from(retryBucket)
-            .upload(path, file, { contentType: file.type, upsert: true });
-          if (retryRes.error) throw retryRes.error;
-          const publicUrl = supabase.storage.from(retryBucket).getPublicUrl(path).data.publicUrl;
-          const { error: updateError } = await supabase
-            .from('audience_profiles')
-            .update({ profile_picture_url: publicUrl })
-            .eq('id', ownerUserId);
-          if (updateError) throw updateError;
-          queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
-            if (!prev) return prev;
-            return { ...prev, profile_picture_url: publicUrl };
-          });
-          queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
-          queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
-          toast.success('Profile picture updated');
-          return;
-        }
-        throw uploadRes.error;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', ownerUserId);
+      formData.append('type', 'avatar');
+
+      const response = await fetch('/api/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
       }
 
-      const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+      const data = (await response.json()) as { url?: string };
+      const imageUrl = data.url;
+      if (!imageUrl) {
+        throw new Error('Missing image URL from upload response');
+      }
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
-        .update({ profile_picture_url: publicUrl })
+        .update({ profile_picture_url: imageUrl })
         .eq('id', ownerUserId);
       if (updateError) throw updateError;
 
       queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
         if (!prev) return prev;
-        return { ...prev, profile_picture_url: publicUrl };
+        return { ...prev, profile_picture_url: imageUrl };
       });
       queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
       queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
@@ -241,52 +205,35 @@ export default function ArtistDetail() {
 
     setIsUploadingCoverPhoto(true);
     try {
-      const extRaw = file.name.split('.').pop() || '';
-      const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
-      const path = `artists/${ownerUserId}/cover-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-      const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
-      const bucket = await resolveStorageBucket(preferredBucket);
-      const uploadRes = await supabase.storage
-        .from(bucket)
-        .upload(path, file, { contentType: file.type, upsert: true });
-      if (uploadRes.error) {
-        const msg = String(uploadRes.error.message || '');
-        if (msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found')) {
-          resolvedArtistDetailStorageBucket = null;
-          const retryBucket = await resolveStorageBucket(preferredBucket);
-          const retryRes = await supabase.storage
-            .from(retryBucket)
-            .upload(path, file, { contentType: file.type, upsert: true });
-          if (retryRes.error) throw retryRes.error;
-          const publicUrl = supabase.storage.from(retryBucket).getPublicUrl(path).data.publicUrl;
-          const { error: updateError } = await supabase
-            .from('audience_profiles')
-            .update({ cover_photo_url: publicUrl })
-            .eq('id', ownerUserId);
-          if (updateError) throw updateError;
-          queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
-            if (!prev) return prev;
-            return { ...prev, cover_photo_url: publicUrl };
-          });
-          queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
-          queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
-          toast.success('Cover photo updated');
-          return;
-        }
-        throw uploadRes.error;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', ownerUserId);
+      formData.append('type', 'cover');
+
+      const response = await fetch('/api/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
       }
 
-      const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+      const data = (await response.json()) as { url?: string };
+      const imageUrl = data.url;
+      if (!imageUrl) {
+        throw new Error('Missing image URL from upload response');
+      }
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
-        .update({ cover_photo_url: publicUrl })
+        .update({ cover_photo_url: imageUrl })
         .eq('id', ownerUserId);
       if (updateError) throw updateError;
 
       queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
         if (!prev) return prev;
-        return { ...prev, cover_photo_url: publicUrl };
+        return { ...prev, cover_photo_url: imageUrl };
       });
       queryClient.invalidateQueries({ queryKey: ['artist-public-profile', ownerUserId] });
       queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
@@ -565,21 +512,25 @@ export default function ArtistDetail() {
     };
   }, [queryClient, timelineUserId]);
 
-  // Calculate real stats from database
   const artistStats = useMemo(() => {
-    if (!artistSongs.length || !popularityData) return { totalPlays: 0, totalLikes: 0 };
-    
+    if (!artistSongs.length || !popularityData) {
+      return { totalPlays: 0, totalLikes: 0, totalPulses: 0 };
+    }
+
     let totalPlays = 0;
     let totalLikes = 0;
-    
+    let totalPulses = 0;
+
     artistSongs.forEach(song => {
       const songData = popularityData.find(p => p.song_id === song.id);
       totalPlays += songData?.play_count || 0;
       totalLikes += songData?.like_count || 0;
+      const pulseData = pulseCounts?.find(p => p.song_id === song.id);
+      totalPulses += pulseData?.pulse_count || 0;
     });
-    
-    return { totalPlays, totalLikes };
-  }, [artistSongs, popularityData]);
+
+    return { totalPlays, totalLikes, totalPulses };
+  }, [artistSongs, popularityData, pulseCounts]);
 
   if (!artist) {
     return (
@@ -911,6 +862,13 @@ export default function ArtistDetail() {
                     {artistStats.totalLikes.toLocaleString()}
                   </p>
                   <p className="text-sm text-muted-foreground">Likes</p>
+                </div>
+                <div className="glass-card p-4 rounded-xl text-center">
+                  <Heart className="w-6 h-6 mx-auto mb-2 text-primary" />
+                  <p className="text-2xl font-heading font-bold text-foreground">
+                    {artistStats.totalPulses.toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Pulses</p>
                 </div>
               </div>
 

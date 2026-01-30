@@ -38,6 +38,16 @@ export interface RankedProfile extends ProfilePopularity {
   popularity_score: number;
 }
 
+export interface TodayHotSong {
+  song: Song;
+  playsToday: number;
+}
+
+export interface SongPulseCount {
+  song_id: string;
+  pulse_count: number;
+}
+
 const ARTIST_EXTRA_PLAYS: Record<string, number> = {
   '1': 2110, // 7ROO7H BASED
   '3': 2700, // IMan Afrikah
@@ -99,6 +109,55 @@ const SONG_BASELINE_PLAYS: Record<string, number> = (() => {
   return perSong;
 })();
 
+const SYNTHETIC_START_DATE_ISO = '2026-01-29T00:00:00.000Z';
+const SYNTHETIC_TOTAL_DAYS = 14;
+const SYNTHETIC_DAILY_PLAYS = 2000;
+
+function getSongBoostWeight(songId: string): number {
+  const song = SONGS.find(s => s.id === songId);
+  if (!song) return 1;
+  const basePlays = song.plays || 0;
+  return 1 / Math.sqrt(1 + basePlays);
+}
+
+function getDailySyntheticPlaysForSong(songId: string, dayIndex: number, songIds: string[]): number {
+  const weights = songIds.map(id => getSongBoostWeight(id));
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0) || 1;
+  const songIndex = songIds.indexOf(songId);
+  if (songIndex === -1) return 0;
+  const weightShare = weights[songIndex] / totalWeight;
+  return Math.round(SYNTHETIC_DAILY_PLAYS * weightShare);
+}
+
+function getSyntheticPlaysUpToNow(songId: string, now: Date, songIds: string[]): number {
+  const start = new Date(SYNTHETIC_START_DATE_ISO);
+  const dayMs = 1000 * 60 * 60 * 24;
+  if (now < start) return 0;
+
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const daysSinceStart = Math.floor((startOfToday.getTime() - start.getTime()) / dayMs);
+  if (daysSinceStart < 0) return 0;
+
+  const totalDays = Math.min(SYNTHETIC_TOTAL_DAYS, daysSinceStart + 1);
+  if (totalDays <= 0) return 0;
+
+  let total = 0;
+
+  for (let dayIndex = 0; dayIndex < totalDays - 1; dayIndex++) {
+    total += getDailySyntheticPlaysForSong(songId, dayIndex, songIds);
+  }
+
+  const fractionOfToday = Math.min(
+    1,
+    Math.max(0, (now.getTime() - startOfToday.getTime()) / dayMs)
+  );
+  const todayPlays = getDailySyntheticPlaysForSong(songId, totalDays - 1, songIds);
+  total += Math.floor(todayPlays * fractionOfToday);
+
+  return total;
+}
+
 function applyBaselinePlays(rows: any[] | null | undefined): SongPopularity[] {
   const byId = new Map<string, SongPopularity>();
   (rows || []).forEach(row => {
@@ -131,6 +190,15 @@ function applyBaselinePlays(rows: any[] | null | undefined): SongPopularity[] {
         popularity_score: 0,
       });
     }
+  });
+
+  const songIds = Array.from(byId.keys());
+  const now = new Date();
+
+  songIds.forEach(songId => {
+    const entry = byId.get(songId);
+    if (!entry || typeof entry.play_count !== 'number') return;
+    entry.play_count += getSyntheticPlaysUpToNow(songId, now, songIds);
   });
 
   return Array.from(byId.values());
@@ -217,16 +285,130 @@ export function useProfilePopularity() {
   });
 }
 
+export function useTodayHotSongs(limit = 5) {
+  return useQuery({
+    queryKey: ['today-hot-songs', limit],
+    queryFn: async () => {
+      const now = new Date();
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+
+      const { data, error } = await supabase
+        .from('song_analytics')
+        .select('song_id, created_at, event_type')
+        .eq('event_type', 'play')
+        .gte('created_at', start.toISOString());
+
+      if (error || !data) {
+        return [] as TodayHotSong[];
+      }
+
+      const counts = new Map<string, number>();
+
+      data.forEach((row: any) => {
+        const songId = row.song_id as string | null;
+        if (!songId) return;
+        const current = counts.get(songId) || 0;
+        counts.set(songId, current + 1);
+      });
+
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+      const songIds = SONGS.map(s => s.id);
+
+      SONGS.forEach(song => {
+        const syntheticTodayTotal = getSyntheticPlaysUpToNow(song.id, now, songIds)
+          - getSyntheticPlaysUpToNow(song.id, startOfToday, songIds);
+        const current = counts.get(song.id) || 0;
+        counts.set(song.id, current + syntheticTodayTotal);
+      });
+
+      let pulseCounts: Map<string, number> = new Map();
+
+      try {
+        const { data: pulseData } = await supabase
+          .from('song_analytics')
+          .select('song_id, created_at, event_type')
+          .eq('event_type', 'pulse')
+          .gte('created_at', start.toISOString());
+
+        if (pulseData) {
+          pulseCounts = new Map();
+          (pulseData as any[]).forEach(row => {
+            const songId = row.song_id as string | null;
+            if (!songId) return;
+            const current = pulseCounts.get(songId) || 0;
+            pulseCounts.set(songId, current + 1);
+          });
+        }
+      } catch {
+        pulseCounts = new Map();
+      }
+
+      const result: TodayHotSong[] = [];
+
+      counts.forEach((playsToday, songId) => {
+        const song = SONGS.find(s => s.id === songId);
+        if (song && playsToday > 0) {
+          const pulses = pulseCounts.get(songId) || 0;
+          result.push({ song, playsToday: playsToday + pulses });
+        }
+      });
+
+      result.sort((a, b) => b.playsToday - a.playsToday);
+
+      return result.slice(0, limit);
+    },
+    staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
+  });
+}
+
+export function usePulseCounts() {
+  return useQuery({
+    queryKey: ['pulse-counts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('song_analytics')
+        .select('song_id, event_type');
+
+      if (error || !data) {
+        return [] as SongPulseCount[];
+      }
+
+      const counts = new Map<string, number>();
+
+      (data as any[]).forEach(row => {
+        const songId = row.song_id as string | null;
+        if (!songId) return;
+        if (row.event_type !== 'pulse') return;
+        const current = counts.get(songId) || 0;
+        counts.set(songId, current + 1);
+      });
+
+      return Array.from(counts.entries()).map(([song_id, pulse_count]) => ({
+        song_id,
+        pulse_count,
+      }));
+    },
+    staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
+  });
+}
+
 export function useRankedSongs() {
   const { data: popularityData, isLoading } = useSongPopularity();
+  const { data: pulseCounts } = usePulseCounts();
   
   const rankedSongsBase: RankedSong[] = SONGS.map(song => {
     const dbData = popularityData?.find(p => p.song_id === song.id);
-    const score = calculateSongScore(dbData);
+    const baseScore = calculateSongScore(dbData);
+    const pulseData = pulseCounts?.find(p => p.song_id === song.id);
+    const pulseBonus = pulseData ? Math.sqrt(pulseData.pulse_count) : 0;
+    const score = baseScore + pulseBonus;
     
     return {
       ...song,
-      // Override mock data with real database data
       plays: dbData?.play_count || 0,
       likes: dbData?.like_count || 0,
       popularity_score: score,

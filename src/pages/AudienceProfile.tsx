@@ -28,25 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 
-let resolvedAudienceProfileBucket: Promise<string> | null = null;
 
-async function resolveAudienceProfileBucket(preferredBucket: string) {
-  if (!resolvedAudienceProfileBucket) {
-    resolvedAudienceProfileBucket = (async () => {
-      const listBuckets = (supabase.storage as any)?.listBuckets as undefined | (() => Promise<any>);
-      if (!listBuckets) return preferredBucket;
-      const { data, error } = await listBuckets();
-      if (error || !Array.isArray(data)) return preferredBucket;
-      const names = new Set<string>(data.map((b: any) => String(b?.name)));
-      if (names.has(preferredBucket)) return preferredBucket;
-      if (names.has('public')) return 'public';
-      const first = data[0]?.name ? String(data[0].name) : preferredBucket;
-      return first || preferredBucket;
-    })();
-  }
-
-  return resolvedAudienceProfileBucket;
-}
 
 export default function AudienceProfile() {
   const { userId } = useParams<{ userId: string }>();
@@ -171,37 +153,33 @@ export default function AudienceProfile() {
 
       setIsUploadingProfilePicture(true);
       try {
-        const extRaw = file.name.split('.').pop() || '';
-        const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
-        const path = `audience/${userId}/profile-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-        const preferredBucket = (import.meta as any).env?.VITE_SUPABASE_STORAGE_BUCKET || 'artist-posts';
-        const bucket = await resolveAudienceProfileBucket(preferredBucket);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('userId', userId);
+        formData.append('type', 'avatar');
 
-        const uploadRes = await supabase.storage
-          .from(bucket)
-          .upload(path, file, { contentType: file.type, upsert: true });
-        if (uploadRes.error) throw uploadRes.error;
+        const response = await fetch('/api/upload/image', {
+          method: 'POST',
+          body: formData,
+        });
 
-        const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+        if (!response.ok) {
+          throw new Error('Failed to upload image');
+        }
+
+        const data = (await response.json()) as { url?: string };
+        const imageUrl = data.url;
+        if (!imageUrl) {
+          throw new Error('Missing image URL from upload response');
+        }
 
         const { error: updateError } = await supabase
           .from('audience_profiles')
-          .update({ profile_picture_url: publicUrl })
+          .update({ profile_picture_url: imageUrl })
           .eq('id', userId);
         if (updateError) throw updateError;
 
-        const prefix = `audience/${userId}`;
-        const { data: existingFiles } = await supabase.storage.from(bucket).list(prefix, { limit: 100 });
-        const keepName = path.split('/').pop();
-        const toDelete =
-          existingFiles
-            ?.filter((f) => f.name !== keepName && f.name.startsWith('profile-'))
-            .map((f) => `${prefix}/${f.name}`) ?? [];
-        if (toDelete.length > 0) {
-          await supabase.storage.from(bucket).remove(toDelete);
-        }
-
-        setProfile((prev) => (prev ? { ...prev, profile_picture_url: publicUrl } : prev));
+        setProfile((prev) => (prev ? { ...prev, profile_picture_url: imageUrl } : prev));
         toast({ title: 'Profile picture updated' });
       } catch (err: any) {
         toast({ title: 'Failed to update profile picture' });

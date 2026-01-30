@@ -3,6 +3,10 @@ import { toast } from '@/hooks/use-toast';
 
 interface CachedSong {
   songId: string;
+  title?: string;
+  artist?: string;
+  duration?: number;
+  audioUrl?: string;
   cachedAt: number;
 }
 
@@ -10,21 +14,41 @@ const CACHED_SONGS_KEY = 'offline-cached-songs';
 
 export function useOfflineAudio() {
   const [cachedSongs, setCachedSongs] = useState<CachedSong[]>([]);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [cachingInProgress, setCachingInProgress] = useState<string | null>(null);
+  const [storageUsedBytes, setStorageUsedBytes] = useState(0);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    // Load cached songs list from localStorage
-    const stored = localStorage.getItem(CACHED_SONGS_KEY);
-    if (stored) {
-      try {
-        setCachedSongs(JSON.parse(stored));
-      } catch {
-        setCachedSongs([]);
+    try {
+      const stored = localStorage.getItem(CACHED_SONGS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as CachedSong[] | { songId: string; cachedAt: number }[];
+        const normalized = Array.isArray(parsed)
+          ? parsed.map((s) => ({
+              songId: (s as CachedSong).songId,
+              title: (s as CachedSong).title,
+              artist: (s as CachedSong).artist,
+              duration: (s as CachedSong).duration,
+              audioUrl: (s as CachedSong).audioUrl,
+              cachedAt: (s as CachedSong).cachedAt ?? Date.now(),
+            }))
+          : [];
+        setCachedSongs(normalized);
       }
+    } catch {
+      setCachedSongs([]);
     }
 
-    // Listen for online/offline events
+    try {
+      const isStandalone =
+        window.matchMedia?.('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true;
+      setIsInstalled(isStandalone);
+    } catch {
+      setIsInstalled(false);
+    }
+
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => {
       setIsOnline(false);
@@ -37,10 +61,24 @@ export function useOfflineAudio() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Listen for messages from service worker
-    navigator.serviceWorker?.addEventListener('message', (event) => {
-      if (event.data.type === 'AUDIO_CACHED') {
-        const { songId } = event.data;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const isStandalone =
+            window.matchMedia?.('(display-mode: standalone)').matches ||
+            (window.navigator as any).standalone === true;
+          setIsInstalled(isStandalone);
+        } catch {
+          void 0;
+        }
+      }
+    };
+
+    const handleSwMessage = (event: MessageEvent) => {
+      const data = (event as any).data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'AUDIO_CACHED') {
+        const { songId } = data;
         const newCachedSong: CachedSong = { songId, cachedAt: Date.now() };
         setCachedSongs(prev => {
           const updated = [...prev.filter(s => s.songId !== songId), newCachedSong];
@@ -48,17 +86,33 @@ export function useOfflineAudio() {
           return updated;
         });
         setCachingInProgress(null);
-        toast({ title: 'Song saved for offline listening!' });
+        toast({ title: 'Saved. This plays even without internet.' });
       }
-    });
+      if (data.type === 'AUDIO_CACHE_STATS' && typeof data.totalBytes === 'number') {
+        setStorageUsedBytes(data.totalBytes);
+      }
+    };
+
+    navigator.serviceWorker?.addEventListener('message', handleSwMessage);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          registration.active?.postMessage({ type: 'GET_AUDIO_CACHE_STATS' });
+        })
+        .catch(() => {});
+    }
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      navigator.serviceWorker?.removeEventListener('message', handleSwMessage as any);
     };
   }, []);
 
-  const cacheSong = useCallback(async (songId: string, audioUrl: string) => {
+  const cacheSong = useCallback(async (songId: string, audioUrl: string, metadata?: { title?: string; artist?: string; duration?: number }) => {
     if (!('serviceWorker' in navigator)) {
       toast({ 
         title: 'Offline mode not supported', 
@@ -84,19 +138,46 @@ export function useOfflineAudio() {
       url: audioUrl
     });
 
+    setCachedSongs(prev => {
+      const newEntry: CachedSong = {
+        songId,
+        title: metadata?.title,
+        artist: metadata?.artist,
+        duration: metadata?.duration,
+        audioUrl,
+        cachedAt: Date.now(),
+      };
+      const updated = [...prev.filter(s => s.songId !== songId), newEntry];
+      localStorage.setItem(CACHED_SONGS_KEY, JSON.stringify(updated));
+      return updated;
+    });
+
     return true;
   }, []);
 
   const removeCachedSong = useCallback(async (songId: string) => {
-    // For now, just remove from the list
-    // In a full implementation, we'd also remove from the cache
+    const existing = cachedSongs.find(s => s.songId === songId);
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (registration.active) {
+          registration.active.postMessage({
+            type: 'REMOVE_CACHED_AUDIO',
+            songId,
+            url: existing?.audioUrl,
+          });
+        }
+      } catch {
+        void 0;
+      }
+    }
     setCachedSongs(prev => {
       const updated = prev.filter(s => s.songId !== songId);
       localStorage.setItem(CACHED_SONGS_KEY, JSON.stringify(updated));
       return updated;
     });
     toast({ title: 'Song removed from offline library' });
-  }, []);
+  }, [cachedSongs]);
 
   const isSongCached = useCallback((songId: string) => {
     return cachedSongs.some(s => s.songId === songId);
@@ -138,7 +219,9 @@ export function useOfflineAudio() {
   return {
     cachedSongs,
     isOnline,
+    isInstalled,
     cachingInProgress,
+    storageUsedBytes,
     cacheSong,
     removeCachedSong,
     isSongCached,
