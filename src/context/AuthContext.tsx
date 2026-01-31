@@ -265,6 +265,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsArtist(false);
       setArtistId(null);
       await refreshProfile();
+      try {
+        localStorage.setItem('songchainn_show_profile_photo_hint', '1');
+      } catch {
+        void 0;
+      }
 
       return { error: null };
     } catch (err: any) {

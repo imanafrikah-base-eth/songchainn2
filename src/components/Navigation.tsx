@@ -32,6 +32,7 @@ export function Navigation() {
   const [showInvite, setShowInvite] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showOfflineSaveAnnouncement, setShowOfflineSaveAnnouncement] = useState(false);
+  const [showProfilePhotoAnnouncement, setShowProfilePhotoAnnouncement] = useState(false);
   const playerState = useSafePlayerState();
   const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
   const { showRoom } = usePlayerActions();
@@ -54,6 +55,20 @@ export function Navigation() {
       console.error('Failed to read offline save announcement state', error);
     }
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const key = 'songchainn_show_profile_photo_hint';
+      const value = localStorage.getItem(key);
+      if (value === '1') {
+        setShowProfilePhotoAnnouncement(true);
+        localStorage.setItem(key, 'shown');
+      }
+    } catch (error) {
+      console.error('Failed to read profile photo announcement state', error);
+    }
+  }, [user]);
   // Enable swipe gestures for mobile navigation
   useSwipeNavigation();
 
@@ -262,6 +277,35 @@ export function Navigation() {
 
         <InviteFriends isOpen={showInvite} onClose={() => setShowInvite(false)} />
       </header>
+
+      {showProfilePhotoAnnouncement && (
+        <div className="border-b border-indigo-500/30 bg-indigo-500/10 backdrop-blur-sm">
+          <div className="container mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm text-indigo-50">
+              You can now update your profile picture and cover photo from your profile.
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfilePhotoAnnouncement(false);
+                  navigate(profilePath);
+                }}
+                className="text-xs sm:text-sm text-indigo-100 hover:text-white underline"
+              >
+                Update now
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowProfilePhotoAnnouncement(false)}
+                className="text-xs sm:text-sm text-indigo-200 hover:text-indigo-50"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showOfflineSaveAnnouncement && (
         <div className="border-b border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm">

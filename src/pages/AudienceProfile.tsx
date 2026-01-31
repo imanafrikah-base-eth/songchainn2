@@ -22,7 +22,7 @@ import { Navigation } from '@/components/Navigation';
 import { PostCard } from '@/components/social/PostCard';
 import { useSocial } from '@/hooks/useSocial';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { AudienceProfile as AudienceProfileType } from '@/types/database';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
@@ -151,31 +151,35 @@ export default function AudienceProfile() {
         return;
       }
 
+      if (!isSupabaseConfigured) {
+        toast({ title: 'Image uploads are not configured yet' });
+        return;
+      }
+
       setIsUploadingProfilePicture(true);
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('userId', userId);
-        formData.append('type', 'avatar');
+        const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
+        const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
+        const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
+        const fileName = `profile_picture_url-${userId}-${Date.now()}.${extension}`;
 
-        const response = await fetch('/api/upload/image', {
-          method: 'POST',
-          body: formData,
-        });
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('profile-images')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
 
-        if (!response.ok) {
-          throw new Error('Failed to upload image');
+        if (uploadError || !uploadData?.path) {
+          throw new Error('Failed to upload image to storage');
         }
 
-        const data = (await response.json()) as { url?: string };
-        const imageUrl = data.url;
-        if (!imageUrl) {
-          throw new Error('Missing image URL from upload response');
-        }
+        const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
+        const imageUrl = `${baseUrl}/storage/v1/object/public/profile-images/${uploadData.path}`;
 
         const { error: updateError } = await supabase
           .from('audience_profiles')
-          .update({ profile_picture_url: imageUrl })
+          .update({ profile_picture_url: imageUrl } as any)
           .eq('id', userId);
         if (updateError) throw updateError;
 

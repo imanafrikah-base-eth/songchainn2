@@ -54,8 +54,8 @@ export default function Auth() {
 
   const handleWalletSignIn = useCallback(async () => {
     setError(null);
-    // Proceed if any wallet is available (injected or WalletConnect)
     if (!hasWallet && !isWalletDetected && !isConnected) {
+      await openConnectModal();
       return;
     }
 
@@ -80,7 +80,7 @@ export default function Auth() {
       setError('Connection failed. Please try again.');
       setConnectionState('idle');
     }
-  }, [hasWallet, isWalletDetected, isConnected, signInWithWallet]);
+  }, [hasWallet, isWalletDetected, isConnected, signInWithWallet, openConnectModal]);
 
   // Handle WalletConnect connection success
   useEffect(() => {
@@ -110,6 +110,11 @@ export default function Auth() {
         if (result.error) throw result.error;
         toast.success('Account created!');
         localStorage.setItem('songchainn_needs_onboarding', '1');
+        try {
+          localStorage.setItem('songchainn_show_profile_photo_hint', '1');
+        } catch {
+          void 0;
+        }
         setPendingWalletConnection(false);
         setAuthMode('signin');
       } else {

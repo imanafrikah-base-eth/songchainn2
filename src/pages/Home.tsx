@@ -59,21 +59,7 @@ export default function Home() {
   const featuredSongs = rankedSongs.slice(0, 3);
   const allSongs = rankedSongs;
   const newSongs = rankedSongs.filter(isSongNew);
-  const curatedHotTodayIds = ['86', '93', '57', '104', '84'];
-  const curatedHotTodaySongs = curatedHotTodayIds
-    .map(id => rankedSongs.find(song => song.id === id))
-    .filter((song): song is typeof rankedSongs[number] => Boolean(song));
-  const now = new Date();
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const tomorrowMidnight = new Date(startOfToday);
-  tomorrowMidnight.setDate(startOfToday.getDate() + 1);
-  const useSampleHotToday = now < tomorrowMidnight;
-  const sampleHotToday = curatedHotTodaySongs.map((song) => ({
-    song,
-    playsToday: song.plays || 0,
-  }));
-  const hotTodayEntries = useSampleHotToday ? sampleHotToday : todayHotSongs;
+  const hotTodayEntries = todayHotSongs;
   const displayName =
     audienceProfile?.profile_name ||
     (user && typeof user.email === 'string'
@@ -297,7 +283,7 @@ export default function Home() {
                           </h2>
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          Most played songs since midnight on $ongChainn.
+                          Most played songs in the last 24 hours on $ongChainn.
                         </p>
                       </div>
                       <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">

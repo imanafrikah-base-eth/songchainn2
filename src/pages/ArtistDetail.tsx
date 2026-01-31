@@ -13,7 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
 import { useShare } from '@/hooks/useShare';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useSocial } from '@/hooks/useSocial';
 import { PostComposer } from '@/components/social/PostComposer';
@@ -157,32 +157,35 @@ export default function ArtistDetail() {
 
   const uploadProfilePicture = useCallback(async (file: File) => {
     if (!ownerUserId) return;
+    if (!isSupabaseConfigured) {
+      toast.error('Image uploads are not configured yet.');
+      return;
+    }
 
     setIsUploadingProfilePicture(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('userId', ownerUserId);
-      formData.append('type', 'avatar');
+      const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
+      const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
+      const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
+      const fileName = `profile_picture_url-${ownerUserId}-${Date.now()}.${extension}`;
 
-      const response = await fetch('/api/upload/image', {
-        method: 'POST',
-        body: formData,
-      });
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
-      if (!response.ok) {
-        throw new Error('Failed to upload image');
+      if (uploadError || !uploadData?.path) {
+        throw new Error('Failed to upload image to storage');
       }
 
-      const data = (await response.json()) as { url?: string };
-      const imageUrl = data.url;
-      if (!imageUrl) {
-        throw new Error('Missing image URL from upload response');
-      }
+      const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
+      const imageUrl = `${baseUrl}/storage/v1/object/public/profile-images/${uploadData.path}`;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
-        .update({ profile_picture_url: imageUrl })
+        .update({ profile_picture_url: imageUrl } as any)
         .eq('id', ownerUserId);
       if (updateError) throw updateError;
 
@@ -202,32 +205,35 @@ export default function ArtistDetail() {
 
   const uploadCoverPhoto = useCallback(async (file: File) => {
     if (!ownerUserId) return;
+    if (!isSupabaseConfigured) {
+      toast.error('Image uploads are not configured yet.');
+      return;
+    }
 
     setIsUploadingCoverPhoto(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('userId', ownerUserId);
-      formData.append('type', 'cover');
+      const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
+      const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
+      const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
+      const fileName = `cover_photo_url-${ownerUserId}-${Date.now()}.${extension}`;
 
-      const response = await fetch('/api/upload/image', {
-        method: 'POST',
-        body: formData,
-      });
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
-      if (!response.ok) {
-        throw new Error('Failed to upload image');
+      if (uploadError || !uploadData?.path) {
+        throw new Error('Failed to upload image to storage');
       }
 
-      const data = (await response.json()) as { url?: string };
-      const imageUrl = data.url;
-      if (!imageUrl) {
-        throw new Error('Missing image URL from upload response');
-      }
+      const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
+      const imageUrl = `${baseUrl}/storage/v1/object/public/profile-images/${uploadData.path}`;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
-        .update({ cover_photo_url: imageUrl })
+        .update({ cover_photo_url: imageUrl } as any)
         .eq('id', ownerUserId);
       if (updateError) throw updateError;
 

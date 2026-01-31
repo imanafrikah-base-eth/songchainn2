@@ -290,14 +290,14 @@ export function useTodayHotSongs(limit = 5) {
     queryKey: ['today-hot-songs', limit],
     queryFn: async () => {
       const now = new Date();
-      const start = new Date(now);
-      start.setHours(0, 0, 0, 0);
+      const windowMs = 1000 * 60 * 60 * 24;
+      const windowStart = new Date(now.getTime() - windowMs);
 
       const { data, error } = await supabase
         .from('song_analytics')
         .select('song_id, created_at, event_type')
         .eq('event_type', 'play')
-        .gte('created_at', start.toISOString());
+        .gte('created_at', windowStart.toISOString());
 
       if (error || !data) {
         return [] as TodayHotSong[];
@@ -312,15 +312,13 @@ export function useTodayHotSongs(limit = 5) {
         counts.set(songId, current + 1);
       });
 
-      const startOfToday = new Date(now);
-      startOfToday.setHours(0, 0, 0, 0);
       const songIds = SONGS.map(s => s.id);
 
       SONGS.forEach(song => {
-        const syntheticTodayTotal = getSyntheticPlaysUpToNow(song.id, now, songIds)
-          - getSyntheticPlaysUpToNow(song.id, startOfToday, songIds);
+        const syntheticWindowTotal = getSyntheticPlaysUpToNow(song.id, now, songIds)
+          - getSyntheticPlaysUpToNow(song.id, windowStart, songIds);
         const current = counts.get(song.id) || 0;
-        counts.set(song.id, current + syntheticTodayTotal);
+        counts.set(song.id, current + syntheticWindowTotal);
       });
 
       let pulseCounts: Map<string, number> = new Map();
@@ -330,7 +328,7 @@ export function useTodayHotSongs(limit = 5) {
           .from('song_analytics')
           .select('song_id, created_at, event_type')
           .eq('event_type', 'pulse')
-          .gte('created_at', start.toISOString());
+          .gte('created_at', windowStart.toISOString());
 
         if (pulseData) {
           pulseCounts = new Map();
