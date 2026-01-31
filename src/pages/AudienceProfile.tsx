@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type ChangeEvent, type SyntheticEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -27,6 +27,7 @@ import { AudienceProfile as AudienceProfileType } from '@/types/database';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { useUserPresence } from '@/hooks/useUserPresence';
 
 
 
@@ -54,6 +55,13 @@ export default function AudienceProfile() {
   const [likedSongsCount, setLikedSongsCount] = useState(0);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const { isOnline: isProfileOnline } = useUserPresence(profile?.user_id ?? profile?.id);
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   const isOwnProfile = userId === user?.id;
   const amFollowing = userId ? isFollowing(userId) : false;
@@ -232,6 +240,7 @@ export default function AudienceProfile() {
             src={profile.cover_photo_url}
             alt="Cover"
             className="w-full h-full object-cover"
+            onError={handleImageError}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-background" />
@@ -258,7 +267,7 @@ export default function AudienceProfile() {
           {/* Avatar */}
           <div className="relative inline-block">
             <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl">
-              <AvatarImage src={profile.profile_picture_url || ''} />
+              <AvatarImage src={profile.profile_picture_url || ''} onError={handleImageError} />
               <AvatarFallback className="text-4xl bg-primary/20 text-primary">
                 {profile.profile_name?.charAt(0) || '?'}
               </AvatarFallback>
@@ -291,7 +300,10 @@ export default function AudienceProfile() {
           </div>
 
           {/* Name & Bio */}
-          <h1 className="text-2xl font-bold mt-4">{profile.profile_name}</h1>
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
+            <h1 className="text-2xl font-bold">{profile.profile_name}</h1>
+          </div>
           {profile.bio && (
             <p className="text-muted-foreground mt-2 max-w-md mx-auto">{profile.bio}</p>
           )}

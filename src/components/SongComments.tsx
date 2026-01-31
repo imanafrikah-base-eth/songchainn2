@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type SyntheticEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { getAllProfiles, listSongComments, saveSongComments } from '@/lib/localDb';
+import { useOnlineUsers } from '@/hooks/useUserPresence';
 
 interface SongCommentsProps {
   songId: string;
@@ -56,6 +57,14 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
     },
     enabled: !!songId,
   });
+  const commentUserIds = useMemo(() => comments.map(comment => comment.user_id), [comments]);
+  const { onlineUserIds } = useOnlineUsers(commentUserIds);
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   // Add comment mutation
   const addComment = useMutation({
@@ -193,7 +202,7 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
                 <div className="flex gap-3">
                   <Link to={`/audience/${comment.user_id}`}>
                     <Avatar className="w-10 h-10">
-                      <AvatarImage src={comment.profile?.profile_picture_url || undefined} />
+                      <AvatarImage src={comment.profile?.profile_picture_url || undefined} onError={handleImageError} />
                       <AvatarFallback className="bg-primary/20 text-primary">
                         {comment.profile?.profile_name?.charAt(0).toUpperCase() || '?'}
                       </AvatarFallback>
@@ -203,8 +212,9 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <Link 
                         to={`/audience/${comment.user_id}`}
-                        className="font-medium text-foreground hover:text-primary transition-colors truncate"
+                        className="font-medium text-foreground hover:text-primary transition-colors truncate inline-flex items-center gap-2"
                       >
+                        <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(comment.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                         {comment.profile?.profile_name || 'Anonymous'}
                       </Link>
                       <div className="flex items-center gap-2 flex-shrink-0">

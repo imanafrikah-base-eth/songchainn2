@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Music, ListMusic, Send } from 'lucide-react';
@@ -31,6 +31,12 @@ export function PostComposer({ onPost }: PostComposerProps) {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const selectedImageObjectUrlRef = useRef<string | null>(null);
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   useEffect(() => {
     if (selectedImageObjectUrlRef.current) {
@@ -125,6 +131,7 @@ export function PostComposer({ onPost }: PostComposerProps) {
               src={audienceProfile.profile_picture_url} 
               alt="Profile" 
               className="w-full h-full object-contain"
+              onError={handleImageError}
             />
           ) : (
             <span className="text-primary font-bold">

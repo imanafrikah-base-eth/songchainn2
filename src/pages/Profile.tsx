@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/context/AuthContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useUserPresence } from '@/hooks/useUserPresence';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useToast } from '@/hooks/use-toast';
 import { Navigation } from '@/components/Navigation';
@@ -39,6 +40,7 @@ export default function Profile() {
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const { storageUsedBytes } = useOfflineAudio();
+  const { isOnline: isProfileOnline } = useUserPresence(audienceProfile?.user_id ?? audienceProfile?.id);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
@@ -77,6 +79,12 @@ export default function Profile() {
   const [bio, setBio] = useState(audienceProfile?.bio || '');
   const [xProfileLink, setXProfileLink] = useState(audienceProfile?.x_profile_link || '');
   const [baseProfileLink, setBaseProfileLink] = useState(audienceProfile?.base_profile_link || '');
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   useEffect(() => {
     if (audienceProfile) {
@@ -460,6 +468,7 @@ export default function Profile() {
             src={effectiveCoverUrl}
             alt="Cover"
             className="w-full h-full object-cover"
+            onError={handleImageError}
           />
         )}
         {user && (
@@ -749,6 +758,7 @@ export default function Profile() {
                   src={effectiveAvatarUrl}
                   alt={audienceProfile.profile_name}
                   className="w-full h-full object-contain"
+                  onError={handleImageError}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-muted-foreground">
@@ -772,16 +782,22 @@ export default function Profile() {
 
           <div className="flex-1">
             {isEditing ? (
-              <Input
-                value={profileName}
-                onChange={(e) => setProfileName(e.target.value)}
-                className="font-heading text-xl font-bold"
-                maxLength={50}
-              />
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
+                <Input
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="font-heading text-xl font-bold"
+                  maxLength={50}
+                />
+              </div>
             ) : (
-              <h1 className="font-heading text-2xl font-bold text-foreground">
-                {audienceProfile.profile_name}
-              </h1>
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
+                <h1 className="font-heading text-2xl font-bold text-foreground">
+                  {audienceProfile.profile_name}
+                </h1>
+              </div>
             )}
             <div className="flex items-center gap-3">
               <p className="text-sm text-muted-foreground">{isArtist ? 'Artist' : 'Audience Member'}</p>

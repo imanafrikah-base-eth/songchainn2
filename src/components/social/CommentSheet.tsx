@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Heart, MoreHorizontal, Reply, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { useCommentLikes } from '@/hooks/useCommentLikes';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { ARTISTS } from '@/data/musicData';
+import { useOnlineUsers } from '@/hooks/useUserPresence';
 
 interface CommentSheetProps {
   isOpen: boolean;
@@ -44,6 +45,14 @@ export function CommentSheet({
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { fetchCommentLikesData, toggleCommentLike } = useCommentLikes();
+  const commentUserIds = useMemo(() => localComments.map(comment => comment.user_id), [localComments]);
+  const { onlineUserIds } = useOnlineUsers(commentUserIds);
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   // Fetch likes data when comments change
   useEffect(() => {
@@ -223,7 +232,7 @@ export function CommentSheet({
                       >
                         <button onClick={() => void goToProfile(comment.user_id, comment.artist_id)}>
                           <Avatar className="w-10 h-10">
-                            <AvatarImage src={avatarSrc} />
+                            <AvatarImage src={avatarSrc} onError={handleImageError} />
                             <AvatarFallback className="bg-primary/20 text-primary">
                               {displayName.charAt(0) || '?'}
                             </AvatarFallback>
@@ -238,6 +247,7 @@ export function CommentSheet({
                                 className="font-semibold text-sm hover:underline"
                               >
                                 <span className="inline-flex items-center gap-1">
+                                  <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(comment.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                                   <span>{displayName}</span>
                                   {isArtistComment && isVerifiedArtist && (
                                     <CheckCircle2 className="w-3.5 h-3.5 text-yellow-400" />

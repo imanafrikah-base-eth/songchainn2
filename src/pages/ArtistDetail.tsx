@@ -14,11 +14,12 @@ import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
 import { useShare } from '@/hooks/useShare';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import { useSocial } from '@/hooks/useSocial';
 import { PostComposer } from '@/components/social/PostComposer';
 import { PostCard } from '@/components/social/PostCard';
 import type { SocialPostWithProfile } from '@/types/social';
+import { useUserPresence } from '@/hooks/useUserPresence';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,6 +113,7 @@ export default function ArtistDetail() {
     if (shouldAutoCreateArtistAccount && user) return user.id;
     return null;
   }, [artistAccount?.user_id, shouldAutoCreateArtistAccount, user]);
+  const { isOnline: isArtistOnline } = useUserPresence(ownerUserId);
 
   const { data: artistProfile } = useQuery({
     queryKey: ['artist-public-profile', ownerUserId],
@@ -142,6 +144,12 @@ export default function ArtistDetail() {
   const isNewArtist = isArtistNew(artist?.addedAt);
 
   const [profileImageFailed, setProfileImageFailed] = useState(false);
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isUploadingCoverPhoto, setIsUploadingCoverPhoto] = useState(false);
@@ -618,6 +626,7 @@ export default function ArtistDetail() {
                 src={displayCoverPhoto}
                 alt="Cover"
                 className="w-full h-full object-cover"
+                onError={handleImageError}
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
@@ -647,6 +656,7 @@ export default function ArtistDetail() {
                     src={displayProfileImage}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110"
+                    onError={handleImageError}
                   />
                   <img 
                     src={displayProfileImage} 
@@ -692,7 +702,8 @@ export default function ArtistDetail() {
               <div className="flex items-start justify-between gap-4 mb-2">
                 <div className="flex-1 min-w-0">
                   {isOwner && isEditingProfile ? (
-                    <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${isArtistOnline ? 'bg-green-500' : 'bg-muted'}`} />
                       <Input
                         value={profileNameDraft}
                         onChange={(e) => setProfileNameDraft(e.target.value)}
@@ -704,6 +715,7 @@ export default function ArtistDetail() {
                   ) : (
                     <h1 className="font-heading text-4xl font-bold text-foreground">
                       <span className="inline-flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${isArtistOnline ? 'bg-green-500' : 'bg-muted'}`} />
                         <span className="truncate">{displayName}</span>
                         {isNewArtist && (
                           <span className="px-2 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold">

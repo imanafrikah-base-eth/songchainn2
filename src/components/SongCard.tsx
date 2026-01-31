@@ -46,6 +46,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
   
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | undefined>(user?.user_metadata?.wallet_address);
+  const [coverImageFailed, setCoverImageFailed] = useState(false);
 
   const isCurrentSong = currentSong?.id === song.id;
   const liked = isLiked(song.id);
@@ -170,12 +171,13 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               <SpinningSongArt isPlaying={isPlaying} size="lg" />
             ) : (
               <>
-                {song.coverImage ? (
-                  <img 
-                    src={song.coverImage} 
-                    alt={song.title} 
+                {song.coverImage && !coverImageFailed ? (
+                  <img
+                    src={song.coverImage}
+                    alt={song.title}
                     className="w-full h-full object-contain"
                     loading="lazy"
+                    onError={() => setCoverImageFailed(true)}
                   />
                 ) : (
                   <div className="w-full h-full gradient-primary opacity-60" />

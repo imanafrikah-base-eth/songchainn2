@@ -128,10 +128,10 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
         return new Response(null, { status: 499, statusText: "Client Abort Suppressed" });
       }
 
-      if (isSupabaseAuth && isFetchFailed) {
+      if (isSupabase && isFetchFailed) {
         return new Response(JSON.stringify({ error: "network_error", message }), {
           status: 503,
-          statusText: "Supabase auth network error suppressed",
+          statusText: "Supabase network error suppressed",
           headers: { "Content-Type": "application/json" },
         });
       }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShare } from '@/hooks/useShare';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useUserPresence } from '@/hooks/useUserPresence';
 
 interface PostCardProps {
   post: SocialPostWithProfile;
@@ -47,6 +48,7 @@ export function PostCard({
   const [comments, setComments] = useState<PostComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
+  const { isOnline } = useUserPresence(post.user_id, { includeLastSeen: false, includeNowPlayingFallback: false });
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
   const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
@@ -57,6 +59,12 @@ export function PostCard({
   const isVerifiedArtist = !!post.artist_is_verified;
   const isFollowingArtist = post.artist_id ? isArtistLiked(post.artist_id) : false;
   const isOwnPost = user?.id === post.user_id;
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   const goToProfile = () => {
     if (post.artist_id) {
@@ -125,14 +133,15 @@ export function PostCard({
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10 cursor-pointer" onClick={goToProfile}>
-            <AvatarImage src={avatarUrl} />
+            <AvatarImage src={avatarUrl} onError={handleImageError} />
             <AvatarFallback className="bg-primary/20 text-primary">
               {displayName.charAt(0) || '?'}
             </AvatarFallback>
           </Avatar>
           <div>
             <div className="flex items-center gap-2">
-              <button type="button" className="font-semibold text-foreground hover:underline" onClick={goToProfile}>
+              <button type="button" className="font-semibold text-foreground hover:underline inline-flex items-center gap-2" onClick={goToProfile}>
+                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-muted'}`} />
                 {displayName}
               </button>
               {isArtistPost && isVerifiedArtist && (

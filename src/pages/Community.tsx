@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -22,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useSocial } from '@/hooks/useSocial';
 import { useTopProfiles } from '@/hooks/usePopularity';
+import { useOnlineUsers } from '@/hooks/useUserPresence';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,14 @@ export default function Community() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const { onlineUserIds } = useOnlineUsers(users.map((profile) => profile.user_id));
+  const onlineUsers = users.filter((profile) => onlineUserIds.has(profile.user_id));
+  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   // Fetch all users
   useEffect(() => {
@@ -236,6 +245,54 @@ export default function Community() {
           </div>
         </motion.section>
 
+        {onlineUsers.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="mb-6"
+          >
+            <div className="glass-card rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                  <h2 className="font-heading text-lg font-semibold text-foreground">
+                    Online now
+                  </h2>
+                </div>
+                <Badge variant="secondary">
+                  {onlineUsers.length} online
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {onlineUsers.slice(0, viewMode === 'grid' ? 8 : 10).map((profile) => (
+                  <button
+                    key={profile.user_id}
+                    type="button"
+                    className="flex items-center gap-3 rounded-xl bg-background/60 px-3 py-2 text-left hover:bg-background/80 transition-colors"
+                    onClick={() => void goToProfile(profile.user_id)}
+                  >
+                    <Avatar className="w-10 h-10 border border-border">
+                      <AvatarImage src={profile.profile_picture_url || ''} onError={handleImageError} />
+                      <AvatarFallback className="bg-primary/20 text-primary text-sm font-bold">
+                        {profile.profile_name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {profile.profile_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Active now
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+        )}
+
         {/* Search and Filters */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -347,6 +404,7 @@ export default function Community() {
                         src={profile.cover_photo_url} 
                         alt="" 
                         className="w-full h-full object-cover"
+                        onError={handleImageError}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-primary/30 via-purple-500/20 to-cyan-500/20" />
@@ -369,7 +427,7 @@ export default function Community() {
                   {/* Avatar */}
                   <div className={`${viewMode === 'grid' ? 'mb-3' : ''}`}>
                     <Avatar className={`${viewMode === 'grid' ? 'w-16 h-16' : 'w-14 h-14'} border-4 border-background shadow-lg`}>
-                      <AvatarImage src={profile.profile_picture_url || ''} />
+                      <AvatarImage src={profile.profile_picture_url || ''} onError={handleImageError} />
                       <AvatarFallback className="bg-primary/20 text-primary text-xl font-bold">
                         {profile.profile_name.charAt(0).toUpperCase()}
                       </AvatarFallback>
@@ -379,6 +437,7 @@ export default function Community() {
                   {/* User Info */}
                   <div className={`${viewMode === 'list' ? 'flex-1 min-w-0' : ''}`}>
                     <div className="flex items-center gap-2 mb-1">
+                      <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(profile.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                       <h3 className="font-semibold text-foreground truncate">
                         {profile.profile_name}
                       </h3>
