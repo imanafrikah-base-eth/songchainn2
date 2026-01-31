@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Link2, ListMusic, Settings, Share2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Link2, ListMusic, Settings, Share2, HardDrive } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -184,6 +185,7 @@ export default function Room() {
   const [reactionsByMessageId, setReactionsByMessageId] = useState<Record<string, Record<string, number>>>({});
   const [myReactionsByMessageId, setMyReactionsByMessageId] = useState<Record<string, Record<string, boolean>>>({});
   const [roomPulseSummary, setRoomPulseSummary] = useState<{ count: number } | null>(null);
+  const { isSongCached } = useOfflineAudio();
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -1351,7 +1353,15 @@ export default function Room() {
 
             <aside className="hidden lg:flex lg:flex-col lg:w-80 lg:h-[calc(100vh-14rem)] lg:py-4 lg:gap-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-zinc-400">Now playing</div>
+                <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <span>Now playing</span>
+                  {currentSong && isSongCached(currentSong.id) && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-300 px-1.5 py-0.5">
+                      <HardDrive className="w-3 h-3" />
+                      <span>Saved offline</span>
+                    </span>
+                  )}
+                </div>
                 {currentSong ? (
                   <div className="mt-3 flex gap-3">
                     <div className="w-12 h-12 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">

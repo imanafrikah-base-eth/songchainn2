@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame } from 'lucide-react';
+import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, HardDrive } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
 import { useRankedSongs, useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
@@ -297,7 +297,7 @@ export default function Home() {
                           </h2>
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          Most played songs since midnight. Showing sample until real data arrives.
+                          Most played songs since midnight on $ongChainn.
                         </p>
                       </div>
                       <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
@@ -370,6 +370,12 @@ export default function Home() {
                                 </span>
                                 <Flame className="w-3 h-3 text-sky-300" />
                                 <span className="uppercase tracking-wide">Hot</span>
+                                {isSaved && (
+                                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/40 text-[9px] font-medium text-sky-100">
+                                    <HardDrive className="w-3 h-3" />
+                                    <span>Offline</span>
+                                  </span>
+                                )}
                               </div>
                               <span className="text-[10px] sm:text-xs text-sky-50/85 tabular-nums">
                                 {entry.playsToday.toLocaleString()} plays today

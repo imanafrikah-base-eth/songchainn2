@@ -398,8 +398,8 @@ export function DownloadAppBanner() {
                         <h3 className="font-heading font-semibold text-foreground text-sm mb-1">
                           Get the $ongChainn App
                         </h3>
-                        <p className="text-xs text-muted-foreground mb-3">
-                          Install for faster access, offline music, and push notifications.
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-3">
+                          Install to unlock one-tap song saving for offline playback, faster access, and notifications.
                         </p>
                         
                         <div className="flex items-center gap-2">

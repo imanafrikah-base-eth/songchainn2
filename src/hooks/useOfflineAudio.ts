@@ -86,7 +86,10 @@ export function useOfflineAudio() {
           return updated;
         });
         setCachingInProgress(null);
-        toast({ title: 'Saved. This plays even without internet.' });
+        toast({
+          title: 'Song saved',
+          description: 'This plays even without internet.',
+        });
       }
       if (data.type === 'AUDIO_CACHE_STATS' && typeof data.totalBytes === 'number') {
         setStorageUsedBytes(data.totalBytes);

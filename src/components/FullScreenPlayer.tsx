@@ -77,6 +77,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
   const lastHintSongIdRef = useRef<string | null>(null);
   const hasShownInitialHintRef = useRef(false);
   const hasShownPulseSentRef = useRef(false);
+  const pulseButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const liked = currentSong ? isLiked(currentSong.id) : false;
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -285,6 +286,15 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
     }
   }, [currentSong, isPlaying, sendPulse]);
 
+  const handlePulseButtonClick = useCallback(() => {
+    const node = pulseButtonRef.current;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    handlePulseTrigger(x, y);
+  }, [handlePulseTrigger]);
+
   const handlePulsePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!currentSong || !isPlaying) return;
     const target = e.target as HTMLElement | null;
@@ -355,7 +365,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="flex items-center justify-between p-4 safe-top"
+              className="flex items-center justify-between p-4 safe-top gap-3"
             >
               <button
                 onClick={onClose}
@@ -363,28 +373,40 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
               >
                 <X className="w-6 h-6 text-foreground" />
               </button>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Now Playing</p>
-                <p className="text-sm font-medium text-foreground truncate max-w-[200px]">
-                  {currentSong.townSquare}
-                </p>
-              </div>
-                <div className="flex items-center gap-2">
-                  {isSaved && (
-                    <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
-                      On device
-                    </span>
-                  )}
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Now Playing</p>
+                  <p className="text-sm font-medium text-foreground truncate max-w-[200px]">
+                    {currentSong.townSquare}
+                  </p>
                 </div>
-              <button
-                onClick={() => setShowQueue(!showQueue)}
-                className={cn(
-                  "p-2 rounded-full glass transition-colors press-effect",
-                  showQueue ? "bg-primary/20 text-primary" : "hover:bg-secondary/50"
+              </div>
+              <div className="flex items-center gap-2">
+                {isSaved && (
+                  <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+                    On device
+                  </span>
                 )}
-              >
-                <ListMusic className="w-6 h-6" />
-              </button>
+                <motion.button
+                  ref={pulseButtonRef}
+                  type="button"
+                  onClick={handlePulseButtonClick}
+                  className="relative w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center shadow-glow-intense"
+                  animate={{ scale: [1, 1.08, 1], boxShadow: ['0 0 0 0 rgba(56,189,248,0.0)', '0 0 18px 4px rgba(56,189,248,0.5)', '0 0 0 0 rgba(56,189,248,0.0)'] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <span className="w-3 h-3 rounded-full bg-primary" />
+                </motion.button>
+                <button
+                  onClick={() => setShowQueue(!showQueue)}
+                  className={cn(
+                    "p-2 rounded-full glass transition-colors press-effect",
+                    showQueue ? "bg-primary/20 text-primary" : "hover:bg-secondary/50"
+                  )}
+                >
+                  <ListMusic className="w-6 h-6" />
+                </button>
+              </div>
             </motion.header>
 
             {/* Main content */}

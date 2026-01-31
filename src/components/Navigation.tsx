@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones, Sparkles } from 'lucide-react';
@@ -31,6 +31,7 @@ export function Navigation() {
   const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const [showInvite, setShowInvite] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showOfflineSaveAnnouncement, setShowOfflineSaveAnnouncement] = useState(false);
   const playerState = useSafePlayerState();
   const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
   const { showRoom } = usePlayerActions();
@@ -40,7 +41,19 @@ export function Navigation() {
   );
   const showReturnToRoom =
     Boolean(playerState?.isRoomMode) && Boolean(playerState?.isRoomHidden) && location.pathname !== '/room';
-  
+
+  useEffect(() => {
+    try {
+      const key = 'offline-save-announcement-v1';
+      const hasSeen = localStorage.getItem(key);
+      if (!hasSeen) {
+        setShowOfflineSaveAnnouncement(true);
+        localStorage.setItem(key, 'shown');
+      }
+    } catch (error) {
+      console.error('Failed to read offline save announcement state', error);
+    }
+  }, []);
   // Enable swipe gestures for mobile navigation
   useSwipeNavigation();
 
@@ -247,9 +260,25 @@ export function Navigation() {
           </div>
         </div>
 
-        {/* Invite Friends Modal */}
         <InviteFriends isOpen={showInvite} onClose={() => setShowInvite(false)} />
       </header>
+
+      {showOfflineSaveAnnouncement && (
+        <div className="border-b border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm">
+          <div className="container mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm text-emerald-100">
+              You can now save songs and play them even without internet.
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowOfflineSaveAnnouncement(false)}
+              className="text-xs sm:text-sm text-emerald-200 hover:text-emerald-100"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Menu Overlay */}
       <AnimatePresence>

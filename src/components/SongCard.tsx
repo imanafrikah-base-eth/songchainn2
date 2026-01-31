@@ -216,8 +216,13 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <span className="text-[10px] sm:text-xs text-muted-foreground tabular-nums hidden xs:block">
-              {totalPlays.toLocaleString()} plays
+            <span className="hidden xs:flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground tabular-nums">
+              {isSaved && (
+                <span className="px-1 py-0.5 rounded-full bg-primary/10 text-primary text-[9px] font-medium">
+                  Saved
+                </span>
+              )}
+              <span>{totalPlays.toLocaleString()} plays</span>
             </span>
             {totalPulses > 0 && (
               <span className="text-[10px] sm:text-xs text-primary tabular-nums hidden xs:block">
@@ -467,8 +472,13 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
         <p className="text-sm text-muted-foreground truncate mb-3">{song.artist}</p>
 
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {totalPlays.toLocaleString()} plays
+          <span className="text-xs text-muted-foreground tabular-nums flex items-center gap-1">
+            {isSaved && (
+              <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+                Saved
+              </span>
+            )}
+            <span>{totalPlays.toLocaleString()} plays</span>
           </span>
           <div className="flex items-center gap-1">
             {totalPulses > 0 && (

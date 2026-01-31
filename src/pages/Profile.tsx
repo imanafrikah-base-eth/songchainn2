@@ -15,7 +15,7 @@ import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { Link, Navigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // X (Twitter) and Base icons
@@ -90,25 +90,28 @@ export default function Profile() {
   const uploadAndUpdateProfileImage = useCallback(
     async (file: File, field: 'profile_picture_url' | 'cover_photo_url') => {
       if (!user) return;
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('userId', user.id);
-      formData.append('type', field === 'profile_picture_url' ? 'avatar' : 'cover');
-
-      const response = await fetch('/api/upload/image', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to upload image');
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase is not configured');
       }
 
-      const data = (await response.json()) as { url?: string };
-      const imageUrl = data.url;
-      if (!imageUrl) {
-        throw new Error('Missing image URL from upload response');
+      const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
+      const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
+      const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
+      const fileName = `${field}-${user.id}-${Date.now()}.${extension}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError || !uploadData?.path) {
+        throw new Error('Failed to upload image to storage');
       }
+
+      const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
+      const imageUrl = `${baseUrl}/storage/v1/object/public/profile-images/${uploadData.path}`;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
@@ -117,7 +120,11 @@ export default function Profile() {
       if (updateError) throw updateError;
 
       await refreshProfile();
-      toast({ title: field === 'profile_picture_url' ? 'Profile picture updated!' : 'Cover photo updated!' });
+      toast({
+        title: field === 'profile_picture_url' ? 'Profile photo updated' : 'Cover photo updated',
+        description: 'Looking sharp. Your profile is live on $ongChainn.',
+      });
+      return imageUrl;
     },
     [refreshProfile, toast, user]
   );
@@ -260,15 +267,12 @@ export default function Profile() {
         type: 'image/jpeg',
       });
 
-      const nextPreviewUrl = URL.createObjectURL(croppedFile);
-      setPendingCoverUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return nextPreviewUrl;
-      });
-
       setIsUploadingCoverPhoto(true);
       try {
-        await uploadAndUpdateProfileImage(croppedFile, 'cover_photo_url');
+        const imageUrl = await uploadAndUpdateProfileImage(croppedFile, 'cover_photo_url');
+        if (imageUrl) {
+          setPendingCoverUrl(imageUrl);
+        }
       } finally {
         setIsUploadingCoverPhoto(false);
       }
@@ -356,15 +360,12 @@ export default function Profile() {
         type: 'image/png',
       });
 
-      const nextPreviewUrl = URL.createObjectURL(croppedFile);
-      setPendingAvatarUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return nextPreviewUrl;
-      });
-
       setIsUploadingProfilePicture(true);
       try {
-        await uploadAndUpdateProfileImage(croppedFile, 'profile_picture_url');
+        const imageUrl = await uploadAndUpdateProfileImage(croppedFile, 'profile_picture_url');
+        if (imageUrl) {
+          setPendingAvatarUrl(imageUrl);
+        }
       } finally {
         setIsUploadingProfilePicture(false);
       }
@@ -375,7 +376,7 @@ export default function Profile() {
 
   const handleSave = async () => {
     if (!user || !profileName.trim()) {
-      toast({ title: 'Profile name is required', variant: 'destructive' });
+      toast({ title: 'Add a profile name to continue', variant: 'destructive' });
       return;
     }
     
@@ -395,9 +396,16 @@ export default function Profile() {
       
       await refreshProfile();
       setIsEditing(false);
-      toast({ title: 'Profile updated!' });
+      toast({
+        title: 'Profile updated',
+        description: 'Your changes are saved across $ongChainn.',
+      });
     } catch (err) {
-      toast({ title: 'Error updating profile', variant: 'destructive' });
+      toast({
+        title: 'Could not update your profile',
+        description: 'Please try again in a moment.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }

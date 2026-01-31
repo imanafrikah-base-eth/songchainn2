@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music } from 'lucide-react';
+import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music, Flame, HardDrive } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { SONGS, GENRES, Genre } from '@/data/musicData';
-import { useRankedSongs } from '@/hooks/usePopularity';
+import { useRankedSongs, useTodayHotSongs } from '@/hooks/usePopularity';
 import { SongCard } from '@/components/SongCard';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { getLikedSongs } from '@/lib/localDb';
 import { useSafePlayerState } from '@/context/PlayerContext';
+import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -56,8 +57,10 @@ export default function Discover() {
   const [selectedGenre, setSelectedGenre] = useState<Genre | 'all'>('all');
   const [showFilters, setShowFilters] = useState(true);
   const { rankedSongs } = useRankedSongs();
+  const { data: todayHotSongs = [] } = useTodayHotSongs(5);
   const playerState = useSafePlayerState();
   const { data: likedSongIds = [] } = useUserLikes();
+  const { isSongCached } = useOfflineAudio();
 
   // Get user's preferred genres based on likes
   const preferredGenres = useMemo(() => {
@@ -158,11 +161,17 @@ export default function Discover() {
                 ) : null}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 text-[11px] sm:text-xs text-primary mb-0.5">
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-primary mb-0.5">
                   <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                     <span>Now Playing in The Room</span>
                   </span>
+                  {playerState.currentSong && isSongCached(playerState.currentSong.id) && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-300 px-1.5 py-0.5">
+                      <HardDrive className="w-3 h-3" />
+                      <span>Saved offline</span>
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm sm:text-base font-medium text-foreground truncate">
                   {playerState.currentSong.title}
@@ -229,6 +238,86 @@ export default function Discover() {
             </div>
           </div>
         </motion.section>
+
+        {/* Hot Today - Top 5 */}
+        {todayHotSongs.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            className="mb-8"
+          >
+            <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 shine-overlay overflow-hidden">
+              <div className="pointer-events-none absolute -inset-x-10 -top-12 h-20 bg-gradient-to-r from-sky-500/35 via-cyan-400/20 to-transparent blur-3xl opacity-70" />
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-sky-400" />
+                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                        Hot Today
+                      </h2>
+                    </div>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                      Top 5 most played songs since midnight. Saved tracks show a Saved tag.
+                    </p>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                      <span>Live Heat</span>
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1.5 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
+                  {todayHotSongs.map((entry, index) => {
+                    const isNowPlaying = playerState?.currentSong?.id === entry.song.id;
+                    const isSaved = isSongCached(entry.song.id);
+                    return (
+                      <div
+                        key={entry.song.id}
+                        className={`relative rounded-xl sm:rounded-2xl p-[1.5px] bg-gradient-to-r from-sky-500/80 via-cyan-400/60 to-transparent ${
+                          isNowPlaying ? 'ring-2 ring-sky-300/80 shadow-glow' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between px-2 pt-2 pb-1">
+                          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-sky-50/90">
+                            <span className="px-1.5 py-0.5 rounded-full bg-black/40 font-semibold tabular-nums">
+                              #{index + 1}
+                            </span>
+                            <Flame className="w-3 h-3 text-sky-300" />
+                            <span className="uppercase tracking-wide">Hot</span>
+                            {isNowPlaying && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-black/50 text-[9px] font-semibold tracking-wide uppercase text-sky-100">
+                                Now Playing
+                              </span>
+                            )}
+                            {isSaved && (
+                              <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/40 text-[9px] font-medium text-sky-100">
+                                <HardDrive className="w-3 h-3" />
+                                <span>Offline</span>
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] sm:text-xs text-sky-50/85 tabular-nums">
+                            {entry.playsToday.toLocaleString()} plays today
+                          </span>
+                        </div>
+                        <div className="rounded-[0.85rem] sm:rounded-[1.1rem] bg-background/90">
+                          <SongCard
+                            song={entry.song}
+                            index={index}
+                            variant="compact"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        )}
 
         {/* Meet the Artists CTA */}
         <motion.section

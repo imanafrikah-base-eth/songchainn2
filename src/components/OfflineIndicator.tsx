@@ -36,36 +36,41 @@ export function OfflineIndicator() {
     <AnimatePresence>
       {showIndicator && (
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="fixed top-0 left-0 right-0 z-[70]"
+          exit={{ opacity: 0, y: -12 }}
+          className="fixed top-3 inset-x-0 z-[70] flex justify-center pointer-events-none"
         >
-          <div className={`py-2 px-4 flex items-center justify-center gap-2 text-sm font-medium ${
-            isSyncing
-              ? 'bg-primary/90 text-primary-foreground'
-              : isOnline 
-                ? 'bg-green-500/90 text-white' 
-                : 'bg-destructive/90 text-destructive-foreground'
-          }`}>
+          <div
+            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium shadow-glow glass-card border pointer-events-auto ${
+              isSyncing
+                ? 'bg-primary/90 text-primary-foreground border-primary/60'
+                : isOnline
+                  ? 'bg-emerald-500/90 text-white border-emerald-400/70'
+                  : 'bg-destructive/90 text-destructive-foreground border-destructive/60'
+            }`}
+          >
             {isSyncing ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>Syncing {pendingCount} action{pendingCount !== 1 ? 's' : ''}...</span>
               </>
             ) : isOnline ? (
               <>
-                <Wifi className="w-4 h-4" />
-                <span>Back online{pendingCount > 0 ? ` - Syncing ${pendingCount} queued action${pendingCount !== 1 ? 's' : ''}` : ''}</span>
+                <Wifi className="w-3.5 h-3.5" />
+                <span>
+                  Back online
+                  {pendingCount > 0 ? ` · Syncing ${pendingCount} queued action${pendingCount !== 1 ? 's' : ''}` : ''}
+                </span>
               </>
             ) : (
               <>
-                <WifiOff className="w-4 h-4 animate-pulse" />
+                <WifiOff className="w-3.5 h-3.5 animate-pulse" />
                 <span>
                   Offline mode
                   {pendingCount > 0 && (
                     <span className="ml-2 inline-flex items-center gap-1">
-                      <CloudOff className="w-3.5 h-3.5" />
+                      <CloudOff className="w-3 h-3" />
                       {pendingCount} pending
                     </span>
                   )}
