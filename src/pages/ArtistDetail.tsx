@@ -19,7 +19,7 @@ import { useSocial } from '@/hooks/useSocial';
 import { PostComposer } from '@/components/social/PostComposer';
 import { PostCard } from '@/components/social/PostCard';
 import type { SocialPostWithProfile } from '@/types/social';
-import { useUserPresence } from '@/hooks/useUserPresence';
+import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -113,7 +113,8 @@ export default function ArtistDetail() {
     if (shouldAutoCreateArtistAccount && user) return user.id;
     return null;
   }, [artistAccount?.user_id, shouldAutoCreateArtistAccount, user]);
-  const { isOnline: isArtistOnline } = useUserPresence(ownerUserId);
+  const { isOnline: isArtistOnline, lastSeenAt: artistLastSeenAt } = useUserPresence(ownerUserId, { includeLastSeen: true });
+  const artistPresenceLabel = formatPresenceLabel(isArtistOnline, artistLastSeenAt);
 
   const { data: artistProfile } = useQuery({
     queryKey: ['artist-public-profile', ownerUserId],
@@ -726,6 +727,7 @@ export default function ArtistDetail() {
                       </span>
                     </h1>
                   )}
+                  <p className="text-sm text-muted-foreground mt-2">{artistPresenceLabel}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {user && (

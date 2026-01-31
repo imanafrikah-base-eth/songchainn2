@@ -22,7 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useSocial } from '@/hooks/useSocial';
 import { useTopProfiles } from '@/hooks/usePopularity';
-import { useOnlineUsers } from '@/hooks/useUserPresence';
+import { formatPresenceLabel, useOnlineUsers } from '@/hooks/useUserPresence';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ export default function Community() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const { onlineUserIds } = useOnlineUsers(users.map((profile) => profile.user_id));
+  const { onlineUserIds, lastSeenByUserId } = useOnlineUsers(users.map((profile) => profile.user_id), { includeLastSeen: true });
   const onlineUsers = users.filter((profile) => onlineUserIds.has(profile.user_id));
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
@@ -283,7 +283,7 @@ export default function Community() {
                         {profile.profile_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Active now
+                        {formatPresenceLabel(true, lastSeenByUserId[profile.user_id] ?? null)}
                       </p>
                     </div>
                   </button>
@@ -447,6 +447,9 @@ export default function Community() {
                         </Badge>
                       )}
                     </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {formatPresenceLabel(onlineUserIds.has(profile.user_id), lastSeenByUserId[profile.user_id] ?? null)}
+                    </p>
                     {/* Location */}
                     {profile.location && (
                       <p className="text-sm text-primary flex items-center gap-1 mb-2">

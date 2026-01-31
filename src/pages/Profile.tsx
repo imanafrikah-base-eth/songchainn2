@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/context/AuthContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
-import { useUserPresence } from '@/hooks/useUserPresence';
+import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useToast } from '@/hooks/use-toast';
 import { Navigation } from '@/components/Navigation';
@@ -40,7 +40,11 @@ export default function Profile() {
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const { storageUsedBytes } = useOfflineAudio();
-  const { isOnline: isProfileOnline } = useUserPresence(audienceProfile?.user_id ?? audienceProfile?.id);
+  const { isOnline: isProfileOnline, lastSeenAt: profileLastSeenAt } = useUserPresence(
+    audienceProfile?.user_id ?? audienceProfile?.id,
+    { includeLastSeen: true }
+  );
+  const profilePresenceLabel = formatPresenceLabel(isProfileOnline, profileLastSeenAt);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
@@ -801,6 +805,7 @@ export default function Profile() {
             )}
             <div className="flex items-center gap-3">
               <p className="text-sm text-muted-foreground">{isArtist ? 'Artist' : 'Audience Member'}</p>
+              <span className="text-xs text-muted-foreground">{profilePresenceLabel}</span>
               {isArtist && artistId && (
                 <Link to={`/artist/${artistId}`} className="text-sm text-primary hover:underline">
                   View Artist Page

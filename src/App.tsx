@@ -10,6 +10,7 @@ import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { NotificationBanner } from "@/components/NotificationBanner";
+import { useUserPresence } from "@/hooks/useUserPresence";
 // Lazy load pages for better initial load performance
 const Home = lazy(() => import("./pages/Home"));
 const Discover = lazy(() => import("./pages/Discover"));
@@ -93,7 +94,8 @@ function AppShell() {
 
 // AppContent must be rendered inside AuthProvider
 function AppContent() {
-  const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
+  const { isAuthenticated, isLoading, needsOnboarding, user } = useAuth();
+  useUserPresence(user?.id ?? null, { includeLastSeen: true });
 
   if (isLoading) {
     return (

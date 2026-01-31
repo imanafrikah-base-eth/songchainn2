@@ -27,7 +27,7 @@ import { AudienceProfile as AudienceProfileType } from '@/types/database';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { useUserPresence } from '@/hooks/useUserPresence';
+import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 
 
 
@@ -55,7 +55,11 @@ export default function AudienceProfile() {
   const [likedSongsCount, setLikedSongsCount] = useState(0);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
-  const { isOnline: isProfileOnline } = useUserPresence(profile?.user_id ?? profile?.id);
+  const { isOnline: isProfileOnline, lastSeenAt: profileLastSeenAt } = useUserPresence(
+    profile?.user_id ?? profile?.id,
+    { includeLastSeen: true }
+  );
+  const profilePresenceLabel = formatPresenceLabel(isProfileOnline, profileLastSeenAt);
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
     if (target.dataset.fallbackApplied === 'true') return;
@@ -304,6 +308,7 @@ export default function AudienceProfile() {
             <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
             <h1 className="text-2xl font-bold">{profile.profile_name}</h1>
           </div>
+          <p className="text-xs text-muted-foreground mt-1">{profilePresenceLabel}</p>
           {profile.bio && (
             <p className="text-muted-foreground mt-2 max-w-md mx-auto">{profile.bio}</p>
           )}

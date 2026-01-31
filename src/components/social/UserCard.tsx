@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AudienceProfile } from '@/types/database';
 import { motion } from 'framer-motion';
-import { useUserPresence } from '@/hooks/useUserPresence.ts';
+import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence.ts';
 
 interface UserCardProps {
   profile: AudienceProfile;
@@ -12,7 +12,8 @@ interface UserCardProps {
 }
 
 export function UserCard({ profile, isFollowing, onFollow, mutualCount }: UserCardProps) {
-  const { isOnline } = useUserPresence(profile.user_id, { includeLastSeen: false, includeNowPlayingFallback: false });
+  const { isOnline, lastSeenAt } = useUserPresence(profile.user_id, { includeLastSeen: true, includeNowPlayingFallback: false });
+  const presenceLabel = formatPresenceLabel(isOnline, lastSeenAt);
 
   return (
     <motion.div
@@ -32,6 +33,7 @@ export function UserCard({ profile, isFollowing, onFollow, mutualCount }: UserCa
             <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-muted'}`} />
             <span>{profile.profile_name}</span>
           </p>
+          <p className="text-xs text-muted-foreground">{presenceLabel}</p>
           {profile.bio && (
             <p className="text-sm text-muted-foreground line-clamp-1">{profile.bio}</p>
           )}

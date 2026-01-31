@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 
@@ -267,4 +268,10 @@ export function useOnlineUsers(userIds: string[] | null | undefined, options?: U
     if (includeLastSeen) lastSeenByUserId[userId] = lastSeen;
   }
   return { onlineUserIds, lastSeenByUserId };
+}
+
+export function formatPresenceLabel(isOnline: boolean, lastSeenAt: number | null) {
+  if (isOnline) return 'Online';
+  if (!lastSeenAt) return 'Offline';
+  return `Last seen ${formatDistanceToNow(new Date(lastSeenAt), { addSuffix: true })}`;
 }
