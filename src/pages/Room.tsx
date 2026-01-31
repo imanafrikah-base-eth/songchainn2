@@ -25,6 +25,7 @@ type RoomMessage = {
 const QUICK_REACTIONS = ['🔥', '👀', '💯'] as const;
 const TEXT_EMOJIS = ['🔥', '👀', '💯', '😂', '😍', '😤', '🤝', '🎧', '🚀', '🫡', '🙏', '⚡'] as const;
 const CUSTOM_EMOJI_TOKENS = [':BASED:', ':LFB!:', ':MALAKAS:', ':TWEAKING:'] as const;
+const STICKER_EMOJI_TOKENS = new Set([':MALAKAS:', ':TWEAKING:']);
 
 const BASED_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="b" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#4cc9ff"/><stop offset="1" stop-color="#1b54ff"/></linearGradient></defs><path d="M36 6c7 10 18 18 18 30 0 11-8 21-18 21S18 47 18 36C18 24 29 16 36 6z" fill="url(#b)"/><path d="M36 18c4 7 10 11 10 19 0 6-4 11-10 11s-10-5-10-11c0-8 6-12 10-19z" fill="#bff2ff" opacity=".35"/><text x="36" y="58" text-anchor="middle" font-size="14" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto" font-weight="900" fill="#ffffff" stroke="#00206e" stroke-width="1.6" paint-order="stroke">BASED</text></svg>`;
 const LFB_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ff8a00"/></linearGradient></defs><path d="M36 7c7 10 18 18 18 30 0 11-8 21-18 21S18 48 18 37C18 25 29 17 36 7z" fill="url(#g)"/><path d="M36 19c4 7 10 11 10 19 0 6-4 11-10 11s-10-5-10-11c0-8 6-12 10-19z" fill="#fff3c6" opacity=".4"/><text x="36" y="58" text-anchor="middle" font-size="16" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto" font-weight="900" fill="#1b1400" stroke="#fff2c2" stroke-width="1.4" paint-order="stroke">LFB!</text></svg>`;
@@ -100,7 +101,20 @@ function formatCountdownSeconds(totalSeconds: number) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-function renderMessageWithCustomEmojis(text: string) {
+function renderMessageWithCustomEmojis(text: string, options?: { allowStickers?: boolean }) {
+  const allowStickers = options?.allowStickers ?? true;
+  const trimmed = text.trim();
+  if (allowStickers && STICKER_EMOJI_TOKENS.has(trimmed)) {
+    const uri = CUSTOM_EMOJI_URI_BY_TOKEN[trimmed as (typeof CUSTOM_EMOJI_TOKENS)[number]];
+    return (
+      <img
+        src={uri}
+        alt={trimmed}
+        className="inline-block h-28 w-28 sm:h-32 sm:w-32"
+        loading="lazy"
+      />
+    );
+  }
   const tokens = Object.keys(CUSTOM_EMOJI_URI_BY_TOKEN) as Array<keyof typeof CUSTOM_EMOJI_URI_BY_TOKEN>;
   const firstIndex = tokens
     .map(token => ({ token, index: text.indexOf(token) }))
@@ -125,15 +139,26 @@ function renderMessageWithCustomEmojis(text: string) {
 
     if (next.index > cursor) nodes.push(text.slice(cursor, next.index));
     const uri = CUSTOM_EMOJI_URI_BY_TOKEN[next.token as (typeof CUSTOM_EMOJI_TOKENS)[number]];
+    const isSticker = allowStickers && STICKER_EMOJI_TOKENS.has(next.token as (typeof CUSTOM_EMOJI_TOKENS)[number]);
+    if (isSticker && nodes.length > 0) {
+      nodes.push(<br key={`ce-br-${key++}`} />);
+    }
     nodes.push(
       <img
         key={`ce-${key++}`}
         src={uri}
         alt={next.token}
-        className="inline-block align-[-2px] h-6 w-6 sm:h-7 sm:w-7"
+        className={
+          isSticker
+            ? 'inline-block align-[-4px] h-24 w-24 sm:h-28 sm:w-28'
+            : 'inline-block align-[-2px] h-6 w-6 sm:h-7 sm:w-7'
+        }
         loading="lazy"
       />
     );
+    if (isSticker && next.index + next.token.length < text.length) {
+      nodes.push(<br key={`ce-br-${key++}`} />);
+    }
     cursor = next.index + next.token.length;
   }
 

@@ -59,7 +59,14 @@ export default function AudienceProfile() {
     profile?.user_id ?? profile?.id,
     { includeLastSeen: true }
   );
-  const profilePresenceLabel = formatPresenceLabel(isProfileOnline, profileLastSeenAt);
+  const [presenceRefreshAt, setPresenceRefreshAt] = useState(Date.now());
+  const profilePresenceLabel =
+    presenceRefreshAt >= 0
+      ? formatPresenceLabel(
+          isProfileOnline,
+          profileLastSeenAt ?? (profile?.updated_at ? new Date(profile.updated_at).getTime() : null)
+        )
+      : '';
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
     if (target.dataset.fallbackApplied === 'true') return;
@@ -114,6 +121,15 @@ export default function AudienceProfile() {
   }, [fetchProfile]);
 
   useEffect(() => {
+    const interval = window.setInterval(() => {
+      setPresenceRefreshAt(Date.now());
+    }, 60_000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!userId) return;
     const channel = supabase
       .channel(`audience-profile-${userId}`)
@@ -136,6 +152,22 @@ export default function AudienceProfile() {
         { event: '*', schema: 'public', table: 'liked_songs', filter: `user_id=eq.${userId}` },
         () => {
           void fetchProfile();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'audience_profiles', filter: `id=eq.${userId}` },
+        (payload) => {
+          const nextProfile = payload.new as AudienceProfileType;
+          setProfile((prev) => (prev ? { ...prev, ...nextProfile } : nextProfile));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'audience_profiles', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const nextProfile = payload.new as AudienceProfileType;
+          setProfile((prev) => (prev ? { ...prev, ...nextProfile } : nextProfile));
         }
       )
       .subscribe();
@@ -308,7 +340,6 @@ export default function AudienceProfile() {
             <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
             <h1 className="text-2xl font-bold">{profile.profile_name}</h1>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{profilePresenceLabel}</p>
           {profile.bio && (
             <p className="text-muted-foreground mt-2 max-w-md mx-auto">{profile.bio}</p>
           )}
@@ -339,7 +370,7 @@ export default function AudienceProfile() {
             )}
             <span className="flex items-center gap-1">
               <Calendar className="w-4 h-4" />
-              Joined {formatDistanceToNow(new Date(profile.created_at), { addSuffix: true })}
+              {profilePresenceLabel}
             </span>
           </div>
 

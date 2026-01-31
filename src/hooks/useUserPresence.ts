@@ -21,6 +21,7 @@ const PRESENCE_KEY = 'songchainn:presence';
 const FALLBACK_ONLINE_WINDOW_MS = 45_000;
 const FALLBACK_HEARTBEAT_MS = 15_000;
 const REALTIME_HEARTBEAT_MS = 15_000;
+const PROFILE_HEARTBEAT_MS = 60_000;
 
 let sharedChannel: ReturnType<typeof supabase.channel> | null = null;
 let sharedUserId: string | null = null;
@@ -28,6 +29,8 @@ let sharedPresence: Record<string, PresenceMeta[]> = {};
 let sharedLastSeen: Record<string, number> = {};
 let sharedRefs = 0;
 let sharedHeartbeat: number | null = null;
+let sharedProfileHeartbeat: number | null = null;
+let sharedProfileUserId: string | null = null;
 const sharedListeners = new Set<() => void>();
 
 function emitSharedUpdate() {
@@ -66,6 +69,38 @@ function stopHeartbeat() {
   sharedHeartbeat = null;
 }
 
+async function updateProfileLastSeen(userId: string) {
+  if (!isSupabaseConfigured) return;
+  try {
+    await supabase
+      .from('audience_profiles')
+      .update({ updated_at: new Date().toISOString() } as any)
+      .or(`id.eq.${userId},user_id.eq.${userId}`);
+  } catch {
+    void 0;
+  }
+}
+
+function startProfileHeartbeat(userId: string) {
+  if (sharedProfileHeartbeat && sharedProfileUserId === userId) return;
+  if (sharedProfileHeartbeat) {
+    window.clearInterval(sharedProfileHeartbeat);
+    sharedProfileHeartbeat = null;
+  }
+  sharedProfileUserId = userId;
+  sharedProfileHeartbeat = window.setInterval(() => {
+    void updateProfileLastSeen(userId);
+  }, PROFILE_HEARTBEAT_MS);
+  void updateProfileLastSeen(userId);
+}
+
+function stopProfileHeartbeat() {
+  if (!sharedProfileHeartbeat) return;
+  window.clearInterval(sharedProfileHeartbeat);
+  sharedProfileHeartbeat = null;
+  sharedProfileUserId = null;
+}
+
 async function ensureSharedChannel(userId: string) {
   if (!isSupabaseConfigured) return null;
   if (sharedChannel && sharedUserId === userId) return sharedChannel;
@@ -92,6 +127,7 @@ async function ensureSharedChannel(userId: string) {
     });
   });
   startHeartbeat(channel);
+  startProfileHeartbeat(userId);
   return channel;
 }
 
@@ -105,6 +141,7 @@ function releaseSharedChannel() {
   sharedPresence = {};
   sharedLastSeen = {};
   stopHeartbeat();
+  stopProfileHeartbeat();
 }
 
 function readPresence(): Record<string, PresenceMeta> {
