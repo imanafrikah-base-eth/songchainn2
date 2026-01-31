@@ -141,12 +141,6 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
   };
 }
 
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
-  });
-}
-
 if (typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e: any) => {
     e.preventDefault();
@@ -158,6 +152,10 @@ if (typeof window !== "undefined") {
     window.__songchainnDeferredInstallPrompt = null;
     window.dispatchEvent(new Event("pwa:appinstalled"));
   });
+}
+
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
 createRoot(document.getElementById("root")!).render(
