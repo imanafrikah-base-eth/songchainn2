@@ -74,6 +74,7 @@ export default function Community() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [timeTick, setTimeTick] = useState(0);
   const { onlineUserIds, lastSeenByUserId } = useOnlineUsers(users.map((profile) => profile.user_id), { includeLastSeen: true });
   const onlineUsers = users.filter((profile) => onlineUserIds.has(profile.user_id));
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
@@ -177,6 +178,15 @@ export default function Community() {
 
     setFilteredUsers(filtered);
   }, [users, searchQuery, sortBy]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setTimeTick((value) => value + 1);
+    }, 60_000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
 
   const handleFollow = async (userId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -441,15 +451,22 @@ export default function Community() {
                       <h3 className="font-semibold text-foreground truncate">
                         {profile.profile_name}
                       </h3>
+                      {!onlineUserIds.has(profile.user_id) && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatPresenceLabel(
+                            false,
+                            lastSeenByUserId[profile.user_id] === null || lastSeenByUserId[profile.user_id] === undefined
+                              ? null
+                              : lastSeenByUserId[profile.user_id] + timeTick * 0
+                          )}
+                        </span>
+                      )}
                       {viewMode === 'list' && isNewUser(profile.created_at) && (
                         <Badge className="bg-green-500/90 text-white border-0 text-xs shrink-0">
                           New
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {formatPresenceLabel(onlineUserIds.has(profile.user_id), lastSeenByUserId[profile.user_id] ?? null)}
-                    </p>
                     {/* Location */}
                     {profile.location && (
                       <p className="text-sm text-primary flex items-center gap-1 mb-2">
