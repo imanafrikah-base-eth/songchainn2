@@ -943,7 +943,10 @@ export default function ArtistDetail() {
             {isOwner ? 'My Music' : 'Discography'}
           </h2>
           {(() => {
-            const volumeOrder: Array<'Vol1' | 'Vol2' | 'Vol3' | 'Vol4'> = [
+            const volumeOrder: Array<'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7'> = [
+              'Vol7',
+              'Vol6',
+              'Vol5',
               'Vol4',
               'Vol3',
               'Vol2',
@@ -980,7 +983,7 @@ export default function ArtistDetail() {
                 (
                   section
                 ): section is {
-                  label: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4';
+                  label: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7';
                   songs: typeof artistSongs;
                 } =>
                   Boolean(section)

@@ -42,10 +42,12 @@ interface UserProfile {
   bio: string | null;
   location: string | null;
   created_at: string;
+  updated_at?: string | null;
   x_profile_link: string | null;
   base_profile_link: string | null;
   follower_count?: number;
   post_count?: number;
+  play_count?: number;
   is_following?: boolean;
 }
 
@@ -74,7 +76,7 @@ export default function Community() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [timeTick, setTimeTick] = useState(0);
+  const [presenceRefreshAt, setPresenceRefreshAt] = useState(Date.now());
   const { onlineUserIds, lastSeenByUserId } = useOnlineUsers(users.map((profile) => profile.user_id), { includeLastSeen: true });
   const onlineUsers = users.filter((profile) => onlineUserIds.has(profile.user_id));
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
@@ -116,7 +118,15 @@ export default function Community() {
       // Get follower counts and post counts
       const userIds = uniqueProfiles.map(p => p.user_id);
       
-      const [followersRes, postsRes] = await Promise.all([
+      const playsQuery = userIds.length
+        ? supabase
+            .from('song_analytics')
+            .select('user_id')
+            .eq('event_type', 'play')
+            .in('user_id', userIds)
+        : Promise.resolve({ data: [] as { user_id: string | null }[] });
+
+      const [followersRes, postsRes, playsRes] = await Promise.all([
         supabase
           .from('user_follows')
           .select('following_id')
@@ -124,7 +134,8 @@ export default function Community() {
         supabase
           .from('social_posts')
           .select('user_id')
-          .in('user_id', userIds)
+          .in('user_id', userIds),
+        playsQuery,
       ]);
 
       const followerCounts = new Map<string, number>();
@@ -137,10 +148,17 @@ export default function Community() {
         postCounts.set(p.user_id, (postCounts.get(p.user_id) || 0) + 1);
       });
 
+      const playCounts = new Map<string, number>();
+      playsRes.data?.forEach(p => {
+        if (!p.user_id) return;
+        playCounts.set(p.user_id, (playCounts.get(p.user_id) || 0) + 1);
+      });
+
       const enrichedUsers: UserProfile[] = uniqueProfiles.map(profile => ({
         ...profile,
         follower_count: followerCounts.get(profile.user_id) || 0,
         post_count: postCounts.get(profile.user_id) || 0,
+        play_count: playCounts.get(profile.user_id) || 0,
       }));
 
       setUsers(enrichedUsers);
@@ -149,6 +167,30 @@ export default function Community() {
     };
 
     fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('community-presence')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'audience_profiles' },
+        (payload) => {
+          const updated = payload.new as UserProfile;
+          const nextUserId = updated?.user_id ?? updated?.id;
+          if (!nextUserId) return;
+          setUsers((prev) =>
+            prev.map((profile) =>
+              profile.user_id === nextUserId ? { ...profile, ...updated, user_id: nextUserId } : profile
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Filter and sort users
@@ -166,12 +208,13 @@ export default function Community() {
         break;
       case 'popular':
         filtered = filtered.sort((a, b) => 
-          (b.follower_count || 0) - (a.follower_count || 0)
+          (b.follower_count || 0) + (b.post_count || 0) + (b.play_count || 0) -
+          ((a.follower_count || 0) + (a.post_count || 0) + (a.play_count || 0))
         );
         break;
       case 'active':
         filtered = filtered.sort((a, b) => 
-          (b.post_count || 0) - (a.post_count || 0)
+          (b.play_count || 0) - (a.play_count || 0)
         );
         break;
     }
@@ -181,7 +224,7 @@ export default function Community() {
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      setTimeTick((value) => value + 1);
+      setPresenceRefreshAt(Date.now());
     }, 60_000);
     return () => {
       window.clearInterval(interval);
@@ -453,12 +496,12 @@ export default function Community() {
                       </h3>
                       {!onlineUserIds.has(profile.user_id) && (
                         <span className="text-xs text-muted-foreground">
-                          {formatPresenceLabel(
-                            false,
-                            lastSeenByUserId[profile.user_id] === null || lastSeenByUserId[profile.user_id] === undefined
-                              ? null
-                              : lastSeenByUserId[profile.user_id] + timeTick * 0
-                          )}
+                          {presenceRefreshAt >= 0 &&
+                            formatPresenceLabel(
+                              false,
+                              lastSeenByUserId[profile.user_id] ??
+                                (profile.updated_at ? new Date(profile.updated_at).getTime() : null)
+                            )}
                         </span>
                       )}
                       {viewMode === 'list' && isNewUser(profile.created_at) && (
