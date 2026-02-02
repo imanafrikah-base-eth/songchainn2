@@ -1,26 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, HardDrive } from 'lucide-react';
-import { SONGS, ARTISTS } from '@/data/musicData';
-import { useRankedSongs, useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
+import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame } from 'lucide-react';
+import { CATALOGS, ARTISTS, type Catalog } from '@/data/musicData';
+import { useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
-import { useSafePlayerState, usePlayerTime } from '@/context/PlayerContext';
-import { SongCard } from '@/components/SongCard';
+import { useSafePlayerState } from '@/context/PlayerContext';
 import { ArtistCard } from '@/components/ArtistCard';
+import { CatalogCard } from '@/components/CatalogCard';
+import { CatalogGrid } from '@/components/CatalogGrid';
+import { SongCard } from '@/components/SongCard';
 import { EngagementPanel } from '@/components/EngagementPanel';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
-import { FeaturedTracksSection } from '@/components/FeaturedTracksSection';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { LocationPrompt } from '@/components/LocationPrompt';
 import { Button } from '@/components/ui/button';
-import { useOfflineAudio } from '@/hooks/useOfflineAudio';
-import { toast } from '@/hooks/use-toast';
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -38,41 +37,68 @@ const itemVariants = {
 
 const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
 
-function isSongNew(song: { addedAt?: string }) {
-  if (!song.addedAt) return false;
-  const ts = new Date(song.addedAt).getTime();
+function isCatalogNew(catalog: { addedAt?: string }) {
+  if (!catalog.addedAt) return false;
+  const ts = new Date(catalog.addedAt).getTime();
   if (!Number.isFinite(ts)) return false;
   return Date.now() - ts < NEW_SONG_WINDOW_MS;
 }
 
 export default function Home() {
-  const { rankedSongs } = useRankedSongs();
   const { rankedArtists } = useRankedArtists();
   const { audienceProfile, refreshProfile, user } = useAuth();
   const { data: todayHotSongs = [] } = useTodayHotSongs(5);
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const playerState = useSafePlayerState();
-  const { currentTime } = usePlayerTime();
-  const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
   const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
-  
-  const featuredSongs = rankedSongs.slice(0, 3);
-  const allSongs = rankedSongs;
-  const newSongs = rankedSongs.filter(isSongNew);
-  const hotTodayEntries = todayHotSongs;
+
+  const catalogs = useMemo(() => CATALOGS, []);
+  const featuredCatalogs = useMemo(
+    () => [...catalogs].sort((a, b) => b.totalPlays - a.totalPlays).slice(0, 6),
+    [catalogs],
+  );
+  const newCatalogs = useMemo(
+    () =>
+      [...catalogs]
+        .filter(isCatalogNew)
+        .sort((a, b) => {
+          const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+          const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+          return timeB - timeA;
+        }),
+    [catalogs],
+  );
+  const allCatalogs = useMemo(
+    () => [...catalogs].sort((a, b) => b.totalPlays - a.totalPlays),
+    [catalogs],
+  );
+  const newReleases = useMemo(() => {
+    if (newCatalogs.length > 0) return newCatalogs;
+    return [...catalogs]
+      .sort((a, b) => {
+        const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+        const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, 8);
+  }, [catalogs, newCatalogs]);
+  const totalTracks = useMemo(
+    () => catalogs.reduce((sum, catalog) => sum + (catalog.trackCount || 0), 0),
+    [catalogs],
+  );
   const displayName =
     audienceProfile?.profile_name ||
     (user && typeof user.email === 'string'
       ? user.email.split('@')[0]
       : null);
 
-  const allSongsCardRef = useRef<HTMLDivElement | null>(null);
-  const { scrollYProgress: allSongsScrollProgress } = useScroll({
-    target: allSongsCardRef,
+  const allCatalogsCardRef = useRef<HTMLDivElement | null>(null);
+  const { scrollYProgress: allCatalogsScrollProgress } = useScroll({
+    target: allCatalogsCardRef,
     offset: ['start 0.9', 'end 0.1'],
   });
-  const allSongsGlowY = useTransform(allSongsScrollProgress, [0, 1], [24, -24]);
-  const allSongsGlowOpacity = useTransform(allSongsScrollProgress, [0, 1], [0.12, 0.35]);
+  const allCatalogsGlowY = useTransform(allCatalogsScrollProgress, [0, 1], [24, -24]);
+  const allCatalogsGlowOpacity = useTransform(allCatalogsScrollProgress, [0, 1], [0.12, 0.35]);
 
   // Check if user needs to add location
   useEffect(() => {
@@ -246,7 +272,7 @@ export default function Home() {
                   <span className="text-foreground font-medium">{ARTISTS.length} Artists</span>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl glass text-xs sm:text-sm">
-                  <span className="text-foreground font-medium">{SONGS.length} Songs</span>
+                  <span className="text-foreground font-medium">{totalTracks} Tracks</span>
                 </div>
                 <div className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-primary/10 text-primary text-xs sm:text-sm font-medium">
                   Zambia
@@ -264,8 +290,9 @@ export default function Home() {
             initial="hidden"
             animate="show"
           >
-            <motion.section variants={itemVariants}>
-              <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
+            {todayHotSongs.length > 0 && (
+              <motion.section variants={itemVariants}>
+                <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
                   <motion.div
                     aria-hidden="true"
                     initial={{ opacity: 0.4, scale: 1 }}
@@ -293,182 +320,120 @@ export default function Home() {
                         </span>
                       </div>
                     </div>
-                    <div className="space-y-1.5 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
-                      {hotTodayEntries.map((entry, index) => {
-                        const isCurrentSong = playerState?.currentSong?.id === entry.song.id;
-                        const isSaved = isSongCached(entry.song.id);
-                        const isSaving = cachingInProgress === entry.song.id;
-                        const hasPlayedEnoughToSave = isCurrentSong && currentTime >= 20;
-
-                        const handleKeepThis = async () => {
-                          if (!isInstalled) {
-                            const deferredPrompt = getDeferredInstallPrompt();
-                            if (deferredPrompt) {
-                              try {
-                                deferredPrompt.prompt();
-                                const { outcome } = await deferredPrompt.userChoice;
-                                if (outcome === 'accepted') {
-                                  toast({
-                                    title: 'Installing $ongChainn...',
-                                    description: 'The app will appear on your home screen shortly.',
-                                  });
-                                }
-                              } finally {
-                                clearDeferredInstallPrompt();
-                              }
-                            } else {
-                              toast({
-                                title: 'To keep songs on your device, add $ongChainn to your home screen.',
-                              });
-                            }
-                            return;
-                          }
-                          if (!hasPlayedEnoughToSave) {
-                            toast({
-                              title: 'Play this song once to save it.',
-                            });
-                            return;
-                          }
-                          if (!isOnline) {
-                            toast({
-                              title: 'Offline – not saved',
-                              description: 'Reconnect to save this song for offline playback.',
-                            });
-                            return;
-                          }
-                          if (isSaved || isSaving) return;
-                          await cacheSong(entry.song.id, entry.song.audioUrl, {
-                            title: entry.song.title,
-                            artist: entry.song.artist,
-                            duration: entry.song.duration,
-                          });
-                        };
-
-                        return (
-                          <div
-                            key={entry.song.id}
-                            className="relative rounded-xl sm:rounded-2xl p-[1.5px] bg-gradient-to-r from-sky-500/80 via-cyan-400/60 to-transparent"
-                          >
-                            <div className="flex items-center justify-between px-2 pt-2 pb-1">
-                              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-sky-50/90">
-                                <span className="px-1.5 py-0.5 rounded-full bg-black/40 font-semibold tabular-nums">
-                                  #{index + 1}
+                    <div className="max-h-[420px] overflow-y-auto pr-2">
+                      <div className="space-y-3">
+                        {todayHotSongs.map(({ song, playsToday }, index) => (
+                          <div key={song.id} className="space-y-1">
+                            <SongCard song={song} index={index} variant="compact" />
+                            <div className="text-[10px] sm:text-xs text-muted-foreground px-1 flex items-center gap-2">
+                              <span>{playsToday.toLocaleString()} plays today</span>
+                              {playerState?.currentSong && playerState.currentSong.id === song.id && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-sky-100">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                                  Now Playing
                                 </span>
-                                <Flame className="w-3 h-3 text-sky-300" />
-                                <span className="uppercase tracking-wide">Hot</span>
-                                {isSaved && (
-                                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/40 text-[9px] font-medium text-sky-100">
-                                    <HardDrive className="w-3 h-3" />
-                                    <span>Offline</span>
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[10px] sm:text-xs text-sky-50/85 tabular-nums">
-                                {entry.playsToday.toLocaleString()} plays today
-                              </span>
-                            </div>
-                            <div className="rounded-[0.85rem] sm:rounded-[1.1rem] bg-background/90">
-                              <SongCard
-                                song={entry.song}
-                                index={index}
-                                variant="compact"
-                              />
-                              <div className="flex items-center justify-between px-2.5 pb-2 pt-1">
-                                <span className="text-[10px] sm:text-xs text-muted-foreground">
-                                  {isSaved
-                                    ? 'Saved for offline'
-                                    : isCurrentSong && hasPlayedEnoughToSave
-                                      ? 'Tap to keep this on your device'
-                                      : 'Play once to keep this offline'}
-                                </span>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handleKeepThis}
-                                  disabled={isSaved || isSaving}
-                                  className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 h-auto"
-                                >
-                                  {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Keep this'}
-                                </Button>
-                              </div>
+                              )}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-            </motion.section>
-
-            <motion.section variants={itemVariants}>
-              <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay border border-primary/20">
-                <FeaturedTracksSection songs={featuredSongs} />
-              </div>
-            </motion.section>
-
-            {newSongs.length > 0 && (
-              <motion.section variants={itemVariants}>
-                <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <div>
-                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
-                        New Music
-                      </h2>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        Fresh drops from the town square, just arrived on $ongChainn.
-                      </p>
-                    </div>
-                    <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
-                      <Sparkles className="w-4 h-4" />
-                      <span>{newSongs.length} new tracks</span>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <div className="space-y-1 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
-                      {newSongs.map((song, index) => (
-                        <SongCard
-                          key={song.id}
-                          song={song}
-                          index={index}
-                          variant="compact"
-                        />
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
               </motion.section>
             )}
 
-            {/* All Songs */}
+            {newReleases.length > 0 && (
+              <motion.section variants={itemVariants}>
+                <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <div>
+                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                        New Releases
+                      </h2>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Fresh catalogs from the town square, just arrived on $ongChainn.
+                      </p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
+                      <Sparkles className="w-4 h-4" />
+                      <span>{newReleases.length} catalogs</span>
+                    </div>
+                  </div>
+                  <div className="max-h-[420px] overflow-y-auto pr-2">
+                    <CatalogGrid>
+                      {newReleases.map((catalog) => (
+                        <CatalogCard
+                          key={catalog.id}
+                          catalog={catalog}
+                          isNew={isCatalogNew(catalog)}
+                        />
+                      ))}
+                    </CatalogGrid>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+
+            {featuredCatalogs.length > 0 && (
+              <motion.section variants={itemVariants}>
+                <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay border border-primary/20">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <div>
+                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                        Featured Catalogs
+                      </h2>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Signature collections surfacing from the town square.
+                      </p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
+                      <Sparkles className="w-4 h-4" />
+                      <span>{featuredCatalogs.length} catalogs</span>
+                    </div>
+                  </div>
+                  <div className="max-h-[420px] overflow-y-auto pr-2">
+                    <CatalogGrid>
+                      {featuredCatalogs.map((catalog) => (
+                        <CatalogCard key={catalog.id} catalog={catalog} />
+                      ))}
+                    </CatalogGrid>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+
             <motion.section variants={itemVariants}>
               <div
-                ref={allSongsCardRef}
+                ref={allCatalogsCardRef}
                 className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden"
               >
                 <motion.div
                   aria-hidden="true"
-                  style={{ y: allSongsGlowY, opacity: allSongsGlowOpacity }}
+                  style={{ y: allCatalogsGlowY, opacity: allCatalogsGlowOpacity }}
                   className="pointer-events-none absolute -inset-x-10 -top-16 h-24 bg-gradient-to-r from-primary/40 via-cyan-400/25 to-emerald-400/35 blur-3xl"
                 />
                 <div className="relative z-10">
                   <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
                     <div>
                       <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
-                        All Songs
+                        All Catalogs
                       </h2>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        Every track in $ongChainn, neatly stacked for deep listening.
+                        Every project on $ongChainn, ready to explore.
                       </p>
                     </div>
                     <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
                       <Music className="w-4 h-4 text-primary" />
-                      <span>{allSongs.length} tracks</span>
+                      <span>{allCatalogs.length} catalogs</span>
                     </div>
                   </div>
-                  <div className="space-y-1 sm:space-y-2 max-h-[520px] sm:max-h-[600px] overflow-y-auto pr-1">
-                    {allSongs.map((song, index) => (
-                      <SongCard key={song.id} song={song} index={index} variant="compact" />
-                    ))}
+                  <div className="max-h-[520px] overflow-y-auto pr-2">
+                    <CatalogGrid>
+                      {allCatalogs.map((catalog) => (
+                        <CatalogCard key={catalog.id} catalog={catalog} />
+                      ))}
+                    </CatalogGrid>
                   </div>
                 </div>
               </div>

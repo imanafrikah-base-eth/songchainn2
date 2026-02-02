@@ -1,17 +1,21 @@
 import { type ChangeEvent, type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive } from 'lucide-react';
+import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive, Plus, Lock, Globe, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useToast } from '@/hooks/use-toast';
 import { Navigation } from '@/components/Navigation';
-import { SONGS } from '@/data/musicData';
+import { CATALOGS, SONGS } from '@/data/musicData';
+import { CatalogCard } from '@/components/CatalogCard';
+import { CatalogGrid } from '@/components/CatalogGrid';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
@@ -35,10 +39,14 @@ const BaseIcon = () => (
 
 export default function Profile() {
   const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding } = useAuth();
-  const { likedSongs, playlists } = useAudienceInteractions();
+  const { likedSongs, playlists, savedCatalogs, createPlaylist, deletePlaylist } = useAudienceInteractions();
   const { points, completedReferrals, shareInviteLink } = useReferrals();
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
+  const [playlistName, setPlaylistName] = useState('');
+  const [playlistDescription, setPlaylistDescription] = useState('');
+  const [playlistIsPublic, setPlaylistIsPublic] = useState(false);
   const { storageUsedBytes } = useOfflineAudio();
   const { isOnline: isProfileOnline, lastSeenAt: profileLastSeenAt } = useUserPresence(
     audienceProfile?.user_id ?? audienceProfile?.id,
@@ -78,6 +86,23 @@ export default function Profile() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleCreatePlaylist = useCallback(async () => {
+    if (!playlistName.trim()) {
+      toast({ title: 'Add a playlist name to continue', variant: 'destructive' });
+      return;
+    }
+    const created = await createPlaylist(
+      playlistName.trim(),
+      playlistDescription.trim() || undefined,
+      playlistIsPublic,
+    );
+    if (!created) return;
+    setPlaylistName('');
+    setPlaylistDescription('');
+    setPlaylistIsPublic(false);
+    setIsCreatePlaylistOpen(false);
+  }, [createPlaylist, playlistDescription, playlistIsPublic, playlistName, toast]);
   
   const [profileName, setProfileName] = useState(audienceProfile?.profile_name || '');
   const [bio, setBio] = useState(audienceProfile?.bio || '');
@@ -423,7 +448,7 @@ export default function Profile() {
     }
   };
 
-  const likedSongsData = SONGS.filter(s => likedSongs.includes(s.id));
+  const savedCatalogsData = CATALOGS.filter((catalog) => savedCatalogs.includes(catalog.id));
   const artistSongsData = isArtist && artistId ? SONGS.filter(s => s.artistId === artistId) : [];
 
   const { data: artistFollowerCount = 0 } = useQuery({
@@ -948,12 +973,11 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Activity Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <Heart className="w-5 h-5 mx-auto text-primary mb-2" />
-            <p className="text-2xl font-bold text-foreground">{likedSongs.length}</p>
-            <p className="text-sm text-muted-foreground">Liked Songs</p>
+            <p className="text-2xl font-bold text-foreground">{savedCatalogs.length}</p>
+            <p className="text-sm text-muted-foreground">Saved Catalogs</p>
           </div>
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <ListMusic className="w-5 h-5 mx-auto text-primary mb-2" />
@@ -977,6 +1001,90 @@ export default function Profile() {
             <p className="text-2xl font-bold text-foreground">{completedReferrals}</p>
             <p className="text-sm text-muted-foreground">Referrals</p>
           </div>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading text-lg font-semibold text-foreground">
+              Playlists
+            </h2>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsCreatePlaylistOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New playlist
+            </Button>
+          </div>
+          {playlists.length === 0 ? (
+            <div className="bg-card border border-border rounded-xl p-4 text-center">
+              <p className="text-sm text-muted-foreground mb-3">
+                Start your first playlist to collect your favorite songs.
+              </p>
+              <Button
+                size="sm"
+                className="gradient-primary"
+                onClick={() => setIsCreatePlaylistOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create playlist
+              </Button>
+            </div>
+          ) : (
+            <ScrollArea className="max-h-80 pr-2">
+              <div className="space-y-3">
+                {playlists.map((playlist) => (
+                  <div
+                    key={playlist.id}
+                    className="flex items-center justify-between gap-3 p-3 bg-card border border-border rounded-xl hover:bg-card/70 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        to={`/playlist/${playlist.id}`}
+                        className="block"
+                      >
+                        <p className="font-medium text-foreground truncate">
+                          {playlist.name}
+                        </p>
+                        {playlist.description && (
+                          <p className="text-sm text-muted-foreground truncate">
+                            {playlist.description}
+                          </p>
+                        )}
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border border-border"
+                      >
+                        {playlist.is_public ? (
+                          <>
+                            <Globe className="w-3 h-3" />
+                            Public
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-3 h-3" />
+                            Private
+                          </>
+                        )}
+                      </span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => deletePlaylist(playlist.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
         </div>
 
         {/* Invite Friends Section */}
@@ -1026,7 +1134,7 @@ export default function Profile() {
                 <span>Offline storage used</span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Saved songs stay on this device for offline playback.
+                Saved tracks stay on this device for offline playback.
               </p>
             </div>
             <p className="text-sm font-semibold text-foreground tabular-nums">
@@ -1035,31 +1143,18 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Liked Songs Preview */}
-        {likedSongsData.length > 0 && (
+        {savedCatalogsData.length > 0 && (
           <div className="mb-8">
             <h2 className="font-heading text-lg font-semibold text-foreground mb-4">
-              Liked Songs
+              Saved Catalogs
             </h2>
-            <div className="space-y-2">
-              {likedSongsData.slice(0, 5).map((song) => (
-                <div
-                  key={song.id}
-                  className="flex items-center gap-3 p-3 bg-card border border-border rounded-xl"
-                >
-                  <img
-                    src={song.coverImage}
-                    alt={song.title}
-                    className="w-12 h-12 rounded-lg object-contain"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">{song.title}</p>
-                    <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
-                  </div>
-                  <Heart className="w-4 h-4 text-primary fill-primary" />
-                </div>
-              ))}
-            </div>
+            <ScrollArea className="max-h-[420px] pr-2">
+              <CatalogGrid className="sm:grid-cols-3 lg:grid-cols-4">
+                {savedCatalogsData.map((catalog) => (
+                  <CatalogCard key={catalog.id} catalog={catalog} />
+                ))}
+              </CatalogGrid>
+            </ScrollArea>
           </div>
         )}
 
@@ -1073,6 +1168,80 @@ export default function Profile() {
 
       <Navigation />
       <InviteFriends isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} />
+
+      <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
+        <DialogContent className="max-w-sm w-[95vw] sm:w-full">
+          <DialogHeader>
+            <DialogTitle>Create playlist</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="playlist-name">Name</Label>
+              <Input
+                id="playlist-name"
+                value={playlistName}
+                onChange={(e) => setPlaylistName(e.target.value)}
+                maxLength={80}
+                placeholder="Give your playlist a name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="playlist-description">Description</Label>
+              <Textarea
+                id="playlist-description"
+                value={playlistDescription}
+                onChange={(e) => setPlaylistDescription(e.target.value)}
+                rows={3}
+                maxLength={200}
+                placeholder="Add a short description (optional)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Visibility</Label>
+              <div className="inline-flex items-center gap-2 rounded-lg bg-muted p-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={playlistIsPublic ? 'ghost' : 'default'}
+                  className="flex-1"
+                  onClick={() => setPlaylistIsPublic(false)}
+                >
+                  <Lock className="w-4 h-4 mr-1" />
+                  Private
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={playlistIsPublic ? 'default' : 'ghost'}
+                  className="flex-1"
+                  onClick={() => setPlaylistIsPublic(true)}
+                >
+                  <Globe className="w-4 h-4 mr-1" />
+                  Public
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Private playlists are only visible to you. Public playlists can be shared.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsCreatePlaylistOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCreatePlaylist()}
+            >
+              Create playlist
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -42,6 +42,21 @@ export interface Song {
   volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7';
 }
 
+export interface Catalog {
+  id: string;
+  title: string;
+  artist: string;
+  artistId: string;
+  coverImage?: string;
+  songIds: string[];
+  volume?: Song['volume'];
+  addedAt?: string;
+  genre: Genre;
+  totalPlays: number;
+  totalLikes: number;
+  trackCount: number;
+}
+
 export interface Artist {
   id: string;
   name: string;
@@ -87,7 +102,52 @@ const ARTWORK_BY_ARTIST: Record<string, string> = {
   Santana: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/file_00000000106871fd889daaa509fd5a14.png',
   SANTANA: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/file_00000000106871fd889daaa509fd5a14.png',
   FAITH: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/FAITH%20ART%20WORK.png',
+  JMN: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN.png',
 };
+
+function buildCatalogs(songs: Song[]): Catalog[] {
+  const grouped = new Map<string, Song[]>();
+  songs.forEach((song) => {
+    const key = `${song.artistId}-${song.volume ?? 'Singles'}`;
+    const entry = grouped.get(key);
+    if (entry) {
+      entry.push(song);
+    } else {
+      grouped.set(key, [song]);
+    }
+  });
+
+  return Array.from(grouped.entries()).map(([key, group]) => {
+    const sorted = [...group].sort((a, b) => {
+      const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+      const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      const idA = Number(a.id) || 0;
+      const idB = Number(b.id) || 0;
+      return idB - idA;
+    });
+    const top = sorted[0];
+    const addedAt = sorted.find((song) => song.addedAt)?.addedAt;
+    const coverImage = group.find((song) => song.coverImage)?.coverImage;
+    const totalPlays = group.reduce((sum, song) => sum + (song.plays || 0), 0);
+    const totalLikes = group.reduce((sum, song) => sum + (song.likes || 0), 0);
+    const displayVolume = top.volume ?? 'Vol1';
+    return {
+      id: key,
+      title: displayVolume,
+      artist: top.artist,
+      artistId: top.artistId,
+      coverImage,
+      songIds: group.map((song) => song.id),
+      volume: displayVolume,
+      addedAt,
+      genre: top.genre,
+      totalPlays,
+      totalLikes,
+      trackCount: group.length,
+    };
+  });
+}
 
 export const SONGS: Song[] = [
   {
@@ -866,7 +926,7 @@ export const SONGS: Song[] = [
     artist: 'JMN',
     artistId: '9',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/JMN%20-%20LATE%20NIGHT.wav',
-    coverImage: '',
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -880,7 +940,7 @@ export const SONGS: Song[] = [
     artist: 'JMN',
     artistId: '9',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/JMN%20-%20PARTY.wav',
-    coverImage: '',
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -894,7 +954,7 @@ export const SONGS: Song[] = [
     artist: 'JMN',
     artistId: '9',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/JMN-%20OWN%20IT.wav',
-    coverImage: '',
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2429,6 +2489,8 @@ export const SONGS: Song[] = [
     volume: 'Vol4',
   },
 ];
+
+export const CATALOGS: Catalog[] = buildCatalogs(SONGS);
 
 export const ARTISTS: Artist[] = [
   {

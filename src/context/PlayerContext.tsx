@@ -25,6 +25,7 @@ interface PlayerActionsContext {
   playNext: () => void;
   playPrevious: () => void;
   addToQueue: (song: Song) => void;
+  playQueue: (songs: Song[], options?: { startIndex?: number }) => void;
   volume: number;
   enterRoomMode: (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => Promise<boolean>;
   exitRoomMode: () => Promise<void>;
@@ -528,6 +529,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setQueue(prev => [...prev, song]);
   }, []);
 
+  const playQueue = useCallback((songs: Song[], options?: { startIndex?: number }) => {
+    if (songs.length === 0) return;
+    const startIndex = typeof options?.startIndex === 'number' && Number.isFinite(options.startIndex)
+      ? Math.max(0, Math.min(songs.length - 1, Math.floor(options.startIndex)))
+      : 0;
+    setQueue(songs);
+    setIsCrossfading(false);
+    crossfadeTriggeredRef.current = false;
+    const nextSong = songs[startIndex];
+    if (isPlaying && currentSong) {
+      crossfadeToSong(nextSong);
+    } else {
+      void forceSetSong(nextSong, { shouldPlay: true });
+    }
+  }, [crossfadeToSong, currentSong, forceSetSong, isPlaying]);
+
   const enterRoomMode = useCallback(async (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => {
     if (playlist.length === 0) return false;
 
@@ -651,12 +668,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     playNext,
     playPrevious,
     addToQueue,
+    playQueue,
     volume,
     enterRoomMode,
     exitRoomMode,
     hideRoom,
     showRoom,
-  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, pause, play, playNext, playPrevious, playSong, seekTo, setVolume, togglePlay, volume]);
+  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, pause, play, playNext, playPrevious, playQueue, playSong, seekTo, setVolume, togglePlay, volume]);
 
   return (
     <PlayerStateCtx.Provider value={stateValue}>

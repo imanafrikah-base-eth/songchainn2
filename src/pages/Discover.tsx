@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music, Flame, HardDrive } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { SONGS, GENRES, Genre } from '@/data/musicData';
-import { useRankedSongs, useTodayHotSongs } from '@/hooks/usePopularity';
+import { CATALOGS, SONGS, GENRES, Genre, type Catalog } from '@/data/musicData';
+import { useTodayHotSongs } from '@/hooks/usePopularity';
+import { CatalogCard } from '@/components/CatalogCard';
+import { CatalogGrid } from '@/components/CatalogGrid';
 import { SongCard } from '@/components/SongCard';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -31,9 +33,9 @@ const itemVariants = {
 
 const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
 
-function isSongNew(song: { addedAt?: string }) {
-  if (!song.addedAt) return false;
-  const ts = new Date(song.addedAt).getTime();
+function isCatalogNew(catalog: { addedAt?: string }) {
+  if (!catalog.addedAt) return false;
+  const ts = new Date(catalog.addedAt).getTime();
   if (!Number.isFinite(ts)) return false;
   return Date.now() - ts < NEW_SONG_WINDOW_MS;
 }
@@ -56,11 +58,11 @@ function useUserLikes() {
 export default function Discover() {
   const [selectedGenre, setSelectedGenre] = useState<Genre | 'all'>('all');
   const [showFilters, setShowFilters] = useState(true);
-  const { rankedSongs } = useRankedSongs();
   const { data: todayHotSongs = [] } = useTodayHotSongs(5);
   const playerState = useSafePlayerState();
   const { data: likedSongIds = [] } = useUserLikes();
   const { isSongCached } = useOfflineAudio();
+  const catalogs = useMemo(() => CATALOGS, []);
 
   // Get user's preferred genres based on likes
   const preferredGenres = useMemo(() => {
@@ -89,42 +91,62 @@ export default function Discover() {
       .map(([genre]) => genre as Genre);
   }, [likedSongIds]);
 
-  const newSongs = useMemo(() => rankedSongs.filter(isSongNew), [rankedSongs]);
+  const newCatalogs = useMemo(
+    () =>
+      [...catalogs]
+        .filter(isCatalogNew)
+        .sort((a, b) => {
+          const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+          const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+          return timeB - timeA;
+        }),
+    [catalogs],
+  );
 
-  // Filter songs by selected genre
-  const filteredSongs = useMemo(() => {
-    if (selectedGenre === 'all') return rankedSongs;
-    return rankedSongs.filter(song => song.genre === selectedGenre);
-  }, [rankedSongs, selectedGenre]);
+  const newReleases = useMemo(() => {
+    if (newCatalogs.length > 0) return newCatalogs;
+    return [...catalogs]
+      .sort((a, b) => {
+        const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+        const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, 8);
+  }, [catalogs, newCatalogs]);
 
-  // Personalized recommendations based on liked genres
-  const recommendedSongs = useMemo(() => {
+  const catalogBySongId = useMemo(() => {
+    const map = new Map<string, Catalog>();
+    catalogs.forEach((catalog) => {
+      catalog.songIds.forEach((id) => map.set(id, catalog));
+    });
+    return map;
+  }, [catalogs]);
+
+  const recommendedCatalogs = useMemo(() => {
     if (preferredGenres.length === 0) {
-      // If no likes, show top trending songs
-      return rankedSongs.slice(0, 3);
+      return [...catalogs].sort((a, b) => b.totalPlays - a.totalPlays).slice(0, 6);
     }
 
-    // Prioritize songs from preferred genres that user hasn't liked yet
-    const unlikedSongs = rankedSongs.filter(song => !likedSongIds.includes(song.id));
-    const recommended = unlikedSongs
-      .sort((a, b) => {
-        const aGenreIndex = preferredGenres.indexOf(a.genre);
-        const bGenreIndex = preferredGenres.indexOf(b.genre);
-        // Songs from preferred genres come first
-        if (aGenreIndex !== -1 && bGenreIndex === -1) return -1;
-        if (aGenreIndex === -1 && bGenreIndex !== -1) return 1;
-        if (aGenreIndex !== -1 && bGenreIndex !== -1) return aGenreIndex - bGenreIndex;
-        return 0;
-      })
-      .slice(0, 3);
+    const catalogSet = new Map<string, Catalog>();
+    preferredGenres.forEach((genre) => {
+      catalogs
+        .filter((catalog) => catalog.genre === genre)
+        .forEach((catalog) => catalogSet.set(catalog.id, catalog));
+    });
 
-    return recommended.length > 0 ? recommended : rankedSongs.slice(0, 3);
-  }, [rankedSongs, preferredGenres, likedSongIds]);
+    return Array.from(catalogSet.values())
+      .sort((a, b) => b.totalPlays - a.totalPlays)
+      .slice(0, 6);
+  }, [catalogs, preferredGenres]);
 
-  // Get a random selection for "shuffle" discovery
-  const shuffledSongs = useMemo(() => {
-    return [...rankedSongs].sort(() => Math.random() - 0.5).slice(0, 4);
-  }, [rankedSongs]);
+  const filteredCatalogs = useMemo(() => {
+    if (selectedGenre === 'all') return catalogs;
+    return catalogs.filter((catalog) => catalog.genre === selectedGenre);
+  }, [catalogs, selectedGenre]);
+
+  const shuffledCatalogs = useMemo(() => {
+    return [...catalogs].sort(() => Math.random() - 0.5).slice(0, 3);
+  }, [catalogs]);
 
   const getGenreColor = (genre: Genre) => {
     const colors: Record<Genre, string> = {
@@ -259,7 +281,7 @@ export default function Discover() {
                       </h2>
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                      Top 5 most played songs since midnight. Saved tracks show a Saved tag.
+                      Most played songs since midnight across the town square.
                     </p>
                   </div>
                   <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
@@ -269,50 +291,23 @@ export default function Discover() {
                     </span>
                   </div>
                 </div>
-                <div className="space-y-1.5 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
-                  {todayHotSongs.map((entry, index) => {
-                    const isNowPlaying = playerState?.currentSong?.id === entry.song.id;
-                    const isSaved = isSongCached(entry.song.id);
-                    return (
-                      <div
-                        key={entry.song.id}
-                        className={`relative rounded-xl sm:rounded-2xl p-[1.5px] bg-gradient-to-r from-sky-500/80 via-cyan-400/60 to-transparent ${
-                          isNowPlaying ? 'ring-2 ring-sky-300/80 shadow-glow' : ''
-                        }`}
-                      >
-                        <div className="flex items-center justify-between px-2 pt-2 pb-1">
-                          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-sky-50/90">
-                            <span className="px-1.5 py-0.5 rounded-full bg-black/40 font-semibold tabular-nums">
-                              #{index + 1}
+                <div className="max-h-[420px] overflow-y-auto pr-2">
+                  <div className="space-y-3">
+                    {todayHotSongs.map(({ song, playsToday }, index) => (
+                      <div key={song.id} className="space-y-1">
+                        <SongCard song={song} index={index} variant="compact" />
+                        <div className="text-[10px] sm:text-xs text-muted-foreground px-1 flex items-center gap-2">
+                          <span>{playsToday.toLocaleString()} plays today</span>
+                          {playerState?.currentSong && playerState.currentSong.id === song.id && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-sky-100">
+                              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                              Now Playing
                             </span>
-                            <Flame className="w-3 h-3 text-sky-300" />
-                            <span className="uppercase tracking-wide">Hot</span>
-                            {isNowPlaying && (
-                              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-black/50 text-[9px] font-semibold tracking-wide uppercase text-sky-100">
-                                Now Playing
-                              </span>
-                            )}
-                            {isSaved && (
-                              <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/40 text-[9px] font-medium text-sky-100">
-                                <HardDrive className="w-3 h-3" />
-                                <span>Offline</span>
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] sm:text-xs text-sky-50/85 tabular-nums">
-                            {entry.playsToday.toLocaleString()} plays today
-                          </span>
-                        </div>
-                        <div className="rounded-[0.85rem] sm:rounded-[1.1rem] bg-background/90">
-                          <SongCard
-                            song={entry.song}
-                            index={index}
-                            variant="compact"
-                          />
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -356,8 +351,7 @@ export default function Discover() {
           </Link>
         </motion.section>
 
-        {/* New Music */}
-        {newSongs.length > 0 && (
+        {newReleases.length > 0 && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -369,28 +363,23 @@ export default function Discover() {
                 <div>
                   <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-primary" />
-                    <span>New Music</span>
+                    <span>New Releases</span>
                   </h2>
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    Latest uploads from $ongChainn artists, ready to discover.
+                    Fresh catalogs landing in the town square.
                   </p>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
                   <Music className="w-4 h-4" />
-                  <span>{newSongs.length} tracks</span>
+                  <span>{newReleases.length} catalogs</span>
                 </div>
                 </div>
-              <div className="relative">
-                <div className="space-y-1 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
-                  {newSongs.map((song, index) => (
-                    <SongCard
-                      key={song.id}
-                      song={song}
-                      index={index}
-                      variant="compact"
-                    />
+              <div className="max-h-[420px] overflow-y-auto pr-2">
+                <CatalogGrid>
+                  {newReleases.map((catalog) => (
+                    <CatalogCard key={catalog.id} catalog={catalog} isNew={isCatalogNew(catalog)} />
                   ))}
-                </div>
+                </CatalogGrid>
               </div>
             </div>
           </motion.section>
@@ -471,27 +460,6 @@ export default function Discover() {
               <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shine-overlay overflow-hidden">
                 <div className="pointer-events-none absolute -inset-x-10 -top-12 h-20 bg-gradient-to-r from-primary/35 via-cyan-400/20 to-emerald-400/25 blur-3xl opacity-60" />
                 <div className="relative z-10">
-                  {recommendedSongs.length > 0 && (
-                    <motion.div
-                      variants={itemVariants}
-                      className="flex items-center gap-2 mb-4"
-                    >
-                      {recommendedSongs.slice(0, 3).map((song) => (
-                        <div
-                          key={song.id}
-                          className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-black/40 border border-white/10"
-                        >
-                          <img
-                            src={song.coverImage}
-                            alt={song.title}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
                   <motion.div variants={itemVariants} className="flex items-center justify-between gap-2 mb-4">
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-primary" />
@@ -504,17 +472,17 @@ export default function Discover() {
                     </div>
                     <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
                       <Heart className="w-3.5 h-3.5 text-primary" />
-                      <span>Personalized picks</span>
+                      <span>Personalized catalogs</span>
                     </div>
                   </motion.div>
-                  <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                    {recommendedSongs.map((song, index) => (
-                      <motion.div key={song.id} variants={itemVariants}>
-                        <SongCard song={song} index={index} variant="compact" />
-                      </motion.div>
-                    ))}
+                  <div className="max-h-[420px] overflow-y-auto pr-2">
+                    <CatalogGrid>
+                      {recommendedCatalogs.map((catalog) => (
+                        <CatalogCard key={catalog.id} catalog={catalog} />
+                      ))}
+                    </CatalogGrid>
                   </div>
-                  {recommendedSongs.length === 0 && (
+                  {recommendedCatalogs.length === 0 && (
                     <motion.p variants={itemVariants} className="text-muted-foreground text-sm py-4">
                       Like some songs to get personalized recommendations!
                     </motion.p>
@@ -523,7 +491,7 @@ export default function Discover() {
               </div>
             </motion.section>
 
-            {/* Filtered Songs / All Songs */}
+            {/* Filtered Catalogs / All Catalogs */}
             <motion.section
               variants={containerVariants}
               initial="hidden"
@@ -532,27 +500,6 @@ export default function Discover() {
               <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shine-overlay overflow-hidden">
                 <div className="pointer-events-none absolute -inset-x-10 -top-12 h-20 bg-gradient-to-r from-primary/30 via-purple-500/25 to-cyan-400/30 blur-3xl opacity-70" />
                 <div className="relative z-10">
-                  {filteredSongs.length > 0 && (
-                    <motion.div
-                      variants={itemVariants}
-                      className="flex items-center gap-2 mb-4"
-                    >
-                      {filteredSongs.slice(0, 3).map((song) => (
-                        <div
-                          key={song.id}
-                          className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-black/40 border border-white/10"
-                        >
-                          <img
-                            src={song.coverImage}
-                            alt={song.title}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
                   <motion.div variants={itemVariants} className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-primary" />
@@ -561,35 +508,37 @@ export default function Discover() {
                       </h2>
                       <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
                         <Music className="w-3.5 h-3.5 text-primary" />
-                        <span>{filteredSongs.length} songs</span>
+                        <span>{filteredCatalogs.length} catalogs</span>
                       </span>
                     </div>
                   </motion.div>
 
-                  <AnimatePresence mode="popLayout">
-                    <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
-                      {filteredSongs.map((song, index) => (
-                        <motion.div
-                          key={song.id}
-                          variants={itemVariants}
-                          initial="hidden"
-                          animate="show"
-                          exit={{ opacity: 0, x: -20 }}
-                          layout
-                        >
-                          <SongCard song={song} index={index} variant="compact" />
-                        </motion.div>
-                      ))}
-                    </div>
-                  </AnimatePresence>
+                  <div className="max-h-[520px] overflow-y-auto pr-2">
+                    <AnimatePresence mode="popLayout">
+                      <CatalogGrid>
+                        {filteredCatalogs.map((catalog) => (
+                          <motion.div
+                            key={catalog.id}
+                            variants={itemVariants}
+                            initial="hidden"
+                            animate="show"
+                            exit={{ opacity: 0, x: -20 }}
+                            layout
+                          >
+                            <CatalogCard catalog={catalog} />
+                          </motion.div>
+                        ))}
+                      </CatalogGrid>
+                    </AnimatePresence>
+                  </div>
 
-                  {filteredSongs.length === 0 && (
+                  {filteredCatalogs.length === 0 && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       className="text-center py-12"
                     >
-                      <p className="text-muted-foreground">No songs in this genre yet</p>
+                      <p className="text-muted-foreground">No catalogs in this genre yet</p>
                     </motion.div>
                   )}
                 </div>
@@ -611,30 +560,29 @@ export default function Discover() {
                 <h3 className="font-heading font-semibold text-foreground">Surprise Me</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Random picks to discover something new
+                Random catalog picks to discover something new
               </p>
               <div className="space-y-2">
-                {shuffledSongs.slice(0, 3).map((song) => (
-                  <div
-                    key={song.id}
-                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => {
-                      // Could trigger play here
-                    }}
+                {shuffledCatalogs.map((catalog) => (
+                  <Link
+                    key={catalog.id}
+                    to={`/catalog/${catalog.id}`}
+                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted/30 transition-colors"
                   >
                     <img
-                      src={song.coverImage}
-                      alt={song.title}
-                      className="w-10 h-10 rounded-lg object-contain"
+                      src={catalog.coverImage}
+                      alt={catalog.title}
+                      className="w-10 h-10 rounded-lg object-cover"
+                      loading="lazy"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{catalog.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{catalog.artist}</p>
                     </div>
-                    <Badge variant="outline" className={`text-[10px] ${getGenreColor(song.genre)}`}>
-                      {song.genre}
+                    <Badge variant="outline" className={`text-[10px] ${getGenreColor(catalog.genre)}`}>
+                      {catalog.genre}
                     </Badge>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -644,13 +592,13 @@ export default function Discover() {
               <h3 className="font-heading font-semibold text-foreground mb-4">Genre Overview</h3>
               <div className="space-y-3">
                 {GENRES.map((genre) => {
-                  const count = SONGS.filter(s => s.genre === genre).length;
-                  const percentage = (count / SONGS.length) * 100;
+                  const count = catalogs.filter((catalog) => catalog.genre === genre).length;
+                  const percentage = catalogs.length > 0 ? (count / catalogs.length) * 100 : 0;
                   return (
                     <div key={genre}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm text-foreground">{genre}</span>
-                        <span className="text-xs text-muted-foreground">{count} songs</span>
+                        <span className="text-xs text-muted-foreground">{count} catalogs</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                         <motion.div

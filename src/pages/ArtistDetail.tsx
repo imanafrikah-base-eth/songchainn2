@@ -963,44 +963,23 @@ export default function ArtistDetail() {
                 return idB - idA;
               });
 
-            const volumeSections = volumeOrder
-              .map((volume) => {
-                const songs = sortByRecent(
-                  artistSongs.filter((song) => {
+            const volumeSections: Array<{
+              label: (typeof volumeOrder)[number];
+              songs: typeof artistSongs;
+            } | null> = volumeOrder.map((volume) => {
+              const songs = sortByRecent(
+                artistSongs.filter((song) => {
                   if (song.volume) return song.volume === volume;
-                  if (
-                    ['1', '2', '3', '4', '5', '6', '7', '8'].includes(song.artistId) &&
-                    volume === 'Vol1'
-                  ) {
-                    return true;
-                  }
-                  return false;
-                  })
-                );
-                return songs.length ? { label: volume, songs } : null;
-              })
-              .filter(
-                (
-                  section
-                ): section is {
-                  label: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7';
-                  songs: typeof artistSongs;
-                } =>
-                  Boolean(section)
+                  return volume === 'Vol1';
+                })
               );
+              return songs.length ? { label: volume, songs } : null;
+            });
 
-            const singles = sortByRecent(
-              artistSongs.filter((song) => {
-                if (song.volume) return false;
-                if (['1', '2', '3', '4', '5', '6', '7', '8'].includes(song.artistId)) return false;
-                return true;
-              })
+            const sections = volumeSections.filter(
+              (section): section is { label: (typeof volumeOrder)[number]; songs: typeof artistSongs } =>
+                Boolean(section)
             );
-
-            const sections = [
-              ...volumeSections,
-              singles.length ? { label: 'Singles', songs: singles } : null,
-            ].filter((section): section is { label: string; songs: typeof artistSongs } => Boolean(section));
 
             return sections.map((section) => (
               <div

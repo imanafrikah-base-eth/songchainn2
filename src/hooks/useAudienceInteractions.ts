@@ -9,6 +9,7 @@ export function useAudienceInteractions() {
   const { toast } = useToast();
   const [likedSongs, setLikedSongs] = useState<string[]>([]);
   const [likedArtists, setLikedArtists] = useState<string[]>([]);
+  const [savedCatalogs, setSavedCatalogs] = useState<string[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -18,6 +19,14 @@ export function useAudienceInteractions() {
       setLikedSongs([]);
       setLikedArtists([]);
       setPlaylists([]);
+      const storageKey = 'songchainn:savedCatalogs:guest';
+      const stored = localStorage.getItem(storageKey);
+      try {
+        const parsed = stored ? JSON.parse(stored) : [];
+        setSavedCatalogs(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setSavedCatalogs([]);
+      }
       setIsLoading(false);
       return;
     }
@@ -33,11 +42,24 @@ export function useAudienceInteractions() {
       setLikedSongs((songsRes.data || []).map((r: any) => r.song_id).filter(Boolean));
       setLikedArtists((artistsRes.data || []).map((r: any) => r.artist_id).filter(Boolean));
       setPlaylists((playlistsRes.data as any) || []);
+      const storageKey = user ? `songchainn:savedCatalogs:${user.id}` : 'songchainn:savedCatalogs:guest';
+      const stored = localStorage.getItem(storageKey);
+      try {
+        const parsed = stored ? JSON.parse(stored) : [];
+        setSavedCatalogs(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setSavedCatalogs([]);
+      }
       setIsLoading(false);
     };
 
     fetchData();
   }, [user]);
+
+  useEffect(() => {
+    const storageKey = user ? `songchainn:savedCatalogs:${user.id}` : 'songchainn:savedCatalogs:guest';
+    localStorage.setItem(storageKey, JSON.stringify(savedCatalogs));
+  }, [savedCatalogs, user]);
 
   // Like/Unlike Song
   const toggleLikeSong = useCallback(async (songId: string) => {
@@ -73,8 +95,16 @@ export function useAudienceInteractions() {
     toast({ title: isLiked ? 'Artist unfollowed' : 'Artist followed!' });
   }, [user, likedArtists, toast]);
 
+  const toggleSaveCatalog = useCallback(async (catalogId: string) => {
+    if (!catalogId) return;
+    const isSaved = savedCatalogs.includes(catalogId);
+    const next = isSaved ? savedCatalogs.filter((id) => id !== catalogId) : [...savedCatalogs, catalogId];
+    setSavedCatalogs(next);
+    toast({ title: isSaved ? 'Catalog removed from saved' : 'Catalog saved!' });
+  }, [savedCatalogs, toast]);
+
   // Create Playlist
-  const createPlaylist = useCallback(async (name: string, description?: string) => {
+  const createPlaylist = useCallback(async (name: string, description?: string, isPublic: boolean = false) => {
     if (!user) return null;
     const { data, error } = await supabase
       .from('playlists')
@@ -82,7 +112,7 @@ export function useAudienceInteractions() {
         user_id: user.id,
         name,
         description: description || null,
-        is_public: false,
+        is_public: isPublic,
         is_collaborative: false,
       } as any)
       .select('*')
@@ -152,16 +182,20 @@ export function useAudienceInteractions() {
   
   // Check if artist is liked
   const isArtistLiked = useCallback((artistId: string) => likedArtists.includes(artistId), [likedArtists]);
+  const isCatalogSaved = useCallback((catalogId: string) => savedCatalogs.includes(catalogId), [savedCatalogs]);
 
   return {
     likedSongs,
     likedArtists,
+    savedCatalogs,
     playlists,
     isLoading,
     toggleLikeSong,
     toggleLikeArtist,
+    toggleSaveCatalog,
     isSongLiked,
     isArtistLiked,
+    isCatalogSaved,
     createPlaylist,
     deletePlaylist,
     addSongToPlaylist,

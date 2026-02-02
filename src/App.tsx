@@ -16,7 +16,9 @@ const Home = lazy(() => import("./pages/Home"));
 const Discover = lazy(() => import("./pages/Discover"));
 const Artists = lazy(() => import("./pages/Artists"));
 const ArtistDetail = lazy(() => import("./pages/ArtistDetail"));
+const CatalogDetail = lazy(() => import("./pages/CatalogDetail"));
 const SongDetail = lazy(() => import("./pages/SongDetail"));
+const PlaylistDetail = lazy(() => import("./pages/PlaylistDetail"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -73,7 +75,9 @@ function AppShell() {
           <Route path="/discover" element={<Discover />} />
           <Route path="/artists" element={<Artists />} />
           <Route path="/artist/:id" element={<ArtistDetail />} />
+          <Route path="/catalog/:id" element={<CatalogDetail />} />
           <Route path="/song/:id" element={<SongDetail />} />
+          <Route path="/playlist/:id" element={<PlaylistDetail />} />
           <Route path="/post/:id" element={<Social />} />
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/profile" element={<Profile />} />
