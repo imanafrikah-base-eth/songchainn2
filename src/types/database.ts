@@ -56,6 +56,8 @@ export interface Playlist {
   is_public: boolean;
   created_at: string;
   updated_at: string;
+  mood: string | null;
+  vibe: string | null;
 }
 
 export interface PlaylistSong {

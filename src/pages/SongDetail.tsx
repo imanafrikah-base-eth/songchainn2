@@ -217,9 +217,19 @@ export default function SongDetail() {
             {/* Info */}
             <div className="flex-1">
               <p className="text-sm text-muted-foreground mb-2 uppercase tracking-wide">Song</p>
-              <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground mb-4">
-                {song.title}
-              </h1>
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground">
+                  {song.title}
+                </h1>
+                {song.isTokenGated && (
+                  <Link
+                    to="/marketplace"
+                    className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 text-primary text-xs px-3 py-1 font-medium"
+                  >
+                    On-chain on Marketplace
+                  </Link>
+                )}
+              </div>
               
               <Link 
                 to={`/artist/${artist.id}`}

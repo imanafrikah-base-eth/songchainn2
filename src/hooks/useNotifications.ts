@@ -6,7 +6,7 @@ import { AudienceProfile } from '@/types/database';
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'follow' | 'like' | 'comment' | 'mention';
+  type: 'follow' | 'like' | 'comment' | 'mention' | 'playlist';
   from_user_id: string;
   post_id: string | null;
   message: string | null;
@@ -52,7 +52,7 @@ export function useNotifications() {
       const enrichedNotifications: Notification[] = notificationsData.map(n => ({
         id: n.id,
         user_id: n.user_id,
-        type: n.type as 'follow' | 'like' | 'comment' | 'mention',
+        type: n.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist',
         from_user_id: n.from_user_id,
         post_id: n.post_id,
         message: n.message,
@@ -100,7 +100,7 @@ export function useNotifications() {
 
   const createNotification = useCallback(async (
     toUserId: string,
-    type: 'follow' | 'like' | 'comment' | 'mention',
+    type: 'follow' | 'like' | 'comment' | 'mention' | 'playlist',
     postId?: string,
     message?: string
   ) => {
@@ -166,7 +166,7 @@ export function useNotifications() {
 
           const enrichedNotification: Notification = {
             ...newNotification,
-            type: newNotification.type as 'follow' | 'like' | 'comment' | 'mention',
+            type: newNotification.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist',
             from_profile: profileData
               ? ({
                   ...(profileData as any),

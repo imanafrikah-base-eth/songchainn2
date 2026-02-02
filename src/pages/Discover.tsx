@@ -57,6 +57,7 @@ function useUserLikes() {
 
 export default function Discover() {
   const [selectedGenre, setSelectedGenre] = useState<Genre | 'all'>('all');
+  const [sortMode, setSortMode] = useState<'trending' | 'newest' | 'mostPlayed' | 'mostLiked'>('trending');
   const [showFilters, setShowFilters] = useState(true);
   const { data: todayHotSongs = [] } = useTodayHotSongs(5);
   const playerState = useSafePlayerState();
@@ -143,6 +144,39 @@ export default function Discover() {
     if (selectedGenre === 'all') return catalogs;
     return catalogs.filter((catalog) => catalog.genre === selectedGenre);
   }, [catalogs, selectedGenre]);
+
+  const sortedCatalogs = useMemo(() => {
+    const items = [...filteredCatalogs];
+    if (items.length === 0) return items;
+
+    if (sortMode === 'newest') {
+      return items.sort((a, b) => {
+        const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+        const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+        return timeB - timeA;
+      });
+    }
+
+    if (sortMode === 'mostPlayed') {
+      return items.sort((a, b) => {
+        if (a.totalPlays !== b.totalPlays) return b.totalPlays - a.totalPlays;
+        return b.totalLikes - a.totalLikes;
+      });
+    }
+
+    if (sortMode === 'mostLiked') {
+      return items.sort((a, b) => {
+        if (a.totalLikes !== b.totalLikes) return b.totalLikes - a.totalLikes;
+        return b.totalPlays - a.totalPlays;
+      });
+    }
+
+    return items.sort((a, b) => {
+      const scoreA = a.totalPlays + a.totalLikes;
+      const scoreB = b.totalPlays + b.totalLikes;
+      return scoreB - scoreA;
+    });
+  }, [filteredCatalogs, sortMode]);
 
   const shuffledCatalogs = useMemo(() => {
     return [...catalogs].sort(() => Math.random() - 0.5).slice(0, 3);
@@ -511,12 +545,59 @@ export default function Discover() {
                         <span>{filteredCatalogs.length} catalogs</span>
                       </span>
                     </div>
+                    <div className="flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs">
+                      <span className="hidden sm:inline text-muted-foreground">Sort</span>
+                      <button
+                        type="button"
+                        onClick={() => setSortMode('trending')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+                          sortMode === 'trending'
+                            ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
+                            : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
+                        }`}
+                      >
+                        Trending
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSortMode('newest')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+                          sortMode === 'newest'
+                            ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
+                            : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
+                        }`}
+                      >
+                        Newest
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSortMode('mostPlayed')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all hidden md:inline-flex ${
+                          sortMode === 'mostPlayed'
+                            ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
+                            : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
+                        }`}
+                      >
+                        Plays
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSortMode('mostLiked')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all hidden md:inline-flex ${
+                          sortMode === 'mostLiked'
+                            ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
+                            : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
+                        }`}
+                      >
+                        Likes
+                      </button>
+                    </div>
                   </motion.div>
 
                   <div className="max-h-[520px] overflow-y-auto pr-2">
                     <AnimatePresence mode="popLayout">
                       <CatalogGrid>
-                        {filteredCatalogs.map((catalog) => (
+                        {sortedCatalogs.map((catalog) => (
                           <motion.div
                             key={catalog.id}
                             variants={itemVariants}
@@ -532,7 +613,7 @@ export default function Discover() {
                     </AnimatePresence>
                   </div>
 
-                  {filteredCatalogs.length === 0 && (
+                  {sortedCatalogs.length === 0 && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}

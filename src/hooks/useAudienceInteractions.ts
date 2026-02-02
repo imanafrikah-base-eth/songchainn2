@@ -104,30 +104,41 @@ export function useAudienceInteractions() {
   }, [savedCatalogs, toast]);
 
   // Create Playlist
-  const createPlaylist = useCallback(async (name: string, description?: string, isPublic: boolean = false) => {
-    if (!user) return null;
-    const { data, error } = await supabase
-      .from('playlists')
-      .insert({
-        user_id: user.id,
-        name,
-        description: description || null,
-        is_public: isPublic,
-        is_collaborative: false,
-      } as any)
-      .select('*')
-      .maybeSingle();
+  const createPlaylist = useCallback(
+    async (
+      name: string,
+      description?: string,
+      isPublic: boolean = false,
+      mood?: string,
+      vibe?: string,
+    ) => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('playlists')
+        .insert({
+          user_id: user.id,
+          name,
+          description: description || null,
+          is_public: isPublic,
+          is_collaborative: false,
+          mood: mood || null,
+          vibe: vibe || null,
+        } as any)
+        .select('*')
+        .maybeSingle();
 
-    if (error || !data) {
-      toast({ title: 'Failed to create playlist', variant: 'destructive' });
-      return null;
-    }
+      if (error || !data) {
+        toast({ title: 'Failed to create playlist', variant: 'destructive' });
+        return null;
+      }
 
-    const playlist = data as any as Playlist;
-    setPlaylists((prev) => [playlist, ...prev]);
-    toast({ title: 'Playlist created!' });
-    return playlist;
-  }, [user, toast]);
+      const playlist = data as any as Playlist;
+      setPlaylists((prev) => [playlist, ...prev]);
+      toast({ title: 'Playlist created!' });
+      return playlist;
+    },
+    [user, toast],
+  );
 
   // Delete Playlist
   const deletePlaylist = useCallback(async (playlistId: string) => {

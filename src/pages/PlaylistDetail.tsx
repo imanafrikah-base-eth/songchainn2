@@ -177,6 +177,21 @@ export default function PlaylistDetail() {
                 </p>
               )}
 
+              {(playlist.mood || playlist.vibe) && (
+                <div className="flex flex-wrap items-center gap-2 mb-5">
+                  {playlist.mood && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+                      Mood: {playlist.mood}
+                    </span>
+                  )}
+                  {playlist.vibe && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-secondary/10 border border-border text-xs font-medium text-foreground">
+                      Vibe: {playlist.vibe}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center gap-4 mb-6">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-sm font-medium">
                   {playlist.is_public ? (

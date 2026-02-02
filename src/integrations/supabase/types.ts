@@ -248,6 +248,8 @@ export type Database = {
           name: string
           updated_at: string
           user_id: string
+          mood: string | null
+          vibe: string | null
         }
         Insert: {
           created_at?: string
@@ -258,6 +260,8 @@ export type Database = {
           name: string
           updated_at?: string
           user_id: string
+          mood?: string | null
+          vibe?: string | null
         }
         Update: {
           created_at?: string
@@ -268,6 +272,8 @@ export type Database = {
           name?: string
           updated_at?: string
           user_id?: string
+          mood?: string | null
+          vibe?: string | null
         }
         Relationships: []
       }

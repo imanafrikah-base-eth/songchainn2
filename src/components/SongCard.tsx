@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Pause, Heart } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Song } from '@/data/musicData';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
@@ -207,11 +208,18 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 </span>
               )}
               {isTokenGated && (
-                <OwnershipBadge 
-                  status={ownershipStatus} 
-                  offlinePlays={offlinePlaysRemaining}
-                  previewSecondsRemaining={previewSecondsRemaining}
-                />
+                <Link
+                  to="/marketplace"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex"
+                >
+                  <OwnershipBadge 
+                    status={ownershipStatus} 
+                    offlinePlays={offlinePlaysRemaining}
+                    previewSecondsRemaining={previewSecondsRemaining}
+                    className="hover:brightness-110"
+                  />
+                </Link>
               )}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground truncate">{song.artist}</p>
@@ -303,12 +311,19 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           {/* Token badge */}
           {isTokenGated && (
             <div className="absolute top-3 left-3 z-20">
-              <OwnershipBadge 
-                status={ownershipStatus} 
-                offlinePlays={offlinePlaysRemaining}
-                previewSecondsRemaining={previewSecondsRemaining}
-                size="md"
-              />
+              <Link
+                to="/marketplace"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex"
+              >
+                <OwnershipBadge 
+                  status={ownershipStatus} 
+                  offlinePlays={offlinePlaysRemaining}
+                  previewSecondsRemaining={previewSecondsRemaining}
+                  size="md"
+                  className="hover:brightness-110"
+                />
+              </Link>
             </div>
           )}
           
@@ -460,17 +475,30 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
       </div>
 
       <div className="p-4">
-        <h3 className={cn(
-          "font-heading font-semibold truncate mb-1 text-base flex items-center gap-2",
-          isCurrentSong ? "text-primary" : "text-foreground"
-        )}>
-          <span className="truncate">{song.title}</span>
-          {isNewSong && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide flex-shrink-0">
-              New
-            </span>
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <h3 className={cn(
+            "font-heading font-semibold truncate text-base flex items-center gap-2",
+            isCurrentSong ? "text-primary" : "text-foreground"
+          )}>
+            <span className="truncate">{song.title}</span>
+            {isNewSong && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide flex-shrink-0">
+                New
+              </span>
+            )}
+          </h3>
+          {isTokenGated && (
+            <Link
+              to="/marketplace"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex"
+            >
+              <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 text-primary text-[10px] px-2 py-0.5 font-medium">
+                On-chain
+              </span>
+            </Link>
           )}
-        </h3>
+        </div>
         <p className="text-sm text-muted-foreground truncate mb-3">{song.artist}</p>
 
         <div className="flex items-center justify-between">

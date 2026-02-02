@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, Heart, MessageCircle, UserPlus, X } from 'lucide-react';
+import { Bell, Check, Heart, MessageCircle, UserPlus, X, ListMusic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -20,6 +20,7 @@ const notificationIcons = {
   like: Heart,
   comment: MessageCircle,
   mention: MessageCircle,
+  playlist: ListMusic,
 };
 
 const notificationMessages = {
@@ -27,6 +28,7 @@ const notificationMessages = {
   like: 'liked your post',
   comment: 'commented on your post',
   mention: 'mentioned you in a post',
+  playlist: 'shared a new playlist',
 };
 
 function NotificationItem({ 
@@ -105,6 +107,7 @@ function NotificationItem({
 
 export function NotificationDropdown() {
   const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'social' | 'playlists'>('all');
   const navigate = useNavigate();
   const { 
     notifications, 
@@ -114,6 +117,15 @@ export function NotificationDropdown() {
     markAllAsRead,
     deleteNotification 
   } = useNotifications();
+
+  const filteredNotifications = filter === 'all'
+    ? notifications
+    : notifications.filter((notification) => {
+        if (filter === 'playlists') {
+          return notification.type === 'playlist';
+        }
+        return notification.type !== 'playlist';
+      });
 
   const handleNotificationNavigate = async (notification: Notification) => {
     setOpen(false);
@@ -189,20 +201,65 @@ export function NotificationDropdown() {
           )}
         </div>
 
+        <div className="px-3 pt-2 pb-1 border-b border-border/40 flex items-center gap-1 text-[11px]">
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className={cn(
+              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
+              filter === 'all'
+                ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
+                : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
+            )}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('social')}
+            className={cn(
+              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
+              filter === 'social'
+                ? 'bg-primary/10 text-primary border-primary/40'
+                : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
+            )}
+          >
+            Social
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('playlists')}
+            className={cn(
+              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
+              filter === 'playlists'
+                ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
+                : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
+            )}
+          >
+            Playlists
+          </button>
+        </div>
+
         <ScrollArea className="max-h-80">
           {isLoading ? (
             <div className="p-4 text-center text-muted-foreground">
               Loading...
             </div>
-          ) : notifications.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <div className="p-8 text-center">
               <Bell className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">No notifications yet</p>
+              <p className="text-sm text-muted-foreground">
+                {filter === 'all'
+                  ? 'No notifications yet'
+                  : filter === 'playlists'
+                  ? 'No playlist notifications yet'
+                  : 'No social notifications yet'}
+              </p>
             </div>
           ) : (
             <div className="p-2">
               <AnimatePresence>
-                {notifications.map(notification => (
+                {filteredNotifications.map(notification => (
                   <NotificationItem
                     key={notification.id}
                     notification={notification}

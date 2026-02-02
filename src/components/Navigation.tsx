@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones, Sparkles } from 'lucide-react';
+import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones, Sparkles, ListMusic } from 'lucide-react';
 import { useEngagement } from '@/context/EngagementContext';
 import { useAuth } from '@/context/AuthContext';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
+  { path: '/#playlists', label: 'Playlists', icon: ListMusic },
   { path: '/discover', label: 'Discover', icon: Compass },
   { path: '/room', label: 'The Room', icon: Headphones },
   { path: '/community', label: 'Community', icon: Users },

@@ -20,8 +20,8 @@ export function OwnershipBadge({
   if (status === 'free') return null;
 
   const sizeClasses = size === 'sm' 
-    ? 'text-[10px] px-1.5 py-0.5 gap-0.5' 
-    : 'text-xs px-2 py-1 gap-1';
+    ? 'text-[10px] px-2 py-0.5 gap-1' 
+    : 'text-xs px-2.5 py-1 gap-1.5';
 
   const iconSize = size === 'sm' ? 10 : 12;
 
@@ -30,22 +30,22 @@ export function OwnershipBadge({
     preview: {
       label: previewSecondsRemaining > 0 ? `${previewSecondsRemaining}s preview` : 'Preview',
       icon: <Clock size={iconSize} />,
-      color: 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+      color: 'text-amber-300'
     },
     preview_used: {
       label: 'Locked',
       icon: <Lock size={iconSize} />,
-      color: 'bg-destructive/20 text-destructive border-destructive/30'
+      color: 'text-destructive'
     },
     owned: {
       label: 'Owned',
       icon: <Unlock size={iconSize} />,
-      color: 'bg-green-500/20 text-green-400 border-green-500/30'
+      color: 'text-emerald-300'
     },
     offline_ready: {
       label: `Offline (${offlinePlays})`,
       icon: <WifiOff size={iconSize} />,
-      color: 'bg-primary/20 text-primary border-primary/30'
+      color: 'text-primary'
     }
   };
 
@@ -55,7 +55,7 @@ export function OwnershipBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center font-medium rounded-full border',
+        'inline-flex items-center font-medium rounded-full border border-primary/40 bg-background/80 backdrop-blur-sm shadow-soft',
         sizeClasses,
         badge.color,
         className

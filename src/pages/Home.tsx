@@ -1,12 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame } from 'lucide-react';
-import { CATALOGS, ARTISTS, type Catalog } from '@/data/musicData';
+import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart } from 'lucide-react';
+import { CATALOGS, ARTISTS, SONGS, type Catalog, type Song } from '@/data/musicData';
 import { useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 import { useSafePlayerState } from '@/context/PlayerContext';
+import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useSocial } from '@/hooks/useSocial';
+import { useNotifications } from '@/hooks/useNotifications';
+import { supabase } from '@/integrations/supabase/client';
 import { ArtistCard } from '@/components/ArtistCard';
 import { CatalogCard } from '@/components/CatalogCard';
 import { CatalogGrid } from '@/components/CatalogGrid';
@@ -20,6 +24,11 @@ import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { LocationPrompt } from '@/components/LocationPrompt';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -37,6 +46,13 @@ const itemVariants = {
 
 const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
 
+const PLAYLIST_GRADIENTS = [
+  'from-emerald-500/70 via-emerald-400/40 to-cyan-500/70',
+  'from-purple-500/70 via-fuchsia-400/40 to-pink-500/70',
+  'from-orange-500/70 via-amber-400/40 to-red-500/70',
+  'from-sky-500/70 via-cyan-400/40 to-indigo-500/70',
+];
+
 function isCatalogNew(catalog: { addedAt?: string }) {
   if (!catalog.addedAt) return false;
   const ts = new Date(catalog.addedAt).getTime();
@@ -44,11 +60,32 @@ function isCatalogNew(catalog: { addedAt?: string }) {
   return Date.now() - ts < NEW_SONG_WINDOW_MS;
 }
 
+function getPlaylistGradient(playlist: { id: string; name: string; mood?: string | null; vibe?: string | null }) {
+  const key = (playlist.mood || playlist.vibe || playlist.name || playlist.id).toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  }
+  const index = Math.abs(hash) % PLAYLIST_GRADIENTS.length;
+  return `bg-gradient-to-br ${PLAYLIST_GRADIENTS[index]}`;
+}
+
 export default function Home() {
   const { rankedArtists } = useRankedArtists();
   const { audienceProfile, refreshProfile, user } = useAuth();
   const { data: todayHotSongs = [] } = useTodayHotSongs(5);
+  const { playlists, createPlaylist, addSongToPlaylist, likedArtists } = useAudienceInteractions();
+  const { createPost } = useSocial();
+  const { createNotification } = useNotifications();
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [newPlaylistDescription, setNewPlaylistDescription] = useState('');
+  const [newPlaylistIsPublic, setNewPlaylistIsPublic] = useState(false);
+  const [newPlaylistMood, setNewPlaylistMood] = useState('');
+  const [newPlaylistVibe, setNewPlaylistVibe] = useState('');
+  const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
+  const [isSubmittingPlaylist, setIsSubmittingPlaylist] = useState(false);
   const playerState = useSafePlayerState();
   const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
 
@@ -86,6 +123,25 @@ export default function Home() {
     () => catalogs.reduce((sum, catalog) => sum + (catalog.trackCount || 0), 0),
     [catalogs],
   );
+  const songsByCatalog = useMemo(
+    () =>
+      catalogs
+        .map((catalog) => {
+          const songs: Song[] = catalog.songIds
+            .map((id) => SONGS.find((song) => song.id === id))
+            .filter(Boolean) as Song[];
+          return { catalog, songs };
+        })
+        .filter((entry) => entry.songs.length > 0),
+    [catalogs],
+  );
+  const likedArtistSongs = useMemo(
+    () =>
+      SONGS.filter((song) => likedArtists.includes(song.artistId))
+        .sort((a, b) => b.plays - a.plays)
+        .slice(0, 8),
+    [likedArtists],
+  );
   const displayName =
     audienceProfile?.profile_name ||
     (user && typeof user.email === 'string'
@@ -99,6 +155,87 @@ export default function Home() {
   });
   const allCatalogsGlowY = useTransform(allCatalogsScrollProgress, [0, 1], [24, -24]);
   const allCatalogsGlowOpacity = useTransform(allCatalogsScrollProgress, [0, 1], [0.12, 0.35]);
+
+  const handleToggleSongSelection = (songId: string) => {
+    setSelectedSongIds((prev) =>
+      prev.includes(songId) ? prev.filter((id) => id !== songId) : [...prev, songId],
+    );
+  };
+
+  const handleCreatePlaylistFromHome = async () => {
+    if (!newPlaylistName.trim() || isSubmittingPlaylist) return;
+    setIsSubmittingPlaylist(true);
+    try {
+      const playlist = await createPlaylist(
+        newPlaylistName.trim(),
+        newPlaylistDescription.trim() || undefined,
+        newPlaylistIsPublic,
+        newPlaylistMood.trim() || undefined,
+        newPlaylistVibe.trim() || undefined,
+      );
+      if (!playlist) return;
+
+      if (selectedSongIds.length > 0) {
+        for (const songId of selectedSongIds) {
+          await addSongToPlaylist(playlist.id, songId);
+        }
+      }
+
+      if (newPlaylistIsPublic) {
+        const moodPart = newPlaylistMood.trim();
+        const vibePart = newPlaylistVibe.trim();
+        const metaParts = [];
+        if (moodPart) metaParts.push(`Mood: ${moodPart}`);
+        if (vibePart) metaParts.push(`Vibe: ${vibePart}`);
+        const meta = metaParts.join(' · ');
+        const content =
+          meta ||
+          `New playlist: ${playlist.name}`;
+
+        await createPost(
+          content,
+          'playlist_share',
+          undefined,
+          playlist.id,
+        );
+
+        const { data: audienceRows } = await supabase
+          .from('audience_profiles')
+          .select('user_id');
+        const targetUserIds =
+          (audienceRows || [])
+            .map((row: any) => row.user_id)
+            .filter((id: string | null) => Boolean(id)) || [];
+
+        const senderName =
+          audienceProfile?.profile_name ||
+          (user && typeof user.email === 'string'
+            ? user.email.split('@')[0]
+            : 'Someone');
+
+        await Promise.all(
+          targetUserIds.map((id: string) =>
+            createNotification(
+              id,
+              'playlist',
+              undefined,
+              `${senderName} shared a new playlist: ${playlist.name}`,
+            ),
+          ),
+        );
+      }
+
+      setNewPlaylistName('');
+      setNewPlaylistDescription('');
+      setNewPlaylistIsPublic(false);
+      setNewPlaylistMood('');
+      setNewPlaylistVibe('');
+      setSelectedSongIds([]);
+      setIsCreatePlaylistOpen(false);
+    } finally {
+      setIsSubmittingPlaylist(false);
+    }
+  };
 
   // Check if user needs to add location
   useEffect(() => {
@@ -375,6 +512,34 @@ export default function Home() {
               </motion.section>
             )}
 
+            {likedArtistSongs.length > 0 && (
+              <motion.section variants={itemVariants}>
+                <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <div>
+                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                        From Artists You Like
+                      </h2>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Songs from artists you have tapped heart on.
+                      </p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
+                      <Heart className="w-4 h-4" />
+                      <span>{likedArtistSongs.length} songs</span>
+                    </div>
+                  </div>
+                  <div className="max-h-[420px] overflow-y-auto pr-2">
+                    <div className="space-y-3">
+                      {likedArtistSongs.map((song, index) => (
+                        <SongCard key={song.id} song={song} index={index} variant="compact" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+
             {featuredCatalogs.length > 0 && (
               <motion.section variants={itemVariants}>
                 <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay border border-primary/20">
@@ -459,6 +624,106 @@ export default function Home() {
                 {rankedArtists.slice(0, 4).map((artist, index) => (
                   <ArtistCard key={artist.id} artist={artist} index={index} />
                 ))}
+              </div>
+            </motion.section>
+
+            <motion.section variants={itemVariants} id="playlists">
+              <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2">
+                    <ListMusic className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                    <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                      Your Playlists
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm text-muted-foreground">
+                      {playlists.length === 1 ? '1 playlist' : `${playlists.length} playlists`}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="hidden sm:inline-flex"
+                      onClick={() => setIsCreatePlaylistOpen(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      New
+                    </Button>
+                  </div>
+                </div>
+                {playlists.length === 0 ? (
+                  <div className="bg-card border border-border rounded-xl p-4 text-center">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      You have not created any playlists yet.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="gradient-primary"
+                      onClick={() => setIsCreatePlaylistOpen(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Start a playlist
+                    </Button>
+                  </div>
+                ) : (
+                  <ScrollArea className="max-h-80 pr-2">
+                    <div className="space-y-3">
+                      {playlists.map((playlist) => (
+                        <div
+                          key={playlist.id}
+                          className="flex items-center justify-between gap-3 p-3 bg-card border border-border rounded-xl hover:bg-card/70 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div
+                              className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xs sm:text-sm font-semibold text-primary-foreground ${getPlaylistGradient(playlist)}`}
+                            >
+                              <span className="truncate max-w-[2.5rem] sm:max-w-[3rem]">
+                                {playlist.name.slice(0, 2).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <Link
+                                to={`/playlist/${playlist.id}`}
+                                className="block"
+                              >
+                                <p className="font-medium text-foreground truncate">
+                                  {playlist.name}
+                                </p>
+                                {playlist.description && (
+                                  <p className="text-sm text-muted-foreground truncate">
+                                    {playlist.description}
+                                  </p>
+                                )}
+                                {(playlist.mood || playlist.vibe) && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {[playlist.mood, playlist.vibe].filter(Boolean).join(' • ')}
+                                  </p>
+                                )}
+                              </Link>
+                            </div>
+                          </div>
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border border-border flex-shrink-0"
+                          >
+                            {playlist.is_public ? (
+                              <>
+                                <Globe className="w-3 h-3" />
+                                Public
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="w-3 h-3" />
+                                Private
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
               </div>
             </motion.section>
 
@@ -710,6 +975,174 @@ export default function Home() {
           refreshProfile();
         }}
       />
+
+      <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
+        <DialogContent className="max-w-2xl w-[95vw] sm:w-full">
+          <DialogHeader>
+            <DialogTitle>Create playlist</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="home-playlist-name">Name</Label>
+                <Input
+                  id="home-playlist-name"
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  maxLength={80}
+                  placeholder="Give your playlist a name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="home-playlist-description">Description</Label>
+                <Textarea
+                  id="home-playlist-description"
+                  value={newPlaylistDescription}
+                  onChange={(e) => setNewPlaylistDescription(e.target.value)}
+                  rows={3}
+                  maxLength={200}
+                  placeholder="Add a short description (optional)"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Visibility</Label>
+                <div className="inline-flex items-center gap-2 rounded-lg bg-muted p-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={newPlaylistIsPublic ? 'ghost' : 'default'}
+                    className="flex-1"
+                    onClick={() => setNewPlaylistIsPublic(false)}
+                  >
+                    <Lock className="w-4 h-4 mr-1" />
+                    Private
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={newPlaylistIsPublic ? 'default' : 'ghost'}
+                    className="flex-1"
+                    onClick={() => setNewPlaylistIsPublic(true)}
+                  >
+                    <Globe className="w-4 h-4 mr-1" />
+                    Public
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Private playlists are only visible to you. Public playlists can be shared.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="home-playlist-mood">Mood</Label>
+                <Input
+                  id="home-playlist-mood"
+                  value={newPlaylistMood}
+                  onChange={(e) => setNewPlaylistMood(e.target.value)}
+                  maxLength={40}
+                  placeholder="Add a mood (e.g., Happy, Sad, Energetic)"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="home-playlist-vibe">Vibe</Label>
+                <Input
+                  id="home-playlist-vibe"
+                  value={newPlaylistVibe}
+                  onChange={(e) => setNewPlaylistVibe(e.target.value)}
+                  maxLength={40}
+                  placeholder="Add a vibe (e.g., Chill, Party, Relaxing)"
+                />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Choose songs from the catalogs
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Tap songs to add or remove them from this playlist.
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {selectedSongIds.length === 0
+                    ? 'No songs selected'
+                    : `${selectedSongIds.length} selected`}
+                </span>
+              </div>
+              <ScrollArea className="h-64 pr-2">
+                <div className="space-y-3">
+                  {songsByCatalog.map(({ catalog, songs }) => (
+                    <div
+                      key={catalog.id}
+                      className="border border-border rounded-xl p-3 bg-card/60"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        {catalog.coverImage && (
+                          <img
+                            src={catalog.coverImage}
+                            alt={catalog.title}
+                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                            loading="lazy"
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {catalog.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {catalog.artist}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        {songs.map((song) => {
+                          const isSelected = selectedSongIds.includes(song.id);
+                          return (
+                            <button
+                              key={song.id}
+                              type="button"
+                              onClick={() => handleToggleSongSelection(song.id)}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors ${
+                                isSelected
+                                  ? 'bg-primary/10 border border-primary/40 text-foreground'
+                                  : 'bg-muted/40 border border-transparent text-muted-foreground hover:bg-muted/60'
+                              }`}
+                            >
+                              <span className="truncate">{song.title}</span>
+                              {isSelected && (
+                                <span className="ml-2 text-[10px] font-semibold text-primary">
+                                  Added
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsCreatePlaylistOpen(false)}
+              disabled={isSubmittingPlaylist}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCreatePlaylistFromHome()}
+              disabled={!newPlaylistName.trim() || isSubmittingPlaylist}
+            >
+              Create playlist
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
