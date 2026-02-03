@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Playlist } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { getLikedArtists, getLikedSongs, getPlaylistSongs as getLocalPlaylistSongs, listPlaylists, savePlaylists, setPlaylistSongs } from '@/lib/localDb';
 
 export function useAudienceInteractions() {
   const { user } = useAuth();
@@ -33,6 +34,21 @@ export function useAudienceInteractions() {
 
     const fetchData = async () => {
       setIsLoading(true);
+      if (!isSupabaseConfigured) {
+        setLikedSongs(getLikedSongs(user.id));
+        setLikedArtists(getLikedArtists(user.id));
+        setPlaylists(listPlaylists(user.id));
+        const storageKey = user ? `songchainn:savedCatalogs:${user.id}` : 'songchainn:savedCatalogs:guest';
+        const stored = localStorage.getItem(storageKey);
+        try {
+          const parsed = stored ? JSON.parse(stored) : [];
+          setSavedCatalogs(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          setSavedCatalogs([]);
+        }
+        setIsLoading(false);
+        return;
+      }
       const [songsRes, artistsRes, playlistsRes] = await Promise.all([
         supabase.from('liked_songs').select('song_id').eq('user_id', user.id),
         supabase.from('liked_artists').select('artist_id').eq('user_id', user.id),
@@ -113,6 +129,25 @@ export function useAudienceInteractions() {
       vibe?: string,
     ) => {
       if (!user) return null;
+      if (!isSupabaseConfigured) {
+        const now = new Date().toISOString();
+        const playlist: Playlist = {
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          name,
+          description: description || null,
+          is_public: isPublic,
+          created_at: now,
+          updated_at: now,
+          mood: mood || null,
+          vibe: vibe || null,
+        };
+        const next = [playlist, ...listPlaylists(user.id)];
+        savePlaylists(user.id, next);
+        setPlaylists(next);
+        toast({ title: 'Playlist created!' });
+        return playlist;
+      }
       const { data, error } = await supabase
         .from('playlists')
         .insert({
@@ -143,6 +178,14 @@ export function useAudienceInteractions() {
   // Delete Playlist
   const deletePlaylist = useCallback(async (playlistId: string) => {
     if (!user) return;
+    if (!isSupabaseConfigured) {
+      const next = listPlaylists(user.id).filter((p) => p.id !== playlistId);
+      savePlaylists(user.id, next);
+      setPlaylistSongs(playlistId, []);
+      setPlaylists(next);
+      toast({ title: 'Playlist deleted' });
+      return;
+    }
     await supabase.from('playlist_songs').delete().eq('playlist_id', playlistId);
     await supabase.from('playlists').delete().eq('id', playlistId).eq('user_id', user.id);
     const next = playlists.filter((p) => p.id !== playlistId);
@@ -153,6 +196,16 @@ export function useAudienceInteractions() {
   // Add Song to Playlist
   const addSongToPlaylist = useCallback(async (playlistId: string, songId: string) => {
     if (!user) return;
+    if (!isSupabaseConfigured) {
+      const songIds = getLocalPlaylistSongs(playlistId);
+      if (songIds.includes(songId)) {
+        toast({ title: 'Song already in playlist' });
+        return;
+      }
+      setPlaylistSongs(playlistId, [...songIds, songId]);
+      toast({ title: 'Song added to playlist!' });
+      return;
+    }
     const { data: existing } = await supabase
       .from('playlist_songs')
       .select('song_id')
@@ -174,12 +227,21 @@ export function useAudienceInteractions() {
   // Remove Song from Playlist
   const removeSongFromPlaylist = useCallback(async (playlistId: string, songId: string) => {
     if (!user) return;
+    if (!isSupabaseConfigured) {
+      const songIds = getLocalPlaylistSongs(playlistId);
+      setPlaylistSongs(playlistId, songIds.filter((id) => id !== songId));
+      toast({ title: 'Song removed from playlist' });
+      return;
+    }
     await supabase.from('playlist_songs').delete().eq('playlist_id', playlistId).eq('song_id', songId);
     toast({ title: 'Song removed from playlist' });
   }, [user, toast]);
 
   // Get Playlist Songs
   const getPlaylistSongs = useCallback(async (playlistId: string): Promise<string[]> => {
+    if (!isSupabaseConfigured) {
+      return getLocalPlaylistSongs(playlistId);
+    }
     const { data } = await supabase
       .from('playlist_songs')
       .select('song_id')

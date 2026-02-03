@@ -23,7 +23,7 @@ const queryClient = new QueryClient({
   },
 });
 
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && import.meta.env.PROD) {
   const AUTO_RELOAD_KEY = "__songchainn_auto_reload_at";
   const AUTO_RELOAD_WINDOW_MS = 30_000;
 

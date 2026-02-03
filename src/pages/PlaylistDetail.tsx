@@ -11,8 +11,9 @@ import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useAuth } from '@/context/AuthContext';
 import type { Playlist } from '@/types/database';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { setPlaylistSongs } from '@/lib/localDb';
 
 export default function PlaylistDetail() {
   const { id } = useParams<{ id: string }>();
@@ -34,13 +35,15 @@ export default function PlaylistDetail() {
       const local = playlists.find((p) => p.id === id);
       if (local) {
         setPlaylist(local);
-      } else {
+      } else if (isSupabaseConfigured) {
         const { data } = await supabase
           .from('playlists')
           .select('*')
           .eq('id', id)
           .maybeSingle();
         setPlaylist((data as any as Playlist) ?? null);
+      } else {
+        setPlaylist(null);
       }
     };
 
@@ -108,12 +111,16 @@ export default function PlaylistDetail() {
         return;
       }
       if (songs.length > 0) {
-        const rows = songs.map((song, index) => ({
-          playlist_id: cloned.id,
-          song_id: song.id,
-          position: index,
-        }));
-        await supabase.from('playlist_songs').insert(rows as any);
+        if (isSupabaseConfigured) {
+          const rows = songs.map((song, index) => ({
+            playlist_id: cloned.id,
+            song_id: song.id,
+            position: index,
+          }));
+          await supabase.from('playlist_songs').insert(rows as any);
+        } else {
+          setPlaylistSongs(cloned.id, songs.map((song) => song.id));
+        }
       }
       toast({ title: 'Playlist saved to your profile' });
     } finally {

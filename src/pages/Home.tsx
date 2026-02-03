@@ -644,7 +644,7 @@ export default function Home() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="hidden sm:inline-flex"
+                      className="inline-flex"
                       onClick={() => setIsCreatePlaylistOpen(true)}
                     >
                       <Plus className="w-4 h-4 mr-1" />

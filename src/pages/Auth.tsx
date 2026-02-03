@@ -571,6 +571,12 @@ export default function Auth() {
                     </button>
                   </div>
 
+                  {authMode === 'signup' && (
+                    <p className="text-xs text-muted-foreground">
+                      Create your new password.
+                    </p>
+                  )}
+
                   {authMode === 'signup' && password && (
                     <div className="space-y-1">
                       <div className="flex gap-1">
