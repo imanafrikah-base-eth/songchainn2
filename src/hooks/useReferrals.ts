@@ -73,7 +73,9 @@ export function useReferrals() {
       writeJson(REFERRAL_CODE_KEY, map);
       setReferralCode(next);
     } catch (error) {
-      console.error('Error in fetchOrCreateReferralCode:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error in fetchOrCreateReferralCode:', error);
+      }
     }
   }, [user, generateReferralCode]);
 
@@ -87,7 +89,9 @@ export function useReferrals() {
       const list = byReferrer[user.id] || [];
       setReferrals([...list].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)));
     } catch (error) {
-      console.error('Error in fetchReferrals:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error in fetchReferrals:', error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +105,9 @@ export function useReferrals() {
       const map = readJson<Record<string, number>>(USER_POINTS_KEY, {});
       setPoints({ total_points: map[user.id] || 0 });
     } catch (error) {
-      console.error('Error in fetchPoints:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error in fetchPoints:', error);
+      }
     }
   }, [user]);
 

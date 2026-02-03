@@ -118,7 +118,9 @@ export default function Onboarding() {
       }
       await refreshProfile();
     } catch (err: any) {
-      console.error('Onboarding error:', err);
+      if (import.meta.env.DEV) {
+        console.error('Onboarding error:', err);
+      }
       const msg = String(err?.message || '');
       const msgLower = msg.toLowerCase();
       const isMissingAudienceProfiles =

@@ -99,12 +99,16 @@ export async function switchToBaseChain(provider: EIP1193Provider): Promise<bool
         });
         return true;
       } catch (addError) {
-        console.error("Failed to add Base chain:", addError);
+        if (import.meta.env.DEV) {
+          console.error("Failed to add Base chain:", addError);
+        }
         return false;
       }
     }
     // User rejected or other error - still try to proceed
-    console.warn("Chain switch warning:", switchError);
+    if (import.meta.env.DEV) {
+      console.warn("Chain switch warning:", switchError);
+    }
     return true;
   }
 }
@@ -157,7 +161,9 @@ export async function connectWallet(): Promise<ConnectResult> {
       return { success: false, error: "Connection request was rejected" };
     }
 
-    console.error("Wallet connection error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Wallet connection error:", error);
+    }
     return {
       success: false,
       error: error?.message || "Failed to connect wallet",

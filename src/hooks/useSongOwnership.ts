@@ -91,7 +91,9 @@ export function useSongOwnership(songId: string): SongOwnership {
         }
       }
     } catch (error) {
-      console.error('Error checking song ownership:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error checking song ownership:', error);
+      }
     } finally {
       setIsLoading(false);
     }

@@ -25,7 +25,9 @@ export function useOfflineQueue() {
         setQueue(parsed);
         setPendingCount(parsed.length);
       } catch (e) {
-        console.error('Failed to parse offline queue:', e);
+        if (import.meta.env.DEV) {
+          console.error('Failed to parse offline queue:', e);
+        }
       }
     }
   }, []);
@@ -41,7 +43,9 @@ export function useOfflineQueue() {
     try {
       return true;
     } catch (error) {
-      console.error('Failed to process action:', action.type, error);
+      if (import.meta.env.DEV) {
+        console.error('Failed to process action:', action.type, error);
+      }
       return false;
     }
   };

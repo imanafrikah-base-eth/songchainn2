@@ -158,7 +158,9 @@ const FUNCTION_SELECTORS: Record<string, string> = {
 function encodeFunctionCall(functionName: string, params: any[]): string {
   const selector = FUNCTION_SELECTORS[functionName];
   if (!selector) {
-    console.error(`Unknown function: ${functionName}`);
+    if (import.meta.env.DEV) {
+      console.error(`Unknown function: ${functionName}`);
+    }
     return "0x";
   }
 
@@ -197,7 +199,9 @@ export async function checkSongBalance(userAddress: string, songId: string): Pro
   
   const provider = getWalletProvider();
   if (!provider) {
-    console.warn("No wallet provider available for balance check");
+    if (import.meta.env.DEV) {
+      console.warn("No wallet provider available for balance check");
+    }
     return BigInt(0);
   }
   
@@ -217,7 +221,9 @@ export async function checkSongBalance(userAddress: string, songId: string): Pro
     
     return BigInt(result || "0");
   } catch (error) {
-    console.error("Error checking song balance:", error);
+    if (import.meta.env.DEV) {
+      console.error("Error checking song balance:", error);
+    }
     return BigInt(0);
   }
 }
@@ -248,7 +254,9 @@ export async function getSongPriceFromContract(songId: string): Promise<bigint |
     
     return result ? BigInt(result) : null;
   } catch (error) {
-    console.error("Error fetching song price:", error);
+    if (import.meta.env.DEV) {
+      console.error("Error fetching song price:", error);
+    }
     return null;
   }
 }
@@ -339,7 +347,9 @@ export async function buySong(
         } else if (switchError?.code === 4001) {
           return { success: false, error: "Please switch to Base network to continue" };
         } else {
-          console.error("Chain switch error:", switchError);
+          if (import.meta.env.DEV) {
+            console.error("Chain switch error:", switchError);
+          }
           return { success: false, error: "Failed to switch to Base network" };
         }
       }
@@ -404,7 +414,9 @@ export async function buySong(
       }
     } catch (preflightError) {
       // If estimation fails for any wallet, don't block the flow — the wallet will still try.
-      console.warn("Preflight balance check skipped:", preflightError);
+      if (import.meta.env.DEV) {
+        console.warn("Preflight balance check skipped:", preflightError);
+      }
     }
 
     // Step 4: Send transaction
@@ -417,7 +429,9 @@ export async function buySong(
         params: [txParams],
       });
     } catch (sendError: any) {
-      console.error("Send transaction error:", sendError);
+      if (import.meta.env.DEV) {
+        console.error("Send transaction error:", sendError);
+      }
 
       if (sendError?.code === 4001 || sendError?.code === "ACTION_REJECTED") {
         return { success: false, error: "Transaction cancelled" };
@@ -492,7 +506,9 @@ export async function buySong(
 
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
       } catch (receiptError) {
-        console.error("Error checking receipt:", receiptError);
+        if (import.meta.env.DEV) {
+          console.error("Error checking receipt:", receiptError);
+        }
         // Continue polling, don't fail yet
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
       }
@@ -506,7 +522,9 @@ export async function buySong(
     };
     
   } catch (error: any) {
-    console.error("Purchase error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Purchase error:", error);
+    }
     
     // Handle specific error codes
     if (error?.code === 4001 || error?.code === "ACTION_REJECTED") {

@@ -57,7 +57,9 @@ export function usePushNotifications() {
       }
       return false;
     } catch (error) {
-      console.error('Error requesting notification permission:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error requesting notification permission:', error);
+      }
       return false;
     }
   }, [isSupported]);
@@ -97,7 +99,9 @@ export function usePushNotifications() {
       
       return true;
     } catch (error) {
-      console.error('Error subscribing to push:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error subscribing to push:', error);
+      }
       toast({
         title: 'Subscription Failed',
         description: 'Could not subscribe to notifications.',
@@ -127,7 +131,9 @@ export function usePushNotifications() {
       
       return true;
     } catch (error) {
-      console.error('Error unsubscribing:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error unsubscribing:', error);
+      }
       return false;
     }
   }, []);

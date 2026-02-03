@@ -52,7 +52,9 @@ export function useGenerateArtwork(songTitle: string, artistName: string) {
         throw new Error(data.error);
       }
     } catch (err) {
-      console.error('Artwork generation error:', err);
+      if (import.meta.env.DEV) {
+        console.error('Artwork generation error:', err);
+      }
       setArtwork({
         imageUrl: '',
         isLoading: false,
@@ -98,7 +100,9 @@ export function useBatchGenerateArtwork() {
           setArtworks(prev => new Map(prev).set(song.id, data.imageUrl));
         }
       } catch (err) {
-        console.error(`Failed to generate artwork for ${song.title}:`, err);
+        if (import.meta.env.DEV) {
+          console.error(`Failed to generate artwork for ${song.title}:`, err);
+        }
       }
 
       setProgress({ current: i + 1, total: songs.length });

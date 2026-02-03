@@ -53,7 +53,9 @@ export function Navigation() {
         localStorage.setItem(key, 'shown');
       }
     } catch (error) {
-      console.error('Failed to read offline save announcement state', error);
+      if (import.meta.env.DEV) {
+        console.error('Failed to read offline save announcement state', error);
+      }
     }
   }, []);
 
@@ -67,7 +69,9 @@ export function Navigation() {
         localStorage.setItem(key, 'shown');
       }
     } catch (error) {
-      console.error('Failed to read profile photo announcement state', error);
+      if (import.meta.env.DEV) {
+        console.error('Failed to read profile photo announcement state', error);
+      }
     }
   }, [user]);
   // Enable swipe gestures for mobile navigation

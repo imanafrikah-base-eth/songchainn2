@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Headphones, ListMusic, Music, Pause, Play, Lock, Globe } from 'lucide-react';
+import { ArrowLeft, Headphones, ListMusic, Music, Pause, Play, Lock, Globe, Plus } from 'lucide-react';
 import { SONGS, type Song } from '@/data/musicData';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -12,17 +12,20 @@ import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useAuth } from '@/context/AuthContext';
 import type { Playlist } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export default function PlaylistDetail() {
   const { id } = useParams<{ id: string }>();
   const { currentSong, isPlaying } = usePlayerState();
   const { playQueue, togglePlay } = usePlayerActions();
-  const { playlists, getPlaylistSongs } = useAudienceInteractions();
+  const { playlists, getPlaylistSongs, createPlaylist } = useAudienceInteractions();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -78,6 +81,45 @@ export default function PlaylistDetail() {
     if (user && playlist.user_id === user.id) return true;
     return false;
   }, [playlist, user]);
+
+  const isOwner = useMemo(() => {
+    if (!playlist || !user) return false;
+    return playlist.user_id === user.id;
+  }, [playlist, user]);
+
+  const hasOwnCopy = useMemo(() => {
+    if (!playlist || !user) return false;
+    if (isOwner) return true;
+    return playlists.some((p) => p.user_id === user.id && p.name === playlist.name);
+  }, [isOwner, playlist, playlists, user]);
+
+  const handleSavePlaylist = async () => {
+    if (!playlist || !user || hasOwnCopy || isSaving) return;
+    setIsSaving(true);
+    try {
+      const cloned = await createPlaylist(
+        playlist.name,
+        playlist.description || undefined,
+        false,
+        playlist.mood || undefined,
+        playlist.vibe || undefined,
+      );
+      if (!cloned) {
+        return;
+      }
+      if (songs.length > 0) {
+        const rows = songs.map((song, index) => ({
+          playlist_id: cloned.id,
+          song_id: song.id,
+          position: index,
+        }));
+        await supabase.from('playlist_songs').insert(rows as any);
+      }
+      toast({ title: 'Playlist saved to your profile' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!id) {
     return null;
@@ -238,6 +280,33 @@ export default function PlaylistDetail() {
                     </>
                   )}
                 </Button>
+                {user && !isOwner && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="gap-2"
+                    onClick={() => void handleSavePlaylist()}
+                    disabled={isSaving || hasOwnCopy}
+                  >
+                    {hasOwnCopy ? (
+                      <>
+                        <span className="w-2.5 h-2.5 rounded-full bg-primary" />
+                        Saved
+                      </>
+                    ) : isSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        Save playlist
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </div>

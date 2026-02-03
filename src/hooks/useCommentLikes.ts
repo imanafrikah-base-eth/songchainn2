@@ -79,7 +79,9 @@ export function useCommentLikes() {
         isLiked: !isCurrentlyLiked
       };
     } catch (error) {
-      console.error('Error toggling comment like:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error toggling comment like:', error);
+      }
       return { success: false, newLikesCount: 0, isLiked: isCurrentlyLiked };
     }
   }, [user]);

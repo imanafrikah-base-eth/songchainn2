@@ -64,7 +64,9 @@ export function useWalletBalance(walletAddress: string | null): WalletBalanceSta
 
       setBalance(formatted);
     } catch (err: any) {
-      console.error('Failed to fetch balance:', err);
+      if (import.meta.env.DEV) {
+        console.error('Failed to fetch balance:', err);
+      }
       setError(err?.message || 'Failed to fetch balance');
     } finally {
       setIsLoading(false);
