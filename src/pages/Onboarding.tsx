@@ -123,15 +123,20 @@ export default function Onboarding() {
       }
       const msg = String(err?.message || '');
       const msgLower = msg.toLowerCase();
+      const code = String(err?.code || '');
       const isMissingAudienceProfiles =
-        String(err?.code || '') === 'PGRST205' ||
+        code === 'PGRST205' ||
+        code === 'PGRST204' ||
         (msgLower.includes('audience_profiles') && msgLower.includes('schema cache')) ||
-        (msgLower.includes('could not find the table') && msgLower.includes('audience_profiles'));
+        (msgLower.includes('could not find the table') && msgLower.includes('audience_profiles')) ||
+        (msgLower.includes('could not find the') &&
+          msgLower.includes('base_profile_link') &&
+          msgLower.includes('schema cache'));
 
       toast({ 
         title: 'Error creating profile', 
         description: isMissingAudienceProfiles
-          ? "Database table 'audience_profiles' is missing. Apply Supabase migrations to enable account creation."
+          ? "Database schema for 'audience_profiles' is missing or outdated. Apply Supabase migrations to enable account creation."
           : msg,
         variant: 'destructive' 
       });

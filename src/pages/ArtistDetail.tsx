@@ -858,7 +858,7 @@ export default function ArtistDetail() {
                 <div className="glass-card p-4 rounded-xl text-center">
                   <Users className="w-6 h-6 mx-auto mb-2 text-primary" />
                   <p className="text-2xl font-heading font-bold text-foreground">
-                    {(82 + (isFollowingArtist ? 1 : 0)).toLocaleString()}
+                    {(92 + (isFollowingArtist ? 1 : 0)).toLocaleString()}
                   </p>
                   <p className="text-sm text-muted-foreground">Followers</p>
                 </div>

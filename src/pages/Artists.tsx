@@ -93,7 +93,7 @@ export default function Artists() {
         totalLikes += songData?.like_count || 0;
       });
       
-    const uiFollowers = 82 + (isArtistLiked(artist.id) ? 1 : 0);
+    const uiFollowers = 92 + (isArtistLiked(artist.id) ? 1 : 0);
       
       return {
         ...artist,
@@ -113,7 +113,7 @@ export default function Artists() {
         artists: acc.artists + 1,
         songs: acc.songs + artist.songCount,
         plays: acc.plays + artist.totalPlays,
-        followers: acc.followers + (artist.followers + 82),
+        followers: acc.followers + (artist.followers + 92),
       }),
       { artists: 0, songs: 0, plays: 0, followers: 0 }
     );
