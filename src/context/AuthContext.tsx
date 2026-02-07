@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           x_profile_link: null,
           base_profile_link: null,
           location: null,
-          onboarding_completed: false,
+          onboarding_completed: true,
         } as any,
         { onConflict: 'id' }
       )
@@ -123,12 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (createError) {
       setAudienceProfile(null);
-      setNeedsOnboarding(true);
+      setNeedsOnboarding(false);
       return;
     }
 
     setAudienceProfile((created as any) ?? null);
-    setNeedsOnboarding(true);
+    setNeedsOnboarding(false);
   }, [user]);
 
   useEffect(() => {

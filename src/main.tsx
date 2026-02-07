@@ -111,11 +111,19 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
       url.includes(".supabase.co/rest/v1/") || url.includes(".supabase.co/functions/v1/");
     const isSupabaseAuth = url.includes(".supabase.co/auth/v1/");
 
+    const isSupabaseRequest = isSupabaseRestOrFn || isSupabaseAuth;
     const shouldIgnoreAbortSignal =
-      typeof init?.signal !== "undefined" && (isSupabaseRestOrFn || isSupabaseAuth);
+      isSupabaseRequest &&
+      (typeof init?.signal !== "undefined" ||
+        (input instanceof Request && typeof input.signal !== "undefined"));
 
-    const nextInit = shouldIgnoreAbortSignal ? { ...init, signal: undefined } : init;
-    return originalFetch(input, nextInit).catch((error: any) => {
+    const nextInput =
+      shouldIgnoreAbortSignal && input instanceof Request
+        ? new Request(input, { signal: undefined })
+        : input;
+    const nextInit = shouldIgnoreAbortSignal && init?.signal ? { ...init, signal: undefined } : init;
+
+    return originalFetch(nextInput, nextInit).catch((error: any) => {
       const isSupabase = isSupabaseRestOrFn || isSupabaseAuth;
       const message = String(error?.message ?? error ?? "");
       const isAbortError =
