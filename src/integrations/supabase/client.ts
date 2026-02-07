@@ -3,17 +3,28 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || '');
-const SUPABASE_PUBLISHABLE_KEY = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
-export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+const SUPABASE_ANON_KEY = String(
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    import.meta.env.VITE_SUPABASE_PUBLIC_ANON_KEY ||
+    ''
+);
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'Missing Supabase env vars. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY/VITE_SUPABASE_PUBLIC_ANON_KEY).'
+  );
+}
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const SAFE_SUPABASE_URL = isSupabaseConfigured ? SUPABASE_URL : 'https://example.invalid';
-const SAFE_SUPABASE_KEY = isSupabaseConfigured ? SUPABASE_PUBLISHABLE_KEY : 'missing-supabase-key';
+const SAFE_SUPABASE_KEY = isSupabaseConfigured ? SUPABASE_ANON_KEY : 'missing-supabase-key';
+const SUPABASE_STORAGE = typeof window !== 'undefined' ? window.localStorage : undefined;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SAFE_SUPABASE_URL, SAFE_SUPABASE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: SUPABASE_STORAGE,
     persistSession: true,
     autoRefreshToken: true,
   }
