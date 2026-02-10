@@ -126,11 +126,18 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
     return originalFetch(nextInput, nextInit).catch((error: any) => {
       const isSupabase = isSupabaseRestOrFn || isSupabaseAuth;
       const message = String(error?.message ?? error ?? "");
+      const normalized = message.toLowerCase();
       const isAbortError =
         error?.name === "AbortError" ||
-        message.toLowerCase().includes("abort") ||
-        message.toLowerCase().includes("aborted");
-      const isFetchFailed = message.toLowerCase().includes("failed to fetch");
+        normalized.includes("abort") ||
+        normalized.includes("aborted");
+      const isFetchFailed =
+        normalized.includes("failed to fetch") ||
+        normalized.includes("network changed") ||
+        normalized.includes("timed out") ||
+        normalized.includes("timeout") ||
+        normalized.includes("name not resolved") ||
+        normalized.includes("dns");
 
       if (isSupabase && isAbortError) {
         return new Response(null, { status: 499, statusText: "Client Abort Suppressed" });
@@ -162,7 +169,7 @@ if (typeof window !== "undefined") {
   });
 }
 
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
+if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 

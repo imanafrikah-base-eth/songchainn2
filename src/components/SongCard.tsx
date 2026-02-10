@@ -442,12 +442,13 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           <SpinningSongArt isPlaying={isPlaying} size="xl" className="rounded-none" />
         ) : (
           <>
-            {song.coverImage ? (
+            {song.coverImage && !coverImageFailed ? (
               <img 
                 src={song.coverImage} 
                 alt={song.title} 
                 className="w-full h-full object-contain"
                 loading="lazy"
+                onError={() => setCoverImageFailed(true)}
               />
             ) : (
               <div className="absolute inset-0 gradient-primary opacity-40" />

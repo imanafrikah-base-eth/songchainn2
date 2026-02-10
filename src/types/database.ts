@@ -12,15 +12,22 @@ export interface UserRole {
 export interface AudienceProfile {
   id: string;
   user_id: string;
+  // New schema fields
+  display_name?: string | null;
   username?: string | null;
-  profile_name: string;
-  bio: string | null;
-  profile_picture_url: string | null;
+  avatar_url?: string | null;
   cover_photo_url: string | null;
-  x_profile_link: string | null;
-  base_profile_link: string | null;
   location: string | null;
-  onboarding_completed: boolean;
+  bio: string | null;
+  twitter_url?: string | null;
+  wallet_address?: string | null;
+
+  // Legacy / compatibility fields still used in some parts of the app
+  profile_name?: string;
+  profile_picture_url?: string | null;
+  x_profile_link?: string | null;
+  base_profile_link?: string | null;
+  onboarding_completed?: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -201,19 +201,52 @@ export function useSocial() {
     ));
   }, [user, posts]);
 
-  const followUser = useCallback(async (userId: string) => {
-    if (!user || userId === user.id) return;
+  const followUser = useCallback(
+    async (userId: string) => {
+      if (!user || userId === user.id) {
+        return;
+      }
 
-    const isCurrentlyFollowing = following.includes(userId);
-    if (isCurrentlyFollowing) {
-      await supabase.from('user_follows').delete().eq('follower_id', user.id).eq('following_id', userId);
-      setFollowing((prev) => prev.filter((id) => id !== userId));
-    } else {
-      await supabase.from('user_follows').insert({ follower_id: user.id, following_id: userId } as any);
-      setFollowing((prev) => Array.from(new Set([...prev, userId])));
-    }
-    toast({ title: isCurrentlyFollowing ? 'Unfollowed' : 'Following!' });
-  }, [user, following, toast]);
+      const isCurrentlyFollowing = following.includes(userId);
+
+      if (isCurrentlyFollowing) {
+        const { error } = await supabase
+          .from('user_follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', userId);
+
+        if (error) {
+          toast({
+            title: 'Could not unfollow',
+            description: error.message || 'Please try again in a moment.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        setFollowing((prev) => prev.filter((id) => id !== userId));
+        toast({ title: 'Unfollowed' });
+      } else {
+        const { error } = await supabase
+          .from('user_follows')
+          .insert({ follower_id: user.id, following_id: userId } as any);
+
+        if (error) {
+          toast({
+            title: 'Could not follow',
+            description: error.message || 'Please check your connection and try again.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        setFollowing((prev) => Array.from(new Set([...prev, userId])));
+        toast({ title: 'Following!' });
+      }
+    },
+    [user, following, toast]
+  );
 
   const isFollowing = useCallback((userId: string) => {
     return following.includes(userId);

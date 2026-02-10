@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
 import { hasWalletProvider, connectWallet, signMessage } from '@/lib/baseWallet';
 
 interface AuthContextType {
@@ -67,66 +68,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const [byUserIdRes, byIdRes] = await Promise.all([
-      supabase.from('audience_profiles').select('*').eq('user_id', user.id).maybeSingle(),
-      supabase.from('audience_profiles').select('*').eq('id', user.id).maybeSingle(),
-    ]);
-
-    const profileData = (byUserIdRes.data as any) || (byIdRes.data as any) || null;
-    const profileError = byUserIdRes.error || byIdRes.error;
-
-    if (profileError) {
-      setAudienceProfile(null);
-      setNeedsOnboarding(shouldRequireOnboardingFromStorage());
-      return;
-    }
-
-    if (profileData) {
-      setAudienceProfile(profileData as any);
-      const completed = (profileData as any).onboarding_completed;
-      const needs = completed === false;
-      setNeedsOnboarding(needs);
-      if (!needs) {
-        try {
-          localStorage.removeItem('songchainn_needs_onboarding');
-        } catch {
-          void 0;
-        }
-      }
-      return;
-    }
-
+    const { data: profileData, error: profileError } = await supabase
+      .from('audience_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
     const fallbackName =
       (user.email ? user.email.split('@')[0] : null) ||
       (user.user_metadata?.full_name as string | undefined) ||
       'Listener';
 
+    if (profileError) {
+      const cached = getProfile(user.id);
+      const localProfile = cached || ensureProfile(user.id, { profile_name: fallbackName, onboarding_completed: true });
+      setAudienceProfile(localProfile);
+      setNeedsOnboarding(false);
+      return;
+    }
+
+    if (profileData) {
+      setAudienceProfile(profileData as any);
+      upsertProfile(profileData as any);
+      setNeedsOnboarding(false);
+      return;
+    }
+
     const { data: created, error: createError } = await supabase
       .from('audience_profiles')
-      .upsert(
+      .insert(
         {
-          id: user.id,
           user_id: user.id,
-          profile_name: fallbackName,
-          bio: null,
-          profile_picture_url: null,
+          display_name: fallbackName,
+          username: fallbackName.toLowerCase(),
+          avatar_url: null,
           cover_photo_url: null,
-          x_profile_link: null,
-          base_profile_link: null,
+          bio: null,
           location: null,
-          onboarding_completed: true,
-        } as any,
-        { onConflict: 'id' }
+        } as any
       )
       .select('*')
       .maybeSingle();
 
     if (createError) {
-      setAudienceProfile(null);
+      const cached = getProfile(user.id);
+      const localProfile = cached || ensureProfile(user.id, { profile_name: fallbackName, onboarding_completed: true });
+      setAudienceProfile(localProfile);
       setNeedsOnboarding(false);
       return;
     }
 
+    if (created) {
+      upsertProfile(created as any);
+    }
     setAudienceProfile((created as any) ?? null);
     setNeedsOnboarding(false);
   }, [user]);
@@ -291,31 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsArtist(false);
       setArtistId(null);
 
-      const username = email.split('@')[0] || 'listener';
-      await supabase
-        .from('audience_profiles')
-        .upsert(
-          {
-            id: u.id,
-            user_id: u.id,
-            profile_name: username,
-            bio: null,
-            profile_picture_url: null,
-            cover_photo_url: null,
-            x_profile_link: null,
-            base_profile_link: null,
-            location: null,
-            onboarding_completed: false,
-          } as any,
-          { onConflict: 'id' }
-        );
-
       await refreshProfile();
-      try {
-        localStorage.setItem('songchainn_needs_onboarding', '1');
-      } catch {
-        void 0;
-      }
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Sign up failed') };
@@ -381,7 +350,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    if (import.meta.env.DEV) {
+      console.error('useAuth must be used within an AuthProvider');
+    }
+    return {
+      user: null,
+      isAuthenticated: false,
+      isAdmin: false,
+      isArtist: false,
+      artistId: null,
+      isLoading: false,
+      audienceProfile: null,
+      needsOnboarding: false,
+      walletAddress: null,
+      isWalletDetected: false,
+      signInWithWallet: async () => ({ error: new Error('AuthProvider missing') }),
+      signUpWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
+      signInWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
+      signOut: async () => {},
+      refreshProfile: async () => {},
+    };
   }
   return context;
 }

@@ -31,7 +31,6 @@ export function DownloadAppBanner() {
   const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
   useEffect(() => {
-    // Check if app is already installed (PWA)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
       || (window.navigator as any).standalone === true;
     
@@ -40,17 +39,50 @@ export function DownloadAppBanner() {
       return;
     }
 
-    // Check if banner was already dismissed
-    const wasDismissed = localStorage.getItem(BANNER_DISMISSED_KEY);
-    
-    // Only show on mobile devices
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    if (isMobile && !wasDismissed) {
-      const timer = setTimeout(() => setIsVisible(true), 5000);
-      return () => clearTimeout(timer);
+    let wasDismissed = false;
+    try {
+      wasDismissed = localStorage.getItem(BANNER_DISMISSED_KEY) === 'true';
+    } catch {
+      void 0;
     }
-  }, []);
+
+    if (wasDismissed) return;
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const existingPrompt = getDeferredInstallPrompt();
+    let timer: number | undefined;
+
+    if (existingPrompt || isIOS) {
+      timer = window.setTimeout(() => setIsVisible(true), 2000);
+    } else if (isMobile) {
+      timer = window.setTimeout(() => setIsVisible(true), 5000);
+    }
+
+    const handleInstallPrompt = () => {
+      try {
+        if (localStorage.getItem(BANNER_DISMISSED_KEY) === 'true') return;
+      } catch {
+        void 0;
+      }
+      setIsVisible(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setIsVisible(false);
+    };
+
+    window.addEventListener('pwa:installprompt', handleInstallPrompt);
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      window.removeEventListener('pwa:installprompt', handleInstallPrompt);
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, [isIOS]);
 
   // Simulate installation progress
   useEffect(() => {

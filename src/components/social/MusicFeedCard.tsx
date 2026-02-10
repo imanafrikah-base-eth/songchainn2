@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Heart, 
@@ -72,6 +72,13 @@ export function MusicFeedCard({
   const totalPulses = pulseCounts && song
     ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count || 0)
     : 0;
+
+  const handleSongImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.currentTarget;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = '/placeholder.svg';
+  };
 
   const handleShare = () => {
     if (song && artist) {
@@ -379,7 +386,12 @@ export function MusicFeedCard({
           className="w-12 h-12 rounded-full border-2 border-white/50 overflow-hidden"
         >
           {song ? (
-            <img src={song.coverImage} alt="" className="w-full h-full object-contain" />
+            <img
+              src={song.coverImage}
+              alt=""
+              className="w-full h-full object-contain"
+              onError={handleSongImageError}
+            />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center">
               <Disc3 className="w-6 h-6 text-white" />

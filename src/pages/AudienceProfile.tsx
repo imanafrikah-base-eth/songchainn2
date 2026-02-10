@@ -205,10 +205,10 @@ export default function AudienceProfile() {
         const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
         const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
         const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
-        const fileName = `profile_picture_url-${userId}-${Date.now()}.${extension}`;
+        const fileName = `avatar_url-${userId}-${Date.now()}.${extension}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('profile-images')
+          .from('avaters')
           .upload(fileName, file, {
             cacheControl: '3600',
             upsert: false,
@@ -218,16 +218,16 @@ export default function AudienceProfile() {
           throw new Error('Failed to upload image to storage');
         }
 
-        const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
-        const imageUrl = `${baseUrl}/storage/v1/object/public/profile-images/${uploadData.path}`;
+        const { data: publicUrlData } = supabase.storage.from('avaters').getPublicUrl(uploadData.path);
+        const imageUrl = publicUrlData.publicUrl;
 
         const { error: updateError } = await supabase
           .from('audience_profiles')
-          .update({ profile_picture_url: imageUrl } as any)
-          .eq('id', userId);
+          .update({ avatar_url: imageUrl } as any)
+          .eq('user_id', userId);
         if (updateError) throw updateError;
 
-        setProfile((prev) => (prev ? { ...prev, profile_picture_url: imageUrl } : prev));
+        setProfile((prev) => (prev ? { ...prev, avatar_url: imageUrl } : prev));
         toast({ title: 'Profile picture updated' });
       } catch (err: any) {
         toast({ title: 'Failed to update profile picture' });
@@ -303,7 +303,7 @@ export default function AudienceProfile() {
           {/* Avatar */}
           <div className="relative inline-block">
             <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl">
-              <AvatarImage src={profile.profile_picture_url || ''} onError={handleImageError} />
+              <AvatarImage src={profile.avatar_url || ''} onError={handleImageError} />
               <AvatarFallback className="text-4xl bg-primary/20 text-primary">
                 {profile.profile_name?.charAt(0) || '?'}
               </AvatarFallback>

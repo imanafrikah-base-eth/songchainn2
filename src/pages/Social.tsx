@@ -1,9 +1,9 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Users, 
-  TrendingUp, 
-  UserPlus, 
+import {
+  Users,
+  TrendingUp,
+  UserPlus,
   Headphones,
   Plus,
   Compass,
@@ -32,6 +32,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { supabase } from '@/integrations/supabase/client';
 import { useSafePlayerState } from '@/context/PlayerContext';
 import { AnimatedBackground } from '@/components/ui/animated-background';
+import logo from '@/assets/songchainn-logo.webp';
 
 export default function Social() {
   const { user, audienceProfile } = useAuth();
@@ -491,6 +492,42 @@ export default function Social() {
         />
 
         <Navigation />
+      </div>
+      
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-lg px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full glass-card rounded-3xl shine-overlay p-8 sm:p-10 text-center flex flex-col items-center gap-4"
+        >
+          <div className="relative mb-2">
+            <div className="absolute inset-0 blur-3xl bg-primary/40 opacity-40" />
+            <img
+              src={logo}
+              alt="$ongChainn"
+              className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto object-contain"
+            />
+          </div>
+          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase">
+            Feed
+          </span>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
+            SongFeed is coming soon
+          </h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Soon you&apos;ll be able to share what you&apos;re listening to and scroll a live music feed from the $ongChainn community.
+          </p>
+          <p className="text-xs text-muted-foreground/80">
+            For now, keep exploring songs while we finish this experience.
+          </p>
+          <Button
+            className="mt-2"
+            variant="outline"
+            onClick={() => navigate('/')}
+          >
+            Back to Home
+          </Button>
+        </motion.div>
       </div>
     </div>
   );

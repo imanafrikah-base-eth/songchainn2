@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Headphones, ListMusic, Music, Pause, Play, Lock, Globe, Plus } from 'lucide-react';
 import { SONGS, type Song } from '@/data/musicData';
@@ -14,9 +14,11 @@ import type { Playlist } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { setPlaylistSongs } from '@/lib/localDb';
+import logo from '@/assets/songchainn-logo.webp';
 
 export default function PlaylistDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { currentSong, isPlaying } = usePlayerState();
   const { playQueue, togglePlay } = usePlayerActions();
   const { playlists, getPlaylistSongs, createPlaylist } = useAudienceInteractions();
@@ -348,6 +350,42 @@ export default function PlaylistDetail() {
       </main>
 
       <AudioPlayer />
+      
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-lg px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full glass-card rounded-3xl shine-overlay p-8 sm:p-10 text-center flex flex-col items-center gap-4"
+        >
+          <div className="relative mb-2">
+            <div className="absolute inset-0 blur-3xl bg-primary/40 opacity-40" />
+            <img
+              src={logo}
+              alt="$ongChainn"
+              className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto object-contain"
+            />
+          </div>
+          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase">
+            Playlists
+          </span>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
+            Playlists are coming soon
+          </h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Soon you&apos;ll be able to build, save, and share curated $ongChainn playlists with your crew.
+          </p>
+          <p className="text-xs text-muted-foreground/80">
+            Thanks for testing early while we finish this feature.
+          </p>
+          <Button
+            className="mt-2"
+            variant="outline"
+            onClick={() => navigate('/')}
+          >
+            Back to Home
+          </Button>
+        </motion.div>
+      </div>
     </div>
   );
 }

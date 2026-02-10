@@ -19,9 +19,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import logo from '@/assets/songchainn-logo.webp';
 
 // X (Twitter) and Base icons
 const XTwitterIcon = () => (
@@ -84,6 +85,7 @@ export default function Profile() {
     startOffsetY: number;
   } | null>(null);
   
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -117,15 +119,15 @@ export default function Profile() {
 
   useEffect(() => {
     if (audienceProfile) {
-      setProfileName(audienceProfile.profile_name);
+      setProfileName(audienceProfile.display_name || audienceProfile.username || 'Listener');
       setBio(audienceProfile.bio || '');
-      setXProfileLink(audienceProfile.x_profile_link || '');
-      setBaseProfileLink(audienceProfile.base_profile_link || '');
+      setXProfileLink(audienceProfile.twitter_url || '');
+      setBaseProfileLink(audienceProfile.wallet_address || '');
     }
   }, [audienceProfile]);
 
   const uploadAndUpdateProfileImage = useCallback(
-    async (file: File, field: 'profile_picture_url' | 'cover_photo_url') => {
+    async (file: File, field: 'avatar_url' | 'cover_photo_url') => {
       if (!user) return;
       if (!isSupabaseConfigured) {
         throw new Error('Supabase is not configured');
@@ -134,10 +136,11 @@ export default function Profile() {
       const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
       const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
       const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
+      const bucket = field === 'avatar_url' ? 'avaters' : 'covers';
       const fileName = `${field}-${user.id}-${Date.now()}.${extension}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('profile-images')
+        .from(bucket)
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false,
@@ -147,18 +150,18 @@ export default function Profile() {
         throw new Error('Failed to upload image to storage');
       }
 
-      const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
-      const imageUrl = `${baseUrl}/storage/v1/object/public/profile-images/${uploadData.path}`;
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(uploadData.path);
+      const imageUrl = publicUrlData.publicUrl;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
         .update({ [field]: imageUrl } as any)
-        .or(`id.eq.${user.id},user_id.eq.${user.id}`);
+        .eq('user_id', user.id);
       if (updateError) throw updateError;
 
       await refreshProfile();
       toast({
-        title: field === 'profile_picture_url' ? 'Profile photo updated' : 'Cover photo updated',
+        title: field === 'avatar_url' ? 'Profile photo updated' : 'Cover photo updated',
         description: 'Looking sharp. Your profile is live on $ongChainn.',
       });
       return imageUrl;
@@ -399,7 +402,7 @@ export default function Profile() {
 
       setIsUploadingProfilePicture(true);
       try {
-        const imageUrl = await uploadAndUpdateProfileImage(croppedFile, 'profile_picture_url');
+        const imageUrl = await uploadAndUpdateProfileImage(croppedFile, 'avatar_url');
         if (imageUrl) {
           setPendingAvatarUrl(imageUrl);
         }
@@ -423,10 +426,11 @@ export default function Profile() {
       const { error } = await supabase
         .from('audience_profiles')
         .update({
-          profile_name: profileName.trim(),
+          display_name: profileName.trim(),
+          username: profileName.trim().toLowerCase(),
           bio: bio.trim() || null,
-          x_profile_link: xProfileLink.trim() || null,
-          base_profile_link: baseProfileLink.trim() || null,
+          twitter_url: xProfileLink.trim() || null,
+          wallet_address: baseProfileLink.trim() || null,
         } as any)
         .or(`id.eq.${user.id},user_id.eq.${user.id}`);
       if (error) throw error;
@@ -479,7 +483,8 @@ export default function Profile() {
   }
 
   const effectiveCoverUrl = pendingCoverUrl || audienceProfile.cover_photo_url;
-  const effectiveAvatarUrl = pendingAvatarUrl || audienceProfile.profile_picture_url;
+  const effectiveAvatarUrl =
+    pendingAvatarUrl || audienceProfile.avatar_url || audienceProfile.profile_picture_url;
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -1242,6 +1247,42 @@ export default function Profile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-lg px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full glass-card rounded-3xl shine-overlay p-8 sm:p-10 text-center flex flex-col items-center gap-4"
+        >
+          <div className="relative mb-2">
+            <div className="absolute inset-0 blur-3xl bg-primary/40 opacity-40" />
+            <img
+              src={logo}
+              alt="$ongChainn"
+              className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto object-contain"
+            />
+          </div>
+          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase">
+            Profile
+          </span>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
+            Profiles are coming soon
+          </h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Soon you&apos;ll be able to customize your $ongChainn profile, showcase playlists, and flex your listening.
+          </p>
+          <p className="text-xs text-muted-foreground/80">
+            Your account is active; we&apos;re just putting the finishing touches on this page.
+          </p>
+          <Button
+            className="mt-2"
+            variant="outline"
+            onClick={() => navigate('/')}
+          >
+            Back to Home
+          </Button>
+        </motion.div>
+      </div>
     </div>
   );
 }

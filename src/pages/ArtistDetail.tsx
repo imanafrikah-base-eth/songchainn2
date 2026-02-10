@@ -176,10 +176,10 @@ export default function ArtistDetail() {
       const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
       const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
       const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
-      const fileName = `profile_picture_url-${ownerUserId}-${Date.now()}.${extension}`;
+      const fileName = `avatar_url-${ownerUserId}-${Date.now()}.${extension}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('profile-images')
+        .from('avaters')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false,
@@ -189,13 +189,13 @@ export default function ArtistDetail() {
         throw new Error('Failed to upload image to storage');
       }
 
-      const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
-      const imageUrl = `${baseUrl}/storage/v1/object/public/profile-images/${uploadData.path}`;
+      const { data: publicUrlData } = supabase.storage.from('avaters').getPublicUrl(uploadData.path);
+      const imageUrl = publicUrlData.publicUrl;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
-        .update({ profile_picture_url: imageUrl } as any)
-        .eq('id', ownerUserId);
+        .update({ avatar_url: imageUrl } as any)
+        .eq('user_id', ownerUserId);
       if (updateError) throw updateError;
 
       queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {
@@ -227,7 +227,7 @@ export default function ArtistDetail() {
       const fileName = `cover_photo_url-${ownerUserId}-${Date.now()}.${extension}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('profile-images')
+        .from('covers')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false,
@@ -237,13 +237,13 @@ export default function ArtistDetail() {
         throw new Error('Failed to upload image to storage');
       }
 
-      const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
-      const imageUrl = `${baseUrl}/storage/v1/object/public/profile-images/${uploadData.path}`;
+      const { data: publicUrlData } = supabase.storage.from('covers').getPublicUrl(uploadData.path);
+      const imageUrl = publicUrlData.publicUrl;
 
       const { error: updateError } = await supabase
         .from('audience_profiles')
         .update({ cover_photo_url: imageUrl } as any)
-        .eq('id', ownerUserId);
+        .eq('user_id', ownerUserId);
       if (updateError) throw updateError;
 
       queryClient.setQueryData(['artist-public-profile', ownerUserId], (prev: any) => {

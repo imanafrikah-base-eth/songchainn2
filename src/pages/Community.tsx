@@ -19,6 +19,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { getAllProfiles, upsertProfile } from '@/lib/localDb';
 import { useAuth } from '@/context/AuthContext';
 import { useSocial } from '@/hooks/useSocial';
 import { useTopProfiles } from '@/hooks/usePopularity';
@@ -32,19 +33,19 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AnimatedBackground } from '@/components/ui/animated-background';
+import logo from '@/assets/songchainn-logo.webp';
 
 interface UserProfile {
   id: string;
   user_id: string;
-  profile_name: string;
-  profile_picture_url: string | null;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
   cover_photo_url: string | null;
   bio: string | null;
   location: string | null;
   created_at: string;
   updated_at?: string | null;
-  x_profile_link: string | null;
-  base_profile_link: string | null;
   follower_count?: number;
   post_count?: number;
   play_count?: number;
@@ -100,6 +101,31 @@ export default function Community() {
         if (import.meta.env.DEV) {
           console.error('Error fetching users:', error);
         }
+        const cached = Object.values(getAllProfiles() || {}).filter((p) => p?.user_id);
+        if (cached.length) {
+          const normalizedCached: UserProfile[] = cached.map((p: any) => ({
+            id: String(p.id),
+            user_id: String(p.user_id ?? p.id),
+            display_name:
+              p.display_name ??
+              p.profile_name ??
+              p.username ??
+              'Listener',
+            username: p.username ?? null,
+            avatar_url: p.avatar_url ?? p.profile_picture_url ?? null,
+            cover_photo_url: p.cover_photo_url ?? null,
+            bio: p.bio ?? null,
+            location: p.location ?? null,
+            created_at: p.created_at ?? new Date().toISOString(),
+            updated_at: p.updated_at ?? null,
+            follower_count: 0,
+            post_count: 0,
+            play_count: 0,
+            is_following: false,
+          }));
+          setUsers(normalizedCached);
+          setFilteredUsers(normalizedCached);
+        }
         setIsLoading(false);
         return;
       }
@@ -108,6 +134,12 @@ export default function Community() {
         .map((p) => ({
           ...p,
           user_id: p?.user_id ?? p?.id,
+          display_name: p?.display_name ?? p?.username ?? 'Listener',
+          username: p?.username ?? null,
+          avatar_url: p?.avatar_url ?? null,
+          cover_photo_url: p?.cover_photo_url ?? null,
+          bio: p?.bio ?? null,
+          location: p?.location ?? null,
         }))
         .filter((p) => p?.user_id) as UserProfile[];
 
@@ -116,6 +148,7 @@ export default function Community() {
         if (!dedupedByUserId.has(p.user_id)) dedupedByUserId.set(p.user_id, p);
       });
       const uniqueProfiles = Array.from(dedupedByUserId.values());
+      uniqueProfiles.forEach((profile) => upsertProfile(profile as any));
 
       // Get follower counts and post counts
       const userIds = uniqueProfiles.map(p => p.user_id);
@@ -197,10 +230,12 @@ export default function Community() {
 
   // Filter and sort users
   useEffect(() => {
-    let filtered = users.filter(u => 
-      u.profile_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.bio?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const query = searchQuery.toLowerCase();
+    let filtered = users.filter((u) => {
+      const name = (u.display_name || u.username || '').toLowerCase();
+      const bio = (u.bio || '').toLowerCase();
+      return name.includes(query) || bio.includes(query);
+    });
 
     switch (sortBy) {
       case 'newest':
@@ -320,7 +355,11 @@ export default function Community() {
                 </Badge>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {onlineUsers.slice(0, viewMode === 'grid' ? 8 : 10).map((profile) => (
+                {onlineUsers.slice(0, viewMode === 'grid' ? 8 : 10).map((profile) => {
+                  const displayName =
+                    profile.display_name || profile.username || 'Listener';
+                  const initial = displayName.charAt(0).toUpperCase();
+                  return (
                   <button
                     key={profile.user_id}
                     type="button"
@@ -328,21 +367,21 @@ export default function Community() {
                     onClick={() => void goToProfile(profile.user_id)}
                   >
                     <Avatar className="w-10 h-10 border border-border">
-                      <AvatarImage src={profile.profile_picture_url || ''} onError={handleImageError} />
+                      <AvatarImage src={profile.avatar_url || ''} onError={handleImageError} />
                       <AvatarFallback className="bg-primary/20 text-primary text-sm font-bold">
-                        {profile.profile_name.charAt(0).toUpperCase()}
+                        {initial}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">
-                        {profile.profile_name}
+                        {displayName}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatPresenceLabel(true, lastSeenByUserId[profile.user_id] ?? null)}
                       </p>
                     </div>
                   </button>
-                ))}
+                );})}
               </div>
             </div>
           </motion.section>
@@ -482,9 +521,11 @@ export default function Community() {
                   {/* Avatar */}
                   <div className={`${viewMode === 'grid' ? 'mb-3' : ''}`}>
                     <Avatar className={`${viewMode === 'grid' ? 'w-16 h-16' : 'w-14 h-14'} border-4 border-background shadow-lg`}>
-                      <AvatarImage src={profile.profile_picture_url || ''} onError={handleImageError} />
+                      <AvatarImage src={profile.avatar_url || ''} onError={handleImageError} />
                       <AvatarFallback className="bg-primary/20 text-primary text-xl font-bold">
-                        {profile.profile_name.charAt(0).toUpperCase()}
+                        {(profile.display_name || profile.username || 'L')
+                          .charAt(0)
+                          .toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   </div>
@@ -494,7 +535,7 @@ export default function Community() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(profile.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                       <h3 className="font-semibold text-foreground truncate">
-                        {profile.profile_name}
+                          {profile.display_name || profile.username || 'Listener'}
                       </h3>
                       {!onlineUserIds.has(profile.user_id) && (
                         <span className="text-xs text-muted-foreground">
@@ -604,6 +645,42 @@ export default function Community() {
       </main>
 
       <AudioPlayer />
+      
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-lg px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full glass-card rounded-3xl shine-overlay p-8 sm:p-10 text-center flex flex-col items-center gap-4"
+        >
+          <div className="relative mb-2">
+            <div className="absolute inset-0 blur-3xl bg-primary/40 opacity-40" />
+            <img
+              src={logo}
+              alt="$ongChainn"
+              className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto object-contain"
+            />
+          </div>
+          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase">
+            Community
+          </span>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
+            Community is coming soon
+          </h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            You&apos;re early. Soon you&apos;ll be able to discover listeners, follow profiles, and see who&apos;s spinning what in real time.
+          </p>
+          <p className="text-xs text-muted-foreground/80">
+            Keep exploring music while we finish building this part of $ongChainn.
+          </p>
+          <Button
+            className="mt-2"
+            variant="outline"
+            onClick={() => navigate('/')}
+          >
+            Back to Home
+          </Button>
+        </motion.div>
+      </div>
     </div>
   );
 }
