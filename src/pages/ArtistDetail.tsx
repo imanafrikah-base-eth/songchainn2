@@ -134,10 +134,11 @@ export default function ArtistDetail() {
 
   const displayName = (artistProfile as any)?.profile_name || artist?.name;
   const displayBio = (artistProfile as any)?.bio || artist?.bio;
-  const preferStaticProfileImage = !!artist?.id && ['1', '2', '3', '4', '5', '6', '7', '8'].includes(artist.id);
-  const displayProfileImage = preferStaticProfileImage
-    ? artist?.profileImage || (artistProfile as any)?.profile_picture_url
-    : (artistProfile as any)?.profile_picture_url || artist?.profileImage;
+  const displayProfileImage =
+    (artistProfile as any)?.profile_picture_url ||
+    artist?.profileImage ||
+    (artistProfile as any)?.avatar_url ||
+    null;
   const displayCoverPhoto = (artistProfile as any)?.cover_photo_url || null;
   const isOwner = !!user && !!ownerUserId && user.id === ownerUserId;
   const isVerified = artistAccount?.is_verified ?? false;
@@ -904,8 +905,8 @@ export default function ArtistDetail() {
           <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Timeline</h2>
           {isOwner && (
             <PostComposer
-              onPost={async (content, type, songId, image) => {
-                await createPost(content, type, songId, undefined, image);
+              onPost={async (content, type, songId) => {
+                await createPost(content, type, songId);
                 if (timelineUserId) {
                   queryClient.invalidateQueries({ queryKey: ['artist-timeline-posts', timelineUserId] });
                 }

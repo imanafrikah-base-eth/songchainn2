@@ -75,6 +75,11 @@ export default function Social() {
     return params.id || searchParams.get('post');
   }, [location.search, params.id]);
 
+  const shareSongId = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get('song');
+  }, [location.search]);
+
   useEffect(() => {
     const fetchSuggestedUsers = async () => {
       if (!user) return;
@@ -98,6 +103,12 @@ export default function Social() {
   useEffect(() => {
     refetchPosts(feedType === 'following' ? 'following' : 'all');
   }, [feedType, refetchPosts]);
+
+  useEffect(() => {
+    if (shareSongId) {
+      setShowComposer(true);
+    }
+  }, [shareSongId]);
 
   useEffect(() => {
     if (!sharedPostId) {
@@ -154,6 +165,15 @@ export default function Social() {
 
   const currentPost = filteredPosts[currentPostIndex];
   const currentCommentsCount = currentPost?.comments_count || 0;
+
+  const closeComposer = useCallback(() => {
+    setShowComposer(false);
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.has('song')) {
+      searchParams.delete('song');
+      navigate({ pathname: location.pathname, search: searchParams.toString() }, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (sharedPostId) return;
@@ -458,7 +478,7 @@ export default function Social() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-                onClick={() => setShowComposer(false)}
+                onClick={closeComposer}
               />
               <motion.div
                 initial={{ y: '100%' }}
@@ -473,8 +493,10 @@ export default function Social() {
                 <PostComposer 
                   onPost={async (content, type, songId) => {
                     await createPost(content, type, songId);
-                    setShowComposer(false);
-                  }} 
+                    closeComposer();
+                  }}
+                  initialType={shareSongId ? 'song_share' : 'text'}
+                  initialSongId={shareSongId ?? undefined}
                 />
               </motion.div>
             </>
@@ -492,42 +514,6 @@ export default function Social() {
         />
 
         <Navigation />
-      </div>
-      
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-lg px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full glass-card rounded-3xl shine-overlay p-8 sm:p-10 text-center flex flex-col items-center gap-4"
-        >
-          <div className="relative mb-2">
-            <div className="absolute inset-0 blur-3xl bg-primary/40 opacity-40" />
-            <img
-              src={logo}
-              alt="$ongChainn"
-              className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto object-contain"
-            />
-          </div>
-          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase">
-            Feed
-          </span>
-          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
-            SongFeed is coming soon
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Soon you&apos;ll be able to share what you&apos;re listening to and scroll a live music feed from the $ongChainn community.
-          </p>
-          <p className="text-xs text-muted-foreground/80">
-            For now, keep exploring songs while we finish this experience.
-          </p>
-          <Button
-            className="mt-2"
-            variant="outline"
-            onClick={() => navigate('/')}
-          >
-            Back to Home
-          </Button>
-        </motion.div>
       </div>
     </div>
   );

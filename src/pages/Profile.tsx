@@ -23,6 +23,19 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import logo from '@/assets/songchainn-logo.webp';
+import { uploadPublicImage } from '../lib/storage';
+
+const first = <T,>(arr: T[] | null | undefined): T | undefined =>
+  Array.isArray(arr) && arr.length > 0 ? arr[0] : undefined;
+
+const firstSplit = (
+  value: string | null | undefined,
+  delimiter: string | RegExp
+): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const parts = value.split(delimiter).map((s) => s.trim()).filter(Boolean);
+  return parts.length > 0 ? parts[0] : undefined;
+};
 
 // X (Twitter) and Base icons
 const XTwitterIcon = () => (
@@ -39,7 +52,7 @@ const BaseIcon = () => (
 );
 
 export default function Profile() {
-  const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding } = useAuth();
+  const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding, isLoading } = useAuth();
   const { likedSongs, playlists, savedCatalogs, createPlaylist, deletePlaylist } = useAudienceInteractions();
   const { points, completedReferrals, shareInviteLink } = useReferrals();
   const { toast } = useToast();
@@ -128,50 +141,50 @@ export default function Profile() {
 
   const uploadAndUpdateProfileImage = useCallback(
     async (file: File, field: 'avatar_url' | 'cover_photo_url') => {
-      if (!user) return;
       if (!isSupabaseConfigured) {
         throw new Error('Supabase is not configured');
       }
 
-      const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
-      const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
-      const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
-      const bucket = field === 'avatar_url' ? 'avaters' : 'covers';
-      const fileName = `${field}-${user.id}-${Date.now()}.${extension}`;
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const authedUser = authData.user;
+      if (!authedUser) throw new Error('Not authenticated');
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      const publicUrl = await uploadPublicImage({
+        bucket: field === 'avatar_url' ? 'avaters' : 'covers',
+        userId: authedUser.id,
+        file,
+      });
 
-      if (uploadError || !uploadData?.path) {
-        throw new Error('Failed to upload image to storage');
-      }
+      const updatePayload =
+        field === 'avatar_url' ? { avatar_url: publicUrl } : { cover_photo_url: publicUrl };
 
-      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(uploadData.path);
-      const imageUrl = publicUrlData.publicUrl;
-
-      const { error: updateError } = await supabase
+      const { error: dbError } = await supabase
         .from('audience_profiles')
-        .update({ [field]: imageUrl } as any)
-        .eq('user_id', user.id);
-      if (updateError) throw updateError;
+        .update(updatePayload)
+        .eq('id', authedUser.id);
+      if (dbError) throw dbError;
 
       await refreshProfile();
       toast({
         title: field === 'avatar_url' ? 'Profile photo updated' : 'Cover photo updated',
         description: 'Looking sharp. Your profile is live on $ongChainn.',
       });
-      return imageUrl;
+      return publicUrl;
     },
-    [refreshProfile, toast, user]
+    [refreshProfile, toast]
   );
+
+  const safeProfileName =
+    profileName ||
+    audienceProfile?.display_name ||
+    audienceProfile?.username ||
+    (user && typeof user.email === 'string' ? firstSplit(user.email, '@') ?? '' : '') ||
+    'Listener';
 
   const handleProfilePictureChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      const file = first(Array.from(e.target.files ?? []));
       e.target.value = '';
       if (!file) return;
       if (file.size > 10 * 1024 * 1024) {
@@ -200,7 +213,7 @@ export default function Profile() {
 
   const handleCoverPhotoChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      const file = first(Array.from(e.target.files ?? []));
       e.target.value = '';
       if (!file) return;
       if (file.size > 10 * 1024 * 1024) {
@@ -790,13 +803,13 @@ export default function Profile() {
               {effectiveAvatarUrl ? (
                 <img
                   src={effectiveAvatarUrl}
-                  alt={audienceProfile.profile_name}
+                  alt={safeProfileName}
                   className="w-full h-full object-contain"
                   onError={handleImageError}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-muted-foreground">
-                  {audienceProfile.profile_name[0].toUpperCase()}
+                  {safeProfileName.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
@@ -917,7 +930,7 @@ export default function Profile() {
             <Input
               value={baseProfileLink}
               onChange={(e) => setBaseProfileLink(e.target.value)}
-              placeholder="Base profile or wallet address"
+              placeholder="Base name (example.base.eth)"
             />
           </div>
         ) : (
@@ -936,9 +949,13 @@ export default function Profile() {
             )}
             {audienceProfile.base_profile_link && (
               <a
-                href={audienceProfile.base_profile_link.startsWith('0x') 
-                  ? `https://basescan.org/address/${audienceProfile.base_profile_link}` 
-                  : audienceProfile.base_profile_link}
+                href={
+                  audienceProfile.base_profile_link.startsWith('0x')
+                    ? `https://basescan.org/address/${audienceProfile.base_profile_link}`
+                    : audienceProfile.base_profile_link.startsWith('http')
+                      ? audienceProfile.base_profile_link
+                      : `https://base.app/${audienceProfile.base_profile_link}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
@@ -1247,42 +1264,6 @@ export default function Profile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-lg px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full glass-card rounded-3xl shine-overlay p-8 sm:p-10 text-center flex flex-col items-center gap-4"
-        >
-          <div className="relative mb-2">
-            <div className="absolute inset-0 blur-3xl bg-primary/40 opacity-40" />
-            <img
-              src={logo}
-              alt="$ongChainn"
-              className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto object-contain"
-            />
-          </div>
-          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase">
-            Profile
-          </span>
-          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
-            Profiles are coming soon
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Soon you&apos;ll be able to customize your $ongChainn profile, showcase playlists, and flex your listening.
-          </p>
-          <p className="text-xs text-muted-foreground/80">
-            Your account is active; we&apos;re just putting the finishing touches on this page.
-          </p>
-          <Button
-            className="mt-2"
-            variant="outline"
-            onClick={() => navigate('/')}
-          >
-            Back to Home
-          </Button>
-        </motion.div>
-      </div>
     </div>
   );
 }

@@ -99,14 +99,22 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Sync liked songs from database when user logs in
   useEffect(() => {
     const syncLikesFromDatabase = async () => {
       if (user) {
-        const { data } = await supabase.from('liked_songs').select('song_id').eq('user_id', user.id);
-        setLikedSongsState(new Set((data || []).map((r: any) => r.song_id).filter(Boolean)));
+        const { data, error } = await supabase
+          .from('liked_songs')
+          .select('song_id')
+          .eq('user_id', user.id);
+        if (error) {
+          if (import.meta.env.DEV) {
+            console.error('Failed to sync liked songs from Supabase', error);
+          }
+          setLikedSongsState(new Set());
+        } else {
+          setLikedSongsState(new Set((data || []).map((r: any) => r.song_id).filter(Boolean)));
+        }
       } else {
-        // Fall back to localStorage for non-authenticated users
         const saved = localStorage.getItem('songchainn_likes');
         setLikedSongsState(saved ? new Set(JSON.parse(saved)) : new Set());
       }
@@ -260,13 +268,19 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     void payload;
 
     (async () => {
-      await supabase.from('song_analytics').insert({
-        event_type: 'pulse',
-        song_id: songId,
-        user_id: null,
-      } as any);
+      try {
+        await supabase.from('song_analytics').insert({
+          event_type: 'pulse',
+          song_id: songId,
+          user_id: user?.id ?? null,
+        } as any);
+      } catch {
+        if (import.meta.env.DEV) {
+          console.error('Failed to record pulse event');
+        }
+      }
     })();
-  }, []);
+  }, [user]);
 
   const toggleLike = useCallback(async (songId: string) => {
     const isCurrentlyLiked = likedSongs.has(songId);
@@ -285,10 +299,34 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     });
 
     if (user) {
-      if (isCurrentlyLiked) {
-        await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
-      } else {
-        await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
+      try {
+        if (isCurrentlyLiked) {
+          await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
+        } else {
+          await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
+
+          const { data: existingLikes, error: selectError } = await supabase
+            .from('social_posts')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('song_id', songId)
+            .eq('post_type', 'song_like')
+            .limit(1);
+
+          if (!selectError && (!existingLikes || existingLikes.length === 0)) {
+            await supabase.from('social_posts').insert({
+              user_id: user.id,
+              song_id: songId,
+              playlist_id: null,
+              content: null,
+              post_type: 'song_like',
+            } as any);
+          }
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error('Failed to toggle like or create social post', error);
+        }
       }
     }
   }, [user, likedSongs]);

@@ -45,6 +45,11 @@ export function LocationPrompt({ isOpen, onClose, onSuccess }: LocationPromptPro
       updateProfile(user.id, { location: location.trim() });
 
       toast({ title: 'Location updated!', description: 'Thanks for sharing where you listen from.' });
+      try {
+        localStorage.setItem('location_prompt_dismissed', 'true');
+      } catch {
+        void 0;
+      }
       onSuccess();
     } catch (err: any) {
       toast({ title: 'Error updating location', variant: 'destructive' });
@@ -54,8 +59,11 @@ export function LocationPrompt({ isOpen, onClose, onSuccess }: LocationPromptPro
   };
 
   const handleSkip = () => {
-    // Store in localStorage that user has skipped - we can remind them later
-    localStorage.setItem('location_prompt_skipped', Date.now().toString());
+    try {
+      localStorage.setItem('location_prompt_dismissed', 'true');
+    } catch {
+      void 0;
+    }
     onClose();
   };
 
@@ -78,7 +86,7 @@ export function LocationPrompt({ isOpen, onClose, onSuccess }: LocationPromptPro
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md mx-4 bg-background rounded-3xl p-6 z-50 shadow-2xl border border-border"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md max-h-[90vh] mx-4 bg-background rounded-3xl p-4 sm:p-6 z-50 shadow-2xl border border-border overflow-y-auto"
           >
             {/* Close Button */}
             <button

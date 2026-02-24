@@ -347,7 +347,7 @@ export function useTodayHotSongs(limit = 5) {
 
       counts.forEach((playsToday, songId) => {
         const song = SONGS.find(s => s.id === songId);
-        if (song && playsToday > 0) {
+        if (song) {
           const pulses = pulseCounts.get(songId) || 0;
           result.push({ song, playsToday: playsToday + pulses });
         }

@@ -153,7 +153,7 @@ export function ShareSongButton({
 
   if (variant === 'button') {
     return (
-      <div className={`relative ${className}`}>
+      <div className={className}>
         <Button
           variant="outline"
           size="sm"
@@ -178,11 +178,11 @@ export function ShareSongButton({
                 onClick={() => setShowDropdown(false)}
               />
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                className={`absolute right-0 z-50 min-w-[180px] glass-card rounded-xl border border-border p-2 shadow-lg ${
-                  dropdownSide === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className={`fixed z-50 min-w-[180px] glass-card rounded-xl border border-border p-2 shadow-lg right-4 ${
+                  dropdownSide === 'top' ? 'top-24' : 'bottom-24'
                 }`}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -210,7 +210,7 @@ export function ShareSongButton({
 
   // Icon variant (default)
   return (
-    <div className={`relative ${className}`}>
+    <div className={className}>
       <motion.button
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
@@ -237,11 +237,11 @@ export function ShareSongButton({
               }}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              className={`absolute right-0 z-50 min-w-[160px] glass-card rounded-xl border border-border p-1.5 shadow-lg ${
-                dropdownSide === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className={`fixed z-50 min-w-[160px] glass-card rounded-xl border border-border p-1.5 shadow-lg right-4 ${
+                dropdownSide === 'top' ? 'top-24' : 'bottom-24'
               }`}
               onClick={(e) => e.stopPropagation()}
             >

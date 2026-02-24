@@ -1,4 +1,4 @@
-import { useState, useEffect, type SyntheticEvent } from 'react';
+import { useState, useEffect, useMemo, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -52,6 +52,71 @@ interface UserProfile {
   is_following?: boolean;
 }
 
+function normalizeProfile(raw: any): UserProfile | null {
+  if (!raw) return null;
+  const userId = raw.user_id ?? raw.id;
+  if (!userId) return null;
+  const displayName =
+    raw.display_name ??
+    raw.profile_name ??
+    raw.username ??
+    'Listener';
+  const username = raw.username ?? null;
+  const avatarUrl =
+    raw.avatar_url ??
+    raw.profile_picture_url ??
+    null;
+  const coverPhotoUrl = raw.cover_photo_url ?? null;
+  const bio = raw.bio ?? null;
+  const location = raw.location ?? null;
+  const createdAt =
+    typeof raw.created_at === 'string'
+      ? raw.created_at
+      : new Date().toISOString();
+  const updatedAt =
+    typeof raw.updated_at === 'string'
+      ? raw.updated_at
+      : null;
+
+  return {
+    id: String(raw.id ?? userId),
+    user_id: String(userId),
+    display_name: displayName,
+    username,
+    avatar_url: avatarUrl,
+    cover_photo_url: coverPhotoUrl,
+    bio,
+    location,
+    created_at: createdAt,
+    updated_at: updatedAt,
+    follower_count: typeof raw.follower_count === 'number' ? raw.follower_count : 0,
+    post_count: typeof raw.post_count === 'number' ? raw.post_count : 0,
+    play_count: typeof raw.play_count === 'number' ? raw.play_count : 0,
+    is_following: Boolean(raw.is_following),
+  };
+}
+
+function safeInitials(displayName: string | null | undefined, username: string | null | undefined, fallback: string): string {
+  const source =
+    (displayName && typeof displayName === 'string' && displayName.trim()) ||
+    (username && typeof username === 'string' && username.trim()) ||
+    fallback;
+  const trimmed = String(source).trim();
+  if (!trimmed) return fallback.toUpperCase();
+  const first = trimmed[0];
+  return typeof first === 'string' ? first.toUpperCase() : fallback.toUpperCase();
+}
+
+function safeDisplayName(displayName: string | null | undefined, username: string | null | undefined): string {
+  if (displayName && typeof displayName === 'string' && displayName.trim()) {
+    return displayName.trim();
+  }
+  if (username && typeof username === 'string' && username.trim()) {
+    return username.trim();
+  }
+  return 'Listener';
+}
+
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -74,6 +139,7 @@ export default function Community() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -87,10 +153,10 @@ export default function Community() {
     target.src = '/placeholder.svg';
   };
 
-  // Fetch all users
   useEffect(() => {
     const fetchUsers = async () => {
       setIsLoading(true);
+      setLoadError(null);
       
       const { data: profiles, error } = await supabase
         .from('audience_profiles')
@@ -101,28 +167,12 @@ export default function Community() {
         if (import.meta.env.DEV) {
           console.error('Error fetching users:', error);
         }
+        setLoadError('Unable to load community right now. Showing cached profiles if available.');
         const cached = Object.values(getAllProfiles() || {}).filter((p) => p?.user_id);
         if (cached.length) {
-          const normalizedCached: UserProfile[] = cached.map((p: any) => ({
-            id: String(p.id),
-            user_id: String(p.user_id ?? p.id),
-            display_name:
-              p.display_name ??
-              p.profile_name ??
-              p.username ??
-              'Listener',
-            username: p.username ?? null,
-            avatar_url: p.avatar_url ?? p.profile_picture_url ?? null,
-            cover_photo_url: p.cover_photo_url ?? null,
-            bio: p.bio ?? null,
-            location: p.location ?? null,
-            created_at: p.created_at ?? new Date().toISOString(),
-            updated_at: p.updated_at ?? null,
-            follower_count: 0,
-            post_count: 0,
-            play_count: 0,
-            is_following: false,
-          }));
+          const normalizedCached: UserProfile[] = cached
+            .map((p: any) => normalizeProfile(p))
+            .filter((p): p is UserProfile => Boolean(p));
           setUsers(normalizedCached);
           setFilteredUsers(normalizedCached);
         }
@@ -130,18 +180,9 @@ export default function Community() {
         return;
       }
 
-      const normalizedProfiles = ((profiles as any[]) || [])
-        .map((p) => ({
-          ...p,
-          user_id: p?.user_id ?? p?.id,
-          display_name: p?.display_name ?? p?.username ?? 'Listener',
-          username: p?.username ?? null,
-          avatar_url: p?.avatar_url ?? null,
-          cover_photo_url: p?.cover_photo_url ?? null,
-          bio: p?.bio ?? null,
-          location: p?.location ?? null,
-        }))
-        .filter((p) => p?.user_id) as UserProfile[];
+      const normalizedProfiles: UserProfile[] = ((profiles as any[]) || [])
+        .map((p) => normalizeProfile(p))
+        .filter((p): p is UserProfile => Boolean(p));
 
       const dedupedByUserId = new Map<string, UserProfile>();
       normalizedProfiles.forEach((p) => {
@@ -228,10 +269,14 @@ export default function Community() {
     };
   }, []);
 
-  // Filter and sort users
-  useEffect(() => {
+  const derivedUsers = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    let filtered = users.filter((u) => {
+    const base = users.map((u) => ({
+      ...u,
+      display_name: safeDisplayName(u.display_name, u.username),
+    }));
+
+    let filtered = base.filter((u) => {
       const name = (u.display_name || u.username || '').toLowerCase();
       const bio = (u.bio || '').toLowerCase();
       return name.includes(query) || bio.includes(query);
@@ -239,24 +284,24 @@ export default function Community() {
 
     switch (sortBy) {
       case 'newest':
-        filtered = filtered.sort((a, b) => 
+        filtered = filtered.sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         break;
       case 'popular':
-        filtered = filtered.sort((a, b) => 
+        filtered = filtered.sort((a, b) =>
           (b.follower_count || 0) + (b.post_count || 0) + (b.play_count || 0) -
           ((a.follower_count || 0) + (a.post_count || 0) + (a.play_count || 0))
         );
         break;
       case 'active':
-        filtered = filtered.sort((a, b) => 
+        filtered = filtered.sort((a, b) =>
           (b.play_count || 0) - (a.play_count || 0)
         );
         break;
     }
 
-    setFilteredUsers(filtered);
+    return filtered;
   }, [users, searchQuery, sortBy]);
 
   useEffect(() => {
@@ -356,9 +401,8 @@ export default function Community() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {onlineUsers.slice(0, viewMode === 'grid' ? 8 : 10).map((profile) => {
-                  const displayName =
-                    profile.display_name || profile.username || 'Listener';
-                  const initial = displayName.charAt(0).toUpperCase();
+                  const displayName = safeDisplayName(profile.display_name, profile.username);
+                  const initial = safeInitials(profile.display_name, profile.username, 'L');
                   return (
                   <button
                     key={profile.user_id}
@@ -446,6 +490,12 @@ export default function Community() {
           </Tabs>
         </motion.div>
 
+        {loadError && !isLoading && (
+          <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {loadError}
+          </div>
+        )}
+
         {/* Users List */}
         {isLoading ? (
           <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
@@ -461,7 +511,7 @@ export default function Community() {
               </div>
             ))}
           </div>
-        ) : filteredUsers.length === 0 ? (
+        ) : derivedUsers.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -480,7 +530,7 @@ export default function Community() {
             animate="show"
             className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}
           >
-            {filteredUsers.map((profile, index) => (
+            {derivedUsers.map((profile, index) => (
               <motion.div
                 key={profile.id}
                 variants={itemVariants}
@@ -523,9 +573,7 @@ export default function Community() {
                     <Avatar className={`${viewMode === 'grid' ? 'w-16 h-16' : 'w-14 h-14'} border-4 border-background shadow-lg`}>
                       <AvatarImage src={profile.avatar_url || ''} onError={handleImageError} />
                       <AvatarFallback className="bg-primary/20 text-primary text-xl font-bold">
-                        {(profile.display_name || profile.username || 'L')
-                          .charAt(0)
-                          .toUpperCase()}
+                        {safeInitials(profile.display_name, profile.username, 'L')}
                       </AvatarFallback>
                     </Avatar>
                   </div>
@@ -535,7 +583,7 @@ export default function Community() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(profile.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                       <h3 className="font-semibold text-foreground truncate">
-                          {profile.display_name || profile.username || 'Listener'}
+                          {safeDisplayName(profile.display_name, profile.username)}
                       </h3>
                       {!onlineUserIds.has(profile.user_id) && (
                         <span className="text-xs text-muted-foreground">
@@ -645,42 +693,6 @@ export default function Community() {
       </main>
 
       <AudioPlayer />
-      
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-lg px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full glass-card rounded-3xl shine-overlay p-8 sm:p-10 text-center flex flex-col items-center gap-4"
-        >
-          <div className="relative mb-2">
-            <div className="absolute inset-0 blur-3xl bg-primary/40 opacity-40" />
-            <img
-              src={logo}
-              alt="$ongChainn"
-              className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto object-contain"
-            />
-          </div>
-          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase">
-            Community
-          </span>
-          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
-            Community is coming soon
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            You&apos;re early. Soon you&apos;ll be able to discover listeners, follow profiles, and see who&apos;s spinning what in real time.
-          </p>
-          <p className="text-xs text-muted-foreground/80">
-            Keep exploring music while we finish building this part of $ongChainn.
-          </p>
-          <Button
-            className="mt-2"
-            variant="outline"
-            onClick={() => navigate('/')}
-          >
-            Back to Home
-          </Button>
-        </motion.div>
-      </div>
     </div>
   );
 }

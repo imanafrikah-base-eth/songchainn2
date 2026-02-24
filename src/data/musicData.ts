@@ -1,13 +1,13 @@
-import artist7roo7hBased from '@/assets/artist-7roo7h-based.png';
-import artistDenajah from '@/assets/artist-denajah.png';
-import artistImanAfrikah from '@/assets/artist-iman-afrikah.png';
-import artistNda from '@/assets/artist-nda.png';
-import artistPrp from '@/assets/artist-prp.png';
-import artistSanchy from '@/assets/artist-sanchy.png';
-import artistSantana from '@/assets/artist-santana.png';
-import artistCover1 from '@/assets/artist-cover-1.jpg';
-import artistCover2 from '@/assets/artist-cover-2.jpg';
-import artistCover3 from '@/assets/artist-cover-3.jpg';
+import artist7roo7hBasedLocal from '@/assets/artist-7roo7h-based.png';
+import artistDenajahLocal from '@/assets/artist-denajah.png';
+import artistImanAfrikahLocal from '@/assets/artist-iman-afrikah.png';
+import artistNdaLocal from '@/assets/artist-nda.png';
+import artistPrpLocal from '@/assets/artist-prp.png';
+import artistSanchyLocal from '@/assets/artist-sanchy.png';
+import artistSantanaLocal from '@/assets/artist-santana.png';
+import artistCover1Local from '@/assets/artist-cover-1.jpg';
+import artistCover2Local from '@/assets/artist-cover-2.jpg';
+import artistCover3Local from '@/assets/artist-cover-3.jpg';
 
 export type Genre =
   | 'Trap'
@@ -98,6 +98,46 @@ export interface AdminUser {
   baseAddress?: string;
   isAdmin: boolean;
 }
+
+const artist7roo7hBased =
+  import.meta.env.VITE_ARTWORK_7ROO7H_BASED ||
+  'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/7ROO7H%20BASED.jpg';
+
+const artistDenajah =
+  import.meta.env.VITE_ARTWORK_DENAJAH ||
+  'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/DENAJAH.jpg';
+
+const artistImanAfrikah =
+  import.meta.env.VITE_ARTWORK_IMAN_AFRIKAH ||
+  'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH.jpg';
+
+const artistNda =
+  import.meta.env.VITE_ARTWORK_NDA ||
+  'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA.jpg';
+
+const artistPrp =
+  import.meta.env.VITE_ARTWORK_PRP ||
+  'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/PRP.jpg';
+
+const artistSanchy =
+  import.meta.env.VITE_ARTWORK_SANCHY ||
+  'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/SANCHY.jpg';
+
+const artistSantana =
+  import.meta.env.VITE_ARTWORK_SANTANA ||
+  'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/file_00000000106871fd889daaa509fd5a14.png';
+
+const artistCover1 =
+  import.meta.env.VITE_ARTWORK_FAITH ||
+  'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/FAITH%20ART%20WORK.png';
+
+const artistCover2 =
+  import.meta.env.VITE_ARTWORK_JMN ||
+  'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN%20ARTWORK.png';
+
+const artistCover3 =
+  import.meta.env.VITE_ARTWORK_SAMMIE ||
+  'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sammie%20Song%20ART.png';
 
 const ARTWORK_BY_ARTIST: Record<string, string> = {
   '7ROO7H BASED': artist7roo7hBased,
@@ -840,7 +880,7 @@ export const SONGS: Song[] = [
     artist: 'PRP',
     artistId: '5',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/PRP%20-%20EVEN%20ME.wav',
-    coverImage: ARTWORK_BY_ARTIST.PRP,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -854,7 +894,7 @@ export const SONGS: Song[] = [
     artist: 'PRP',
     artistId: '5',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/PRP%20-%20EX.wav',
-    coverImage: ARTWORK_BY_ARTIST.PRP,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -868,7 +908,7 @@ export const SONGS: Song[] = [
     artist: 'PRP',
     artistId: '5',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/PRP%20-%20KEEP.wav',
-    coverImage: ARTWORK_BY_ARTIST.PRP,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -882,7 +922,7 @@ export const SONGS: Song[] = [
     artist: 'PRP',
     artistId: '5',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/PRP%20-%20KEYS.wav',
-    coverImage: ARTWORK_BY_ARTIST.PRP,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -896,7 +936,7 @@ export const SONGS: Song[] = [
     artist: 'PRP',
     artistId: '5',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/PRP%20-%20NO%20LIMITS.wav',
-    coverImage: ARTWORK_BY_ARTIST.PRP,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -910,7 +950,7 @@ export const SONGS: Song[] = [
     artist: 'PRP',
     artistId: '5',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/PRP%20-%20PANADO.wav',
-    coverImage: ARTWORK_BY_ARTIST.PRP,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -938,7 +978,7 @@ export const SONGS: Song[] = [
     artist: 'JMN',
     artistId: '9',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/JMN%20-%20LATE%20NIGHT.wav',
-    coverImage: ARTWORK_BY_ARTIST.JMN,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -952,7 +992,7 @@ export const SONGS: Song[] = [
     artist: 'JMN',
     artistId: '9',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/JMN%20-%20PARTY.wav',
-    coverImage: ARTWORK_BY_ARTIST.JMN,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -966,7 +1006,7 @@ export const SONGS: Song[] = [
     artist: 'JMN',
     artistId: '9',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/JMN-%20OWN%20IT.wav',
-    coverImage: ARTWORK_BY_ARTIST.JMN,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN%20ARTWORK.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -980,7 +1020,7 @@ export const SONGS: Song[] = [
     artist: 'SAMMIE',
     artistId: '10',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/SAMMIE%20-%20EYES%20ON%20ME.wav',
-    coverImage: ARTWORK_BY_ARTIST.SAMMIE,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sammie%20Song%20ART.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -994,7 +1034,7 @@ export const SONGS: Song[] = [
     artist: 'SAMMIE',
     artistId: '10',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/SAMMIE%20-%20LET%20GO.wav',
-    coverImage: ARTWORK_BY_ARTIST.SAMMIE,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sammie%20Song%20ART.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1008,7 +1048,7 @@ export const SONGS: Song[] = [
     artist: 'SAMMIE',
     artistId: '10',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/SAMMIE%20-%20NOBODY.wav',
-    coverImage: ARTWORK_BY_ARTIST.SAMMIE,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sammie%20Song%20ART.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1022,7 +1062,7 @@ export const SONGS: Song[] = [
     artist: 'SAMMIE',
     artistId: '10',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/SAMMIE%20-%20THE%20ONE.wav',
-    coverImage: ARTWORK_BY_ARTIST.SAMMIE,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sammie%20Song%20ART.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1036,7 +1076,7 @@ export const SONGS: Song[] = [
     artist: 'SAMMIE',
     artistId: '10',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/SAMMIE%20-%20LOVE.wav',
-    coverImage: ARTWORK_BY_ARTIST.SAMMIE,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sammie%20Song%20ART.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1050,7 +1090,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/NDA%20-%20CALM.wav',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/nda%20artwor.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1064,7 +1104,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: "https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/NDA%20-%20CAN'T%20MATCH.wav",
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/nda%20artwor.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1078,7 +1118,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/NDA%20-%20COME%20HOME.wav',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/nda%20artwor.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1092,7 +1132,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/NDA%20-%20FUEGO.wav',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/nda%20artwor.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1106,7 +1146,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/NDA%20-%20MONEY.wav',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/nda%20artwor.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1120,7 +1160,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/NDA%20-%20PREACH.wav',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/nda%20artwor.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1134,7 +1174,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/NDA%20-%20STILL.wav',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/nda%20artwor.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1344,7 +1384,7 @@ export const SONGS: Song[] = [
     artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/1.%20IMAN%20AFRIKAH%20-%20TALKING%20TO%20YOU.wav',
-    coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH%20vol4%20artwork.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1358,7 +1398,7 @@ export const SONGS: Song[] = [
     artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/2.%20IMAN%20AFRIKAH%20-%20SLOW%20BURN.wav',
-    coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH%20vol4%20artwork.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1372,7 +1412,7 @@ export const SONGS: Song[] = [
     artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/3.%20IMAN%20AFRIKAH%20-%20MOVES%20DIFFERENT.wav',
-    coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH%20vol4%20artwork.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1386,7 +1426,7 @@ export const SONGS: Song[] = [
     artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/4.%20IMAN%20AFRIKAH%20-%20NOTICE%20YOU.wav',
-    coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH%20vol4%20artwork.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1400,7 +1440,7 @@ export const SONGS: Song[] = [
     artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/5.%20IMAN%20AFRIKAH%20-%20STAY%20A%20WHILE.wav',
-    coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH%20vol4%20artwork.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1414,7 +1454,7 @@ export const SONGS: Song[] = [
     artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/6.%20IMAN%20AFRIKAH%20-%20JUST%20LIKE%20THAT.wav',
-    coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH%20vol4%20artwork.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1428,7 +1468,7 @@ export const SONGS: Song[] = [
     artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/7.%20IMAN%20AFRIKAH%20-%20MOVE%20LIKE%20THAT.wav',
-    coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMAN%20AFRIKAH%20vol4%20artwork.png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2128,7 +2168,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%203AM%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/MiDNiGHT%20RUN_20260129_221806_0000%20(1).jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2142,7 +2182,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20BACK%20ON%20MY%20SHIT%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/MiDNiGHT%20RUN_20260129_221806_0000%20(1).jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2156,7 +2196,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20BITTERSWEET%20ESCAPE%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/MiDNiGHT%20RUN_20260129_221806_0000%20(1).jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2170,7 +2210,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20BOSSED%20UP%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/MiDNiGHT%20RUN_20260129_221806_0000%20(1).jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2184,7 +2224,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20CROSSED%20LINES%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/MiDNiGHT%20RUN_20260129_221806_0000%20(1).jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2198,7 +2238,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20FLOOD%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/MiDNiGHT%20RUN_20260129_221806_0000%20(1).jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2226,7 +2266,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%202.22%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20DRUMTIDE%3B%206.11%20VL5.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2240,7 +2280,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%204.44%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20DRUMTIDE%3B%206.11%20VL5.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2254,7 +2294,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20ELEMENT%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20DRUMTIDE%3B%206.11%20VL5.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2268,7 +2308,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20Gbona%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20DRUMTIDE%3B%206.11%20VL5.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2282,7 +2322,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20GiRL%20FROM%20LTC%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20DRUMTIDE%3B%206.11%20VL5.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2296,7 +2336,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20married%20to%20the%20grind%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20DRUMTIDE%3B%206.11%20VL5.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2310,7 +2350,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20POUR%20UP%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20DRUMTIDE%3B%206.11%20VL5.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2324,7 +2364,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20BAD%20TO%20THE%20BONE%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20INFINITY%20MINUS%20ONE%20VL6.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2338,7 +2378,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20CLEAN%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20INFINITY%20MINUS%20ONE%20VL6.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2352,7 +2392,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20FROZE%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20INFINITY%20MINUS%20ONE%20VL6.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2366,7 +2406,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20I%27M%20HIM%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20INFINITY%20MINUS%20ONE%20VL6.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2380,7 +2420,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20LOST%20MORALS%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20INFINITY%20MINUS%20ONE%20VL6.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2394,7 +2434,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20REAL%20ONE%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20INFINITY%20MINUS%20ONE%20VL6.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2408,7 +2448,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20STILL%20WATCHING%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20INFINITY%20MINUS%20ONE%20VL6.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2436,7 +2476,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20DO%20YOU%20DIGG%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2450,7 +2490,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20ACE%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2464,7 +2504,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20BEAMM%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2478,7 +2518,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20BIEH%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2492,7 +2532,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20YEAH%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2506,7 +2546,7 @@ export const SONGS: Song[] = [
     artist: 'NDA',
     artistId: '4',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20ROACHES%20AND%20RATS%20RMS.mp3',
-    coverImage: ARTWORK_BY_ARTIST.NDA,
+    coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -2525,7 +2565,7 @@ export const ARTISTS: Artist[] = [
     bio: 'A visionary artist from Zambia blending traditional African rhythms with contemporary electronic sounds. 7ROO7H BASED creates music that speaks to the soul and moves the body.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artist7roo7hBased,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20%20Based/7ROO7H%20Based%20(1).png',
     songs: ['1', '8', '10', '11', '12', '13', '49', '107', '108', '109', '110', '111', '112', '113', '114', '115', '116', '117', '118', '119', '120', '121', '122', '123', '124', '125', '126'],
   },
   {
@@ -2534,7 +2574,7 @@ export const ARTISTS: Artist[] = [
     bio: 'DenaJah brings infectious energy to every track, fusing reggae influences with modern Afrobeats. Their sound is a celebration of African heritage and global connection.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistDenajah,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/DenaJah/file_0000000064dc71f5be6445bc8e4cda04.png',
     songs: ['2', '9', '14', '15', '16', '17', '18'],
   },
   {
@@ -2543,7 +2583,7 @@ export const ARTISTS: Artist[] = [
     bio: 'A pioneer of the Zambian music scene, IMan Afrikah creates timeless melodies that resonate across borders. Their music is a journey through sound and emotion.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistImanAfrikah,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/file_0000000077c8722f8f65c9d1abd8bca1-2.png',
     songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147'],
   },
   {
@@ -2552,7 +2592,7 @@ export const ARTISTS: Artist[] = [
     bio: 'NDA explores the depths of introspective music, creating soundscapes that encourage reflection and growth. Their artistry pushes boundaries while staying rooted in authenticity.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistNda,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/NDA/NDA%20(1).png',
     songs: ['4', '19', '20', '21', '22', '23', '24', '148', '149', '150', '151', '152', '153', '154', '155', '156', '157', '158', '159', '160', '161', '162', '163', '164', '165', '166', '167', '168', '169', '170', '171', '172', '173', '174', '175'],
   },
   {
@@ -2561,7 +2601,7 @@ export const ARTISTS: Artist[] = [
     bio: 'PRP delivers high-energy tracks that get crowds moving. With a unique blend of hip-hop and African influences, their music is both fresh and deeply rooted.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistPrp,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/PRP/PRP%20(2).png',
     songs: ['5', '25', '26', '27', '28', '29', '30'],
   },
   {
@@ -2570,7 +2610,7 @@ export const ARTISTS: Artist[] = [
     bio: 'Sanchy creates atmospheric music that paints pictures with sound. Their late-night vibes and smooth production make every track a sonic experience.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistSanchy,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sanchy/Sanchy%20(1).png',
     songs: ['6', '37', '38', '39', '40', '41', '42'],
   },
   {
@@ -2579,7 +2619,7 @@ export const ARTISTS: Artist[] = [
     bio: 'Santana builds their music brick by brick, layering sounds to create powerful compositions. Their dedication to craft shines through in every release.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistSantana,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Santana/Santana%20(1).png',
     songs: ['7', '43', '44', '45', '46', '47', '48'],
   },
   {
@@ -2588,7 +2628,7 @@ export const ARTISTS: Artist[] = [
     bio: 'FAITH brings soulful energy and a fearless voice, blending modern Afro rhythms with heartfelt storytelling.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistCover1,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/FAITH/Faith%20(2).png',
     songs: ['50', '51', '52', '53', '54', '55', '56'],
     addedAt: '2026-01-05T00:00:00.000Z',
   },
@@ -2598,7 +2638,7 @@ export const ARTISTS: Artist[] = [
     bio: 'JMN blends late-night vibes with high-energy anthems designed for shared listening in the town square.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistCover2,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/JMN.png',
     songs: ['92', '93', '94'],
     addedAt: '2026-01-14T00:00:00.000Z',
   },
@@ -2608,7 +2648,7 @@ export const ARTISTS: Artist[] = [
     bio: 'SAMMIE crafts heartfelt Afro melodies that move between dance-floor energy and intimate reflection.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
-    profileImage: artistCover3,
+    profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sammie.png',
     songs: ['95', '96', '97', '98', '99'],
     addedAt: '2026-01-14T00:00:00.000Z',
   },

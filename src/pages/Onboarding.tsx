@@ -1,12 +1,12 @@
-import { useCallback, useState } from 'react';
+import { type ChangeEvent, useCallback, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Headphones, User, FileText, Link2, Loader2, MapPin } from 'lucide-react';
+import { ArrowLeft, Headphones, User, FileText, Link2, Loader2, MapPin, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import logo from '@/assets/songchainn-logo.webp';
 import { z } from 'zod';
@@ -15,6 +15,12 @@ import { useNavigate } from 'react-router-dom';
 // Validation schema
 const profileSchema = z.object({
   profileName: z.string().trim().min(1, 'Profile name is required').max(50, 'Profile name must be less than 50 characters'),
+  username: z
+    .string()
+    .trim()
+    .min(3, 'Username is required')
+    .max(32, 'Username must be less than 32 characters')
+    .regex(/^[a-z0-9_]+$/i, 'Username can only contain letters, numbers, and underscores'),
   bio: z.string().max(500, 'Bio must be less than 500 characters').optional(),
   location: z.string().trim().min(1, 'Location is required').max(100, 'Location must be less than 100 characters'),
   xProfileLink: z.string().url('Invalid URL').optional().or(z.literal('')),
@@ -29,10 +35,19 @@ export default function Onboarding() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [profileName, setProfileName] = useState('');
+   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [xProfileLink, setXProfileLink] = useState('');
   const [baseProfileLink, setBaseProfileLink] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUploadFailed, setAvatarUploadFailed] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverUploadFailed, setCoverUploadFailed] = useState(false);
+  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleBackToSignIn = useCallback(async () => {
     try {
@@ -47,6 +62,104 @@ export default function Onboarding() {
     }
   }, [navigate, signOut]);
 
+  const handleAvatarChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Image too large (max 10MB)', variant: 'destructive' });
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Please select an image file', variant: 'destructive' });
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setAvatarFile(file);
+    setAvatarUploadFailed(false);
+    setAvatarPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+  }, [toast]);
+
+  const handleCoverChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Image too large (max 10MB)', variant: 'destructive' });
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Please select an image file', variant: 'destructive' });
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setCoverFile(file);
+    setCoverUploadFailed(false);
+    setCoverPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+  }, [toast]);
+
+  const uploadImage = useCallback(
+    async (file: File, field: 'avatar_url' | 'cover_photo_url') => {
+      if (!user || !isSupabaseConfigured) return null;
+      const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
+      const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
+      const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
+      const bucket = field === 'avatar_url' ? 'avaters' : 'covers';
+      let attempt = 0;
+      let lastError: string | null = null;
+
+      while (attempt < 2) {
+        attempt += 1;
+        const fileName = `${field}-${user.id}-${Date.now()}-${attempt}.${extension}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (!uploadError && uploadData?.path) {
+          const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(uploadData.path);
+          return publicUrlData.publicUrl;
+        }
+
+        lastError = uploadError?.message || 'Upload failed';
+      }
+
+      toast({ title: 'Image upload failed', description: lastError || 'Saving profile without this photo.' });
+      return null;
+    },
+    [toast, user]
+  );
+
+  const retryAvatarUpload = useCallback(async () => {
+    if (!avatarFile) return;
+    const uploaded = await uploadImage(avatarFile, 'avatar_url');
+    if (uploaded) {
+      setAvatarUploadFailed(false);
+      toast({ title: 'Profile photo uploaded' });
+    } else {
+      setAvatarUploadFailed(true);
+    }
+  }, [avatarFile, toast, uploadImage]);
+
+  const retryCoverUpload = useCallback(async () => {
+    if (!coverFile) return;
+    const uploaded = await uploadImage(coverFile, 'cover_photo_url');
+    if (uploaded) {
+      setCoverUploadFailed(false);
+      toast({ title: 'Cover photo uploaded' });
+    } else {
+      setCoverUploadFailed(true);
+    }
+  }, [coverFile, toast, uploadImage]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -54,6 +167,7 @@ export default function Onboarding() {
     // Validate with zod
     const validationResult = profileSchema.safeParse({
       profileName,
+      username,
       bio: bio || undefined,
       location,
       xProfileLink: xProfileLink || undefined,
@@ -72,51 +186,43 @@ export default function Onboarding() {
       return;
     }
     
-    if (!user) return;
-    
     setIsLoading(true);
     
     try {
-      const userRes = await supabase.auth.getUser();
-      const authedUser = userRes.data?.user;
-      if (!authedUser) {
-        throw userRes.error || new Error('Not authenticated');
-      }
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const authedUser = authData.user;
+      if (!authedUser) throw new Error('Not authenticated');
 
-      const [existingByUserIdRes, existingByIdRes] = await Promise.all([
-        (supabase as any).from('audience_profiles').select('id').eq('user_id', authedUser.id).maybeSingle(),
-        (supabase as any).from('audience_profiles').select('id').eq('id', authedUser.id).maybeSingle(),
-      ]);
+      const payload = {
+        user_id: authedUser.id,
+        profile_name: profileName.trim(),
+        bio: bio?.trim() || null,
+        location: location.trim(),
+        base_profile_link: baseProfileLink?.trim() || null,
+        x_profile_link: xProfileLink?.trim() || null,
+        onboarding_completed: true,
+        updated_at: new Date().toISOString(),
+      };
 
-      const targetProfileId =
-        existingByUserIdRes?.data?.id || existingByIdRes?.data?.id || authedUser.id;
-
-      const primaryRes = await (supabase as any)
+      const { error } = await supabase
         .from('audience_profiles')
-        .upsert(
-          {
-            id: targetProfileId,
-            user_id: authedUser.id,
-            profile_name: profileName.trim(),
-            bio: bio.trim() || null,
-            location: location.trim(),
-            x_profile_link: xProfileLink.trim() || null,
-            base_profile_link: baseProfileLink.trim() || null,
-            onboarding_completed: true,
-          },
-          { onConflict: 'id' }
-        );
+        .upsert(payload, { onConflict: 'id' });
 
-      const primaryError = primaryRes?.error;
-      if (primaryError) throw primaryError;
+      if (error) {
+        console.error('Onboarding upsert error:', error);
+        throw error;
+      }
       
       toast({ title: 'Welcome to the Audience!' });
       try {
-        localStorage.removeItem('songchainn_needs_onboarding');
+        localStorage.setItem('songchainn_needs_onboarding', '0');
+        localStorage.setItem('songchainn_show_profile_photo_hint', '1');
       } catch {
         void 0;
       }
       await refreshProfile();
+      navigate('/', { replace: true });
     } catch (err: any) {
       if (import.meta.env.DEV) {
         console.error('Onboarding error:', err);
@@ -184,6 +290,95 @@ export default function Onboarding() {
           onSubmit={handleSubmit}
           className="space-y-6"
         >
+          <div className="space-y-4">
+            {!isSupabaseConfigured && (
+              <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-xs sm:text-sm text-amber-200">
+                Storage is not configured. Photos will be skipped until Supabase storage is enabled.
+              </div>
+            )}
+            <div className="relative h-32 sm:h-40 rounded-2xl overflow-hidden bg-gradient-to-r from-primary/20 via-primary/10 to-secondary/20 border border-primary/30">
+              {coverPreview && (
+                <img
+                  src={coverPreview}
+                  alt="Cover preview"
+                  className="w-full h-full object-cover"
+                />
+              )}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="backdrop-blur bg-background/80"
+                  onClick={() => coverPhotoInputRef.current?.click()}
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  {coverPreview ? 'Change cover photo' : 'Add cover photo'}
+                </Button>
+              </div>
+              <input
+                ref={coverPhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCoverChange}
+              />
+            </div>
+            {coverUploadFailed && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs sm:text-sm text-destructive">
+                <span>Cover upload failed. Retry?</span>
+                <Button type="button" size="sm" variant="outline" onClick={retryCoverUpload}>
+                  Retry
+                </Button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full border-4 border-background bg-secondary overflow-hidden">
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt="Profile preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-muted-foreground">
+                      {(profileName.trim() || user?.email || 'L').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={profilePictureInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="absolute -bottom-1 -right-1 rounded-full bg-background/90 backdrop-blur"
+                  onClick={() => profilePictureInputRef.current?.click()}
+                >
+                  <Camera className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex-1 text-xs sm:text-sm text-muted-foreground">
+                Add a profile photo and cover so people can spot you in the town square.
+              </div>
+            </div>
+            {avatarUploadFailed && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs sm:text-sm text-destructive">
+                <span>Profile photo upload failed. Retry?</span>
+                <Button type="button" size="sm" variant="outline" onClick={retryAvatarUpload}>
+                  Retry
+                </Button>
+              </div>
+            )}
+          </div>
+
           {/* Profile Name */}
           <div className="space-y-2">
             <Label htmlFor="profileName" className="text-sm font-medium flex items-center gap-2">
@@ -201,6 +396,27 @@ export default function Onboarding() {
             {errors.profileName && (
               <p className="text-xs text-destructive">{errors.profileName}</p>
             )}
+          </div>
+
+          {/* Username */}
+          <div className="space-y-2">
+            <Label htmlFor="username" className="text-sm font-medium">
+              Username <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="e.g. zamrock_fan"
+              maxLength={32}
+              className={errors.username ? 'border-destructive' : ''}
+            />
+            {errors.username && (
+              <p className="text-xs text-destructive">{errors.username}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              This is your handle for comments, community, and leaderboards.
+            </p>
           </div>
 
           {/* Location */}
@@ -264,13 +480,13 @@ export default function Onboarding() {
               
               <div>
                 <Label htmlFor="baseLink" className="text-xs text-muted-foreground">
-                  Base Profile / Wallet
+                  Base name
                 </Label>
                 <Input
                   id="baseLink"
                   value={baseProfileLink}
                   onChange={(e) => setBaseProfileLink(e.target.value)}
-                  placeholder="https://base.app/yourprofile or 0x..."
+                  placeholder="example.base.eth"
                 />
               </div>
             </div>

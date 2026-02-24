@@ -13,6 +13,8 @@ import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { InviteFriends } from '@/components/InviteFriends';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { SONGS } from '@/data/musicData';
 
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
@@ -34,6 +36,7 @@ export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showOfflineSaveAnnouncement, setShowOfflineSaveAnnouncement] = useState(false);
   const [showProfilePhotoAnnouncement, setShowProfilePhotoAnnouncement] = useState(false);
+  const [pulseBanner, setPulseBanner] = useState<{ songId: string; title: string } | null>(null);
   const playerState = useSafePlayerState();
   const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
   const { showRoom } = usePlayerActions();
@@ -74,6 +77,31 @@ export function Navigation() {
       }
     }
   }, [user]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('global-song-pulses')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'song_analytics' },
+        (payload) => {
+          const row = (payload as any)?.new as { event_type?: string; song_id?: string | null } | undefined;
+          if (!row || row.event_type !== 'pulse') return;
+          const songId = row.song_id || '';
+          const song = SONGS.find((s) => s.id === songId);
+          const title = song?.title || 'A song';
+          setPulseBanner({ songId, title });
+          window.setTimeout(() => {
+            setPulseBanner((current) => (current && current.songId === songId ? null : current));
+          }, 3000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
   // Enable swipe gestures for mobile navigation
   useSwipeNavigation();
 
@@ -311,6 +339,24 @@ export function Navigation() {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {pulseBanner && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -10 }}
+            className="fixed inset-x-0 top-16 z-40 pointer-events-none flex justify-center px-3 sm:px-4"
+          >
+            <div className="pointer-events-auto rounded-2xl bg-rose-500/90 text-rose-50 px-4 py-2 shadow-xl border border-rose-300/60 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-200 animate-ping" />
+              <span className="text-sm font-semibold">
+                {pulseBanner.title} got pulsed
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showOfflineSaveAnnouncement && (
         <div className="border-b border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm">

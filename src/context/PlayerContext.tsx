@@ -47,7 +47,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [isCrossfading, setIsCrossfading] = useState(false);
   const [audioVersion, setAudioVersion] = useState(0);
   const [isRoomMode, setIsRoomMode] = useState(false);
-   const [isRoomHidden, setIsRoomHidden] = useState(false);
+  const [isRoomHidden, setIsRoomHidden] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('room_hidden') === 'true';
+    } catch {
+      return false;
+    }
+  });
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -638,10 +645,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const hideRoom = useCallback(() => {
     if (!isRoomModeRef.current) return;
     setIsRoomHidden(true);
+    try {
+      localStorage.setItem('room_hidden', 'true');
+    } catch {
+      void 0;
+    }
   }, []);
 
   const showRoom = useCallback(() => {
     setIsRoomHidden(false);
+    try {
+      localStorage.removeItem('room_hidden');
+    } catch {
+      void 0;
+    }
   }, []);
 
   // Memoize context values to prevent unnecessary re-renders

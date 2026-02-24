@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Music, ListMusic, Send } from 'lucide-react';
@@ -17,20 +17,18 @@ interface PostComposerProps {
   onPost: (
     content: string,
     type: 'text' | 'song_share',
-    songId?: string,
-    image?: { url: string; path: string }
+    songId?: string
   ) => void;
+  initialType?: 'text' | 'song_share';
+  initialSongId?: string;
 }
 
-export function PostComposer({ onPost }: PostComposerProps) {
+export function PostComposer({ onPost, initialType = 'text', initialSongId }: PostComposerProps) {
   const { audienceProfile, isArtist, user } = useAuth();
   const [content, setContent] = useState('');
-  const [postType, setPostType] = useState<'text' | 'song_share'>('text');
-  const [selectedSong, setSelectedSong] = useState<string>('');
+  const [postType, setPostType] = useState<'text' | 'song_share'>(initialType);
+  const [selectedSong, setSelectedSong] = useState<string>(initialSongId ?? '');
   const [isPosting, setIsPosting] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  const selectedImageObjectUrlRef = useRef<string | null>(null);
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
     if (target.dataset.fallbackApplied === 'true') return;
@@ -38,77 +36,24 @@ export function PostComposer({ onPost }: PostComposerProps) {
     target.src = '/placeholder.svg';
   };
 
-  useEffect(() => {
-    if (selectedImageObjectUrlRef.current) {
-      URL.revokeObjectURL(selectedImageObjectUrlRef.current);
-      selectedImageObjectUrlRef.current = null;
-    }
-
-    if (!selectedImage) {
-      setSelectedImageUrl(null);
-      return;
-    }
-
-    const next = URL.createObjectURL(selectedImage);
-    selectedImageObjectUrlRef.current = next;
-    setSelectedImageUrl(next);
-
-    return () => {
-      if (selectedImageObjectUrlRef.current) {
-        URL.revokeObjectURL(selectedImageObjectUrlRef.current);
-        selectedImageObjectUrlRef.current = null;
-      }
-    };
-  }, [selectedImage]);
-
   const handlePost = async () => {
     if (!user) {
       toast.error('Please sign in to post');
       return;
     }
-    if (!content.trim() && postType === 'text' && !selectedImage) return;
+    if (!content.trim() && postType === 'text') return;
     if (postType === 'song_share' && !selectedSong) return;
 
     setIsPosting(true);
     try {
-      let imagePayload: { url: string; path: string } | undefined;
-
-      if (selectedImage) {
-        const formData = new FormData();
-        formData.append('file', selectedImage);
-        formData.append('userId', user.id);
-        formData.append('type', 'post');
-
-        const response = await fetch('/api/upload/image', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to upload image');
-        }
-
-        const data = (await response.json()) as { url?: string; key?: string; path?: string };
-        const imageUrl = data.url;
-        const imagePath = data.path || data.key || '';
-
-        if (!imageUrl) {
-          throw new Error('Missing image URL from upload response');
-        }
-
-        imagePayload = { url: imageUrl, path: imagePath };
-      }
-
       await onPost(
         content,
         postType,
-        postType === 'song_share' ? selectedSong : undefined,
-        imagePayload
+        postType === 'song_share' ? selectedSong : undefined
       );
       setContent('');
       setSelectedSong('');
       setPostType('text');
-      setSelectedImage(null);
     } catch (err: any) {
       toast.error('Error creating post', { description: err?.message ? String(err.message) : undefined });
     } finally {
@@ -146,31 +91,6 @@ export function PostComposer({ onPost }: PostComposerProps) {
             onChange={(e) => setContent(e.target.value)}
             className="min-h-[80px] resize-none bg-background/50 border-border/50"
           />
-
-          {isArtist && (
-            <div className="space-y-2">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] || null;
-                  if (!file) return;
-                  if (file.size > 10 * 1024 * 1024) {
-                    toast.error('Image too large', { description: 'Max size is 10MB.' });
-                    return;
-                  }
-                  setSelectedImage(file);
-                }}
-                className="w-full text-sm"
-                disabled={isPosting}
-              />
-              {selectedImageUrl && (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-border/50">
-                  <img src={selectedImageUrl} alt="" className="w-full h-full object-contain" />
-                </div>
-              )}
-            </div>
-          )}
           
           {postType === 'song_share' && (
             <Select value={selectedSong} onValueChange={setSelectedSong}>
@@ -214,7 +134,7 @@ export function PostComposer({ onPost }: PostComposerProps) {
           onClick={handlePost} 
           disabled={
             isPosting ||
-            (!content.trim() && postType === 'text' && !selectedImage) ||
+            (!content.trim() && postType === 'text') ||
             (postType === 'song_share' && !selectedSong)
           }
           size="sm"

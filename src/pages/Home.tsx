@@ -237,21 +237,17 @@ export default function Home() {
     }
   };
 
-  // Check if user needs to add location
   useEffect(() => {
-    if (audienceProfile && !audienceProfile.location) {
-      // Check if user has skipped recently (within last 24 hours)
-      const skippedAt = localStorage.getItem('location_prompt_skipped');
-      if (skippedAt) {
-        const hoursSinceSkip = (Date.now() - parseInt(skippedAt)) / (1000 * 60 * 60);
-        if (hoursSinceSkip < 24) {
-          return; // Don't show again within 24 hours
-        }
-      }
-      // Show prompt after a short delay
-      const timer = setTimeout(() => setShowLocationPrompt(true), 2000);
-      return () => clearTimeout(timer);
+    if (!audienceProfile) return;
+    if (audienceProfile.location && audienceProfile.location.trim().length > 0) return;
+    try {
+      const dismissed = localStorage.getItem('location_prompt_dismissed');
+      if (dismissed === 'true') return;
+    } catch {
+      void 0;
     }
+    const timer = setTimeout(() => setShowLocationPrompt(true), 2000);
+    return () => clearTimeout(timer);
   }, [audienceProfile]);
 
   return (

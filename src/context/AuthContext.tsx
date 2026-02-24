@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isArtist, setIsArtist] = useState(false);
   const [artistId, setArtistId] = useState<string | null>(null);
   const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(null);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(shouldRequireOnboardingFromStorage());
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isWalletDetected, setIsWalletDetected] = useState(false);
 
@@ -80,48 +80,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (profileError) {
       const cached = getProfile(user.id);
-      const localProfile = cached || ensureProfile(user.id, { profile_name: fallbackName, onboarding_completed: true });
-      setAudienceProfile(localProfile);
-      setNeedsOnboarding(false);
+      if (cached) {
+        setAudienceProfile(cached);
+        const completed = (cached as any).onboarding_completed === true;
+        setNeedsOnboarding(!completed);
+        try {
+          localStorage.setItem('songchainn_needs_onboarding', completed ? '0' : '1');
+        } catch {
+          void 0;
+        }
+      } else {
+        setAudienceProfile(null);
+        setNeedsOnboarding(true);
+        try {
+          localStorage.setItem('songchainn_needs_onboarding', '1');
+        } catch {
+          void 0;
+        }
+      }
       return;
     }
 
     if (profileData) {
       setAudienceProfile(profileData as any);
       upsertProfile(profileData as any);
-      setNeedsOnboarding(false);
+      const completed = (profileData as any).onboarding_completed === true;
+      const storageFlag = shouldRequireOnboardingFromStorage();
+      const needsOnboardingFlag = !completed && storageFlag;
+      setNeedsOnboarding(needsOnboardingFlag);
+      try {
+        localStorage.setItem('songchainn_needs_onboarding', needsOnboardingFlag ? '1' : '0');
+      } catch {
+        void 0;
+      }
       return;
     }
 
-    const { data: created, error: createError } = await supabase
-      .from('audience_profiles')
-      .insert(
-        {
-          user_id: user.id,
-          display_name: fallbackName,
-          username: fallbackName.toLowerCase(),
-          avatar_url: null,
-          cover_photo_url: null,
-          bio: null,
-          location: null,
-        } as any
-      )
-      .select('*')
-      .maybeSingle();
-
-    if (createError) {
-      const cached = getProfile(user.id);
-      const localProfile = cached || ensureProfile(user.id, { profile_name: fallbackName, onboarding_completed: true });
-      setAudienceProfile(localProfile);
-      setNeedsOnboarding(false);
-      return;
+    setAudienceProfile(null);
+    setNeedsOnboarding(true);
+    try {
+      localStorage.setItem('songchainn_needs_onboarding', '1');
+    } catch {
+      void 0;
     }
-
-    if (created) {
-      upsertProfile(created as any);
-    }
-    setAudienceProfile((created as any) ?? null);
-    setNeedsOnboarding(false);
   }, [user]);
 
   useEffect(() => {
@@ -257,12 +258,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false);
       setIsArtist(false);
       setArtistId(null);
-      await refreshProfile();
+      setNeedsOnboarding(true);
       try {
+        localStorage.setItem('songchainn_needs_onboarding', '1');
         localStorage.setItem('songchainn_show_profile_photo_hint', '1');
       } catch {
         void 0;
       }
+      await refreshProfile();
 
       return { error: null };
     } catch (err: any) {
@@ -283,13 +286,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false);
       setIsArtist(false);
       setArtistId(null);
-
+      setNeedsOnboarding(true);
+      try {
+        localStorage.setItem('songchainn_needs_onboarding', '1');
+      } catch {
+        void 0;
+      }
       await refreshProfile();
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Sign up failed') };
     }
-  }, [refreshProfile]);
+  }, [refreshProfile, setNeedsOnboarding]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     try {

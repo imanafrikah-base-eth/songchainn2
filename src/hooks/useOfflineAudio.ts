@@ -96,10 +96,12 @@ export function useOfflineAudio() {
       }
     };
 
-    navigator.serviceWorker?.addEventListener('message', handleSwMessage);
+    if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true') {
+      navigator.serviceWorker?.addEventListener('message', handleSwMessage);
+    }
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    if ('serviceWorker' in navigator) {
+    if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.ready
         .then((registration) => {
           registration.active?.postMessage({ type: 'GET_AUDIO_CACHE_STATS' });
@@ -111,12 +113,14 @@ export function useOfflineAudio() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      navigator.serviceWorker?.removeEventListener('message', handleSwMessage as any);
+      if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true') {
+        navigator.serviceWorker?.removeEventListener('message', handleSwMessage as any);
+      }
     };
   }, []);
 
   const cacheSong = useCallback(async (songId: string, audioUrl: string, metadata?: { title?: string; artist?: string; duration?: number }) => {
-    if (!('serviceWorker' in navigator)) {
+    if (!import.meta.env.PROD || import.meta.env.VITE_ENABLE_SERVICE_WORKER !== 'true' || !('serviceWorker' in navigator)) {
       toast({ 
         title: 'Offline mode not supported', 
         variant: 'destructive' 
@@ -160,7 +164,7 @@ export function useOfflineAudio() {
 
   const removeCachedSong = useCallback(async (songId: string) => {
     const existing = cachedSongs.find(s => s.songId === songId);
-    if ('serviceWorker' in navigator) {
+    if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true' && 'serviceWorker' in navigator) {
       try {
         const registration = await navigator.serviceWorker.ready;
         if (registration.active) {
@@ -187,7 +191,7 @@ export function useOfflineAudio() {
   }, [cachedSongs]);
 
   const getCachedAudioUrl = useCallback(async (songId: string): Promise<string | null> => {
-    if (!('serviceWorker' in navigator)) return null;
+    if (!import.meta.env.PROD || import.meta.env.VITE_ENABLE_SERVICE_WORKER !== 'true' || !('serviceWorker' in navigator)) return null;
     
     return new Promise((resolve) => {
       const registration = navigator.serviceWorker.ready.then(reg => {

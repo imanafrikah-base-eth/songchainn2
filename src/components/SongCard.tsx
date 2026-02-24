@@ -1,7 +1,7 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Pause, Heart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Song } from '@/data/musicData';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
@@ -31,11 +31,12 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
   const { currentSong, isPlaying } = usePlayerState();
   const { playSong, togglePlay } = usePlayerActions();
   const { currentTime } = usePlayerTime();
-  const { toggleLike, isLiked } = useEngagement();
+  const { toggleLike, isLiked, sendPulse } = useEngagement();
   const { data: popularityData } = useSongPopularity();
   const { data: pulseCounts } = usePulseCounts();
   const { user } = useAuth();
   const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
+  const navigate = useNavigate();
   
   // Song ownership for token-gated songs
   const { 
@@ -94,6 +95,19 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     e.stopPropagation();
     toggleLike(song.id);
   }, [toggleLike, song.id]);
+
+  const handlePulseClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isCurrentSong) {
+      playSong(song);
+    }
+    sendPulse(song.id);
+  }, [isCurrentSong, playSong, sendPulse, song]);
+
+  const handleShareToFeed = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/social?song=${encodeURIComponent(song.id)}`);
+  }, [navigate, song.id]);
 
   const handleKeepThis = useCallback(async () => {
     if (!isInstalled) {
@@ -523,6 +537,24 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               artistName={song.artist}
               coverImage={song.coverImage}
             />
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={handleShareToFeed}
+              className="px-2 py-1 rounded-full text-[11px] font-medium text-foreground border border-primary/40 bg-primary/5"
+            >
+              Share to feed
+            </motion.button>
+            {isCurrentSong && isPlaying && (
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.96 }}
+                onClick={handlePulseClick}
+                className="px-2 py-1 rounded-full text-[11px] font-medium text-primary border border-primary/50 bg-primary/10"
+              >
+                Pulse
+              </motion.button>
+            )}
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}

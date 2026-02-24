@@ -10,7 +10,12 @@ export function usePushNotifications() {
 
   useEffect(() => {
     const checkSupport = async () => {
-      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+      const supported =
+        import.meta.env.PROD &&
+        import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true' &&
+        'serviceWorker' in navigator &&
+        'PushManager' in window &&
+        'Notification' in window;
       setIsSupported(supported);
       
       if (supported) {

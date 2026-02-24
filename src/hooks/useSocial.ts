@@ -137,23 +137,15 @@ export function useSocial() {
     content: string,
     postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
     songId?: string,
-    playlistId?: string,
-    image?: { url: string; path: string }
+    playlistId?: string
   ) => {
     if (!user) return;
-
-    if (image && !isArtist) {
-      toast({ title: 'Only artists can upload images', variant: 'destructive' });
-      return;
-    }
 
     const { error } = await supabase.from('social_posts').insert({
       user_id: user.id,
       content,
       song_id: songId || null,
       playlist_id: playlistId || null,
-      image_url: image?.url ?? null,
-      image_path: image?.path ?? null,
       post_type: postType,
     } as any);
 
@@ -164,7 +156,7 @@ export function useSocial() {
 
     toast({ title: 'Post shared!' });
     await fetchPosts();
-  }, [user, isArtist, toast, fetchPosts]);
+  }, [user, toast, fetchPosts]);
 
   const deletePost = useCallback(async (postId: string) => {
     if (!user) return;

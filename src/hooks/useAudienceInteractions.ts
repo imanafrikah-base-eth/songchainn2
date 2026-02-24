@@ -52,11 +52,29 @@ export function useAudienceInteractions() {
       const [songsRes, artistsRes, playlistsRes] = await Promise.all([
         supabase.from('liked_songs').select('song_id').eq('user_id', user.id),
         supabase.from('liked_artists').select('artist_id').eq('user_id', user.id),
-        supabase.from('playlists').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase
+          .from('playlists')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
       ]);
 
-      setLikedSongs((songsRes.data || []).map((r: any) => r.song_id).filter(Boolean));
-      setLikedArtists((artistsRes.data || []).map((r: any) => r.artist_id).filter(Boolean));
+      if (songsRes.error && import.meta.env.DEV) {
+        console.error('Failed to load liked songs', songsRes.error);
+      }
+      if (artistsRes.error && import.meta.env.DEV) {
+        console.error('Failed to load liked artists', artistsRes.error);
+      }
+      if (playlistsRes.error && import.meta.env.DEV) {
+        console.error('Failed to load playlists', playlistsRes.error);
+      }
+
+      setLikedSongs(
+        (songsRes.data || []).map((r: any) => r.song_id).filter(Boolean),
+      );
+      setLikedArtists(
+        (artistsRes.data || []).map((r: any) => r.artist_id).filter(Boolean),
+      );
       setPlaylists((playlistsRes.data as any) || []);
       const storageKey = user ? `songchainn:savedCatalogs:${user.id}` : 'songchainn:savedCatalogs:guest';
       const stored = localStorage.getItem(storageKey);
