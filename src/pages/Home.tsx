@@ -22,7 +22,6 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
-import { LocationPrompt } from '@/components/LocationPrompt';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -77,7 +76,6 @@ export default function Home() {
   const { playlists, createPlaylist, addSongToPlaylist, likedArtists } = useAudienceInteractions();
   const { createPost } = useSocial();
   const { createNotification } = useNotifications();
-  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [newPlaylistDescription, setNewPlaylistDescription] = useState('');
@@ -236,19 +234,6 @@ export default function Home() {
       setIsSubmittingPlaylist(false);
     }
   };
-
-  useEffect(() => {
-    if (!audienceProfile) return;
-    if (audienceProfile.location && audienceProfile.location.trim().length > 0) return;
-    try {
-      const dismissed = localStorage.getItem('location_prompt_dismissed');
-      if (dismissed === 'true') return;
-    } catch {
-      void 0;
-    }
-    const timer = setTimeout(() => setShowLocationPrompt(true), 2000);
-    return () => clearTimeout(timer);
-  }, [audienceProfile]);
 
   return (
     <div className="min-h-screen bg-background pb-24 relative">
@@ -961,16 +946,6 @@ export default function Home() {
       </main>
 
       <AudioPlayer />
-
-      {/* Location Prompt for existing users */}
-      <LocationPrompt
-        isOpen={showLocationPrompt}
-        onClose={() => setShowLocationPrompt(false)}
-        onSuccess={() => {
-          setShowLocationPrompt(false);
-          refreshProfile();
-        }}
-      />
 
       <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
         <DialogContent className="max-w-2xl w-[95vw] sm:w-full">
