@@ -49,42 +49,56 @@ export function useAudienceInteractions() {
         setIsLoading(false);
         return;
       }
-      const [songsRes, artistsRes, playlistsRes] = await Promise.all([
-        supabase.from('liked_songs').select('song_id').eq('user_id', user.id),
-        supabase.from('liked_artists').select('artist_id').eq('user_id', user.id),
-        supabase
-          .from('playlists')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false }),
-      ]);
-
-      if (songsRes.error && import.meta.env.DEV) {
-        console.error('Failed to load liked songs', songsRes.error);
-      }
-      if (artistsRes.error && import.meta.env.DEV) {
-        console.error('Failed to load liked artists', artistsRes.error);
-      }
-      if (playlistsRes.error && import.meta.env.DEV) {
-        console.error('Failed to load playlists', playlistsRes.error);
-      }
-
-      setLikedSongs(
-        (songsRes.data || []).map((r: any) => r.song_id).filter(Boolean),
-      );
-      setLikedArtists(
-        (artistsRes.data || []).map((r: any) => r.artist_id).filter(Boolean),
-      );
-      setPlaylists((playlistsRes.data as any) || []);
-      const storageKey = user ? `songchainn:savedCatalogs:${user.id}` : 'songchainn:savedCatalogs:guest';
-      const stored = localStorage.getItem(storageKey);
       try {
-        const parsed = stored ? JSON.parse(stored) : [];
-        setSavedCatalogs(Array.isArray(parsed) ? parsed : []);
-      } catch {
-        setSavedCatalogs([]);
+        const [songsRes, artistsRes, playlistsRes] = await Promise.all([
+          supabase.from('liked_songs').select('song_id').eq('user_id', user.id),
+          supabase.from('liked_artists').select('artist_id').eq('user_id', user.id),
+          supabase
+            .from('playlists')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false }),
+        ]);
+
+        if (songsRes.error && import.meta.env.DEV) {
+          console.error('Failed to load liked songs', songsRes.error);
+        }
+        if (artistsRes.error && import.meta.env.DEV) {
+          const artistError = artistsRes.error as any;
+          const message = String(artistError?.message || '').toLowerCase();
+          if (!message.includes('abort')) {
+            console.error('Failed to load liked artists', artistsRes.error);
+          }
+        }
+        if (playlistsRes.error && import.meta.env.DEV) {
+          console.error('Failed to load playlists', playlistsRes.error);
+        }
+
+        setLikedSongs(
+          (songsRes.data || []).map((r: any) => r.song_id).filter(Boolean),
+        );
+        setLikedArtists(
+          (artistsRes.data || []).map((r: any) => r.artist_id).filter(Boolean),
+        );
+        setPlaylists((playlistsRes.data as any) || []);
+        const storageKey = user ? `songchainn:savedCatalogs:${user.id}` : 'songchainn:savedCatalogs:guest';
+        const stored = localStorage.getItem(storageKey);
+        try {
+          const parsed = stored ? JSON.parse(stored) : [];
+          setSavedCatalogs(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          setSavedCatalogs([]);
+        }
+      } catch (err: any) {
+        if (import.meta.env.DEV) {
+          const message = String(err?.message || '').toLowerCase();
+          if (!message.includes('abort')) {
+            console.error('Failed to load audience interactions', err);
+          }
+        }
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchData();
@@ -146,7 +160,10 @@ export function useAudienceInteractions() {
       mood?: string,
       vibe?: string,
     ) => {
-      if (!user) return null;
+      if (!user) {
+        toast({ title: 'Please sign in', variant: 'destructive' });
+        return null;
+      }
       if (!isSupabaseConfigured) {
         const now = new Date().toISOString();
         const playlist: Playlist = {
@@ -166,29 +183,66 @@ export function useAudienceInteractions() {
         toast({ title: 'Playlist created!' });
         return playlist;
       }
-      const { data, error } = await supabase
-        .from('playlists')
-        .insert({
-          user_id: user.id,
-          name,
-          description: description || null,
-          is_public: isPublic,
-          is_collaborative: false,
-          mood: mood || null,
-          vibe: vibe || null,
-        } as any)
-        .select('*')
-        .maybeSingle();
+      try {
+        const {
+          data: authData,
+          error: authErr,
+        } = await supabase.auth.getUser();
+        if (authErr) throw authErr;
 
-      if (error || !data) {
-        toast({ title: 'Failed to create playlist', variant: 'destructive' });
+        const sessionUser = authData?.user;
+        if (!sessionUser) {
+          toast({ title: 'Please sign in', variant: 'destructive' });
+          return null;
+        }
+
+        const cleanName = (name ?? '').trim();
+        const cleanDescription = (description ?? '').trim();
+
+        const payload: { user_id: string; name: string; description?: string | null } = {
+          user_id: sessionUser.id,
+          name: cleanName || name,
+        };
+
+        if (cleanDescription) {
+          payload.description = cleanDescription;
+        } else {
+          payload.description = null;
+        }
+
+        const { data, error } = await supabase
+          .from('playlists')
+          .insert(payload)
+          .select('*')
+          .maybeSingle();
+
+        if (error || !data) {
+          console.error('playlists insert failed', { error, payload });
+          const messageParts = [
+            error?.message,
+            (error as any)?.details,
+          ].filter(Boolean);
+          toast({
+            title: 'Failed to create playlist',
+            description: messageParts.join(' — ') || 'Please try again in a moment.',
+            variant: 'destructive',
+          });
+          return null;
+        }
+
+        const playlist = data as any as Playlist;
+        setPlaylists((prev) => [playlist, ...prev]);
+        toast({ title: 'Playlist created!' });
+        return playlist;
+      } catch (err: any) {
+        console.error('playlists insert failed', err);
+        toast({
+          title: 'Failed to create playlist',
+          description: String(err?.message || 'Please try again in a moment.'),
+          variant: 'destructive',
+        });
         return null;
       }
-
-      const playlist = data as any as Playlist;
-      setPlaylists((prev) => [playlist, ...prev]);
-      toast({ title: 'Playlist created!' });
-      return playlist;
     },
     [user, toast],
   );
@@ -210,6 +264,44 @@ export function useAudienceInteractions() {
     setPlaylists(next);
     toast({ title: 'Playlist deleted' });
   }, [user, toast, playlists]);
+
+  const updatePlaylistVisibility = useCallback(
+    async (playlistId: string, isPublic: boolean) => {
+      if (!user) return false;
+      if (!isSupabaseConfigured) {
+        const existing = listPlaylists(user.id);
+        const next = existing.map((p) =>
+          p.id === playlistId ? { ...p, is_public: isPublic } : p,
+        );
+        savePlaylists(user.id, next);
+        setPlaylists(next);
+        toast({ title: isPublic ? 'Playlist published' : 'Playlist made private' });
+        return true;
+      }
+
+      const { error } = await supabase
+        .from('playlists')
+        .update({ is_public: isPublic } as any)
+        .eq('id', playlistId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        toast({
+          title: 'Could not update playlist',
+          description: error.message || 'Please try again in a moment.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      setPlaylists((prev) =>
+        prev.map((p) => (p.id === playlistId ? { ...p, is_public: isPublic } : p)),
+      );
+      toast({ title: isPublic ? 'Playlist published' : 'Playlist made private' });
+      return true;
+    },
+    [user, toast],
+  );
 
   // Add Song to Playlist
   const addSongToPlaylist = useCallback(async (playlistId: string, songId: string) => {
@@ -292,5 +384,6 @@ export function useAudienceInteractions() {
     addSongToPlaylist,
     removeSongFromPlaylist,
     getPlaylistSongs,
+    updatePlaylistVisibility,
   };
 }

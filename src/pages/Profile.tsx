@@ -53,7 +53,7 @@ const BaseIcon = () => (
 
 export default function Profile() {
   const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding, isLoading } = useAuth();
-  const { likedSongs, playlists, savedCatalogs, createPlaylist, deletePlaylist } = useAudienceInteractions();
+  const { likedSongs, playlists, savedCatalogs, createPlaylist, deletePlaylist, updatePlaylistVisibility } = useAudienceInteractions();
   const { points, completedReferrals, shareInviteLink } = useReferrals();
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -1092,6 +1092,15 @@ export default function Profile() {
                           </>
                         )}
                       </span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => updatePlaylistVisibility(playlist.id, !playlist.is_public)}
+                      >
+                        {playlist.is_public ? <Lock className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                      </Button>
                       <Button
                         type="button"
                         size="icon"

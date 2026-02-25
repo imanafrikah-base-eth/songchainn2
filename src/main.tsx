@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.tsx";
 import "./index.css";
 import { Web3Provider } from "./components/Web3Provider";
+import { checkSupabaseReachability } from "./lib/networkCheck";
 
 declare global {
   interface Window {
@@ -22,6 +23,10 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+if (import.meta.env.DEV) {
+  checkSupabaseReachability();
+}
 
 if (typeof window !== "undefined" && import.meta.env.PROD) {
   const AUTO_RELOAD_KEY = "__songchainn_auto_reload_at";

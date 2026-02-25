@@ -82,14 +82,6 @@ export default function Auth() {
     }
   }, [hasWallet, isWalletDetected, isConnected, signInWithWallet, openConnectModal]);
 
-  // Handle WalletConnect connection success
-  useEffect(() => {
-    if (isConnected && web3Address && connectionState === 'idle') {
-      // User connected via WalletConnect modal, now sign in
-      handleWalletSignIn();
-    }
-  }, [isConnected, web3Address, connectionState, handleWalletSignIn]);
-
   useEffect(() => {
     if (user) navigate('/', { replace: true });
   }, [user, navigate]);

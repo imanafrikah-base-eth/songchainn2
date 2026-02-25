@@ -50,7 +50,7 @@ export interface Song {
   artistWallet?: string;
   isTokenGated?: boolean;
   addedAt?: string;
-  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7';
+  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0';
 }
 
 export interface Catalog {
@@ -2554,6 +2554,230 @@ export const SONGS: Song[] = [
     addedAt: '2026-02-01T00:00:00.000Z',
     volume: 'Vol4',
   },
+  {
+    id: '176',
+    title: 'RUDE BOY',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20RUDE%20BOY.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMan%20Arikah%20-3.0%20art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Trap',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: '3.0',
+  },
+  {
+    id: '177',
+    title: 'ID FLEX',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20ID%20FLEX.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMan%20Arikah%20-3.0%20art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Trap',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: '3.0',
+  },
+  {
+    id: '178',
+    title: 'LIKKU MISS',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20LIKKU%20MISS.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMan%20Arikah%20-3.0%20art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Trap',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: '3.0',
+  },
+  {
+    id: '179',
+    title: 'WGE',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20WGE.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMan%20Arikah%20-3.0%20art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Trap',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: '3.0',
+  },
+  {
+    id: '180',
+    title: 'TAKE IT HOW YOU WANT',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20TAKE%20IT%20HOW%20YOU%20WANT.mp3',
+    coverImage:
+    'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMan%20Arikah%20-3.0%20art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Trap',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: '3.0',
+  },
+  {
+    id: '181',
+    title: 'THROUGH YOU',
+    artist: 'IMAN AFRIKAH ft SANTANA',
+    artistId: '3',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20ft%20SANTANA%20%20-%20THROUGH%20YOU.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMan%20Arikah%20-3.0%20art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Trap',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: '3.0',
+  },
+  {
+    id: '182',
+    title: 'WILD OUT',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20WILD%20OUT.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/IMan%20Arikah%20-3.0%20art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Trap',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: '3.0',
+  },
+  {
+    id: '183',
+    title: 'BUMBLE BEE',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/SANTANA%20-%20BUMBLE%20BEE.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/Santana%20vol2%20Art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: 'Vol2',
+  },
+  {
+    id: '184',
+    title: 'DIAL TONE',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/SANTANA%20-%20DIAL%20TONE.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/Santana%20vol2%20Art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: 'Vol2',
+  },
+  {
+    id: '185',
+    title: 'GNB',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/SANTANA%20-%20GNB.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/Santana%20vol2%20Art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: 'Vol2',
+  },
+  {
+    id: '186',
+    title: 'NYASH',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/SANTANA%20-%20NYASH.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/Santana%20vol2%20Art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: 'Vol2',
+  },
+  {
+    id: '187',
+    title: 'CHERIE',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/SANTANA%20-%20CHERIE.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/Santana%20vol2%20Art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: 'Vol2',
+  },
+  {
+    id: '188',
+    title: 'NYASH EXT',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/SANTANA%20-%20NYASH%20EXT.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/Santana%20vol2%20Art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: 'Vol2',
+  },
+  {
+    id: '189',
+    title: 'SOKO',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/SANTANA%20-%20SOKO.mp3',
+    coverImage:
+      'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/Santana%20vol2%20Art.png',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-02-24T00:00:00.000Z',
+    volume: 'Vol2',
+  },
 ];
 
 export const CATALOGS: Catalog[] = buildCatalogs(SONGS);
@@ -2584,7 +2808,7 @@ export const ARTISTS: Artist[] = [
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
     profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/file_0000000077c8722f8f65c9d1abd8bca1-2.png',
-    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147'],
+    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182'],
   },
   {
     id: '4',
@@ -2620,7 +2844,7 @@ export const ARTISTS: Artist[] = [
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
     profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Santana/Santana%20(1).png',
-    songs: ['7', '43', '44', '45', '46', '47', '48'],
+    songs: ['7', '43', '44', '45', '46', '47', '48', '183', '184', '185', '186', '187', '188', '189'],
   },
   {
     id: '8',

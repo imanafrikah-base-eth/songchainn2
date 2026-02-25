@@ -65,7 +65,9 @@ export function PostComposer({ onPost, initialType = 'text', initialSongId }: Po
     return ARTISTS.find(a => a.id === artistId)?.name || 'Unknown Artist';
   };
 
-  const songs = SONGS;
+  const songs = Array.from(
+    new Map(SONGS.map((song) => [song.id, song])).values(),
+  );
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-4">

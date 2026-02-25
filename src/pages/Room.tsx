@@ -1138,14 +1138,6 @@ export default function Room() {
     };
   }, [segmentNowMs]);
 
-  useEffect(() => {
-    return () => {
-      if (!isRoomHidden) {
-        void exitRoomMode();
-      }
-    };
-  }, [exitRoomMode, isRoomHidden]);
-
   if (!user) return null;
 
   return (

@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
 import { AudienceProfile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 
 export function useSocial() {
   const { user, isArtist } = useAuth();
@@ -133,30 +134,67 @@ export function useSocial() {
     }
   }, [user, fetchPosts]);
 
-  const createPost = useCallback(async (
-    content: string,
-    postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
-    songId?: string,
-    playlistId?: string
-  ) => {
-    if (!user) return;
+  const createPost = useCallback(
+    async (
+      content: string,
+      _postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
+      _songId?: string,
+      _playlistId?: string
+    ) => {
+      let payloadForLog: { user_id: string; content?: string; media_url?: string } | undefined;
 
-    const { error } = await supabase.from('social_posts').insert({
-      user_id: user.id,
-      content,
-      song_id: songId || null,
-      playlist_id: playlistId || null,
-      post_type: postType,
-    } as any);
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        if (authErr) throw authErr;
 
-    if (error) {
-      toast({ title: 'Failed to share post', variant: 'destructive' });
-      return;
-    }
+        const user = authData?.user;
+        if (!user) throw new Error('Not authenticated');
 
-    toast({ title: 'Post shared!' });
-    await fetchPosts();
-  }, [user, toast, fetchPosts]);
+        const mediaUrl = _songId;
+
+        const cleanContent = (content ?? '').trim();
+        const cleanMediaUrl = (mediaUrl ?? '').trim();
+
+        if (!cleanContent && !cleanMediaUrl) {
+          throw new Error('Post cannot be empty');
+        }
+
+        const payload: { user_id: string; content?: string; media_url?: string } = {
+          user_id: user.id,
+        };
+
+        if (cleanContent) payload.content = cleanContent;
+        if (cleanMediaUrl) payload.media_url = cleanMediaUrl;
+
+        payloadForLog = payload;
+
+        const { error } = await supabase.from('social_posts').insert(payload as any);
+        if (error) {
+          console.error('social_posts insert failed', { error, payload: payloadForLog });
+          throw error;
+        }
+
+        toast({ title: 'Post shared!' });
+        await fetchPosts();
+      } catch (error: any) {
+        const msg = String(error?.message || '');
+        if (msg === 'Post cannot be empty') {
+          toast({
+            title: 'Post cannot be empty',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        console.error('social_posts insert failed', { error, payload: payloadForLog });
+        toast({
+          title: 'Could not post — check console',
+          variant: 'destructive',
+        });
+      }
+    },
+    [toast, fetchPosts]
+  );
 
   const deletePost = useCallback(async (postId: string) => {
     if (!user) return;
