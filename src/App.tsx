@@ -29,6 +29,7 @@ const Community = lazy(() => import("./pages/Community"));
 const AudienceProfile = lazy(() => import("./pages/AudienceProfile"));
 const Install = lazy(() => import("./pages/Install"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Room = lazy(() => import("./pages/Room"));
 const About = lazy(() => import("./pages/About"));
 
@@ -88,6 +89,7 @@ function AppShell() {
           <Route path="/install" element={<Install />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/room" element={<Room />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
@@ -116,6 +118,7 @@ function AppContent() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/install" element={<Install />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<Auth />} />
           </Routes>
         </Suspense>

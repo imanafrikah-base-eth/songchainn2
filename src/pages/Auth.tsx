@@ -12,6 +12,7 @@ import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
 import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
 import { useNavigate } from 'react-router-dom';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -118,11 +119,43 @@ export default function Auth() {
       }
     } catch (err: any) {
       const msg = String(err?.message || '');
-      if (msg.toLowerCase().includes('invalid login credentials')) {
+      const lower = msg.toLowerCase();
+      if (authMode === 'signup' && (lower.includes('user already registered') || lower.includes('already exists'))) {
+        setError('Account already exists. Please Sign In or Reset Password.');
+        setAuthMode('signin');
+        setAuthView('email');
+      } else if (lower.includes('invalid login credentials')) {
         setError('Invalid email or password');
       } else {
         setError(msg || 'Authentication failed');
       }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError(null);
+    if (!email) {
+      setError('Enter your email to reset your password');
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      setError('Password reset is not available right now.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) {
+        setError(error.message || 'Failed to send reset email');
+        return;
+      }
+      toast.success('Password reset email sent. Check your inbox.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to send reset email');
     } finally {
       setIsLoading(false);
     }
@@ -594,15 +627,25 @@ export default function Auth() {
                   </Button>
 
                   {authMode === 'signin' && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isLoading}
-                      onClick={handleSendEmailLink}
-                      className="w-full h-12 rounded-xl border-border/50 hover:bg-secondary/30 text-foreground font-medium"
-                    >
-                      Email me a sign-in link
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isLoading}
+                        onClick={handleSendEmailLink}
+                        className="w-full h-12 rounded-xl border-border/50 hover:bg-secondary/30 text-foreground font-medium"
+                      >
+                        Email me a sign-in link
+                      </Button>
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={handleForgotPassword}
+                        className="w-full text-xs text-muted-foreground hover:text-foreground mt-2 underline-offset-2 hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    </>
                   )}
                 </form>
               </motion.div>
