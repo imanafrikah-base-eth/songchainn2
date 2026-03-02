@@ -17,7 +17,8 @@ type RoomMessage = {
   id: string;
   user_id: string;
   room_name: string;
-  message: string;
+  content: string;
+  message?: string;
   created_at: string;
   reply_to_message_id: string | null;
 };
@@ -520,7 +521,7 @@ export default function Room() {
       const cutoffIso = new Date(Date.now() - ROOM_TTL_MS).toISOString();
       const messagesRes = await (supabase as any)
         .from('room_messages')
-        .select('id, user_id, room_name, message, created_at, reply_to_message_id')
+        .select('id, user_id, room_name, content, message, created_at, reply_to_message_id')
         .gte('created_at', cutoffIso)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -657,7 +658,7 @@ export default function Room() {
     const cutoffIso = new Date(Date.now() - ROOM_TTL_MS).toISOString();
     const messagesRes = await (supabase as any)
       .from('room_messages')
-      .select('id, user_id, room_name, message, created_at, reply_to_message_id')
+      .select('id, user_id, room_name, content, message, created_at, reply_to_message_id')
       .gte('created_at', cutoffIso)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -858,7 +859,6 @@ export default function Room() {
   }, [chatBackend, roomName, user]);
 
   const sendMessage = useCallback(async () => {
-    if (!user) return;
     if (!roomName) {
       setIsNamePromptOpen(true);
       return;
@@ -868,10 +868,12 @@ export default function Room() {
     if (!cleaned) return;
 
     if (chatBackend === 'local') {
+      if (!user) return;
       const newMessage: RoomMessage = {
         id: makeMessageId(),
         user_id: user.id,
         room_name: roomName,
+        content: cleaned.slice(0, 280),
         message: cleaned.slice(0, 280),
         created_at: new Date().toISOString(),
         reply_to_message_id: replyTo?.id ?? null,
@@ -892,25 +894,36 @@ export default function Room() {
     }
 
     setIsSending(true);
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError || !data?.user) {
+      setIsSending(false);
+      return;
+    }
+    const sessionUser = data.user;
+
     const res = await (supabase as any)
       .from('room_messages')
       .insert({
-        user_id: user.id,
+        room_id: 'global',
+        user_id: sessionUser.id,
+        content: cleaned.slice(0, 280),
         room_name: roomName,
         message: cleaned.slice(0, 280),
         reply_to_message_id: replyTo?.id ?? null,
       })
-      .select('id, user_id, room_name, message, created_at, reply_to_message_id')
+      .select('id, user_id, room_name, content, message, created_at, reply_to_message_id')
       .single();
 
     setIsSending(false);
     if (res?.error) {
       if (isMissingTableError(res.error)) {
         setChatBackend('local');
+        if (!user) return;
         const newMessage: RoomMessage = {
           id: makeMessageId(),
           user_id: user.id,
           room_name: roomName,
+          content: cleaned.slice(0, 280),
           message: cleaned.slice(0, 280),
           created_at: new Date().toISOString(),
           reply_to_message_id: replyTo?.id ?? null,
@@ -931,7 +944,7 @@ export default function Room() {
       toast.error('Message not sent', { description: res.error.message });
       return;
     }
-    const inserted = res?.data as RoomMessage | undefined;
+    const inserted = (res?.data as RoomMessage | undefined) ?? undefined;
     if (inserted) {
       broadcastRoomMessage(inserted);
       setMessages(prev => {
@@ -1451,7 +1464,9 @@ export default function Room() {
             <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
               <div className="min-w-0">
                 <div className="text-xs text-zinc-400">Replying to {replyTo.room_name}</div>
-                <div className="text-xs text-zinc-300 truncate">{renderMessageWithCustomEmojis(replyTo.message)}</div>
+                <div className="text-xs text-zinc-300 truncate">
+                  {renderMessageWithCustomEmojis(replyTo.content || replyTo.message || '')}
+                </div>
               </div>
               <Button
                 type="button"
@@ -1851,7 +1866,7 @@ function SwipeToReplyMessage({
       <div className="min-w-0 flex-1">
         {parent && (
           <div className="mb-1 pl-2 border-l border-white/15 text-xs text-zinc-500 truncate">
-            Reply to {parent.room_name}: {parent.message}
+            Reply to {parent.room_name}: {parent.content || parent.message}
           </div>
         )}
         <span className="text-zinc-100 inline-flex items-center gap-1">
@@ -1860,7 +1875,9 @@ function SwipeToReplyMessage({
             <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
           )}
         </span>{' '}
-        <span className="text-zinc-300">{renderMessageWithCustomEmojis(message.message)}</span>
+        <span className="text-zinc-300">
+          {renderMessageWithCustomEmojis(message.content || message.message || '')}
+        </span>
         <div className="mt-1 flex items-center gap-1.5">
           {QUICK_REACTIONS.map((emoji) => {
             const count = reactions?.[emoji] ?? 0;

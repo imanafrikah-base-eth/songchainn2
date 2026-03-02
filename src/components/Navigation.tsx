@@ -18,7 +18,7 @@ import { SONGS } from '@/data/musicData';
 
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
-  { path: '/#playlists', label: 'Playlists', icon: ListMusic },
+  { path: '/playlists', label: 'Playlists', icon: ListMusic },
   { path: '/discover', label: 'Discover', icon: Compass },
   { path: '/room', label: 'The Room', icon: Headphones },
   { path: '/community', label: 'Community', icon: Users },

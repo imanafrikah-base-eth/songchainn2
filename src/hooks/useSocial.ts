@@ -137,11 +137,19 @@ export function useSocial() {
   const createPost = useCallback(
     async (
       content: string,
-      _postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
-      _songId?: string,
-      _playlistId?: string
+      postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
+      songId?: string,
+      playlistId?: string
     ) => {
-      let payloadForLog: { user_id: string; content?: string; media_url?: string } | undefined;
+      let payloadForLog:
+        | {
+            user_id: string;
+            content?: string | null;
+            post_type?: string;
+            song_id?: string | null;
+            playlist_id?: string | null;
+          }
+        | undefined;
 
       try {
         const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -150,25 +158,32 @@ export function useSocial() {
         const user = authData?.user;
         if (!user) throw new Error('Not authenticated');
 
-        const mediaUrl = _songId;
-
         const cleanContent = (content ?? '').trim();
-        const cleanMediaUrl = (mediaUrl ?? '').trim();
+        const cleanSongId = (songId ?? '').trim();
+        const cleanPlaylistId = (playlistId ?? '').trim();
 
-        if (!cleanContent && !cleanMediaUrl) {
+        if (!cleanContent && !cleanSongId && !cleanPlaylistId) {
           throw new Error('Post cannot be empty');
         }
 
-        const payload: { user_id: string; content?: string; media_url?: string } = {
+        const payload: Database['public']['Tables']['social_posts']['Insert'] = {
           user_id: user.id,
+          post_type: postType,
         };
 
-        if (cleanContent) payload.content = cleanContent;
-        if (cleanMediaUrl) payload.media_url = cleanMediaUrl;
+        if (cleanContent) {
+          payload.content = cleanContent;
+        }
+        if (cleanSongId) {
+          payload.song_id = cleanSongId;
+        }
+        if (cleanPlaylistId) {
+          payload.playlist_id = cleanPlaylistId;
+        }
 
-        payloadForLog = payload;
+        payloadForLog = payload as any;
 
-        const { error } = await supabase.from('social_posts').insert(payload as any);
+        const { error } = await supabase.from('social_posts').insert(payload);
         if (error) {
           console.error('social_posts insert failed', { error, payload: payloadForLog });
           throw error;

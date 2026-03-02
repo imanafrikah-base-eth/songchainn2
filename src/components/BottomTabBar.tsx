@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Compass, Users, MessageCircle, User, Headphones } from 'lucide-react';
+import { Home, Compass, Users, MessageCircle, User, Headphones, ListMusic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSafePlayerState } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
@@ -9,6 +9,7 @@ import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 const tabItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/discover', label: 'Discover', icon: Compass },
+  { path: '/playlists', label: 'Playlists', icon: ListMusic },
   { path: '/room', label: 'Room', icon: Headphones },
   { path: '/community', label: 'Community', icon: Users },
   { path: '/social', label: 'Feed', icon: MessageCircle },

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
-import { hasWalletProvider, connectWallet, signMessage } from '@/lib/baseWallet';
+import { hasWalletProvider } from '@/lib/baseWallet';
 
 interface AuthContextType {
   user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null;
@@ -188,73 +188,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: new Error('Supabase is not configured') };
       }
 
-      const connectResult = await connectWallet();
-      if (!connectResult.success || !connectResult.address) {
-        return { error: new Error(connectResult.error || 'Failed to connect wallet') };
+      if (!hasWalletProvider()) {
+        return { error: new Error('No wallet detected. Please install a Base compatible wallet.') };
       }
 
-      const address = connectResult.address;
+      const { data, error } = await supabase.auth.signInWithWeb3({
+        chain: 'ethereum',
+        statement: 'Sign in to $ongChainn on Base',
+      } as any);
 
-      const nonceRes = await (supabase as any).functions.invoke('verify-base-signature', {
-        body: { action: 'generate-nonce' },
-      });
-      if (nonceRes.error || !nonceRes.data?.nonce) {
-        return { error: new Error('Failed to get sign-in nonce') };
+      if (error) {
+        return { error };
       }
 
-      const nonce = String(nonceRes.data.nonce);
-
-      const message = [
-        'Sign in to $ongChainn',
-        '',
-        `Wallet: ${address}`,
-        `Nonce: ${nonce}`,
-      ].join('\n');
-
-      const sigRes = await signMessage(message, address);
-      if (!sigRes.signature) {
-        return { error: new Error(sigRes.error || 'Signature was rejected') };
-      }
-
-      const verifyRes = await (supabase as any).functions.invoke('verify-base-signature', {
-        body: {
-          action: 'verify',
-          address,
-          message,
-          signature: sigRes.signature,
-          nonce,
-        },
-      });
-
-      if (verifyRes.error || !verifyRes.data?.success || !verifyRes.data?.session) {
-        const msg = verifyRes?.data?.error || verifyRes?.error?.message || 'Wallet verification failed';
-        return { error: new Error(msg) };
-      }
-
-      const session = verifyRes.data.session as any;
-      const userData = verifyRes.data.user as any;
-
-      if (!session?.access_token || !session?.refresh_token) {
-        return { error: new Error('Invalid session returned from wallet sign-in') };
-      }
-
-      const { error: setSessionError } = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
-      if (setSessionError) {
-        return { error: setSessionError };
-      }
-
-      if (userData?.id) {
-        setUser({
-          id: userData.id,
-          email: userData.email,
-          user_metadata: userData.user_metadata as any,
-        });
-      }
-
-      setWalletAddress(address);
       setIsAdmin(false);
       setIsArtist(false);
       setArtistId(null);

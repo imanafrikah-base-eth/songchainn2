@@ -11,6 +11,7 @@ import { CountryCodeSelector } from '@/components/CountryCodeSelector';
 import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
 import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
+import { BaseWalletButton } from '@/components/wallet/BaseWalletButton';
 import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
@@ -359,13 +360,9 @@ export default function Auth() {
                   </div>
                 )}
 
-                <Button
-                  onClick={handleWalletSignIn}
-                  disabled={isWalletLoading}
-                  className="w-full gradient-primary text-primary-foreground font-semibold h-14 rounded-2xl shadow-glow hover-scale press-effect text-base"
-                >
-                  {getButtonContent()}
-                </Button>
+                <div className="w-full mb-3">
+                  <BaseWalletButton fullWidth />
+                </div>
 
                 {/* WalletConnect QR Option */}
                 <Button
@@ -460,13 +457,9 @@ export default function Auth() {
                   </div>
                 )}
 
-                <Button
-                  onClick={handleWalletSignIn}
-                  disabled={isWalletLoading}
-                  className="w-full gradient-primary text-primary-foreground font-semibold h-14 rounded-2xl shadow-glow hover-scale press-effect text-base"
-                >
-                  {getButtonContent()}
-                </Button>
+                <div className="w-full mb-3">
+                  <BaseWalletButton fullWidth />
+                </div>
 
                 {/* WalletConnect QR Option - always show for mobile wallet users */}
                 <Button
