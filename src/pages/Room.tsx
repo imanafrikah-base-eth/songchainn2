@@ -77,12 +77,56 @@ function isMissingTableError(error: unknown) {
   );
 }
 
+function isMissingColumnError(error: unknown) {
+  const message = typeof (error as any)?.message === 'string' ? (error as any).message : '';
+  return message.includes("Could not find the '") && message.includes("' column");
+}
+
+function hasMissingColumn(error: unknown, column: string) {
+  const message = typeof (error as any)?.message === 'string' ? (error as any).message : '';
+  return message.includes(`Could not find the '${column}' column`);
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function makeMessageId() {
   const maybeCrypto = globalThis.crypto as Crypto | undefined;
   if (maybeCrypto && 'randomUUID' in maybeCrypto && typeof maybeCrypto.randomUUID === 'function') {
     return maybeCrypto.randomUUID();
   }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function coerceRoomMessage(row: any): RoomMessage | null {
+  if (!row || typeof row !== 'object') return null;
+  const id = typeof row.id === 'string' ? row.id : '';
+  const userId = typeof row.user_id === 'string' ? row.user_id : '';
+  const roomName = typeof row.room_name === 'string' ? row.room_name : '';
+  const createdAt = typeof row.created_at === 'string' ? row.created_at : new Date().toISOString();
+  const message = typeof row.message === 'string' ? row.message : undefined;
+  const content = typeof row.content === 'string' ? row.content : (message ?? '');
+  const replyTo = typeof row.reply_to_message_id === 'string' ? row.reply_to_message_id : null;
+  if (!id || !userId || !roomName || !content) return null;
+  return {
+    id,
+    user_id: userId,
+    room_name: roomName,
+    content,
+    message,
+    created_at: createdAt,
+    reply_to_message_id: replyTo,
+  };
 }
 
 function extractMentions(text: string) {
@@ -521,7 +565,7 @@ export default function Room() {
       const cutoffIso = new Date(Date.now() - ROOM_TTL_MS).toISOString();
       const messagesRes = await (supabase as any)
         .from('room_messages')
-        .select('id, user_id, room_name, content, message, created_at, reply_to_message_id')
+        .select('*')
         .gte('created_at', cutoffIso)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -536,7 +580,8 @@ export default function Room() {
           setMessages([]);
         }
       } else {
-        const loaded = (messagesRes?.data as RoomMessage[] | undefined) ?? [];
+        const raw = (messagesRes?.data as any[] | undefined) ?? [];
+        const loaded = raw.map(coerceRoomMessage).filter(Boolean) as RoomMessage[];
         setMessages(loaded.slice().reverse());
       }
       setTimeout(() => {
@@ -625,15 +670,34 @@ export default function Room() {
       const storedNameRaw = localStorage.getItem(`room_username:${user.id}`) || '';
       const storedName = storedNameRaw ? normalizeRoomName(storedNameRaw) : '';
       const toTrack = normalizeRoomName(roomName || storedName || '');
-      await channel.track({ room_name: toTrack || 'Guest', in_room: true, viewing: true });
+      await channel
+        .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
+        .catch(() => void 0);
       syncPresence();
     });
+
+    const presenceHeartbeat = window.setInterval(() => {
+      const toTrack = normalizeRoomName(roomName || '');
+      void channel
+        .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
+        .catch(() => void 0);
+    }, 15000);
 
     const sweepInterval = window.setInterval(() => {
       setTypingUsers(prev => prev.filter(Boolean).slice(-3));
     }, 1000);
 
+    const onVisibility = () => {
+      const toTrack = normalizeRoomName(roomName || '');
+      void channel
+        .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
+        .catch(() => void 0);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(presenceHeartbeat);
       window.clearInterval(sweepInterval);
       typingTimeoutRef.current = null;
       typingSentRef.current = false;
@@ -658,12 +722,13 @@ export default function Room() {
     const cutoffIso = new Date(Date.now() - ROOM_TTL_MS).toISOString();
     const messagesRes = await (supabase as any)
       .from('room_messages')
-      .select('id, user_id, room_name, content, message, created_at, reply_to_message_id')
+      .select('*')
       .gte('created_at', cutoffIso)
       .order('created_at', { ascending: false })
       .limit(50);
     if (messagesRes?.error) return;
-    const loaded = (messagesRes?.data as RoomMessage[] | undefined) ?? [];
+    const raw = (messagesRes?.data as any[] | undefined) ?? [];
+    const loaded = raw.map(coerceRoomMessage).filter(Boolean) as RoomMessage[];
     mergeRecentMessages(loaded);
   }, [mergeRecentMessages]);
 
@@ -700,7 +765,9 @@ export default function Room() {
     const channel = presenceChannelRef.current;
     if (!channel || !user) return;
     const toTrack = normalizeRoomName(roomName || '');
-    void channel.track({ room_name: toTrack || 'Guest', in_room: true, viewing: true });
+    void channel
+      .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
+      .catch(() => void 0);
   }, [roomName, user]);
 
   useEffect(() => {
@@ -712,8 +779,8 @@ export default function Room() {
     channel.on('postgres_changes', { event: '*', schema: 'public', table: 'room_messages' }, payload => {
       const eventType = (payload as any)?.eventType as string | undefined;
       if (eventType === 'INSERT' || eventType === 'UPDATE') {
-        const next = (payload as any)?.new as RoomMessage | undefined;
-        if (!next?.id) return;
+        const next = coerceRoomMessage((payload as any)?.new);
+        if (!next) return;
         mergeRecentMessages([next]);
         if (next.user_id !== user.id && document.visibilityState === 'visible') {
           void playBeep();
@@ -867,32 +934,6 @@ export default function Room() {
     const cleaned = stripUrls(draft);
     if (!cleaned) return;
 
-    if (chatBackend === 'local') {
-      if (!user) return;
-      const newMessage: RoomMessage = {
-        id: makeMessageId(),
-        user_id: user.id,
-        room_name: roomName,
-        content: cleaned.slice(0, 280),
-        message: cleaned.slice(0, 280),
-        created_at: new Date().toISOString(),
-        reply_to_message_id: replyTo?.id ?? null,
-      };
-
-      setMessages(prev => {
-        const updated = [...prev, newMessage];
-        if (updated.length > 50) updated.shift();
-        persistLocalMessages(updated);
-        return updated;
-      });
-      broadcastRef.current?.postMessage({ type: 'message', message: newMessage });
-      broadcastRoomMessage(newMessage);
-      setDraft('');
-      setReplyTo(null);
-      shouldAutoScrollRef.current = true;
-      return;
-    }
-
     setIsSending(true);
     const { data, error: authError } = await supabase.auth.getUser();
     if (authError || !data?.user) {
@@ -901,65 +942,74 @@ export default function Room() {
     }
     const sessionUser = data.user;
 
-    const res = await (supabase as any)
-      .from('room_messages')
-      .insert({
-        room_id: 'global',
+    const optimisticId = makeMessageId();
+    const optimistic: RoomMessage = {
+      id: optimisticId,
+      user_id: sessionUser.id,
+      room_name: roomName,
+      content: cleaned.slice(0, 280),
+      message: cleaned.slice(0, 280),
+      created_at: new Date().toISOString(),
+      reply_to_message_id: replyTo?.id ?? null,
+    };
+
+    setMessages(prev => {
+      if (prev.some(m => m.id === optimistic.id)) return prev;
+      const updated = [...prev, optimistic];
+      if (updated.length > 50) updated.shift();
+      if (chatBackend === 'local') persistLocalMessages(updated);
+      return updated;
+    });
+    broadcastRef.current?.postMessage({ type: 'message', message: optimistic });
+    broadcastRoomMessage(optimistic);
+    setDraft('');
+    setReplyTo(null);
+    shouldAutoScrollRef.current = true;
+
+    if (chatBackend === 'local') {
+      setIsSending(false);
+      return;
+    }
+
+    const fullPayload: any = {
+      id: isUuid(optimisticId) ? optimisticId : undefined,
+      room_id: 'global',
+      user_id: sessionUser.id,
+      content: cleaned.slice(0, 280),
+      room_name: roomName,
+      message: cleaned.slice(0, 280),
+      reply_to_message_id: replyTo?.id ?? null,
+    };
+    if (!fullPayload.id) delete fullPayload.id;
+
+    let res = await (supabase as any).from('room_messages').insert(fullPayload).select('*').single();
+    if (res?.error && isMissingColumnError(res.error)) {
+      const minimalPayload: any = {
+        id: isUuid(optimisticId) ? optimisticId : undefined,
         user_id: sessionUser.id,
-        content: cleaned.slice(0, 280),
         room_name: roomName,
         message: cleaned.slice(0, 280),
         reply_to_message_id: replyTo?.id ?? null,
-      })
-      .select('id, user_id, room_name, content, message, created_at, reply_to_message_id')
-      .single();
+      };
+      if (!minimalPayload.id) delete minimalPayload.id;
+      if (hasMissingColumn(res.error, 'reply_to_message_id')) delete minimalPayload.reply_to_message_id;
+      res = await (supabase as any).from('room_messages').insert(minimalPayload).select('*').single();
+    }
 
     setIsSending(false);
     if (res?.error) {
       if (isMissingTableError(res.error)) {
         setChatBackend('local');
-        if (!user) return;
-        const newMessage: RoomMessage = {
-          id: makeMessageId(),
-          user_id: user.id,
-          room_name: roomName,
-          content: cleaned.slice(0, 280),
-          message: cleaned.slice(0, 280),
-          created_at: new Date().toISOString(),
-          reply_to_message_id: replyTo?.id ?? null,
-        };
-        setMessages(prev => {
-          const updated = [...prev, newMessage];
-          if (updated.length > 50) updated.shift();
-          persistLocalMessages(updated);
-          return updated;
-        });
-        broadcastRef.current?.postMessage({ type: 'message', message: newMessage });
-        broadcastRoomMessage(newMessage);
-        setDraft('');
-        setReplyTo(null);
-        shouldAutoScrollRef.current = true;
         return;
       }
-      toast.error('Message not sent', { description: res.error.message });
+      toast.error('Message not saved', { description: res.error.message });
       return;
     }
-    const inserted = (res?.data as RoomMessage | undefined) ?? undefined;
-    if (inserted) {
-      broadcastRoomMessage(inserted);
-      setMessages(prev => {
-        if (prev.some(m => m.id === inserted.id)) return prev;
-        const updated = [...prev, inserted];
-        if (updated.length > 50) updated.shift();
-        return updated;
-      });
-    }
 
-    setDraft('');
-    setReplyTo(null);
-    shouldAutoScrollRef.current = true;
+    const inserted = coerceRoomMessage(res?.data);
+    if (inserted) mergeRecentMessages([inserted]);
     void createMentionNotifications(cleaned);
-  }, [broadcastRoomMessage, chatBackend, createMentionNotifications, draft, persistLocalMessages, replyTo, roomName, user]);
+  }, [broadcastRoomMessage, chatBackend, createMentionNotifications, draft, mergeRecentMessages, persistLocalMessages, replyTo, roomName]);
 
   const toggleQuickReaction = useCallback((messageId: string, emoji: string) => {
     if (!user) return;
