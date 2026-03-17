@@ -2,12 +2,44 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 type PresenceMeta = { in_room?: boolean };
+const PRESENCE_KEY_PREFIX = 'songchainn:room_presence_key:v1:';
 
 let sharedChannel: ReturnType<typeof supabase.channel> | null = null;
 let sharedUserId: string | null = null;
+let sharedPresenceKey: string | null = null;
 let sharedCount = 0;
 let sharedRefs = 0;
 const sharedListeners = new Set<(count: number) => void>();
+
+function makePresenceKey() {
+  const maybeCrypto = globalThis.crypto as Crypto | undefined;
+  if (maybeCrypto && 'randomUUID' in maybeCrypto && typeof maybeCrypto.randomUUID === 'function') {
+    return maybeCrypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function getOrCreatePresenceKey(userId: string) {
+  try {
+    const storageKey = `${PRESENCE_KEY_PREFIX}${userId}`;
+    const existing = localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const created = makePresenceKey();
+    localStorage.setItem(storageKey, created);
+    return created;
+  } catch {
+    return makePresenceKey();
+  }
+}
 
 function computeInRoomCount(channel: ReturnType<typeof supabase.channel>) {
   const state = channel.presenceState() as Record<string, PresenceMeta[]>;
@@ -24,7 +56,8 @@ function emitSharedCount(next: number) {
 }
 
 async function ensureSharedChannel(userId: string) {
-  if (sharedChannel && sharedUserId === userId) return sharedChannel;
+  const presenceKey = getOrCreatePresenceKey(userId);
+  if (sharedChannel && sharedUserId === userId && sharedPresenceKey === presenceKey) return sharedChannel;
 
   if (sharedChannel) {
     supabase.removeChannel(sharedChannel);
@@ -32,10 +65,11 @@ async function ensureSharedChannel(userId: string) {
   }
 
   sharedUserId = userId;
+  sharedPresenceKey = presenceKey;
 
   const channel = supabase.channel('room-presence', {
     config: {
-      presence: { key: userId },
+      presence: { key: presenceKey },
     },
   });
   sharedChannel = channel;
@@ -63,6 +97,7 @@ function releaseSharedChannel() {
   supabase.removeChannel(sharedChannel);
   sharedChannel = null;
   sharedUserId = null;
+  sharedPresenceKey = null;
   sharedCount = 0;
 }
 

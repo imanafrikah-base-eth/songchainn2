@@ -38,7 +38,8 @@ export function Navigation() {
   const [showProfilePhotoAnnouncement, setShowProfilePhotoAnnouncement] = useState(false);
   const [pulseBanner, setPulseBanner] = useState<{ songId: string; title: string } | null>(null);
   const playerState = useSafePlayerState();
-  const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
+  const isInRoom = location.pathname === '/room' || Boolean(playerState?.isRoomMode);
+  const roomOnlineCount = useRoomOnlineCount(user?.id, isInRoom);
   const { showRoom } = usePlayerActions();
   const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
   const effectiveNavItems = navItems.map((item) =>
@@ -158,16 +159,20 @@ export function Navigation() {
                     )}
                   >
                     <span className="flex items-center gap-2 relative z-10">
-                      <item.icon className="w-4 h-4" />
+                      <span className="relative">
+                        <item.icon className="w-4 h-4" />
+                        {item.path === '/room' && roomOnlineCount > 0 && (
+                          <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
+                            {roomOnlineCount}
+                          </span>
+                        )}
+                      </span>
                       {item.label}
                       {item.path === '/room' && roomOnlineCount > 0 && (
                         <>
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                             <span>LIVE</span>
-                          </span>
-                          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
-                            {roomOnlineCount}
                           </span>
                         </>
                       )}

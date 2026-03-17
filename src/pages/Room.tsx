@@ -46,6 +46,7 @@ const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const ROOM_SEGMENT_SECONDS = 180;
 const TYPING_IDLE_MS = 1400;
 const LOCAL_IDENTITY_KEY = 'room:identity_mode:v1';
+const ROOM_PRESENCE_KEY_PREFIX = 'songchainn:room_presence_key:v1:';
 
 const KNOWN_ARTIST_NAMES = new Set(
   ARTISTS.map(a => a.name.trim().toLowerCase()).filter(Boolean)
@@ -106,6 +107,19 @@ function makeMessageId() {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function getOrCreateRoomPresenceKey(userId: string) {
+  try {
+    const storageKey = `${ROOM_PRESENCE_KEY_PREFIX}${userId}`;
+    const existing = localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const created = makeMessageId();
+    localStorage.setItem(storageKey, created);
+    return created;
+  } catch {
+    return makeMessageId();
+  }
 }
 
 function coerceRoomMessage(row: any): RoomMessage | null {
@@ -250,7 +264,7 @@ export default function Room() {
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
   const [viewingCount, setViewingCount] = useState(0);
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [typingUsersById, setTypingUsersById] = useState<Record<string, string>>({});
   const [segmentNowMs, setSegmentNowMs] = useState(() => Date.now());
   const [reactionsByMessageId, setReactionsByMessageId] = useState<Record<string, Record<string, number>>>({});
   const [myReactionsByMessageId, setMyReactionsByMessageId] = useState<Record<string, Record<string, boolean>>>({});
@@ -265,9 +279,11 @@ export default function Room() {
   const broadcastRef = useRef<BroadcastChannel | null>(null);
   const isPlayingRef = useRef(false);
   const roomEnterAtRef = useRef<number>(0);
+  const roomNameRef = useRef('');
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const typingSentRef = useRef(false);
+  const typingSeenAtRef = useRef<Record<string, number>>({});
   const beepCtxRef = useRef<AudioContext | null>(null);
   const beepUnlockedRef = useRef(false);
   const lastBeepAtRef = useRef(0);
@@ -276,6 +292,10 @@ export default function Room() {
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
+
+  useEffect(() => {
+    roomNameRef.current = roomName;
+  }, [roomName]);
 
   const unlockBeep = useCallback(async () => {
     if (beepUnlockedRef.current) return;
@@ -595,9 +615,9 @@ export default function Room() {
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase.channel('room-presence', {
+    const channel = supabase.channel('room-presence-page', {
       config: {
-        presence: { key: user.id },
+        presence: { key: getOrCreateRoomPresenceKey(user.id) },
       },
     });
     presenceChannelRef.current = channel;
@@ -632,13 +652,24 @@ export default function Room() {
       const fromUserId = data?.user_id;
       if (!fromUserId || fromUserId === user.id) return;
       const name = normalizeRoomName(data?.room_name || '');
-      const label = name ? `@${name}; typing` : 'typing';
+      const label = `${name || 'Someone'} is typing`;
+      const now = Date.now();
 
-      setTypingUsers(prev => {
-        const next = prev.filter(x => x !== label);
-        if (data?.is_typing) next.push(label);
+      setTypingUsersById(prev => {
+        const next = { ...prev };
+        if (data?.is_typing) {
+          next[fromUserId] = label;
+        } else {
+          delete next[fromUserId];
+        }
         return next;
       });
+
+      if (data?.is_typing) {
+        typingSeenAtRef.current[fromUserId] = now;
+      } else {
+        delete typingSeenAtRef.current[fromUserId];
+      }
     });
 
     channel.on('broadcast', { event: 'message' }, payload => {
@@ -669,7 +700,7 @@ export default function Room() {
       if (status !== 'SUBSCRIBED') return;
       const storedNameRaw = localStorage.getItem(`room_username:${user.id}`) || '';
       const storedName = storedNameRaw ? normalizeRoomName(storedNameRaw) : '';
-      const toTrack = normalizeRoomName(roomName || storedName || '');
+      const toTrack = normalizeRoomName(roomNameRef.current || storedName || '');
       await channel
         .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
         .catch(() => void 0);
@@ -677,18 +708,37 @@ export default function Room() {
     });
 
     const presenceHeartbeat = window.setInterval(() => {
-      const toTrack = normalizeRoomName(roomName || '');
+      const toTrack = normalizeRoomName(roomNameRef.current || '');
       void channel
         .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
         .catch(() => void 0);
     }, 15000);
 
     const sweepInterval = window.setInterval(() => {
-      setTypingUsers(prev => prev.filter(Boolean).slice(-3));
+      const now = Date.now();
+      const cutoff = now - 3000;
+      const entries = Object.entries(typingSeenAtRef.current)
+        .filter(([, seenAt]) => seenAt >= cutoff)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+
+      const keepIds = new Set(entries.map(([id]) => id));
+      for (const id of Object.keys(typingSeenAtRef.current)) {
+        if (!keepIds.has(id)) delete typingSeenAtRef.current[id];
+      }
+
+      setTypingUsersById(prev => {
+        const next: Record<string, string> = {};
+        for (const [id] of entries) {
+          const label = prev[id];
+          if (label) next[id] = label;
+        }
+        return next;
+      });
     }, 1000);
 
     const onVisibility = () => {
-      const toTrack = normalizeRoomName(roomName || '');
+      const toTrack = normalizeRoomName(roomNameRef.current || '');
       void channel
         .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
         .catch(() => void 0);
@@ -702,9 +752,11 @@ export default function Room() {
       typingTimeoutRef.current = null;
       typingSentRef.current = false;
       presenceChannelRef.current = null;
+      typingSeenAtRef.current = {};
+      setTypingUsersById({});
       supabase.removeChannel(channel);
     };
-  }, [applyReactionDelta, chatBackend, persistLocalMessages, playBeep, roomName, user]);
+  }, [applyReactionDelta, chatBackend, persistLocalMessages, playBeep, user]);
 
   const mergeRecentMessages = useCallback((incoming: RoomMessage[]) => {
     setMessages(prev => {
@@ -1500,9 +1552,9 @@ export default function Room() {
 
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-black/70 backdrop-blur border-t border-white/10">
         <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 space-y-2">
-          {typingUsers.length > 0 && (
+          {Object.keys(typingUsersById).length > 0 && (
             <div className="text-[11px] text-zinc-500 truncate">
-              {typingUsers.join(' • ')}
+              {Object.values(typingUsersById).join(' • ')}
             </div>
           )}
           {!replyTo && (

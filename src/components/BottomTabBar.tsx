@@ -21,7 +21,8 @@ export function BottomTabBar() {
   const playerState = useSafePlayerState();
   const currentSong = playerState?.currentSong;
   const { user, isArtist, artistId } = useAuth();
-  const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
+  const isInRoom = location.pathname === '/room' || Boolean(playerState?.isRoomMode);
+  const roomOnlineCount = useRoomOnlineCount(user?.id, isInRoom);
   const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
   const effectiveTabItems = tabItems.map((item) =>
     item.path === '/profile' ? { ...item, path: profilePath } : item
