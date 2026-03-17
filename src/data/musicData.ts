@@ -12,6 +12,7 @@ import artistCover3Local from '@/assets/artist-cover-3.jpg';
 export type Genre =
   | 'Trap'
   | 'Afro'
+  | 'Reggae'
   | 'RnB'
   | 'Dancehall'
   | 'Kalind-Rock'
@@ -24,6 +25,7 @@ export type Genre =
 export const GENRES: Genre[] = [
   'Trap',
   'Afro',
+  'Reggae',
   'RnB',
   'Dancehall',
   'Kalind-Rock',
@@ -1320,7 +1322,7 @@ export const SONGS: Song[] = [
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
-    genre: 'Alternative',
+    genre: 'Reggae',
     addedAt: '2026-01-14T00:00:00.000Z',
     volume: 'Vol3',
   },
@@ -1348,7 +1350,7 @@ export const SONGS: Song[] = [
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
-    genre: 'Alternative',
+    genre: 'Reggae',
     addedAt: '2026-01-14T00:00:00.000Z',
     volume: 'Vol3',
   },

@@ -186,6 +186,8 @@ export default function Discover() {
     const colors: Record<Genre, string> = {
       Trap: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
       Afro: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+      Reggae: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      RnB: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
       Dancehall: 'bg-green-500/20 text-green-400 border-green-500/30',
       'Kalind-Rock': 'bg-red-500/20 text-red-400 border-red-500/30',
       'Kali-Funk': 'bg-pink-500/20 text-pink-400 border-pink-500/30',
@@ -194,7 +196,7 @@ export default function Discover() {
       Alternative: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
       'Pop-Dancehall': 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
     };
-    return colors[genre];
+    return colors[genre] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';
   };
 
   return (
