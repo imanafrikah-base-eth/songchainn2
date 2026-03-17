@@ -615,7 +615,7 @@ export default function Room() {
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase.channel('room-presence-page', {
+    const channel = supabase.channel('room-presence', {
       config: {
         presence: { key: getOrCreateRoomPresenceKey(user.id) },
       },

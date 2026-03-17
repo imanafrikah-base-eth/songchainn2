@@ -105,17 +105,12 @@ export function useRoomOnlineCount(userId: string | null | undefined, inRoom: bo
   const [count, setCount] = useState(sharedCount);
 
   useEffect(() => {
-    if (!userId) {
-      setCount(0);
-      return;
-    }
-
     sharedRefs += 1;
     const listener = (next: number) => setCount(next);
     sharedListeners.add(listener);
     setCount(sharedCount);
 
-    void ensureSharedChannel(userId);
+    void ensureSharedChannel(userId || 'guest');
 
     return () => {
       sharedListeners.delete(listener);
@@ -125,9 +120,8 @@ export function useRoomOnlineCount(userId: string | null | undefined, inRoom: bo
   }, [userId]);
 
   useEffect(() => {
-    if (!userId) return;
     void (async () => {
-      const channel = await ensureSharedChannel(userId);
+      const channel = await ensureSharedChannel(userId || 'guest');
       try {
         await channel.track({ in_room: Boolean(inRoom) });
       } catch {
