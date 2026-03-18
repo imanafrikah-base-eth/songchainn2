@@ -38,8 +38,20 @@ export function Navigation() {
   const [showProfilePhotoAnnouncement, setShowProfilePhotoAnnouncement] = useState(false);
   const [pulseBanner, setPulseBanner] = useState<{ songId: string; title: string } | null>(null);
   const playerState = useSafePlayerState();
-  const isInRoom = location.pathname === '/room' || Boolean(playerState?.isRoomMode);
-  const roomOnlineCount = useRoomOnlineCount(user?.id, isInRoom);
+  const roomUsername = (() => {
+    if (!user?.id) return null;
+    try {
+      return localStorage.getItem(`room_username:${user.id}`) || (user.email ? user.email.split('@')[0] : null) || 'Guest';
+    } catch {
+      return (user.email ? user.email.split('@')[0] : null) || 'Guest';
+    }
+  })();
+  const roomOnlineCount = useRoomOnlineCount({
+    roomId: 'global',
+    viewerUserId: user?.id,
+    isListening: Boolean(playerState?.isRoomMode),
+    username: roomUsername,
+  });
   const { showRoom } = usePlayerActions();
   const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
   const effectiveNavItems = navItems.map((item) =>

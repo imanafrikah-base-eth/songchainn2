@@ -85,7 +85,7 @@ export default function Home() {
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const [isSubmittingPlaylist, setIsSubmittingPlaylist] = useState(false);
   const playerState = useSafePlayerState();
-  const roomOnlineCount = useRoomOnlineCount(user?.id, Boolean(playerState?.isRoomMode));
+  const roomOnlineCount = useRoomOnlineCount({ roomId: 'global', viewerUserId: user?.id });
 
   const catalogs = useMemo(() => CATALOGS, []);
   const featuredCatalogs = useMemo(

@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-type PresenceMeta = { in_room?: boolean };
-const PRESENCE_KEY_PREFIX = 'songchainn:room_presence_key:v1:';
+type PresenceMeta = {
+  user_id?: string;
+  room_id?: string;
+  username?: string;
+  online_at?: string;
+};
+
+const VIEWER_KEY_STORAGE = 'songchainn:room_presence_viewer_key:v1';
 
 let sharedChannel: ReturnType<typeof supabase.channel> | null = null;
-let sharedUserId: string | null = null;
-let sharedPresenceKey: string | null = null;
+let sharedRoomId: string | null = null;
+let sharedViewerKey: string | null = null;
 let sharedCount = 0;
 let sharedRefs = 0;
 const sharedListeners = new Set<(count: number) => void>();
+let sharedShouldTrack = false;
+let sharedTracked = false;
+let sharedTrackMeta: PresenceMeta | null = null;
 
-function makePresenceKey() {
+function makeViewerKey() {
   const maybeCrypto = globalThis.crypto as Crypto | undefined;
   if (maybeCrypto && 'randomUUID' in maybeCrypto && typeof maybeCrypto.randomUUID === 'function') {
     return maybeCrypto.randomUUID();
@@ -28,26 +37,23 @@ function makePresenceKey() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function getOrCreatePresenceKey(userId: string) {
+function getViewerKey(viewerUserId: string | null | undefined) {
+  if (viewerUserId) return viewerUserId;
   try {
-    const storageKey = `${PRESENCE_KEY_PREFIX}${userId}`;
-    const existing = localStorage.getItem(storageKey);
+    const existing = localStorage.getItem(VIEWER_KEY_STORAGE);
     if (existing) return existing;
-    const created = makePresenceKey();
-    localStorage.setItem(storageKey, created);
+    const created = makeViewerKey();
+    localStorage.setItem(VIEWER_KEY_STORAGE, created);
     return created;
   } catch {
-    return makePresenceKey();
+    return makeViewerKey();
   }
 }
 
-function computeInRoomCount(channel: ReturnType<typeof supabase.channel>) {
+function computeListenerCount(channel: ReturnType<typeof supabase.channel>) {
+  // Count is calculated from presenceState() keys (unique active listeners in this room channel).
   const state = channel.presenceState() as Record<string, PresenceMeta[]>;
-  let count = 0;
-  for (const metas of Object.values(state)) {
-    if (Array.isArray(metas) && metas.some(m => Boolean(m?.in_room))) count += 1;
-  }
-  return count;
+  return Object.keys(state).length;
 }
 
 function emitSharedCount(next: number) {
@@ -55,27 +61,31 @@ function emitSharedCount(next: number) {
   for (const listener of sharedListeners) listener(next);
 }
 
-async function ensureSharedChannel(userId: string) {
-  const presenceKey = getOrCreatePresenceKey(userId);
-  if (sharedChannel && sharedUserId === userId && sharedPresenceKey === presenceKey) return sharedChannel;
+async function ensureSharedChannel(roomId: string, viewerKey: string) {
+  if (sharedChannel && sharedRoomId === roomId && sharedViewerKey === viewerKey) return sharedChannel;
 
   if (sharedChannel) {
+    if (sharedTracked) {
+      void sharedChannel.untrack().catch(() => void 0);
+    }
     supabase.removeChannel(sharedChannel);
     sharedChannel = null;
+    sharedTracked = false;
   }
 
-  sharedUserId = userId;
-  sharedPresenceKey = presenceKey;
+  sharedRoomId = roomId;
+  sharedViewerKey = viewerKey;
 
-  const channel = supabase.channel('room-presence', {
+  const channel = supabase.channel(`room:${roomId}`, {
     config: {
-      presence: { key: presenceKey },
+      presence: { key: viewerKey },
     },
   });
   sharedChannel = channel;
 
-  const sync = () => emitSharedCount(computeInRoomCount(channel));
+  const sync = () => emitSharedCount(computeListenerCount(channel));
 
+  // Remote presence updates are received here (sync/join/leave) and drive the badge count.
   channel.on('presence', { event: 'sync' }, sync);
   channel.on('presence', { event: 'join' }, sync);
   channel.on('presence', { event: 'leave' }, sync);
@@ -84,6 +94,12 @@ async function ensureSharedChannel(userId: string) {
     channel.subscribe(status => {
       if (status !== 'SUBSCRIBED') return;
       sync();
+      if (sharedShouldTrack && sharedTrackMeta) {
+        // Presence is tracked here when the current user is an active listener.
+        void channel.track(sharedTrackMeta).then(() => {
+          sharedTracked = true;
+        }).catch(() => void 0);
+      }
       resolve();
     });
   });
@@ -94,14 +110,21 @@ async function ensureSharedChannel(userId: string) {
 function releaseSharedChannel() {
   if (sharedRefs > 0) return;
   if (!sharedChannel) return;
+  // Cleanup happens here when no components are observing (unsubscribe to prevent leaks).
+  if (sharedTracked) {
+    void sharedChannel.untrack().catch(() => void 0);
+    sharedTracked = false;
+  }
   supabase.removeChannel(sharedChannel);
   sharedChannel = null;
-  sharedUserId = null;
-  sharedPresenceKey = null;
+  sharedRoomId = null;
+  sharedViewerKey = null;
   sharedCount = 0;
 }
 
-export function useRoomOnlineCount(userId: string | null | undefined, inRoom: boolean | null | undefined) {
+export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: string | null; isListening?: boolean; username?: string | null }) {
+  const roomId = params?.roomId || 'global';
+  const viewerKey = getViewerKey(params?.viewerUserId);
   const [count, setCount] = useState(sharedCount);
 
   useEffect(() => {
@@ -110,25 +133,40 @@ export function useRoomOnlineCount(userId: string | null | undefined, inRoom: bo
     sharedListeners.add(listener);
     setCount(sharedCount);
 
-    void ensureSharedChannel(userId || 'guest');
+    void ensureSharedChannel(roomId, viewerKey);
 
     return () => {
       sharedListeners.delete(listener);
       sharedRefs = Math.max(0, sharedRefs - 1);
       if (sharedRefs === 0) releaseSharedChannel();
     };
-  }, [userId]);
+  }, [roomId, viewerKey]);
 
   useEffect(() => {
-    void (async () => {
-      const channel = await ensureSharedChannel(userId || 'guest');
-      try {
-        await channel.track({ in_room: Boolean(inRoom) });
-      } catch {
-        void 0;
-      }
-    })();
-  }, [userId, inRoom]);
+    const shouldTrack = Boolean(params?.viewerUserId) && Boolean(params?.isListening);
+    const username = (params?.username || '').trim().slice(0, 20) || 'Guest';
+
+    sharedShouldTrack = shouldTrack;
+    sharedTrackMeta = shouldTrack
+      ? { user_id: params?.viewerUserId || undefined, room_id: roomId, username, online_at: new Date().toISOString() }
+      : null;
+
+    if (!sharedChannel) return;
+    if (!shouldTrack && sharedTracked) {
+      // Cleanup happens here when a listener stops listening (untrack to prevent stale counts).
+      void sharedChannel.untrack().catch(() => void 0);
+      sharedTracked = false;
+      return;
+    }
+    if (shouldTrack && sharedTrackMeta) {
+      void sharedChannel
+        .track(sharedTrackMeta)
+        .then(() => {
+          sharedTracked = true;
+        })
+        .catch(() => void 0);
+    }
+  }, [params?.isListening, params?.username, params?.viewerUserId, roomId]);
 
   return count;
 }

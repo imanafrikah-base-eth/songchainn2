@@ -46,7 +46,7 @@ const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const ROOM_SEGMENT_SECONDS = 180;
 const TYPING_IDLE_MS = 1400;
 const LOCAL_IDENTITY_KEY = 'room:identity_mode:v1';
-const ROOM_PRESENCE_KEY_PREFIX = 'songchainn:room_presence_key:v1:';
+const ROOM_ID = 'global';
 
 const KNOWN_ARTIST_NAMES = new Set(
   ARTISTS.map(a => a.name.trim().toLowerCase()).filter(Boolean)
@@ -107,19 +107,6 @@ function makeMessageId() {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function getOrCreateRoomPresenceKey(userId: string) {
-  try {
-    const storageKey = `${ROOM_PRESENCE_KEY_PREFIX}${userId}`;
-    const existing = localStorage.getItem(storageKey);
-    if (existing) return existing;
-    const created = makeMessageId();
-    localStorage.setItem(storageKey, created);
-    return created;
-  } catch {
-    return makeMessageId();
-  }
 }
 
 function coerceRoomMessage(row: any): RoomMessage | null {
@@ -615,31 +602,28 @@ export default function Room() {
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase.channel('room-presence', {
+    const channel = supabase.channel(`room:${ROOM_ID}`, {
       config: {
-        presence: { key: getOrCreateRoomPresenceKey(user.id) },
+        presence: { key: user.id },
       },
     });
     presenceChannelRef.current = channel;
 
     const syncPresence = () => {
-      const state = channel.presenceState() as Record<string, Array<{ room_name?: string; in_room?: boolean; viewing?: boolean }>>;
+      // Count is calculated from presenceState() keys (unique active listeners).
+      const state = channel.presenceState() as Record<string, Array<{ username?: string; room_name?: string; room_id?: string }>>;
       let listeningCount = 0;
-      let activeViewingCount = 0;
       const names = new Set<string>();
       for (const metas of Object.values(state)) {
         if (!Array.isArray(metas)) continue;
-        const isListening = metas.some(m => Boolean(m?.in_room));
-        const isViewing = metas.some(m => Boolean((m as any)?.viewing));
-        if (isListening) listeningCount += 1;
-        if (isViewing) activeViewingCount += 1;
+        if (metas.length > 0) listeningCount += 1;
         for (const meta of metas) {
-          const name = normalizeRoomName(meta?.room_name || '');
+          const name = normalizeRoomName((meta as any)?.username || meta?.room_name || '');
           if (name && name.toLowerCase() !== 'guest') names.add(name);
         }
       }
       setOnlineCount(listeningCount);
-      setViewingCount(activeViewingCount);
+      setViewingCount(listeningCount);
       setActiveRoomNames([...names].sort((a, b) => a.localeCompare(b)).slice(0, 40));
     };
 
@@ -648,10 +632,10 @@ export default function Room() {
     channel.on('presence', { event: 'leave' }, syncPresence);
 
     channel.on('broadcast', { event: 'typing' }, payload => {
-      const data = (payload as any)?.payload as { user_id?: string; room_name?: string; is_typing?: boolean } | undefined;
+      const data = (payload as any)?.payload as { user_id?: string; username?: string; room_name?: string; is_typing?: boolean } | undefined;
       const fromUserId = data?.user_id;
       if (!fromUserId || fromUserId === user.id) return;
-      const name = normalizeRoomName(data?.room_name || '');
+      const name = normalizeRoomName(data?.username || data?.room_name || '');
       const label = `${name || 'Someone'} is typing`;
       const now = Date.now();
 
@@ -701,18 +685,18 @@ export default function Room() {
       const storedNameRaw = localStorage.getItem(`room_username:${user.id}`) || '';
       const storedName = storedNameRaw ? normalizeRoomName(storedNameRaw) : '';
       const toTrack = normalizeRoomName(roomNameRef.current || storedName || '');
-      await channel
-        .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
-        .catch(() => void 0);
       syncPresence();
-    });
-
-    const presenceHeartbeat = window.setInterval(() => {
-      const toTrack = normalizeRoomName(roomNameRef.current || '');
-      void channel
-        .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
+      if (!isRoomMode) return;
+      // Presence is tracked here when the user is an active listener.
+      await channel
+        .track({
+          user_id: user.id,
+          room_id: ROOM_ID,
+          username: toTrack || 'Guest',
+          online_at: new Date().toISOString(),
+        })
         .catch(() => void 0);
-    }, 15000);
+    });
 
     const sweepInterval = window.setInterval(() => {
       const now = Date.now();
@@ -737,26 +721,18 @@ export default function Room() {
       });
     }, 1000);
 
-    const onVisibility = () => {
-      const toTrack = normalizeRoomName(roomNameRef.current || '');
-      void channel
-        .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
-        .catch(() => void 0);
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.clearInterval(presenceHeartbeat);
       window.clearInterval(sweepInterval);
       typingTimeoutRef.current = null;
       typingSentRef.current = false;
       presenceChannelRef.current = null;
       typingSeenAtRef.current = {};
       setTypingUsersById({});
+      // Cleanup happens here (untrack + unsubscribe) to prevent stale counts.
+      void channel.untrack().catch(() => void 0);
       supabase.removeChannel(channel);
     };
-  }, [applyReactionDelta, chatBackend, persistLocalMessages, playBeep, user]);
+  }, [applyReactionDelta, chatBackend, isRoomMode, persistLocalMessages, playBeep, user]);
 
   const mergeRecentMessages = useCallback((incoming: RoomMessage[]) => {
     setMessages(prev => {
@@ -816,11 +792,20 @@ export default function Room() {
   useEffect(() => {
     const channel = presenceChannelRef.current;
     if (!channel || !user) return;
+    if (!isRoomMode) {
+      void channel.untrack().catch(() => void 0);
+      return;
+    }
     const toTrack = normalizeRoomName(roomName || '');
     void channel
-      .track({ room_name: toTrack || 'Guest', in_room: true, viewing: document.visibilityState === 'visible' })
+      .track({
+        user_id: user.id,
+        room_id: ROOM_ID,
+        username: toTrack || 'Guest',
+        online_at: new Date().toISOString(),
+      })
       .catch(() => void 0);
-  }, [roomName, user]);
+  }, [isRoomMode, roomName, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -1115,7 +1100,7 @@ export default function Room() {
       .send({
         type: 'broadcast',
         event: 'typing',
-        payload: { user_id: user.id, room_name: roomName, is_typing: nextTyping },
+        payload: { user_id: user.id, room_id: ROOM_ID, username: roomNameRef.current || roomName || 'Guest', is_typing: nextTyping },
       })
       .catch(() => {
         void 0;
