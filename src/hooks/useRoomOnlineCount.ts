@@ -147,9 +147,13 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
     const username = (params?.username || '').trim().slice(0, 20) || 'Guest';
 
     if (shouldTrack) sharedTrackRefs += 1;
-    sharedTrackMeta = shouldTrack
+    const currentTrackMeta = shouldTrack
       ? { user_id: params?.viewerUserId || undefined, room_id: roomId, username, online_at: new Date().toISOString() }
-      : sharedTrackMeta;
+      : null;
+
+    if (currentTrackMeta) {
+      sharedTrackMeta = currentTrackMeta;
+    }
 
     if (sharedChannel && sharedTrackRefs > 0 && sharedTrackMeta) {
       void sharedChannel.track(sharedTrackMeta).then(() => {
