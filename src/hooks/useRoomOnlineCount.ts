@@ -15,8 +15,8 @@ let sharedRoomId: string | null = null;
 let sharedViewerKey: string | null = null;
 let sharedCount = 0;
 let sharedRefs = 0;
+let sharedTrackRefs = 0;
 const sharedListeners = new Set<(count: number) => void>();
-let sharedShouldTrack = false;
 let sharedTracked = false;
 let sharedTrackMeta: PresenceMeta | null = null;
 
@@ -94,7 +94,7 @@ async function ensureSharedChannel(roomId: string, viewerKey: string) {
     channel.subscribe(status => {
       if (status !== 'SUBSCRIBED') return;
       sync();
-      if (sharedShouldTrack && sharedTrackMeta) {
+      if (sharedTrackRefs > 0 && sharedTrackMeta) {
         // Presence is tracked here when the current user is an active listener.
         void channel.track(sharedTrackMeta).then(() => {
           sharedTracked = true;
@@ -146,26 +146,24 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
     const shouldTrack = Boolean(params?.viewerUserId) && Boolean(params?.isListening);
     const username = (params?.username || '').trim().slice(0, 20) || 'Guest';
 
-    sharedShouldTrack = shouldTrack;
+    if (shouldTrack) sharedTrackRefs += 1;
     sharedTrackMeta = shouldTrack
       ? { user_id: params?.viewerUserId || undefined, room_id: roomId, username, online_at: new Date().toISOString() }
-      : null;
+      : sharedTrackMeta;
 
-    if (!sharedChannel) return;
-    if (!shouldTrack && sharedTracked) {
-      // Cleanup happens here when a listener stops listening (untrack to prevent stale counts).
-      void sharedChannel.untrack().catch(() => void 0);
-      sharedTracked = false;
-      return;
+    if (sharedChannel && sharedTrackRefs > 0 && sharedTrackMeta) {
+      void sharedChannel.track(sharedTrackMeta).then(() => {
+        sharedTracked = true;
+      }).catch(() => void 0);
     }
-    if (shouldTrack && sharedTrackMeta) {
-      void sharedChannel
-        .track(sharedTrackMeta)
-        .then(() => {
-          sharedTracked = true;
-        })
-        .catch(() => void 0);
-    }
+
+    return () => {
+      if (shouldTrack) sharedTrackRefs = Math.max(0, sharedTrackRefs - 1);
+      if (sharedTrackRefs === 0 && sharedTracked && sharedChannel) {
+        void sharedChannel.untrack().catch(() => void 0);
+        sharedTracked = false;
+      }
+    };
   }, [params?.isListening, params?.username, params?.viewerUserId, roomId]);
 
   return count;

@@ -267,7 +267,7 @@ export default function Room() {
   const isPlayingRef = useRef(false);
   const roomEnterAtRef = useRef<number>(0);
   const roomNameRef = useRef('');
-  const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [presenceChannel, setPresenceChannel] = useState<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const typingSentRef = useRef(false);
   const typingSeenAtRef = useRef<Record<string, number>>({});
@@ -337,7 +337,7 @@ export default function Room() {
   }, []);
 
   const broadcastRoomMessage = useCallback((message: RoomMessage) => {
-    const channel = presenceChannelRef.current;
+    const channel = presenceChannel;
     if (!channel) return;
     channel
       .send({
@@ -348,10 +348,10 @@ export default function Room() {
       .catch(() => {
         void 0;
       });
-  }, []);
+  }, [presenceChannel]);
 
   const broadcastRoomReaction = useCallback((reaction: { message_id: string; emoji: string; delta: number; user_id: string }) => {
-    const channel = presenceChannelRef.current;
+    const channel = presenceChannel;
     if (!channel) return;
     channel
       .send({
@@ -362,7 +362,7 @@ export default function Room() {
       .catch(() => {
         void 0;
       });
-  }, []);
+  }, [presenceChannel]);
 
   const applyReactionDelta = useCallback((messageId: string, emoji: string, delta: number) => {
     setReactionsByMessageId(prev => {
@@ -607,7 +607,7 @@ export default function Room() {
         presence: { key: user.id },
       },
     });
-    presenceChannelRef.current = channel;
+    setPresenceChannel(channel);
 
     const syncPresence = () => {
       // Count is calculated from presenceState() keys (unique active listeners).
@@ -725,7 +725,7 @@ export default function Room() {
       window.clearInterval(sweepInterval);
       typingTimeoutRef.current = null;
       typingSentRef.current = false;
-      presenceChannelRef.current = null;
+      setPresenceChannel(null);
       typingSeenAtRef.current = {};
       setTypingUsersById({});
       // Cleanup happens here (untrack + unsubscribe) to prevent stale counts.
@@ -790,14 +790,13 @@ export default function Room() {
   }, [chatBackend, fetchRecentMessages, user]);
 
   useEffect(() => {
-    const channel = presenceChannelRef.current;
-    if (!channel || !user) return;
+    if (!presenceChannel || !user) return;
     if (!isRoomMode) {
-      void channel.untrack().catch(() => void 0);
+      void presenceChannel.untrack().catch(() => void 0);
       return;
     }
     const toTrack = normalizeRoomName(roomName || '');
-    void channel
+    void presenceChannel
       .track({
         user_id: user.id,
         room_id: ROOM_ID,
@@ -805,7 +804,7 @@ export default function Room() {
         online_at: new Date().toISOString(),
       })
       .catch(() => void 0);
-  }, [isRoomMode, roomName, user]);
+  }, [isRoomMode, presenceChannel, roomName, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -1091,7 +1090,7 @@ export default function Room() {
   }, [setVolume]);
 
   const setTyping = useCallback((nextTyping: boolean) => {
-    const channel = presenceChannelRef.current;
+    const channel = presenceChannel;
     if (!channel || !user) return;
     if (nextTyping && typingSentRef.current) return;
 
@@ -1105,7 +1104,7 @@ export default function Room() {
       .catch(() => {
         void 0;
       });
-  }, [roomName, user]);
+  }, [presenceChannel, roomName, user]);
 
   const insertTextAtCursor = useCallback((textToInsert: string) => {
     const input = inputRef.current;
