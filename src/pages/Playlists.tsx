@@ -11,14 +11,17 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Navigation } from '@/components/Navigation';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Playlists() {
-  const { playlists, createPlaylist, deletePlaylist, updatePlaylistVisibility } = useAudienceInteractions();
+  const { playlists, publicPlaylists, createPlaylist, deletePlaylist, updatePlaylistVisibility } = useAudienceInteractions();
+  const { user } = useAuth();
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [playlistName, setPlaylistName] = useState('');
   const [playlistDescription, setPlaylistDescription] = useState('');
   const [playlistIsPublic, setPlaylistIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const communityPlaylists = publicPlaylists.filter((playlist) => playlist.user_id !== user?.id);
 
   const handleCreatePlaylist = async () => {
     if (!playlistName.trim() || isSubmitting) return;
@@ -78,7 +81,7 @@ export default function Playlists() {
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-lg font-semibold text-foreground">
-              Playlists
+              Your Playlists
             </h2>
             <Button
               size="sm"
@@ -172,6 +175,50 @@ export default function Playlists() {
             </ScrollArea>
           )}
         </section>
+
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading text-lg font-semibold text-foreground">
+              Community Playlists
+            </h2>
+          </div>
+          {communityPlaylists.length === 0 ? (
+            <div className="bg-card border border-border rounded-xl p-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                No public playlists yet. Public playlists from the community will appear here.
+              </p>
+            </div>
+          ) : (
+            <ScrollArea className="max-h-[420px] pr-2">
+              <div className="space-y-3">
+                {communityPlaylists.map((playlist) => (
+                  <div
+                    key={playlist.id}
+                    className="flex items-center justify-between gap-3 p-3 bg-card border border-border rounded-xl hover:bg-card/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <ListMusic className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <Link to={`/playlist/${playlist.id}`} className="block">
+                          <p className="font-medium text-foreground truncate">{playlist.name}</p>
+                          {playlist.description && (
+                            <p className="text-sm text-muted-foreground truncate">{playlist.description}</p>
+                          )}
+                        </Link>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border border-border">
+                      <Globe className="w-3 h-3" />
+                      Public
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </section>
       </main>
 
       <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
@@ -251,4 +298,3 @@ export default function Playlists() {
     </div>
   );
 }
-

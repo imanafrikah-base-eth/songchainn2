@@ -1198,18 +1198,29 @@ export default function Room() {
     }, TYPING_IDLE_MS);
   }, [autoplayBlocked, handleRetryAutoplay, setTyping]);
 
+  const knownMentionNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const name of activeRoomNames) {
+      const normalized = normalizeRoomName(name);
+      if (normalized && normalized.toLowerCase() !== 'guest') names.add(normalized);
+    }
+    for (const message of messages) {
+      const normalized = normalizeRoomName(message.room_name);
+      if (normalized && normalized.toLowerCase() !== 'guest') names.add(normalized);
+    }
+    const selfName = normalizeRoomName(roomName || '');
+    if (selfName && selfName.toLowerCase() !== 'guest') names.add(selfName);
+    return [...names].sort((a, b) => a.localeCompare(b)).slice(0, 50);
+  }, [activeRoomNames, messages, roomName]);
+
   const mentionSuggestions = useMemo(() => {
     if (!mentionState) return [];
     const q = mentionState.query.trim().toLowerCase();
-    const normalized = activeRoomNames
-      .map(n => normalizeRoomName(n))
-      .filter(Boolean);
-    const uniq = Array.from(new Set(normalized));
     const matches = q.length === 0
-      ? uniq
-      : uniq.filter(n => n.toLowerCase().startsWith(q));
+      ? knownMentionNames
+      : knownMentionNames.filter(n => n.toLowerCase().startsWith(q));
     return matches.slice(0, 7);
-  }, [activeRoomNames, mentionState]);
+  }, [knownMentionNames, mentionState]);
 
   const messageById = useMemo(() => {
     const map = new Map<string, RoomMessage>();

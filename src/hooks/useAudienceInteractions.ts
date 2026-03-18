@@ -12,6 +12,7 @@ export function useAudienceInteractions() {
   const [likedArtists, setLikedArtists] = useState<string[]>([]);
   const [savedCatalogs, setSavedCatalogs] = useState<string[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [publicPlaylists, setPublicPlaylists] = useState<Playlist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch initial data
@@ -20,6 +21,7 @@ export function useAudienceInteractions() {
       setLikedSongs([]);
       setLikedArtists([]);
       setPlaylists([]);
+      setPublicPlaylists([]);
       const storageKey = 'songchainn:savedCatalogs:guest';
       const stored = localStorage.getItem(storageKey);
       try {
@@ -37,7 +39,9 @@ export function useAudienceInteractions() {
       if (!isSupabaseConfigured) {
         setLikedSongs(getLikedSongs(user.id));
         setLikedArtists(getLikedArtists(user.id));
-        setPlaylists(listPlaylists(user.id));
+        const ownPlaylists = listPlaylists(user.id);
+        setPlaylists(ownPlaylists);
+        setPublicPlaylists(ownPlaylists.filter(p => p.is_public));
         const storageKey = user ? `songchainn:savedCatalogs:${user.id}` : 'songchainn:savedCatalogs:guest';
         const stored = localStorage.getItem(storageKey);
         try {
@@ -56,7 +60,7 @@ export function useAudienceInteractions() {
           supabase
             .from('playlists')
             .select('*')
-            .eq('user_id', user.id)
+            .or(`is_public.eq.true,user_id.eq.${user.id}`)
             .order('created_at', { ascending: false }),
         ]);
 
@@ -80,7 +84,19 @@ export function useAudienceInteractions() {
         setLikedArtists(
           (artistsRes.data || []).map((r: any) => r.artist_id).filter(Boolean),
         );
-        setPlaylists((playlistsRes.data as any) || []);
+        const loadedPlaylists = ((playlistsRes.data as any) || []) as Playlist[];
+        const ownPlaylists = loadedPlaylists.filter((playlist) => playlist.user_id === user.id);
+        const globallyPublicPlaylists = loadedPlaylists.filter((playlist) => playlist.is_public);
+        setPlaylists(ownPlaylists);
+        setPublicPlaylists(globallyPublicPlaylists);
+        if (import.meta.env.DEV) {
+          console.log('playlists fetch results', {
+            total: loadedPlaylists.length,
+            own: ownPlaylists.length,
+            public: globallyPublicPlaylists.length,
+            userId: user.id,
+          });
+        }
         const storageKey = user ? `songchainn:savedCatalogs:${user.id}` : 'songchainn:savedCatalogs:guest';
         const stored = localStorage.getItem(storageKey);
         try {
@@ -180,6 +196,9 @@ export function useAudienceInteractions() {
         const next = [playlist, ...listPlaylists(user.id)];
         savePlaylists(user.id, next);
         setPlaylists(next);
+        if (playlist.is_public) {
+          setPublicPlaylists(prev => [playlist, ...prev]);
+        }
         toast({ title: 'Playlist created!' });
         return playlist;
       }
@@ -199,9 +218,10 @@ export function useAudienceInteractions() {
         const cleanName = (name ?? '').trim();
         const cleanDescription = (description ?? '').trim();
 
-        const payload: { user_id: string; name: string; description?: string | null } = {
+        const payload: { user_id: string; name: string; description?: string | null; is_public: boolean; mood?: string | null; vibe?: string | null } = {
           user_id: sessionUser.id,
           name: cleanName || name,
+          is_public: Boolean(isPublic),
         };
 
         if (cleanDescription) {
@@ -209,6 +229,8 @@ export function useAudienceInteractions() {
         } else {
           payload.description = null;
         }
+        payload.mood = mood?.trim() || null;
+        payload.vibe = vibe?.trim() || null;
 
         const { data, error } = await supabase
           .from('playlists')
@@ -232,6 +254,9 @@ export function useAudienceInteractions() {
 
         const playlist = data as any as Playlist;
         setPlaylists((prev) => [playlist, ...prev]);
+        if (playlist.is_public) {
+          setPublicPlaylists((prev) => [playlist, ...prev.filter((p) => p.id !== playlist.id)]);
+        }
         toast({ title: 'Playlist created!' });
         return playlist;
       } catch (err: any) {
@@ -262,6 +287,7 @@ export function useAudienceInteractions() {
     await supabase.from('playlists').delete().eq('id', playlistId).eq('user_id', user.id);
     const next = playlists.filter((p) => p.id !== playlistId);
     setPlaylists(next);
+    setPublicPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
     toast({ title: 'Playlist deleted' });
   }, [user, toast, playlists]);
 
@@ -275,6 +301,7 @@ export function useAudienceInteractions() {
         );
         savePlaylists(user.id, next);
         setPlaylists(next);
+        setPublicPlaylists(next.filter((p) => p.is_public));
         toast({ title: isPublic ? 'Playlist published' : 'Playlist made private' });
         return true;
       }
@@ -297,10 +324,17 @@ export function useAudienceInteractions() {
       setPlaylists((prev) =>
         prev.map((p) => (p.id === playlistId ? { ...p, is_public: isPublic } : p)),
       );
+      setPublicPlaylists((prev) => {
+        const withoutTarget = prev.filter((p) => p.id !== playlistId);
+        if (!isPublic) return withoutTarget;
+        const fromOwn = playlists.find((p) => p.id === playlistId);
+        if (!fromOwn) return withoutTarget;
+        return [{ ...fromOwn, is_public: true }, ...withoutTarget];
+      });
       toast({ title: isPublic ? 'Playlist published' : 'Playlist made private' });
       return true;
     },
-    [user, toast],
+    [playlists, user, toast],
   );
 
   // Add Song to Playlist
@@ -372,6 +406,7 @@ export function useAudienceInteractions() {
     likedArtists,
     savedCatalogs,
     playlists,
+    publicPlaylists,
     isLoading,
     toggleLikeSong,
     toggleLikeArtist,

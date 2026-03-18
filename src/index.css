@@ -466,3 +466,26 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 300px;
 }
+
+@keyframes global-pulse-shake {
+  0% { transform: translate3d(0, 0, 0); }
+  18% { transform: translate3d(-2px, 1px, 0); }
+  36% { transform: translate3d(2px, -1px, 0); }
+  54% { transform: translate3d(-1px, 1px, 0); }
+  72% { transform: translate3d(1px, -1px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes global-pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(0, 180, 255, 0); }
+  40% { box-shadow: 0 0 0 6px rgba(0, 180, 255, 0.2); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 180, 255, 0); }
+}
+
+.app-global-pulse {
+  animation: global-pulse-shake 560ms cubic-bezier(0.2, 0.8, 0.2, 1), global-pulse-glow 560ms ease-out;
+}
+
+.app-global-pulse--reduced {
+  animation: global-pulse-glow 560ms ease-out;
+}

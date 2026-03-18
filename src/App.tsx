@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +11,7 @@ import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { NotificationBanner } from "@/components/NotificationBanner";
 import { useUserPresence } from "@/hooks/useUserPresence";
+import { supabase } from "@/integrations/supabase/client";
 // Lazy load pages for better initial load performance
 const Home = lazy(() => import("./pages/Home"));
 const Discover = lazy(() => import("./pages/Discover"));
@@ -66,11 +67,73 @@ function RedirectHandler() {
 
 function AppShell() {
   const location = useLocation();
+  const { user } = useAuth();
   const hideChrome = location.pathname.startsWith('/room');
+  const [isGlobalPulsing, setIsGlobalPulsing] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const pulseTimeoutRef = useRef<number | null>(null);
+
+  const triggerGlobalPulse = useCallback((source: string, songId: string | null, senderId: string | null) => {
+    if (import.meta.env.DEV) {
+      console.log('pulse event received', { source, songId, senderId });
+    }
+    setIsGlobalPulsing(false);
+    window.requestAnimationFrame(() => {
+      setIsGlobalPulsing(true);
+      if (pulseTimeoutRef.current) {
+        window.clearTimeout(pulseTimeoutRef.current);
+      }
+      pulseTimeoutRef.current = window.setTimeout(() => {
+        setIsGlobalPulsing(false);
+      }, 650);
+    });
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const apply = () => setPrefersReducedMotion(media.matches);
+    apply();
+    media.addEventListener('change', apply);
+    return () => {
+      media.removeEventListener('change', apply);
+    };
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase.channel('global-pulse-effects');
+    const onLocalPulse = (event: Event) => {
+      const detail = (event as CustomEvent<{ songId?: string; userId?: string | null }>).detail;
+      triggerGlobalPulse('local', detail?.songId ?? null, detail?.userId ?? null);
+    };
+
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'song_analytics' }, payload => {
+      const row = (payload as any)?.new as { event_type?: string; song_id?: string; user_id?: string | null } | undefined;
+      if (!row || row.event_type !== 'pulse') return;
+      if (row.user_id && row.user_id === user?.id) return;
+      triggerGlobalPulse('realtime', row.song_id ?? null, row.user_id ?? null);
+    });
+
+    channel.subscribe();
+    window.addEventListener('songchainn:pulse', onLocalPulse as EventListener);
+    return () => {
+      window.removeEventListener('songchainn:pulse', onLocalPulse as EventListener);
+      if (pulseTimeoutRef.current) {
+        window.clearTimeout(pulseTimeoutRef.current);
+        pulseTimeoutRef.current = null;
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [triggerGlobalPulse, user?.id]);
+
+  const rootPulseClass = isGlobalPulsing
+    ? prefersReducedMotion
+      ? 'app-global-pulse app-global-pulse--reduced'
+      : 'app-global-pulse'
+    : '';
 
   return (
     <>
-      <div className={hideChrome ? undefined : "pb-20 lg:pb-0"}>
+      <div className={`${hideChrome ? '' : 'pb-20 lg:pb-0'} ${rootPulseClass}`.trim()}>
         <RedirectHandler />
         <Routes>
           <Route path="/" element={<Home />} />

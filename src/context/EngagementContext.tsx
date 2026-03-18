@@ -29,7 +29,7 @@ const POINTS_PER_PLAY = 2;
 const POINTS_PER_LIKE = 1;
 const STREAK_BONUS = 5;
 const PLAY_DEDUPE_WINDOW_MS = 30_000;
-const PULSE_DEDUPE_WINDOW_MS = 3 * 60 * 1000;
+const PULSE_DEDUPE_WINDOW_MS = 500;
 const OFFLINE_PLAYS_KEY = 'songchainn_offline_plays_v1';
 
 interface OfflinePlay {
@@ -64,7 +64,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const [likedSongs, setLikedSongsState] = useState<Set<string>>(new Set());
   const [isInitialized, setIsInitialized] = useState(false);
   const lastPlayRef = useRef<{ songId: string; at: number } | null>(null);
-  const lastPulseBySongRef = useRef<Record<string, number>>({});
+  const lastPulseAtRef = useRef<number>(0);
   const offlinePlaysRef = useRef<OfflinePlay[]>([]);
 
   useEffect(() => {
@@ -252,10 +252,8 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const sendPulse = useCallback((songId: string, options?: { roomName?: string | null }) => {
     if (!songId) return;
     const now = Date.now();
-    const lastBySong = lastPulseBySongRef.current;
-    const lastForSong = lastBySong[songId];
-    if (lastForSong && now - lastForSong < PULSE_DEDUPE_WINDOW_MS) return;
-    lastBySong[songId] = now;
+    if (now - lastPulseAtRef.current < PULSE_DEDUPE_WINDOW_MS) return;
+    lastPulseAtRef.current = now;
 
     const anonymousUserId = ensureAnonymousId();
     const payload = {
@@ -266,6 +264,14 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     };
 
     void payload;
+    window.dispatchEvent(new CustomEvent('songchainn:pulse', {
+      detail: {
+        songId,
+        userId: user?.id ?? null,
+        source: 'local',
+        timestamp: payload.timestamp,
+      },
+    }));
 
     (async () => {
       try {
