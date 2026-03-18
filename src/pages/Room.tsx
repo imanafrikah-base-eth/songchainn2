@@ -636,8 +636,10 @@ export default function Room() {
           if (name && name.toLowerCase() !== 'guest') names.add(name);
         }
       }
-      setOnlineCount(listeningCount);
-      setViewingCount(listeningCount);
+      const minSelfCount = user ? 1 : 0;
+      const resolvedCount = Math.max(listeningCount, minSelfCount);
+      setOnlineCount(resolvedCount);
+      setViewingCount(resolvedCount);
       setActiveRoomNames([...names].sort((a, b) => a.localeCompare(b)).slice(0, 40));
     };
 
@@ -700,13 +702,13 @@ export default function Room() {
       const storedName = storedNameRaw ? normalizeRoomName(storedNameRaw) : '';
       const toTrack = normalizeRoomName(roomNameRef.current || storedName || '');
       syncPresence();
-      if (!isRoomMode) return;
-      // Presence is tracked here when the user is an active listener.
+      // Presence is tracked here for everyone currently in the room page.
       await channel
         .track({
           user_id: user.id,
           room_id: ROOM_ID,
           username: toTrack || 'Guest',
+          is_listening: isRoomMode,
           online_at: new Date().toISOString(),
         })
         .catch(() => void 0);
@@ -805,16 +807,13 @@ export default function Room() {
 
   useEffect(() => {
     if (!presenceChannel || !user) return;
-    if (!isRoomMode) {
-      void presenceChannel.untrack().catch(() => void 0);
-      return;
-    }
     const toTrack = normalizeRoomName(roomName || '');
     void presenceChannel
       .track({
         user_id: user.id,
         room_id: ROOM_ID,
         username: toTrack || 'Guest',
+        is_listening: isRoomMode,
         online_at: new Date().toISOString(),
       })
       .catch(() => void 0);
