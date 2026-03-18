@@ -46,6 +46,7 @@ const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const ROOM_SEGMENT_SECONDS = 180;
 const TYPING_IDLE_MS = 1400;
 const LOCAL_IDENTITY_KEY = 'room:identity_mode:v1';
+const ROOM_PRESENCE_VIEWER_KEY_STORAGE = 'songchainn:room_presence_viewer_key:v1';
 const ROOM_ID = 'global';
 
 const KNOWN_ARTIST_NAMES = new Set(
@@ -107,6 +108,18 @@ function makeMessageId() {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function getRoomPresenceViewerKey() {
+  try {
+    const existing = localStorage.getItem(ROOM_PRESENCE_VIEWER_KEY_STORAGE);
+    if (existing) return existing;
+    const created = makeMessageId();
+    localStorage.setItem(ROOM_PRESENCE_VIEWER_KEY_STORAGE, created);
+    return created;
+  } catch {
+    return makeMessageId();
+  }
 }
 
 function coerceRoomMessage(row: any): RoomMessage | null {
@@ -257,6 +270,7 @@ export default function Room() {
   const [myReactionsByMessageId, setMyReactionsByMessageId] = useState<Record<string, Record<string, boolean>>>({});
   const [roomPulseSummary, setRoomPulseSummary] = useState<{ count: number } | null>(null);
   const { isSongCached } = useOfflineAudio();
+  const roomPresenceViewerKey = useMemo(() => getRoomPresenceViewerKey(), []);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -604,7 +618,7 @@ export default function Room() {
 
     const channel = supabase.channel(`room:${ROOM_ID}`, {
       config: {
-        presence: { key: user.id },
+        presence: { key: roomPresenceViewerKey },
       },
     });
     setPresenceChannel(channel);
@@ -732,7 +746,7 @@ export default function Room() {
       void channel.untrack().catch(() => void 0);
       supabase.removeChannel(channel);
     };
-  }, [applyReactionDelta, chatBackend, isRoomMode, persistLocalMessages, playBeep, user]);
+  }, [applyReactionDelta, chatBackend, isRoomMode, persistLocalMessages, playBeep, roomPresenceViewerKey, user]);
 
   const mergeRecentMessages = useCallback((incoming: RoomMessage[]) => {
     setMessages(prev => {
