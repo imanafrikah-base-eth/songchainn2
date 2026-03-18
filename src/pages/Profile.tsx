@@ -37,6 +37,33 @@ const firstSplit = (
   return parts.length > 0 ? parts[0] : undefined;
 };
 
+const USERNAME_PATTERN = /^[a-z0-9._]+$/;
+
+const trimOrNull = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+const normalizeUsername = (value: string) => value.trim().toLowerCase();
+
+const normalizeUrl = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
+const isMissingColumnError = (error: unknown) => {
+  const message = typeof (error as any)?.message === 'string' ? (error as any).message : '';
+  return message.includes("Could not find the '") && message.includes("' column");
+};
+
+const getMissingColumnName = (error: unknown) => {
+  const message = typeof (error as any)?.message === 'string' ? (error as any).message : '';
+  const match = message.match(/Could not find the '([^']+)' column/i);
+  return match?.[1] ?? null;
+};
+
 // X (Twitter) and Base icons
 const XTwitterIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
@@ -119,10 +146,15 @@ export default function Profile() {
     setIsCreatePlaylistOpen(false);
   }, [createPlaylist, playlistDescription, playlistIsPublic, playlistName, toast]);
   
-  const [profileName, setProfileName] = useState(audienceProfile?.profile_name || '');
+  const [displayName, setDisplayName] = useState(audienceProfile?.display_name || audienceProfile?.profile_name || '');
+  const [username, setUsername] = useState(audienceProfile?.username || '');
   const [bio, setBio] = useState(audienceProfile?.bio || '');
-  const [xProfileLink, setXProfileLink] = useState(audienceProfile?.x_profile_link || '');
-  const [baseProfileLink, setBaseProfileLink] = useState(audienceProfile?.base_profile_link || '');
+  const [location, setLocation] = useState(audienceProfile?.location || '');
+  const [websiteUrl, setWebsiteUrl] = useState(((audienceProfile as any)?.website_url || (audienceProfile as any)?.website || '') as string);
+  const [xProfileLink, setXProfileLink] = useState(audienceProfile?.twitter_url || audienceProfile?.x_profile_link || '');
+  const [baseProfileLink, setBaseProfileLink] = useState(audienceProfile?.base_profile_link || audienceProfile?.wallet_address || '');
+  const [interests, setInterests] = useState((((audienceProfile as any)?.interests || (audienceProfile as any)?.genre || '') as string));
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
     if (target.dataset.fallbackApplied === 'true') return;
@@ -132,10 +164,15 @@ export default function Profile() {
 
   useEffect(() => {
     if (audienceProfile) {
-      setProfileName(audienceProfile.display_name || audienceProfile.username || 'Listener');
+      setDisplayName(audienceProfile.display_name || audienceProfile.profile_name || audienceProfile.username || 'Listener');
+      setUsername(audienceProfile.username || '');
       setBio(audienceProfile.bio || '');
-      setXProfileLink(audienceProfile.twitter_url || '');
-      setBaseProfileLink(audienceProfile.wallet_address || '');
+      setLocation(audienceProfile.location || '');
+      setWebsiteUrl(((audienceProfile as any)?.website_url || (audienceProfile as any)?.website || '') as string);
+      setXProfileLink(audienceProfile.twitter_url || audienceProfile.x_profile_link || '');
+      setBaseProfileLink(audienceProfile.base_profile_link || audienceProfile.wallet_address || '');
+      setInterests((((audienceProfile as any)?.interests || (audienceProfile as any)?.genre || '') as string));
+      setFieldErrors({});
     }
   }, [audienceProfile]);
 
@@ -162,7 +199,7 @@ export default function Profile() {
       const { error: dbError } = await supabase
         .from('audience_profiles')
         .update(updatePayload)
-        .eq('id', authedUser.id);
+        .eq('user_id', authedUser.id);
       if (dbError) throw dbError;
 
       await refreshProfile();
@@ -176,8 +213,9 @@ export default function Profile() {
   );
 
   const safeProfileName =
-    profileName ||
+    displayName ||
     audienceProfile?.display_name ||
+    audienceProfile?.profile_name ||
     audienceProfile?.username ||
     (user && typeof user.email === 'string' ? firstSplit(user.email, '@') ?? '' : '') ||
     'Listener';
@@ -428,33 +466,117 @@ export default function Profile() {
   }, [avatarDraftFile, avatarOffsetX, avatarOffsetY, uploadAndUpdateProfileImage, user]);
 
   const handleSave = async () => {
-    if (!user || !profileName.trim()) {
-      toast({ title: 'Add a profile name to continue', variant: 'destructive' });
+    if (!user) return;
+
+    const nextErrors: Record<string, string> = {};
+    const nextDisplayName = displayName.trim();
+    const nextUsername = normalizeUsername(username);
+    const nextBio = bio.trim();
+    const nextLocation = location.trim();
+    const nextWebsite = normalizeUrl(websiteUrl);
+    const nextXLink = normalizeUrl(xProfileLink);
+    const nextBaseLink = baseProfileLink.trim();
+    const nextInterests = interests.trim();
+
+    if (!nextDisplayName) nextErrors.displayName = 'Display name is required.';
+    if (nextDisplayName.length > 50) nextErrors.displayName = 'Display name must be 50 characters or less.';
+    if (nextUsername.length > 32) nextErrors.username = 'Username must be 32 characters or less.';
+    if (nextUsername && !USERNAME_PATTERN.test(nextUsername)) {
+      nextErrors.username = 'Use lowercase letters, numbers, periods, or underscores.';
+    }
+    if (nextBio.length > 160) nextErrors.bio = 'Bio must be 160 characters or less.';
+    if (nextLocation.length > 80) nextErrors.location = 'Location must be 80 characters or less.';
+    if (nextInterests.length > 120) nextErrors.interests = 'Interests must be 120 characters or less.';
+
+    if (nextWebsite) {
+      try {
+        const parsed = new URL(nextWebsite);
+        if (!/^https?:$/i.test(parsed.protocol)) nextErrors.websiteUrl = 'Website must start with http or https.';
+      } catch {
+        nextErrors.websiteUrl = 'Enter a valid website URL.';
+      }
+    }
+
+    if (nextXLink) {
+      try {
+        const parsed = new URL(nextXLink);
+        if (!/^https?:$/i.test(parsed.protocol)) nextErrors.xProfileLink = 'X link must start with http or https.';
+      } catch {
+        nextErrors.xProfileLink = 'Enter a valid X profile URL.';
+      }
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      toast({
+        title: 'Please fix profile form errors',
+        description: 'Some fields need attention before saving.',
+        variant: 'destructive',
+      });
       return;
     }
-    
+
+    setFieldErrors({});
     setIsSaving(true);
-    
+
     try {
-      const { error } = await supabase
-        .from('audience_profiles')
-        .update({
-          display_name: profileName.trim(),
-          username: profileName.trim().toLowerCase(),
-          bio: bio.trim() || null,
-          twitter_url: xProfileLink.trim() || null,
-          wallet_address: baseProfileLink.trim() || null,
-        } as any)
-        .or(`id.eq.${user.id},user_id.eq.${user.id}`);
-      if (error) throw error;
-      
+      if (nextUsername) {
+        const { data: existingUsernameRows, error: usernameCheckError } = await (supabase as any)
+          .from('audience_profiles')
+          .select('id,user_id')
+          .eq('username', nextUsername)
+          .limit(1);
+
+        if (usernameCheckError) {
+          if (!isMissingColumnError(usernameCheckError)) throw usernameCheckError;
+        } else {
+          const existingUser = first(existingUsernameRows as Array<{ id?: string | null; user_id?: string | null }> | null | undefined);
+          const existingOwnerId = existingUser?.user_id || existingUser?.id || null;
+          if (existingOwnerId && existingOwnerId !== user.id) {
+            setFieldErrors({ username: 'This username is already taken.' });
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
+
+      let updatePayload: Record<string, any> = {
+        display_name: nextDisplayName,
+        profile_name: nextDisplayName,
+        username: nextUsername || null,
+        bio: trimOrNull(nextBio),
+        location: trimOrNull(nextLocation),
+        website_url: nextWebsite,
+        website: nextWebsite,
+        twitter_url: nextXLink,
+        x_profile_link: nextXLink,
+        wallet_address: trimOrNull(nextBaseLink),
+        base_profile_link: trimOrNull(nextBaseLink),
+        interests: trimOrNull(nextInterests),
+        genre: trimOrNull(nextInterests),
+      };
+
+      while (true) {
+        const { error } = await (supabase as any)
+          .from('audience_profiles')
+          .update(updatePayload as any)
+          .eq('user_id', user.id);
+        if (!error) break;
+        if (!isMissingColumnError(error)) throw error;
+        const missingColumn = getMissingColumnName(error);
+        if (!missingColumn || !(missingColumn in updatePayload)) throw error;
+        const { [missingColumn]: _removed, ...nextPayload } = updatePayload;
+        updatePayload = nextPayload;
+        if (Object.keys(updatePayload).length === 0) throw error;
+      }
+
       await refreshProfile();
       setIsEditing(false);
       toast({
         title: 'Profile updated',
         description: 'Your changes are saved across $ongChainn.',
       });
-    } catch (err) {
+    } catch {
       toast({
         title: 'Could not update your profile',
         description: 'Please try again in a moment.',
@@ -498,6 +620,23 @@ export default function Profile() {
   const effectiveCoverUrl = pendingCoverUrl || audienceProfile.cover_photo_url;
   const effectiveAvatarUrl =
     pendingAvatarUrl || audienceProfile.avatar_url || audienceProfile.profile_picture_url;
+  const profileDisplayName =
+    audienceProfile.display_name ||
+    audienceProfile.profile_name ||
+    audienceProfile.username ||
+    safeProfileName;
+  const profileUsername = audienceProfile.username || '';
+  const profileLocation = audienceProfile.location || '';
+  const profileWebsite =
+    ((audienceProfile as any)?.website_url as string | null | undefined) ||
+    ((audienceProfile as any)?.website as string | null | undefined) ||
+    '';
+  const profileXLink = audienceProfile.twitter_url || audienceProfile.x_profile_link || '';
+  const profileBaseLink = audienceProfile.base_profile_link || audienceProfile.wallet_address || '';
+  const profileInterests =
+    (((audienceProfile as any)?.interests as string | null | undefined) ||
+      ((audienceProfile as any)?.genre as string | null | undefined) ||
+      '');
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -829,21 +968,22 @@ export default function Profile() {
 
           <div className="flex-1">
             {isEditing ? (
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
-                <Input
-                  value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
-                  className="font-heading text-xl font-bold"
-                  maxLength={50}
-                />
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
+                  <span className="font-heading text-xl font-bold text-foreground">Editing profile</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Update your identity and links for the community.</p>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
                 <h1 className="font-heading text-2xl font-bold text-foreground">
-                  {audienceProfile.profile_name}
+                  {profileDisplayName}
                 </h1>
+                {profileUsername && (
+                  <span className="text-sm text-muted-foreground">@{profileUsername}</span>
+                )}
               </div>
             )}
             <div className="flex items-center gap-3">
@@ -865,10 +1005,15 @@ export default function Profile() {
                   size="icon"
                   onClick={() => {
                     setIsEditing(false);
-                    setProfileName(audienceProfile.profile_name);
+                    setDisplayName(profileDisplayName || 'Listener');
+                    setUsername(profileUsername);
                     setBio(audienceProfile.bio || '');
-                    setXProfileLink(audienceProfile.x_profile_link || '');
-                    setBaseProfileLink(audienceProfile.base_profile_link || '');
+                    setLocation(profileLocation);
+                    setWebsiteUrl(profileWebsite);
+                    setXProfileLink(profileXLink);
+                    setBaseProfileLink(profileBaseLink);
+                    setInterests(profileInterests);
+                    setFieldErrors({});
                   }}
                   disabled={isSaving}
                 >
@@ -902,42 +1047,127 @@ export default function Profile() {
           className="mb-6"
         >
           {isEditing ? (
-            <div className="space-y-2">
-              <Textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell us about yourself..."
-                maxLength={500}
-                rows={3}
-              />
-              <p className="text-xs text-muted-foreground text-right">{bio.length}/500</p>
+            <div className="space-y-4 rounded-2xl border border-border/70 bg-card/60 p-4 sm:p-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-display-name">Display Name</Label>
+                <Input
+                  id="profile-display-name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="How should people see your name?"
+                  maxLength={50}
+                />
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-destructive">{fieldErrors.displayName || ''}</span>
+                  <span className="text-muted-foreground">{displayName.trim().length}/50</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-username">Username</Label>
+                <Input
+                  id="profile-username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="username"
+                  maxLength={32}
+                />
+                <p className="text-xs text-muted-foreground">Use lowercase letters, numbers, periods, and underscores.</p>
+                {fieldErrors.username && <p className="text-xs text-destructive">{fieldErrors.username}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-bio">Bio</Label>
+                <Textarea
+                  id="profile-bio"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Tell people who you are in 160 characters."
+                  maxLength={160}
+                  rows={4}
+                />
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-destructive">{fieldErrors.bio || ''}</span>
+                  <span className="text-muted-foreground">{bio.trim().length}/160</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-location">Location</Label>
+                <Input
+                  id="profile-location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="City, Country"
+                  maxLength={80}
+                />
+                {fieldErrors.location && <p className="text-xs text-destructive">{fieldErrors.location}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-website">Website</Label>
+                <Input
+                  id="profile-website"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="https://yourwebsite.com"
+                />
+                {fieldErrors.websiteUrl && <p className="text-xs text-destructive">{fieldErrors.websiteUrl}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-x">X Link</Label>
+                <Input
+                  id="profile-x"
+                  value={xProfileLink}
+                  onChange={(e) => setXProfileLink(e.target.value)}
+                  placeholder="https://x.com/yourhandle"
+                />
+                {fieldErrors.xProfileLink && <p className="text-xs text-destructive">{fieldErrors.xProfileLink}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-base">Base Link / Wallet</Label>
+                <Input
+                  id="profile-base"
+                  value={baseProfileLink}
+                  onChange={(e) => setBaseProfileLink(e.target.value)}
+                  placeholder="example.base.eth or 0x..."
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-interests">Genre / Interests</Label>
+                <Input
+                  id="profile-interests"
+                  value={interests}
+                  onChange={(e) => setInterests(e.target.value)}
+                  placeholder="Afrobeats, Hip-hop, Alté..."
+                  maxLength={120}
+                />
+                {fieldErrors.interests && <p className="text-xs text-destructive">{fieldErrors.interests}</p>}
+              </div>
             </div>
           ) : (
-            <p className="text-muted-foreground">
-              {audienceProfile.bio || 'No bio yet'}
-            </p>
+            <div className="space-y-3">
+              <p className="text-muted-foreground">
+                {audienceProfile.bio || 'No bio yet'}
+              </p>
+              {profileLocation && (
+                <p className="text-sm text-muted-foreground">{profileLocation}</p>
+              )}
+              {profileInterests && (
+                <p className="text-sm text-muted-foreground">{profileInterests}</p>
+              )}
+            </div>
           )}
         </motion.div>
 
-        {/* Social Links */}
-        {isEditing ? (
-          <div className="space-y-3 mb-6">
-            <Input
-              value={xProfileLink}
-              onChange={(e) => setXProfileLink(e.target.value)}
-              placeholder="X (Twitter) profile URL"
-            />
-            <Input
-              value={baseProfileLink}
-              onChange={(e) => setBaseProfileLink(e.target.value)}
-              placeholder="Base name (example.base.eth)"
-            />
-          </div>
-        ) : (
-          <div className="flex gap-3 mb-6">
-            {audienceProfile.x_profile_link && (
+        {!isEditing && (
+          <div className="flex flex-wrap gap-3 mb-6">
+            {profileXLink && (
               <a
-                href={audienceProfile.x_profile_link}
+                href={profileXLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
@@ -947,14 +1177,14 @@ export default function Profile() {
                 <ExternalLink className="w-3 h-3 text-muted-foreground" />
               </a>
             )}
-            {audienceProfile.base_profile_link && (
+            {profileBaseLink && (
               <a
                 href={
-                  audienceProfile.base_profile_link.startsWith('0x')
-                    ? `https://basescan.org/address/${audienceProfile.base_profile_link}`
-                    : audienceProfile.base_profile_link.startsWith('http')
-                      ? audienceProfile.base_profile_link
-                      : `https://base.app/${audienceProfile.base_profile_link}`
+                  profileBaseLink.startsWith('0x')
+                    ? `https://basescan.org/address/${profileBaseLink}`
+                    : profileBaseLink.startsWith('http')
+                      ? profileBaseLink
+                      : `https://base.app/${profileBaseLink}`
                 }
                 target="_blank"
                 rel="noopener noreferrer"
@@ -963,6 +1193,17 @@ export default function Profile() {
                 <BaseIcon />
                 <span className="text-sm">Base</span>
                 <ExternalLink className="w-3 h-3 text-muted-foreground" />
+              </a>
+            )}
+            {profileWebsite && (
+              <a
+                href={profileWebsite.startsWith('http') ? profileWebsite : `https://${profileWebsite}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span className="text-sm">Website</span>
               </a>
             )}
           </div>
