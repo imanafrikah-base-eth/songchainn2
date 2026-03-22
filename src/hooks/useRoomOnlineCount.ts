@@ -55,9 +55,26 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
         .eq('room_id', roomId)
         .eq('is_active', true);
 
-      if (!isActive || fallback?.error) return;
-      const fallbackCount = Math.max(0, Number(fallback?.count ?? 0));
-      setCount(isListening ? Math.max(1, fallbackCount) : fallbackCount);
+      if (!isActive) return;
+      if (!fallback?.error) {
+        const fallbackCount = Math.max(0, Number(fallback?.count ?? 0));
+        setCount(isListening ? Math.max(1, fallbackCount) : fallbackCount);
+        return;
+      }
+
+      const liveUsersFallback = await (supabase as any)
+        .from('room_live_users')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('room_id', roomId);
+
+      if (!isActive) return;
+      if (!liveUsersFallback?.error) {
+        const liveUsersCount = Math.max(0, Number(liveUsersFallback?.count ?? 0));
+        setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
+        return;
+      }
+
+      setCount(isListening ? 1 : 0);
     };
 
     const channel = supabase
@@ -69,16 +86,28 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
           void fetchCount();
         },
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_live_counts', filter: `room_id=eq.${roomId}` },
+        () => {
+          void fetchCount();
+        },
+      )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           void fetchCount();
         }
       });
 
+    const interval = window.setInterval(() => {
+      void fetchCount();
+    }, 5000);
+
     void fetchCount();
 
     return () => {
       isActive = false;
+      window.clearInterval(interval);
       supabase.removeChannel(channel);
     };
   }, [isListening, roomId]);
