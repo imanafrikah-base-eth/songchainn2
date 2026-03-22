@@ -29,6 +29,7 @@ import {
 import { toast } from 'sonner';
 
 const NEW_ARTIST_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
+const DEFAULT_ARTIST_FOLLOWERS = 66;
 
 function isArtistNew(addedAt?: string) {
   if (!addedAt) return false;
@@ -391,21 +392,19 @@ export default function ArtistDetail() {
     toast.success('Theme updated');
   }, [id, isOwner, queryClient]);
 
-  // Fetch follower count directly from liked_artists (per current user visibility)
+  // Fetch follower count via RPC
   const { data: followerCount = 0 } = useQuery({
     queryKey: ['artist-followers', id],
     queryFn: async () => {
       if (!id) return 0;
-      const { data, error } = await (supabase as any)
-        .from('liked_artists')
-        .select('id', { count: 'exact', head: true })
-        .eq('artist_id', id);
-      if (error || typeof data !== 'number') return 0;
-      return data;
+      const { data, error } = await (supabase as any).rpc('get_artist_follower_count', { p_artist_id: id });
+      if (error) return 0;
+      return typeof data === 'number' ? data : Number(data ?? 0);
     },
     enabled: !!id,
     refetchInterval: 15000,
   });
+  const displayedFollowerCount = Math.max(DEFAULT_ARTIST_FOLLOWERS, followerCount);
 
   useEffect(() => {
     if (!id) return;
@@ -859,7 +858,7 @@ export default function ArtistDetail() {
                 <div className="glass-card p-4 rounded-xl text-center">
                   <Users className="w-6 h-6 mx-auto mb-2 text-primary" />
                   <p className="text-2xl font-heading font-bold text-foreground">
-                    {(92 + (isFollowingArtist ? 1 : 0)).toLocaleString()}
+                    {displayedFollowerCount.toLocaleString()}
                   </p>
                   <p className="text-sm text-muted-foreground">Followers</p>
                 </div>
@@ -944,7 +943,8 @@ export default function ArtistDetail() {
             {isOwner ? 'My Music' : 'Discography'}
           </h2>
           {(() => {
-            const volumeOrder: Array<'3.0' | 'Lovers EP' | 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7'> = [
+            const volumeOrder: Array<"ER'TING FLEX" | '3.0' | 'Lovers EP' | 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7'> = [
+              "ER'TING FLEX",
               '3.0',
               'Lovers EP',
               'Vol7',

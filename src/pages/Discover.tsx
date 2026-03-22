@@ -17,6 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getLikedSongs } from '@/lib/localDb';
 import { useSafePlayerState } from '@/context/PlayerContext';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
+import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -59,10 +60,16 @@ export default function Discover() {
   const [selectedGenre, setSelectedGenre] = useState<Genre | 'all'>('all');
   const [sortMode, setSortMode] = useState<'trending' | 'newest' | 'mostPlayed' | 'mostLiked'>('trending');
   const [showFilters, setShowFilters] = useState(true);
+  const { user } = useAuth();
   const { data: todayHotSongs = [] } = useTodayHotSongs(5);
   const playerState = useSafePlayerState();
   const { data: likedSongIds = [] } = useUserLikes();
   const { isSongCached } = useOfflineAudio();
+  const roomOnlineCount = useRoomOnlineCount({
+    roomId: 'global',
+    viewerUserId: user?.id,
+    isListening: Boolean(playerState?.isRoomMode),
+  });
   const catalogs = useMemo(() => CATALOGS, []);
 
   // Get user's preferred genres based on likes
@@ -70,6 +77,8 @@ export default function Discover() {
     const genreCounts: Record<Genre, number> = {
       Trap: 0,
       Afro: 0,
+      Reggae: 0,
+      RnB: 0,
       Dancehall: 0,
       'Kalind-Rock': 0,
       'Kali-Funk': 0,
@@ -234,6 +243,9 @@ export default function Discover() {
                 >
                   <Headphones className="w-3.5 h-3.5" />
                   <span>Jump into Room</span>
+                  <span className="inline-flex items-center rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
+                    {roomOnlineCount} live
+                  </span>
                 </button>
               </Link>
             </div>

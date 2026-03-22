@@ -9,6 +9,7 @@ import { SpinningSongArt } from './SpinningSongArt';
 import { ShareSongButton } from './ShareSongButton';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -21,11 +22,13 @@ function formatTime(seconds: number): string {
 const ProgressBar = memo(function ProgressBar({ 
   currentTime, 
   duration, 
-  onSeek 
+  onSeek,
+  disabled = false,
 }: { 
   currentTime: number; 
   duration: number; 
   onSeek: (time: number) => void;
+  disabled?: boolean;
 }) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   
@@ -37,8 +40,8 @@ const ProgressBar = memo(function ProgressBar({
 
   return (
     <div
-      className="absolute top-0 left-0 right-0 h-1 bg-muted/30 cursor-pointer group"
-      onClick={handleClick}
+      className={`absolute top-0 left-0 right-0 h-1 bg-muted/30 group ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
+      onClick={disabled ? undefined : handleClick}
     >
       <div
         className="h-full gradient-primary relative"
@@ -72,6 +75,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
   const { addPlay, addOfflinePlay } = useEngagement();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const roomOnlineCount = useRoomOnlineCount({ roomId: 'global', viewerUserId: user?.id, isListening: isRoomMode });
   
   const hasCountedPlay = useRef(false);
   const playStartTime = useRef<number | null>(null);
@@ -161,12 +165,12 @@ export const AudioPlayer = memo(function AudioPlayer() {
           : [],
       });
 
-      navigator.mediaSession.setActionHandler('play', togglePlay);
-      navigator.mediaSession.setActionHandler('pause', togglePlay);
-      navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
-      navigator.mediaSession.setActionHandler('nexttrack', playNext);
+      navigator.mediaSession.setActionHandler('play', isRoomMode ? null : togglePlay);
+      navigator.mediaSession.setActionHandler('pause', isRoomMode ? null : togglePlay);
+      navigator.mediaSession.setActionHandler('previoustrack', isRoomMode ? null : playPrevious);
+      navigator.mediaSession.setActionHandler('nexttrack', isRoomMode ? null : playNext);
     }
-  }, [currentSong, togglePlay, playPrevious, playNext]);
+  }, [currentSong, isRoomMode, togglePlay, playPrevious, playNext]);
 
   useEffect(() => {
     if ('mediaSession' in navigator) {
@@ -183,14 +187,56 @@ export const AudioPlayer = memo(function AudioPlayer() {
   }, [setVolume]);
 
   const handleOpenFullScreen = useCallback(() => {
+    if (isRoomMode) return;
     setIsFullScreen(true);
-  }, []);
+  }, [isRoomMode]);
 
   const handleCloseFullScreen = useCallback(() => {
     setIsFullScreen(false);
   }, []);
 
+  useEffect(() => {
+    if (isRoomMode) {
+      setIsFullScreen(false);
+    }
+  }, [isRoomMode]);
+
   if (!currentSong) return null;
+
+  if (showReturnToRoom) {
+    return (
+      <motion.div
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="fixed bottom-0 left-0 right-0 z-50"
+      >
+        <div className="glass-surface border-t border-border/50 pb-safe">
+          <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  showRoom();
+                  navigate('/room');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 text-primary text-xs px-3 py-1 font-semibold shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span>Return to Room</span>
+                <span className="inline-flex items-center rounded-full bg-primary text-primary-foreground px-1.5 py-0.5 text-[10px] leading-none">
+                  {roomOnlineCount} live
+                </span>
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-foreground truncate">{currentSong.title}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{currentSong.artist}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <>
@@ -201,22 +247,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
       >
         {/* Glass background with safe area padding for mobile */}
         <div className="glass-surface border-t border-border/50 pb-safe">
-          {showReturnToRoom && (
-            <div className="container mx-auto px-3 sm:px-4 pt-2 pb-1 md:hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  showRoom();
-                  navigate('/room');
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary text-xs px-3 py-1"
-              >
-                <Headphones className="w-3.5 h-3.5" />
-                <span>Return to Room</span>
-              </button>
-            </div>
-          )}
-          <ProgressBar currentTime={currentTime} duration={duration} onSeek={seekTo} />
+          <ProgressBar currentTime={currentTime} duration={duration} onSeek={seekTo} disabled={isRoomMode} />
 
           <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
             <div className="flex items-center justify-between gap-2 sm:gap-4">
@@ -264,8 +295,9 @@ export const AudioPlayer = memo(function AudioPlayer() {
                 </button>
 
                 <motion.button
-                  onClick={togglePlay}
-                  className="p-3 sm:p-3 gradient-primary rounded-full shadow-glow press-effect"
+                  onClick={isRoomMode ? undefined : togglePlay}
+                  disabled={isRoomMode}
+                  className="p-3 sm:p-3 gradient-primary rounded-full shadow-glow press-effect disabled:opacity-40"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -277,8 +309,9 @@ export const AudioPlayer = memo(function AudioPlayer() {
                 </motion.button>
 
                 <button
-                  onClick={playNext}
-                  className="p-2 hover:bg-secondary/80 rounded-full transition-colors press-effect"
+                  onClick={isRoomMode ? undefined : playNext}
+                  disabled={isRoomMode}
+                  className="p-2 hover:bg-secondary/80 rounded-full transition-colors press-effect disabled:opacity-40 disabled:hover:bg-transparent"
                 >
                   <SkipForward className="w-4 h-4 sm:w-5 sm:h-5 text-foreground" />
                 </button>

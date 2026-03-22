@@ -23,6 +23,13 @@ type RoomMessage = {
   reply_to_message_id: string | null;
 };
 
+type RoomLiveUser = {
+  user_id: string;
+  room_name: string;
+  joined_at?: string | null;
+  last_seen_at?: string | null;
+};
+
 const QUICK_REACTIONS = ['🔥', '👀', '💯'] as const;
 const TEXT_EMOJIS = ['🔥', '👀', '💯', '😂', '😍', '😤', '🤝', '🎧', '🚀', '🫡', '🙏', '⚡'] as const;
 const CUSTOM_EMOJI_TOKENS = [':BASED:', ':LFB!:', ':MALAKAS:', ':TWEAKING:'] as const;
@@ -46,7 +53,6 @@ const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const ROOM_SEGMENT_SECONDS = 180;
 const TYPING_IDLE_MS = 1400;
 const LOCAL_IDENTITY_KEY = 'room:identity_mode:v1';
-const ROOM_PRESENCE_VIEWER_KEY_STORAGE = 'songchainn:room_presence_viewer_key:v1';
 const ROOM_ID = 'global';
 
 const KNOWN_ARTIST_NAMES = new Set(
@@ -108,18 +114,6 @@ function makeMessageId() {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function getRoomPresenceViewerKey() {
-  try {
-    const existing = localStorage.getItem(ROOM_PRESENCE_VIEWER_KEY_STORAGE);
-    if (existing) return existing;
-    const created = makeMessageId();
-    localStorage.setItem(ROOM_PRESENCE_VIEWER_KEY_STORAGE, created);
-    return created;
-  } catch {
-    return makeMessageId();
-  }
 }
 
 function coerceRoomMessage(row: any): RoomMessage | null {
@@ -252,7 +246,7 @@ export default function Room() {
   const [isSending, setIsSending] = useState(false);
   const [replyTo, setReplyTo] = useState<RoomMessage | null>(null);
   const [chatBackend, setChatBackend] = useState<'supabase' | 'local'>('supabase');
-  const [activeRoomNames, setActiveRoomNames] = useState<string[]>([]);
+  const [liveUsers, setLiveUsers] = useState<RoomLiveUser[]>([]);
   const [mentionState, setMentionState] = useState<{ atIndex: number; query: string; activeIndex: number } | null>(null);
 
   const [isNamePromptOpen, setIsNamePromptOpen] = useState(false);
@@ -263,14 +257,12 @@ export default function Room() {
 
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
-  const [viewingCount, setViewingCount] = useState(0);
   const [typingUsersById, setTypingUsersById] = useState<Record<string, string>>({});
   const [segmentNowMs, setSegmentNowMs] = useState(() => Date.now());
   const [reactionsByMessageId, setReactionsByMessageId] = useState<Record<string, Record<string, number>>>({});
   const [myReactionsByMessageId, setMyReactionsByMessageId] = useState<Record<string, Record<string, boolean>>>({});
   const [roomPulseSummary, setRoomPulseSummary] = useState<{ count: number } | null>(null);
   const { isSongCached } = useOfflineAudio();
-  const roomPresenceViewerKey = useMemo(() => getRoomPresenceViewerKey(), []);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -616,36 +608,8 @@ export default function Room() {
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase.channel(`room:${ROOM_ID}`, {
-      config: {
-        presence: { key: roomPresenceViewerKey },
-      },
-    });
+    const channel = supabase.channel(`room:${ROOM_ID}`);
     setPresenceChannel(channel);
-
-    const syncPresence = () => {
-      // Count is calculated from presenceState() keys (unique active listeners).
-      const state = channel.presenceState() as Record<string, Array<{ username?: string; room_name?: string; room_id?: string }>>;
-      let listeningCount = 0;
-      const names = new Set<string>();
-      for (const metas of Object.values(state)) {
-        if (!Array.isArray(metas)) continue;
-        if (metas.length > 0) listeningCount += 1;
-        for (const meta of metas) {
-          const name = normalizeRoomName((meta as any)?.username || meta?.room_name || '');
-          if (name && name.toLowerCase() !== 'guest') names.add(name);
-        }
-      }
-      const minSelfCount = user ? 1 : 0;
-      const resolvedCount = Math.max(listeningCount, minSelfCount);
-      setOnlineCount(resolvedCount);
-      setViewingCount(resolvedCount);
-      setActiveRoomNames([...names].sort((a, b) => a.localeCompare(b)).slice(0, 40));
-    };
-
-    channel.on('presence', { event: 'sync' }, syncPresence);
-    channel.on('presence', { event: 'join' }, syncPresence);
-    channel.on('presence', { event: 'leave' }, syncPresence);
 
     channel.on('broadcast', { event: 'typing' }, payload => {
       const data = (payload as any)?.payload as { user_id?: string; username?: string; room_name?: string; is_typing?: boolean } | undefined;
@@ -696,26 +660,7 @@ export default function Room() {
       applyReactionDelta(messageId, emoji, delta);
     });
 
-    channel.subscribe(async status => {
-      if (status !== 'SUBSCRIBED') return;
-      const storedNameRaw = localStorage.getItem(`room_username:${user.id}`) || '';
-      const storedName = storedNameRaw ? normalizeRoomName(storedNameRaw) : '';
-      const toTrack = normalizeRoomName(roomNameRef.current || storedName || '');
-      syncPresence();
-      // Presence is tracked here for everyone currently in the room page.
-      await channel
-        .track({
-          user_id: user.id,
-          room_id: ROOM_ID,
-          username: toTrack || 'Guest',
-          is_listening: isRoomMode,
-          online_at: new Date().toISOString(),
-        })
-        .then(() => {
-          syncPresence();
-        })
-        .catch(() => void 0);
-    });
+    channel.subscribe();
 
     const sweepInterval = window.setInterval(() => {
       const now = Date.now();
@@ -747,11 +692,135 @@ export default function Room() {
       setPresenceChannel(null);
       typingSeenAtRef.current = {};
       setTypingUsersById({});
-      // Cleanup happens here (untrack + unsubscribe) to prevent stale counts.
-      void channel.untrack().catch(() => void 0);
       supabase.removeChannel(channel);
     };
-  }, [applyReactionDelta, chatBackend, isRoomMode, persistLocalMessages, playBeep, roomPresenceViewerKey, user]);
+  }, [applyReactionDelta, chatBackend, persistLocalMessages, playBeep, user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let isActive = true;
+    let heartbeatInterval: number | null = null;
+    const fallbackName = normalizeRoomName(roomNameRef.current || roomName || '') || 'Guest';
+
+    const callRoomRpc = async (fn: 'join_room' | 'heartbeat_room' | 'leave_room') => {
+      const first = await (supabase as any).rpc(fn, { room_id: ROOM_ID });
+      if (!first?.error) return first;
+      return (supabase as any).rpc(fn, { roomId: ROOM_ID });
+    };
+
+    const setOptimisticSelf = () => {
+      const optimisticUser: RoomLiveUser = {
+        user_id: user.id,
+        room_name: fallbackName,
+        joined_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+      };
+      setLiveUsers((prev) => {
+        const withoutSelf = prev.filter((entry) => entry.user_id !== user.id);
+        return [optimisticUser, ...withoutSelf];
+      });
+      setOnlineCount((prev) => Math.max(1, prev));
+    };
+
+    const refreshLiveUsers = async () => {
+      const liveRes = await (supabase as any)
+        .from('room_live_users')
+        .select('*')
+        .eq('room_id', ROOM_ID);
+
+      if (!isActive) return;
+
+      const byUserId = new Map<string, RoomLiveUser>();
+      const addRows = (rows: any[]) => {
+        for (const row of rows) {
+          const userId = typeof row?.user_id === 'string' ? row.user_id : '';
+          if (!userId) continue;
+          const name = typeof row?.room_name === 'string' ? normalizeRoomName(row.room_name) : '';
+          const joinedAt = typeof row?.joined_at === 'string' ? row.joined_at : null;
+          const lastSeenAt = typeof row?.last_seen_at === 'string' ? row.last_seen_at : null;
+          const existing = byUserId.get(userId);
+          if (!existing) {
+            byUserId.set(userId, { user_id: userId, room_name: name || 'Guest', joined_at: joinedAt, last_seen_at: lastSeenAt });
+            continue;
+          }
+          const existingJoined = existing.joined_at ? new Date(existing.joined_at).getTime() : 0;
+          const nextJoined = joinedAt ? new Date(joinedAt).getTime() : 0;
+          if (nextJoined > existingJoined) {
+            byUserId.set(userId, { user_id: userId, room_name: name || 'Guest', joined_at: joinedAt, last_seen_at: lastSeenAt });
+          }
+        }
+      };
+
+      addRows(Array.isArray(liveRes?.data) ? liveRes.data : []);
+
+      if (byUserId.size === 0) {
+        const profileRes = await (supabase as any)
+          .from('room_profiles')
+          .select('*')
+          .eq('room_id', ROOM_ID)
+          .eq('is_active', true);
+        if (!isActive) return;
+        addRows(Array.isArray(profileRes?.data) ? profileRes.data : []);
+      }
+
+      if (byUserId.size === 0) {
+        setOptimisticSelf();
+        return;
+      }
+
+      const nextUsers = [...byUserId.values()]
+        .sort((a, b) => {
+          const timeA = a.joined_at ? new Date(a.joined_at).getTime() : 0;
+          const timeB = b.joined_at ? new Date(b.joined_at).getTime() : 0;
+          return timeA - timeB;
+        });
+
+      setLiveUsers(nextUsers);
+      setOnlineCount(Math.max(1, nextUsers.length));
+    };
+
+    const joinRoom = async () => {
+      setOptimisticSelf();
+      await callRoomRpc('join_room');
+      await refreshLiveUsers();
+    };
+
+    const heartbeatRoom = async () => {
+      await callRoomRpc('heartbeat_room');
+    };
+
+    void joinRoom().finally(() => {
+      if (!isActive) return;
+      heartbeatInterval = window.setInterval(() => {
+        void heartbeatRoom();
+      }, 25000);
+    });
+
+    const profilesChannel = supabase
+      .channel(`room-profiles:${ROOM_ID}:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_profiles', filter: `room_id=eq.${ROOM_ID}` },
+        () => {
+          void refreshLiveUsers();
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          void refreshLiveUsers();
+        }
+      });
+
+    return () => {
+      isActive = false;
+      if (heartbeatInterval) window.clearInterval(heartbeatInterval);
+      supabase.removeChannel(profilesChannel);
+      void callRoomRpc('leave_room');
+      setLiveUsers([]);
+      setOnlineCount(0);
+    };
+  }, [roomName, user]);
 
   const mergeRecentMessages = useCallback((incoming: RoomMessage[]) => {
     setMessages(prev => {
@@ -807,29 +876,6 @@ export default function Room() {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [chatBackend, fetchRecentMessages, user]);
-
-  useEffect(() => {
-    if (!presenceChannel || !user) return;
-    const toTrack = normalizeRoomName(roomName || '');
-    const label = toTrack || 'Guest';
-    if (label && label.toLowerCase() !== 'guest') {
-      setActiveRoomNames(prev => {
-        if (prev.includes(label)) return prev;
-        return [label, ...prev].slice(0, 40);
-      });
-    }
-    setOnlineCount(prev => Math.max(prev, 1));
-    setViewingCount(prev => Math.max(prev, 1));
-    void presenceChannel
-      .track({
-        user_id: user.id,
-        room_id: ROOM_ID,
-        username: label,
-        is_listening: isRoomMode,
-        online_at: new Date().toISOString(),
-      })
-      .catch(() => void 0);
-  }, [isRoomMode, presenceChannel, roomName, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -1211,8 +1257,8 @@ export default function Room() {
 
   const knownMentionNames = useMemo(() => {
     const names = new Set<string>();
-    for (const name of activeRoomNames) {
-      const normalized = normalizeRoomName(name);
+    for (const userEntry of liveUsers) {
+      const normalized = normalizeRoomName(userEntry.room_name || '');
       if (normalized && normalized.toLowerCase() !== 'guest') names.add(normalized);
     }
     for (const message of messages) {
@@ -1222,7 +1268,7 @@ export default function Room() {
     const selfName = normalizeRoomName(roomName || '');
     if (selfName && selfName.toLowerCase() !== 'guest') names.add(selfName);
     return [...names].sort((a, b) => a.localeCompare(b)).slice(0, 50);
-  }, [activeRoomNames, messages, roomName]);
+  }, [liveUsers, messages, roomName]);
 
   const mentionSuggestions = useMemo(() => {
     if (!mentionState) return [];
@@ -1237,12 +1283,12 @@ export default function Room() {
     const merged = new Set<string>();
     const selfName = normalizeRoomName(roomName || '');
     if (selfName && selfName.toLowerCase() !== 'guest') merged.add(selfName);
-    for (const name of activeRoomNames) {
-      const normalized = normalizeRoomName(name);
+    for (const userEntry of liveUsers) {
+      const normalized = normalizeRoomName(userEntry.room_name || '');
       if (normalized && normalized.toLowerCase() !== 'guest') merged.add(normalized);
     }
     return [...merged].slice(0, 12);
-  }, [activeRoomNames, roomName]);
+  }, [liveUsers, roomName]);
 
   const messageById = useMemo(() => {
     const map = new Map<string, RoomMessage>();
@@ -1388,9 +1434,6 @@ export default function Room() {
             </div>
             <div className="text-zinc-400">
               <span>{onlineCount} listening</span>
-              {viewingCount > 0 && (
-                <span className="ml-2 text-zinc-500">• {viewingCount} viewing</span>
-              )}
             </div>
           </div>
           {onlineNames.length > 0 && (

@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { useSongPopularity } from '@/hooks/usePopularity';
-import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
@@ -25,6 +24,7 @@ const itemVariants = {
 };
 
 const NEW_ARTIST_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
+const DEFAULT_ARTIST_FOLLOWERS = 66;
 
 function isArtistNew(addedAt?: string) {
   if (!addedAt) return false;
@@ -37,22 +37,16 @@ export default function Artists() {
   const { data: popularityData } = useSongPopularity();
   const artistIds = useMemo(() => ARTISTS.map(a => a.id), []);
   const queryClient = useQueryClient();
-  const { isArtistLiked } = useAudienceInteractions();
-  
-  // Fetch follower counts directly from liked_artists (per current user visibility)
+
   const { data: followerCounts = {} } = useQuery({
     queryKey: ['all-artist-followers'],
     queryFn: async () => {
       const counts: Record<string, number> = {};
       if (artistIds.length === 0) return counts;
-      const { data, error } = await (supabase as any)
-        .from('liked_artists')
-        .select('artist_id')
-        .in('artist_id', artistIds);
-      if (error || !data) return counts;
-      (data as Array<{ artist_id: string | null }>).forEach(row => {
-        if (!row.artist_id) return;
-        counts[row.artist_id] = (counts[row.artist_id] || 0) + 1;
+      const { data, error } = await (supabase as any).rpc('get_artist_follow_counts', { artist_ids: artistIds });
+      if (error || !Array.isArray(data)) return counts;
+      (data as Array<{ artist_id: string; follower_count: number }>).forEach(row => {
+        counts[row.artist_id] = Number(row.follower_count || 0);
       });
       return counts;
     },
@@ -92,28 +86,23 @@ export default function Artists() {
         totalPlays += songData?.play_count || 0;
         totalLikes += songData?.like_count || 0;
       });
-      
-    const uiFollowers = 92 + (isArtistLiked(artist.id) ? 1 : 0);
-      
       return {
         ...artist,
         songCount: songs.length,
         totalPlays,
         totalLikes,
-        followers: followerCounts[artist.id] || 0,
-        uiFollowers,
+        followers: Math.max(DEFAULT_ARTIST_FOLLOWERS, followerCounts[artist.id] || 0),
       };
     }).sort((a, b) => b.totalPlays - a.totalPlays);
-  }, [popularityData, followerCounts, isArtistLiked]);
+  }, [popularityData, followerCounts]);
 
-  // Calculate total stats (followers should match per-artist UI offsets)
   const totalStats = useMemo(() => {
     return artistsWithStats.reduce(
       (acc, artist) => ({
         artists: acc.artists + 1,
         songs: acc.songs + artist.songCount,
         plays: acc.plays + artist.totalPlays,
-        followers: acc.followers + (artist.followers + 92),
+        followers: acc.followers + artist.followers,
       }),
       { artists: 0, songs: 0, plays: 0, followers: 0 }
     );
@@ -263,7 +252,7 @@ export default function Artists() {
                             <Heart className="w-3.5 h-3.5" />
                           </div>
                           <div className="text-sm font-semibold text-foreground tabular-nums">
-                            {(artist.uiFollowers || 0).toLocaleString()}
+                            {(artist.followers || 0).toLocaleString()}
                           </div>
                           <div className="text-[10px] text-muted-foreground">Followers</div>
                         </div>

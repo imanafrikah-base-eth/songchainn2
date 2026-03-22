@@ -85,7 +85,11 @@ export default function Home() {
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const [isSubmittingPlaylist, setIsSubmittingPlaylist] = useState(false);
   const playerState = useSafePlayerState();
-  const roomOnlineCount = useRoomOnlineCount({ roomId: 'global', viewerUserId: user?.id });
+  const roomOnlineCount = useRoomOnlineCount({
+    roomId: 'global',
+    viewerUserId: user?.id,
+    isListening: Boolean(playerState?.isRoomMode),
+  });
 
   const catalogs = useMemo(() => CATALOGS, []);
   const featuredCatalogs = useMemo(
@@ -265,6 +269,9 @@ export default function Home() {
                 <Button size="sm" className="text-xs sm:text-sm gap-1.5">
                   <Headphones className="w-3.5 h-3.5" />
                   <span>Jump into Room</span>
+                  <span className="inline-flex items-center rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
+                    {roomOnlineCount} live
+                  </span>
                   <ArrowRight className="w-3 h-3" />
                 </Button>
               </Link>

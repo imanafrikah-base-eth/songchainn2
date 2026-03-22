@@ -1,173 +1,87 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-type PresenceMeta = {
-  user_id?: string;
+type RoomLiveCountRow = {
   room_id?: string;
-  username?: string;
-  online_at?: string;
+  listener_count?: number | null;
+  online_count?: number | null;
+  count?: number | null;
+  live_count?: number | null;
+  listeners?: number | null;
+  total?: number | null;
 };
 
-const VIEWER_KEY_STORAGE = 'songchainn:room_presence_viewer_key:v1';
-
-let sharedChannel: ReturnType<typeof supabase.channel> | null = null;
-let sharedRoomId: string | null = null;
-let sharedViewerKey: string | null = null;
-let sharedCount = 0;
-let sharedRefs = 0;
-let sharedTrackRefs = 0;
-const sharedListeners = new Set<(count: number) => void>();
-let sharedTracked = false;
-let sharedTrackMeta: PresenceMeta | null = null;
-
-function makeViewerKey() {
-  const maybeCrypto = globalThis.crypto as Crypto | undefined;
-  if (maybeCrypto && 'randomUUID' in maybeCrypto && typeof maybeCrypto.randomUUID === 'function') {
-    return maybeCrypto.randomUUID();
-  }
-  const bytes = new Uint8Array(16);
-  for (let i = 0; i < bytes.length; i += 1) {
-    bytes[i] = Math.floor(Math.random() * 256);
-  }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function getViewerKey() {
-  try {
-    const existing = localStorage.getItem(VIEWER_KEY_STORAGE);
-    if (existing) return existing;
-    const created = makeViewerKey();
-    localStorage.setItem(VIEWER_KEY_STORAGE, created);
-    return created;
-  } catch {
-    return makeViewerKey();
-  }
-}
-
-function computeListenerCount(channel: ReturnType<typeof supabase.channel>) {
-  // Count is calculated from presenceState() keys (unique active listeners in this room channel).
-  const state = channel.presenceState() as Record<string, PresenceMeta[]>;
-  return Object.keys(state).length;
-}
-
-function emitSharedCount(next: number) {
-  sharedCount = next;
-  for (const listener of sharedListeners) listener(next);
-}
-
-async function ensureSharedChannel(roomId: string, viewerKey: string) {
-  if (sharedChannel && sharedRoomId === roomId && sharedViewerKey === viewerKey) return sharedChannel;
-
-  if (sharedChannel) {
-    if (sharedTracked) {
-      void sharedChannel.untrack().catch(() => void 0);
-    }
-    supabase.removeChannel(sharedChannel);
-    sharedChannel = null;
-    sharedTracked = false;
-  }
-
-  sharedRoomId = roomId;
-  sharedViewerKey = viewerKey;
-
-  const channel = supabase.channel(`room:${roomId}`, {
-    config: {
-      presence: { key: viewerKey },
-    },
-  });
-  sharedChannel = channel;
-
-  const sync = () => emitSharedCount(computeListenerCount(channel));
-
-  // Remote presence updates are received here (sync/join/leave) and drive the badge count.
-  channel.on('presence', { event: 'sync' }, sync);
-  channel.on('presence', { event: 'join' }, sync);
-  channel.on('presence', { event: 'leave' }, sync);
-
-  await new Promise<void>(resolve => {
-    channel.subscribe(status => {
-      if (status !== 'SUBSCRIBED') return;
-      sync();
-      if (sharedTrackRefs > 0 && sharedTrackMeta) {
-        // Presence is tracked here when the current user is an active listener.
-        void channel.track(sharedTrackMeta).then(() => {
-          sharedTracked = true;
-        }).catch(() => void 0);
-      }
-      resolve();
-    });
-  });
-
-  return channel;
-}
-
-function releaseSharedChannel() {
-  if (sharedRefs > 0) return;
-  if (!sharedChannel) return;
-  // Cleanup happens here when no components are observing (unsubscribe to prevent leaks).
-  if (sharedTracked) {
-    void sharedChannel.untrack().catch(() => void 0);
-    sharedTracked = false;
-  }
-  supabase.removeChannel(sharedChannel);
-  sharedChannel = null;
-  sharedRoomId = null;
-  sharedViewerKey = null;
-  sharedCount = 0;
+function resolveLiveCount(row: RoomLiveCountRow | null | undefined) {
+  const listenerCount = Number(row?.listener_count ?? 0);
+  if (Number.isFinite(listenerCount) && listenerCount >= 0) return listenerCount;
+  const onlineCount = Number(row?.online_count ?? 0);
+  if (Number.isFinite(onlineCount) && onlineCount >= 0) return onlineCount;
+  const liveCount = Number(row?.live_count ?? 0);
+  if (Number.isFinite(liveCount) && liveCount >= 0) return liveCount;
+  const listeners = Number(row?.listeners ?? 0);
+  if (Number.isFinite(listeners) && listeners >= 0) return listeners;
+  const total = Number(row?.total ?? 0);
+  if (Number.isFinite(total) && total >= 0) return total;
+  const genericCount = Number(row?.count ?? 0);
+  if (Number.isFinite(genericCount) && genericCount >= 0) return genericCount;
+  return 0;
 }
 
 export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: string | null; isListening?: boolean; username?: string | null }) {
   const roomId = params?.roomId || 'global';
-  const viewerKey = getViewerKey();
-  const [count, setCount] = useState(sharedCount);
+  const isListening = Boolean(params?.isListening);
+  const [count, setCount] = useState(0);
 
   useEffect(() => {
-    sharedRefs += 1;
-    const listener = (next: number) => setCount(next);
-    sharedListeners.add(listener);
-    setCount(sharedCount);
+    let isActive = true;
 
-    void ensureSharedChannel(roomId, viewerKey);
+    const fetchCount = async () => {
+      const { data, error } = await (supabase as any)
+        .from('room_live_counts')
+        .select('*')
+        .eq('room_id', roomId)
+        .maybeSingle();
 
-    return () => {
-      sharedListeners.delete(listener);
-      sharedRefs = Math.max(0, sharedRefs - 1);
-      if (sharedRefs === 0) releaseSharedChannel();
-    };
-  }, [roomId, viewerKey]);
-
-  useEffect(() => {
-    const shouldTrack = Boolean(params?.viewerUserId) && Boolean(params?.isListening);
-    const username = (params?.username || '').trim().slice(0, 20) || 'Guest';
-
-    if (shouldTrack) sharedTrackRefs += 1;
-    const currentTrackMeta = shouldTrack
-      ? { user_id: params?.viewerUserId || undefined, room_id: roomId, username, online_at: new Date().toISOString() }
-      : null;
-
-    if (currentTrackMeta) {
-      sharedTrackMeta = currentTrackMeta;
-    }
-
-    if (sharedChannel && sharedTrackRefs > 0 && sharedTrackMeta) {
-      void sharedChannel.track(sharedTrackMeta).then(() => {
-        sharedTracked = true;
-      }).catch(() => void 0);
-    }
-
-    return () => {
-      if (shouldTrack) sharedTrackRefs = Math.max(0, sharedTrackRefs - 1);
-      if (sharedTrackRefs === 0 && sharedTracked && sharedChannel) {
-        void sharedChannel.untrack().catch(() => void 0);
-        sharedTracked = false;
+      if (!isActive) return;
+      if (!error) {
+        const nextCount = resolveLiveCount((data ?? null) as RoomLiveCountRow | null);
+        setCount(isListening ? Math.max(1, nextCount) : nextCount);
+        return;
       }
+
+      const fallback = await (supabase as any)
+        .from('room_profiles')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('room_id', roomId)
+        .eq('is_active', true);
+
+      if (!isActive || fallback?.error) return;
+      const fallbackCount = Math.max(0, Number(fallback?.count ?? 0));
+      setCount(isListening ? Math.max(1, fallbackCount) : fallbackCount);
     };
-  }, [params?.isListening, params?.username, params?.viewerUserId, roomId]);
+
+    const channel = supabase
+      .channel(`room-live-counts:${roomId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_profiles', filter: `room_id=eq.${roomId}` },
+        () => {
+          void fetchCount();
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          void fetchCount();
+        }
+      });
+
+    void fetchCount();
+
+    return () => {
+      isActive = false;
+      supabase.removeChannel(channel);
+    };
+  }, [isListening, roomId]);
 
   return count;
 }

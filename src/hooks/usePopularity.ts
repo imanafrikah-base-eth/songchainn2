@@ -81,6 +81,18 @@ const SONG_EXTRA_BASELINE_PLAYS: Record<string, number> = {
   '94': 85,
 };
 
+function stableSongSeed(song: Song): number {
+  const text = `${song.id}:${song.artistId}:${song.title}`;
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+  // Add some randomness based on the current time to make it dynamic
+  const now = new Date();
+  const timeSeed = now.getHours() + now.getDate();
+  return (hash + timeSeed) >>> 0;
+}
+
 const SONG_BASELINE_PLAYS: Record<string, number> = (() => {
   const perSong: Record<string, number> = {};
   ARTISTS.forEach((artist) => {
@@ -93,17 +105,39 @@ const SONG_BASELINE_PLAYS: Record<string, number> = (() => {
     } else if (artist.id === '10') {
       total = 303;
     } else {
-      total = 2000 + (ARTIST_EXTRA_PLAYS[artist.id] || 0);
+      // Add randomness to the total per artist
+      const artistSeed = parseInt(artist.id) || 1;
+      const artistRandomness = (artistSeed * 7919) % 500;
+      total = 2000 + (ARTIST_EXTRA_PLAYS[artist.id] || 0) + artistRandomness;
     }
 
-    const base = Math.floor(total / songs.length);
-    let remainder = total - base * songs.length;
+    const weightedSongs = songs.map((song) => {
+      const seed = stableSongSeed(song);
+      // Increase spread and randomness in weights
+      const spread = 0.5 + ((seed % 1500) / 1000) * 2.5;
+      const recencyBoost = song.addedAt ? 0.35 : 0;
+      const existingPlayBoost = Math.min(3.0, Math.log10((song.plays || 0) + 5) / 1.0);
+      const weight = spread + recencyBoost + existingPlayBoost;
+      return { song, weight, seed };
+    });
 
-    songs.forEach((song) => {
-      const extra = remainder > 0 ? 1 : 0;
-      if (remainder > 0) remainder -= 1;
-      const songExtra = SONG_EXTRA_BASELINE_PLAYS[song.id] || 0;
-      perSong[song.id] = base + extra + songExtra;
+    const totalWeight = weightedSongs.reduce((sum, entry) => sum + entry.weight, 0) || 1;
+    let assigned = 0;
+
+    weightedSongs.forEach((entry, index) => {
+      const exact = (total * entry.weight) / totalWeight;
+      const allocated = index === weightedSongs.length - 1 ? Math.max(0, total - assigned) : Math.floor(exact);
+      assigned += allocated;
+      
+      // More aggressive deterministic noise
+      const deterministicNoise = (entry.seed % 137) + Math.floor((entry.seed % 41) * 1.5);
+      const minimum = 15 + (entry.seed % 47);
+      const songExtra = SONG_EXTRA_BASELINE_PLAYS[entry.song.id] || 0;
+      
+      // Add a truly random element that changes every few hours
+      const hourlyRandom = (Math.floor(Date.now() / (1000 * 60 * 60 * 4)) * entry.seed) % 100;
+      
+      perSong[entry.song.id] = Math.max(minimum, allocated + deterministicNoise + songExtra + hourlyRandom);
     });
   });
   return perSong;

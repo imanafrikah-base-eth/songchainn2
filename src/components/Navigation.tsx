@@ -211,10 +211,13 @@ export function Navigation() {
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-primary/10 text-primary text-xs sm:text-sm font-medium"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-primary/15 text-primary text-xs sm:text-sm font-semibold shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
                 >
                   <Headphones className="w-4 h-4" />
                   <span>Return to Room</span>
+                  <span className="inline-flex items-center rounded-full bg-primary text-primary-foreground px-1.5 py-0.5 text-[10px] sm:text-xs leading-none">
+                    {roomOnlineCount} live
+                  </span>
                 </motion.button>
               )}
               {/* Wallet Balance - shown when connected */}

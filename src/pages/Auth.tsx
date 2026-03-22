@@ -268,43 +268,73 @@ export default function Auth() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md relative z-10"
+        className="w-full max-w-5xl relative z-10 grid lg:grid-cols-2 gap-6 items-stretch"
       >
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <motion.img
-            src={logo}
-            alt="$ongChainn"
-            className="h-20 mx-auto mb-6"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 200 }}
-          />
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="font-heading text-3xl font-bold text-foreground mb-2"
-          >
-            Welcome to $ongChainn
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-sm text-muted-foreground"
-          >
-            The Audience experience awaits
-          </motion.p>
+        <div className="hidden lg:flex flex-col justify-between rounded-3xl border border-border/40 bg-gradient-to-br from-primary/20 via-background/80 to-background p-8 shine-overlay">
+          <div>
+            <motion.img
+              src={logo}
+              alt="$ongChainn"
+              className="h-16 mb-8"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+            />
+            <h1 className="font-heading text-5xl leading-tight font-bold text-foreground mb-4">
+              Explore the music you love.
+            </h1>
+            <p className="text-base text-muted-foreground max-w-md">
+              Sign in to continue discovering music with your community, or create a new account in seconds.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="py-4 px-3 rounded-2xl glass-card text-center">
+              <Music className="w-6 h-6 mx-auto text-primary mb-2" />
+              <p className="text-sm font-medium text-foreground">Stream Music</p>
+              <p className="text-xs text-muted-foreground">Curated tracks</p>
+            </div>
+            <div className="py-4 px-3 rounded-2xl glass-card text-center">
+              <Users className="w-6 h-6 mx-auto text-primary mb-2" />
+              <p className="text-sm font-medium text-foreground">Join Community</p>
+              <p className="text-xs text-muted-foreground">Town Squares</p>
+            </div>
+          </div>
         </div>
 
-        {/* Auth Card */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.15 }}
-          className="glass-card rounded-3xl p-6 shine-overlay"
-        >
+        <div className="w-full max-w-md lg:max-w-none mx-auto">
+          <div className="text-center mb-6 lg:hidden">
+            <motion.img
+              src={logo}
+              alt="$ongChainn"
+              className="h-16 mx-auto mb-4"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+            />
+            <motion.h1
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="font-heading text-2xl font-bold text-foreground mb-1"
+            >
+              Welcome to $ongChainn
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-sm text-muted-foreground"
+            >
+              The Audience experience awaits
+            </motion.p>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15 }}
+            className="glass-card rounded-3xl p-6 shine-overlay"
+          >
           <AnimatePresence mode="wait">
             {connectionState === 'success' && !pendingWalletConnection ? (
               <motion.div
@@ -405,28 +435,40 @@ export default function Auth() {
               </motion.div>
             ) : authView === 'main' ? (
               <motion.div key="main" initial={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <button
-                  onClick={() => {
-                    setAuthMode('signup');
-                    setAuthView('email');
-                    setError(null);
-                  }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect mb-4"
-                >
-                  <Mail className="w-5 h-5 text-muted-foreground" />
-                  <span className="text-foreground font-medium">Sign up with Email</span>
-                </button>
-
+                <div className="mb-6 text-center">
+                  <h2 className="font-heading text-2xl font-semibold text-foreground">Log in to $ongChainn</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Continue your music journey or create a new account.
+                  </p>
+                </div>
                 <button
                   onClick={() => {
                     setAuthMode('signin');
                     setAuthView('email');
                     setError(null);
                   }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect mb-4"
+                  className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl bg-primary text-primary-foreground hover:opacity-95 transition-colors press-effect mb-3"
                 >
-                  <Mail className="w-5 h-5 text-muted-foreground" />
-                  <span className="text-foreground font-medium">Sign in with Email</span>
+                  <span className="flex items-center gap-3">
+                    <Mail className="w-5 h-5" />
+                    <span className="font-semibold">Sign in with Email</span>
+                  </span>
+                  <span className="text-xs opacity-90">Returning user</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setAuthView('email');
+                    setError(null);
+                  }}
+                  className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl border border-primary/40 bg-primary/5 text-foreground hover:bg-primary/10 transition-colors press-effect mb-5"
+                >
+                  <span className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-primary" />
+                    <span className="font-semibold">Create new account</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">First time</span>
                 </button>
 
                 {/* Wallet Primary CTA */}
@@ -545,6 +587,33 @@ export default function Auth() {
                   <span className="text-sm">Back</span>
                 </button>
 
+                <div className="inline-flex items-center rounded-2xl bg-muted/40 p-1 mb-5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('signin')}
+                    className={cn(
+                      "flex-1 h-9 rounded-xl text-sm font-medium transition-colors",
+                      authMode === 'signin'
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('signup')}
+                    className={cn(
+                      "flex-1 h-9 rounded-xl text-sm font-medium transition-colors",
+                      authMode === 'signup'
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Sign Up
+                  </button>
+                </div>
+
                 <h3 className="font-heading text-xl font-semibold text-foreground mb-1">
                   {authMode === 'signup' ? 'Create Account' : 'Sign In'}
                 </h3>
@@ -614,9 +683,14 @@ export default function Auth() {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full gradient-primary text-primary-foreground font-semibold h-12 rounded-xl"
+                    className={cn(
+                      "w-full font-semibold h-12 rounded-xl",
+                      authMode === 'signup'
+                        ? "bg-green-600 hover:bg-green-600/90 text-white"
+                        : "gradient-primary text-primary-foreground"
+                    )}
                   >
-                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : authMode === 'signup' ? 'Create Account' : 'Sign In'}
+                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : authMode === 'signup' ? 'Create new account' : 'Log in'}
                   </Button>
 
                   {authMode === 'signin' && (
@@ -743,36 +817,17 @@ export default function Auth() {
               </motion.div>
             ) : null}
           </AnimatePresence>
-        </motion.div>
+          </motion.div>
 
-        {/* Features */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="grid grid-cols-2 gap-3 mt-6"
-        >
-          <div className="py-4 px-3 rounded-2xl glass-card text-center shine-overlay">
-            <Music className="w-6 h-6 mx-auto text-primary mb-2" />
-            <p className="text-sm font-medium text-foreground">Stream Music</p>
-            <p className="text-xs text-muted-foreground">Curated tracks</p>
-          </div>
-          <div className="py-4 px-3 rounded-2xl glass-card text-center shine-overlay">
-            <Users className="w-6 h-6 mx-auto text-primary mb-2" />
-            <p className="text-sm font-medium text-foreground">Join Community</p>
-            <p className="text-xs text-muted-foreground">Town Squares</p>
-          </div>
-        </motion.div>
-
-        {/* Footer note */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="text-center text-xs text-muted-foreground mt-6"
-        >
-          Audience Edition • Building culture before ownership
-        </motion.p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-center text-xs text-muted-foreground mt-6"
+          >
+            Audience Edition • Building culture before ownership
+          </motion.p>
+        </div>
       </motion.div>
     </div>
   );
