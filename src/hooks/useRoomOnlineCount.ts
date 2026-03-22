@@ -37,8 +37,7 @@ function makeViewerKey() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function getViewerKey(viewerUserId: string | null | undefined) {
-  if (viewerUserId) return viewerUserId;
+function getViewerKey() {
   try {
     const existing = localStorage.getItem(VIEWER_KEY_STORAGE);
     if (existing) return existing;
@@ -124,7 +123,7 @@ function releaseSharedChannel() {
 
 export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: string | null; isListening?: boolean; username?: string | null }) {
   const roomId = params?.roomId || 'global';
-  const viewerKey = getViewerKey(params?.viewerUserId);
+  const viewerKey = getViewerKey();
   const [count, setCount] = useState(sharedCount);
 
   useEffect(() => {

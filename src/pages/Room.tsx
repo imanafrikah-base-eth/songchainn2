@@ -711,6 +711,9 @@ export default function Room() {
           is_listening: isRoomMode,
           online_at: new Date().toISOString(),
         })
+        .then(() => {
+          syncPresence();
+        })
         .catch(() => void 0);
     });
 
@@ -808,11 +811,20 @@ export default function Room() {
   useEffect(() => {
     if (!presenceChannel || !user) return;
     const toTrack = normalizeRoomName(roomName || '');
+    const label = toTrack || 'Guest';
+    if (label && label.toLowerCase() !== 'guest') {
+      setActiveRoomNames(prev => {
+        if (prev.includes(label)) return prev;
+        return [label, ...prev].slice(0, 40);
+      });
+    }
+    setOnlineCount(prev => Math.max(prev, 1));
+    setViewingCount(prev => Math.max(prev, 1));
     void presenceChannel
       .track({
         user_id: user.id,
         room_id: ROOM_ID,
-        username: toTrack || 'Guest',
+        username: label,
         is_listening: isRoomMode,
         online_at: new Date().toISOString(),
       })
@@ -1221,6 +1233,17 @@ export default function Room() {
     return matches.slice(0, 7);
   }, [knownMentionNames, mentionState]);
 
+  const onlineNames = useMemo(() => {
+    const merged = new Set<string>();
+    const selfName = normalizeRoomName(roomName || '');
+    if (selfName && selfName.toLowerCase() !== 'guest') merged.add(selfName);
+    for (const name of activeRoomNames) {
+      const normalized = normalizeRoomName(name);
+      if (normalized && normalized.toLowerCase() !== 'guest') merged.add(normalized);
+    }
+    return [...merged].slice(0, 12);
+  }, [activeRoomNames, roomName]);
+
   const messageById = useMemo(() => {
     const map = new Map<string, RoomMessage>();
     for (const m of messages) map.set(m.id, m);
@@ -1370,6 +1393,11 @@ export default function Room() {
               )}
             </div>
           </div>
+          {onlineNames.length > 0 && (
+            <div className="text-[11px] text-zinc-500 truncate">
+              Online now: {onlineNames.join(' • ')}
+            </div>
+          )}
           <div
             role="button"
             tabIndex={0}

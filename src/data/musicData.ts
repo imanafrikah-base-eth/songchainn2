@@ -54,7 +54,7 @@ export interface Song {
   artistWallet?: string;
   isTokenGated?: boolean;
   addedAt?: string;
-  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | 'Lovers EP';
+  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP';
 }
 
 export interface Catalog {
@@ -2894,6 +2894,118 @@ export const SONGS: Song[] = [
     addedAt: '2026-03-01T00:00:00.000Z',
     volume: 'Lovers EP',
   },
+  {
+    id: '197',
+    title: 'BEEN BAD',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20BEEN%20BAD%20(Riddim).mp3",
+    coverImage:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/ER'TING%20FLEX%20ARTWORK.png",
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Dancehall',
+    addedAt: '2026-03-21T00:00:00.000Z',
+    volume: "ER'TING FLEX",
+  },
+  {
+    id: '198',
+    title: "CAN'T LET YOU GO",
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20CAN'T%20LET%20YOU%20GO.mp3",
+    coverImage:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/ER'TING%20FLEX%20ARTWORK.png",
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Dancehall',
+    addedAt: '2026-03-21T00:00:00.000Z',
+    volume: "ER'TING FLEX",
+  },
+  {
+    id: '199',
+    title: 'ROYALTY',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20ROYALTY.mp3",
+    coverImage:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/ER'TING%20FLEX%20ARTWORK.png",
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Dancehall',
+    addedAt: '2026-03-21T00:00:00.000Z',
+    volume: "ER'TING FLEX",
+  },
+  {
+    id: '200',
+    title: 'STYLE UP',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20STYLE%20UP.mp3",
+    coverImage:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/ER'TING%20FLEX%20ARTWORK.png",
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Dancehall',
+    addedAt: '2026-03-21T00:00:00.000Z',
+    volume: "ER'TING FLEX",
+  },
+  {
+    id: '201',
+    title: 'WHEN SHE TOUCH ROAD',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20WHEN%20SHE%20TOUCH%20ROAD.mp3",
+    coverImage:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/ER'TING%20FLEX%20ARTWORK.png",
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Dancehall',
+    addedAt: '2026-03-21T00:00:00.000Z',
+    volume: "ER'TING FLEX",
+  },
+  {
+    id: '202',
+    title: 'HAVE YOU SEEN HER',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20HAVE%20YOU%20SEEN%20HER.mp3",
+    coverImage:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/ER'TING%20FLEX%20ARTWORK.png",
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Dancehall',
+    addedAt: '2026-03-21T00:00:00.000Z',
+    volume: "ER'TING FLEX",
+  },
+  {
+    id: '203',
+    title: 'WILD (FT RVSSIAN)',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20Wild%20ft%20RVSSIAN.mp3",
+    coverImage:
+      "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/ER'TING%20FLEX%20ARTWORK.png",
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Dancehall',
+    addedAt: '2026-03-21T00:00:00.000Z',
+    volume: "ER'TING FLEX",
+  },
 ];
 
 export const CATALOGS: Catalog[] = buildCatalogs(SONGS);
@@ -2924,7 +3036,7 @@ export const ARTISTS: Artist[] = [
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
     profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/file_0000000077c8722f8f65c9d1abd8bca1-2.png',
-    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182', '190', '191', '192', '193', '194', '195', '196'],
+    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182', '190', '191', '192', '193', '194', '195', '196', '197', '198', '199', '200', '201', '202', '203'],
   },
   {
     id: '4',

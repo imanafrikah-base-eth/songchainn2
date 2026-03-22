@@ -92,31 +92,21 @@ export default function Home() {
     () => [...catalogs].sort((a, b) => b.totalPlays - a.totalPlays).slice(0, 6),
     [catalogs],
   );
-  const newCatalogs = useMemo(
-    () =>
-      [...catalogs]
-        .filter(isCatalogNew)
-        .sort((a, b) => {
-          const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
-          const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
-          return timeB - timeA;
-        }),
-    [catalogs],
-  );
   const allCatalogs = useMemo(
     () => [...catalogs].sort((a, b) => b.totalPlays - a.totalPlays),
     [catalogs],
   );
-  const newReleases = useMemo(() => {
-    if (newCatalogs.length > 0) return newCatalogs;
-    return [...catalogs]
-      .sort((a, b) => {
-        const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
-        const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
-        return timeB - timeA;
-      })
-      .slice(0, 8);
-  }, [catalogs, newCatalogs]);
+  const newReleases = useMemo(
+    () =>
+      [...catalogs]
+        .sort((a, b) => {
+          const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+          const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+          return timeB - timeA;
+        })
+        .slice(0, 5),
+    [catalogs],
+  );
   const totalTracks = useMemo(
     () => catalogs.reduce((sum, catalog) => sum + (catalog.trackCount || 0), 0),
     [catalogs],

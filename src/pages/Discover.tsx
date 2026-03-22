@@ -92,28 +92,17 @@ export default function Discover() {
       .map(([genre]) => genre as Genre);
   }, [likedSongIds]);
 
-  const newCatalogs = useMemo(
+  const newReleases = useMemo(
     () =>
       [...catalogs]
-        .filter(isCatalogNew)
         .sort((a, b) => {
           const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
           const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
           return timeB - timeA;
-        }),
+        })
+        .slice(0, 5),
     [catalogs],
   );
-
-  const newReleases = useMemo(() => {
-    if (newCatalogs.length > 0) return newCatalogs;
-    return [...catalogs]
-      .sort((a, b) => {
-        const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
-        const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
-        return timeB - timeA;
-      })
-      .slice(0, 8);
-  }, [catalogs, newCatalogs]);
 
   const catalogBySongId = useMemo(() => {
     const map = new Map<string, Catalog>();
