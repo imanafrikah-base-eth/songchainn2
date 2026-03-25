@@ -27,6 +27,7 @@ type AuthView = 'landing' | 'main' | 'email' | 'phone' | 'verify-otp' | 'connect
 const DEFAULT_COUNTRY = COUNTRY_CODES.find(c => c.code === 'ZM') || COUNTRY_CODES[0];
 const DAILY_MIX_ID = 'songchainn-daily-mix-preview';
 const DAILY_MIX_URL = 'https://pub-6e7e2bb48a994314926f27fb90fa198f.r2.dev/SongChainn%20Playlist%201.mp3';
+const GUEST_LOCKED_SONGS_KEY = 'songchainn_guest_locked_songs';
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ export default function Auth() {
   const [hasAutoStartedMix, setHasAutoStartedMix] = useState(false);
   const [showMixFinishedPrompt, setShowMixFinishedPrompt] = useState(false);
   const [mixFinishedHandled, setMixFinishedHandled] = useState(false);
+  const [guestLockedSongIds, setGuestLockedSongIds] = useState<Set<string>>(new Set());
 
   // Track if user signed in via email/phone but needs wallet
   const [pendingWalletConnection, setPendingWalletConnection] = useState(false);
@@ -98,37 +100,10 @@ export default function Auth() {
   const previewArtists = useMemo(() => rankedArtists.slice(0, 8), [rankedArtists]);
 
   const previewSongs = useMemo(() => {
-    const now = new Date();
-    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const hashText = (value: string) => {
-      let hash = 0;
-      for (let i = 0; i < value.length; i += 1) {
-        hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
-      }
-      return hash;
-    };
-
-    const artistsOrder = [...new Set(SONGS.map((song) => song.artistId))].sort((a, b) => {
-      const scoreA = hashText(`${dateKey}:artist:${a}`);
-      const scoreB = hashText(`${dateKey}:artist:${b}`);
-      return scoreA - scoreB;
-    });
-
-    const picks: Song[] = [];
-    artistsOrder.forEach((artistId) => {
-      const artistSongs = SONGS.filter((song) => song.artistId === artistId);
-      if (!artistSongs.length) return;
-      const selected = artistSongs.reduce((best, song) => {
-        if (!best) return song;
-        const bestScore = hashText(`${dateKey}:song:${artistId}:${best.id}`);
-        const songScore = hashText(`${dateKey}:song:${artistId}:${song.id}`);
-        return songScore > bestScore ? song : best;
-      }, null as Song | null);
-      if (selected) picks.push(selected);
-    });
-
-    return picks.slice(0, 6);
-  }, []);
+    return [...SONGS].sort(
+      (a, b) => (popularityBySongId.get(b.id) || b.plays || 0) - (popularityBySongId.get(a.id) || a.plays || 0)
+    );
+  }, [popularityBySongId]);
 
   // Detect any wallet provider (MetaMask, Coinbase, Rainbow, etc.)
   const hasWallet = typeof window !== 'undefined' && (() => {
@@ -171,6 +146,20 @@ export default function Auth() {
   useEffect(() => {
     if (user) navigate('/', { replace: true });
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(GUEST_LOCKED_SONGS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const normalized = parsed.filter((id): id is string => typeof id === 'string' && id.length > 0);
+      setGuestLockedSongIds(new Set(normalized));
+    } catch {
+      setGuestLockedSongIds(new Set());
+    }
+  }, []);
 
   const handleWalletConnect = async () => {
     setError(null);
@@ -355,11 +344,31 @@ export default function Auth() {
   }, [dailyMixSong, playSong]);
 
   const handleSongPlayAttempt = useCallback((song: Song) => {
+    if (user) {
+      playSong(song, { force: true });
+      return;
+    }
+    if (guestLockedSongIds.has(song.id)) {
+      toast.error('This song is locked. Sign in or sign up to play it again.');
+      setAuthView('main');
+      setAuthMode('signin');
+      return;
+    }
     playSong(song, { force: true });
-    toast.error('Sign in or create an account to play full songs.');
-    setAuthView('main');
-    setAuthMode('signin');
-  }, [playSong]);
+    setGuestLockedSongIds((prev) => {
+      const next = new Set(prev);
+      next.add(song.id);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(GUEST_LOCKED_SONGS_KEY, JSON.stringify(Array.from(next)));
+        } catch {
+          void 0;
+        }
+      }
+      return next;
+    });
+    toast.success('Playing now. Guests get one play per song.');
+  }, [guestLockedSongIds, playSong, user]);
 
   const handleBrowseWithoutAuthModal = useCallback(() => {
     setShowMixFinishedPrompt(false);
@@ -441,7 +450,12 @@ export default function Auth() {
                   key={`sidebar-hot-${song.id}`}
                   type="button"
                   onClick={() => handleSongPlayAttempt(song)}
-                  className="w-full rounded-xl bg-secondary/35 hover:bg-secondary/50 transition-colors p-2 text-left"
+                  className={cn(
+                    "w-full rounded-xl transition-colors p-2 text-left",
+                    !user && guestLockedSongIds.has(song.id)
+                      ? "bg-secondary/20 border border-primary/30"
+                      : "bg-secondary/35 hover:bg-secondary/50"
+                  )}
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-md overflow-hidden bg-background/60 flex items-center justify-center shrink-0">
@@ -456,7 +470,12 @@ export default function Auth() {
                       <p className="text-[11px] text-muted-foreground truncate">{song.artist}</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-primary mt-1">{playsToday.toLocaleString()} plays today</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="text-[10px] text-primary">{playsToday.toLocaleString()} plays today</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {!user && guestLockedSongIds.has(song.id) ? 'Locked' : 'Play once'}
+                    </p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -474,7 +493,12 @@ export default function Auth() {
                     key={`mobile-hot-${song.id}`}
                     type="button"
                     onClick={() => handleSongPlayAttempt(song)}
-                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-colors p-2.5"
+                    className={cn(
+                      "text-left rounded-xl transition-colors p-2.5",
+                      !user && guestLockedSongIds.has(song.id)
+                        ? "bg-secondary/20 border border-primary/30"
+                        : "bg-secondary/30 hover:bg-secondary/45"
+                    )}
                   >
                     <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                       {song.coverImage ? (
@@ -485,7 +509,12 @@ export default function Auth() {
                     </div>
                     <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                    <p className="text-[11px] text-primary mt-1">{playsToday.toLocaleString()} plays today</p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-primary">{playsToday.toLocaleString()} plays today</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {!user && guestLockedSongIds.has(song.id) ? 'Locked' : 'Play once'}
+                      </p>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -562,9 +591,9 @@ export default function Auth() {
 
             <section>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-heading text-foreground">Songs You Can Preview</h2>
+                <h2 className="text-xl font-heading text-foreground">All Songs</h2>
                 <div className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium bg-primary/10 text-primary">
-                  Picked fresh today
+                  One free play per song
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -573,7 +602,12 @@ export default function Auth() {
                     key={song.id}
                     type="button"
                     onClick={() => handleSongPlayAttempt(song)}
-                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-colors p-2.5"
+                    className={cn(
+                      "text-left rounded-xl transition-colors p-2.5",
+                      !user && guestLockedSongIds.has(song.id)
+                        ? "bg-secondary/20 border border-primary/30"
+                        : "bg-secondary/30 hover:bg-secondary/45"
+                    )}
                   >
                     <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                       {song.coverImage ? (
@@ -586,7 +620,9 @@ export default function Auth() {
                     <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
                     <div className="flex items-center justify-between mt-1 gap-2">
                       <p className="text-[11px] text-muted-foreground truncate">{song.townSquare}</p>
-                      <p className="text-[11px] text-primary font-medium whitespace-nowrap">Tap to play</p>
+                      <p className="text-[11px] text-primary font-medium whitespace-nowrap">
+                        {!user && guestLockedSongIds.has(song.id) ? 'Locked' : 'Tap to play'}
+                      </p>
                     </div>
                   </button>
                 ))}
@@ -600,7 +636,7 @@ export default function Auth() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="w-full max-w-[22.5rem] sm:max-w-sm border border-primary/25 bg-background/95 shadow-2xl rounded-2xl p-4 sm:p-5 shine-overlay max-h-[88vh] overflow-auto"
+              className="w-[90vw] max-w-[18.5rem] sm:w-full sm:max-w-sm border border-primary/25 bg-background/95 shadow-2xl rounded-2xl p-3 sm:p-5 shine-overlay max-h-[80vh] sm:max-h-[88vh] overflow-auto"
             >
               <AnimatePresence mode="wait">
             {connectionState === 'success' && !pendingWalletConnection ? (
@@ -702,6 +738,16 @@ export default function Auth() {
               </motion.div>
             ) : authView === 'main' ? (
               <motion.div key="main" initial={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <button
+                  onClick={() => {
+                    setAuthView('landing');
+                    setError(null);
+                  }}
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-3 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="text-sm">Back</span>
+                </button>
                 <div className="mb-6 text-center">
                   <h2 className="font-heading text-2xl font-semibold text-foreground">Log in to $ongChainn</h2>
                   <p className="text-sm text-muted-foreground mt-1">
