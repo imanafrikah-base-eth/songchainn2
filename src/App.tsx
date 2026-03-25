@@ -180,13 +180,17 @@ function AppContent() {
     <BrowserRouter>
       <NotificationBanner />
       {!isAuthenticated ? (
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/install" element={<Install />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="*" element={<Auth />} />
-          </Routes>
-        </Suspense>
+        <PlayerProvider>
+          <EngagementProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/install" element={<Install />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="*" element={<Auth />} />
+              </Routes>
+            </Suspense>
+          </EngagementProvider>
+        </PlayerProvider>
       ) : needsOnboarding ? (
         <Suspense fallback={<PageLoader />}>
           <Onboarding />
