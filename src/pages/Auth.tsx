@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ExternalLink, Loader2, Shield, Music, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, QrCode } from 'lucide-react';
+import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, QrCode, Play, Disc3, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -14,25 +14,31 @@ import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
 import { BaseWalletButton } from '@/components/wallet/BaseWalletButton';
 import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { CATALOGS, SONGS, type Song } from '@/data/musicData';
+import { usePlayerActions, usePlayerState, usePlayerTime } from '@/context/PlayerContext';
+import { AudioPlayer } from '@/components/AudioPlayer';
+import { useRankedArtists, useSongPopularity, useTodayHotSongs } from '@/hooks/usePopularity';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
-type AuthView = 'main' | 'email' | 'phone' | 'verify-otp' | 'connect-wallet';
+type AuthView = 'landing' | 'main' | 'email' | 'phone' | 'verify-otp' | 'connect-wallet';
 
 // Default to Zambia
 const DEFAULT_COUNTRY = COUNTRY_CODES.find(c => c.code === 'ZM') || COUNTRY_CODES[0];
+const DAILY_MIX_ID = 'songchainn-daily-mix-preview';
+const DAILY_MIX_URL = 'https://pub-6e7e2bb48a994314926f27fb90fa198f.r2.dev/SongChainn%20Playlist%201.mp3';
 
 export default function Auth() {
   const navigate = useNavigate();
   const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail } = useAuth();
-  const { openConnectModal, isConnected, address: web3Address } = useWeb3Wallet();
+  const { openConnectModal, isConnected } = useWeb3Wallet();
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
   const [showOtherOptions, setShowOtherOptions] = useState(false);
   
   // Auth state
-  const [authView, setAuthView] = useState<AuthView>('main');
+  const [authView, setAuthView] = useState<AuthView>('landing');
   const [authMode, setAuthMode] = useState<AuthMode>('signup');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -42,9 +48,87 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [resendTimer, setResendTimer] = useState(0);
+  const [hasAutoStartedMix, setHasAutoStartedMix] = useState(false);
+  const [showMixFinishedPrompt, setShowMixFinishedPrompt] = useState(false);
+  const [mixFinishedHandled, setMixFinishedHandled] = useState(false);
 
   // Track if user signed in via email/phone but needs wallet
   const [pendingWalletConnection, setPendingWalletConnection] = useState(false);
+  const { playSong, pause } = usePlayerActions();
+  const { currentSong, isPlaying } = usePlayerState();
+  const { currentTime, duration } = usePlayerTime();
+  const { rankedArtists } = useRankedArtists();
+  const { data: popularityData = [] } = useSongPopularity();
+  const { data: hotTodaySongs = [] } = useTodayHotSongs(8);
+
+  const dailyMixSong = useMemo<Song>(() => ({
+    id: DAILY_MIX_ID,
+    title: 'SongChainn Daily Mix',
+    artist: 'SongChainn',
+    artistId: 'songchainn',
+    audioUrl: DAILY_MIX_URL,
+    coverImage: logo,
+    duration: 0,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+  }), []);
+
+  const popularityBySongId = useMemo(() => {
+    const map = new Map<string, number>();
+    popularityData.forEach((row) => {
+      if (!row.song_id) return;
+      map.set(row.song_id, Number(row.play_count || 0));
+    });
+    return map;
+  }, [popularityData]);
+
+  const previewCatalogs = useMemo(() => {
+    return [...CATALOGS]
+      .map((catalog) => {
+        const livePlays = catalog.songIds.reduce((sum, songId) => sum + (popularityBySongId.get(songId) || 0), 0);
+        const mergedPlays = Math.max(catalog.totalPlays, livePlays);
+        return { ...catalog, totalPlays: mergedPlays };
+      })
+      .sort((a, b) => b.totalPlays - a.totalPlays)
+      .slice(0, 6);
+  }, [popularityBySongId]);
+
+  const previewArtists = useMemo(() => rankedArtists.slice(0, 8), [rankedArtists]);
+
+  const previewSongs = useMemo(() => {
+    const now = new Date();
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const hashText = (value: string) => {
+      let hash = 0;
+      for (let i = 0; i < value.length; i += 1) {
+        hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+      }
+      return hash;
+    };
+
+    const artistsOrder = [...new Set(SONGS.map((song) => song.artistId))].sort((a, b) => {
+      const scoreA = hashText(`${dateKey}:artist:${a}`);
+      const scoreB = hashText(`${dateKey}:artist:${b}`);
+      return scoreA - scoreB;
+    });
+
+    const picks: Song[] = [];
+    artistsOrder.forEach((artistId) => {
+      const artistSongs = SONGS.filter((song) => song.artistId === artistId);
+      if (!artistSongs.length) return;
+      const selected = artistSongs.reduce((best, song) => {
+        if (!best) return song;
+        const bestScore = hashText(`${dateKey}:song:${artistId}:${best.id}`);
+        const songScore = hashText(`${dateKey}:song:${artistId}:${song.id}`);
+        return songScore > bestScore ? song : best;
+      }, null as Song | null);
+      if (selected) picks.push(selected);
+    });
+
+    return picks.slice(0, 6);
+  }, []);
 
   // Detect any wallet provider (MetaMask, Coinbase, Rainbow, etc.)
   const hasWallet = typeof window !== 'undefined' && (() => {
@@ -261,81 +345,264 @@ export default function Auth() {
 
   const passwordStrength = getPasswordStrength();
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      <AnimatedBackground variant="subtle" />
+  const handleStartDailyMix = useCallback((source: 'auto' | 'manual' = 'manual') => {
+    setMixFinishedHandled(false);
+    setShowMixFinishedPrompt(false);
+    playSong(dailyMixSong, { force: true });
+    if (source === 'manual') {
+      toast.success('Now playing SongChainn Daily Mix');
+    }
+  }, [dailyMixSong, playSong]);
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-5xl relative z-10 grid lg:grid-cols-2 gap-6 items-stretch"
-      >
-        <div className="hidden lg:flex flex-col justify-between rounded-3xl border border-border/40 bg-gradient-to-br from-primary/20 via-background/80 to-background p-8 shine-overlay">
-          <div>
-            <motion.img
-              src={logo}
-              alt="$ongChainn"
-              className="h-16 mb-8"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 200 }}
-            />
-            <h1 className="font-heading text-5xl leading-tight font-bold text-foreground mb-4">
-              Explore the music you love.
-            </h1>
-            <p className="text-base text-muted-foreground max-w-md">
-              Sign in to continue discovering music with your community, or create a new account in seconds.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="py-4 px-3 rounded-2xl glass-card text-center">
-              <Music className="w-6 h-6 mx-auto text-primary mb-2" />
-              <p className="text-sm font-medium text-foreground">Stream Music</p>
-              <p className="text-xs text-muted-foreground">Curated tracks</p>
+  const handleSongPlayAttempt = useCallback((song: Song) => {
+    playSong(song, { force: true });
+    toast.error('Sign in or create an account to play full songs.');
+    setAuthView('main');
+    setAuthMode('signin');
+  }, [playSong]);
+
+  const handleBrowseWithoutAuthModal = useCallback(() => {
+    setShowMixFinishedPrompt(false);
+  }, []);
+
+  useEffect(() => {
+    if (hasAutoStartedMix) return;
+    handleStartDailyMix('auto');
+    setHasAutoStartedMix(true);
+  }, [handleStartDailyMix, hasAutoStartedMix]);
+
+  useEffect(() => {
+    const isDailyMixActive = currentSong?.id === DAILY_MIX_ID;
+    if (!isDailyMixActive || mixFinishedHandled) return;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    if (currentTime < Math.max(1, duration - 0.35)) return;
+    pause();
+    setMixFinishedHandled(true);
+    setShowMixFinishedPrompt(true);
+    setAuthView('main');
+    setError(null);
+  }, [currentSong?.id, currentTime, duration, mixFinishedHandled, pause]);
+
+  return (
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      <AnimatedBackground variant="subtle" />
+      <div className="relative z-10 min-h-screen pb-24">
+        <div className="h-16 border-b border-border/40 bg-background/85 backdrop-blur sticky top-0 z-20 px-3 md:px-5">
+          <div className="h-full max-w-[1400px] mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <img src={logo} alt="$ongChainn" className="w-8 h-8 rounded-md object-contain" />
+              <button
+                type="button"
+                onClick={handleBrowseWithoutAuthModal}
+                className="hidden md:flex items-center rounded-full border border-primary/25 bg-primary/10 hover:bg-primary/15 px-4 h-10 text-xs font-medium tracking-wide text-primary/90 min-w-[320px] text-left transition-colors"
+              >
+                Powered by Create on Base
+              </button>
             </div>
-            <div className="py-4 px-3 rounded-2xl glass-card text-center">
-              <Users className="w-6 h-6 mx-auto text-primary mb-2" />
-              <p className="text-sm font-medium text-foreground">Join Community</p>
-              <p className="text-xs text-muted-foreground">Town Squares</p>
+            <div className="hidden lg:flex items-center gap-6 text-sm text-muted-foreground">
+              <button type="button" onClick={handleBrowseWithoutAuthModal} className="hover:text-foreground transition-colors">Premuim Music</button>
+              <button type="button" onClick={() => navigate('/install')} className="hover:text-foreground transition-colors">Install App</button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="rounded-full text-muted-foreground hover:text-foreground px-4"
+                onClick={() => {
+                  setAuthMode('signup');
+                  setAuthView('email');
+                }}
+              >
+                Sign up
+              </Button>
+              <Button
+                type="button"
+                className="rounded-full bg-foreground text-background hover:bg-foreground/90 px-5"
+                onClick={() => {
+                  setAuthMode('signin');
+                  setAuthView('email');
+                }}
+              >
+                Log in
+              </Button>
             </div>
           </div>
         </div>
 
-        <div className="w-full max-w-md lg:max-w-none mx-auto">
-          <div className="text-center mb-6 lg:hidden">
-            <motion.img
-              src={logo}
-              alt="$ongChainn"
-              className="h-16 mx-auto mb-4"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 200 }}
-            />
-            <motion.h1
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="font-heading text-2xl font-bold text-foreground mb-1"
-            >
-              Welcome to $ongChainn
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-sm text-muted-foreground"
-            >
-              The Audience experience awaits
-            </motion.p>
-          </div>
+        <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[250px_1fr] gap-3 p-3 md:p-4">
+          <aside className="hidden lg:block rounded-xl border border-border/40 bg-background/80 backdrop-blur p-3">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-foreground">Hot Today</h3>
+              <Flame className="w-4 h-4 text-primary" />
+            </div>
+            <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
+              {hotTodaySongs.slice(0, 8).map(({ song, playsToday }) => (
+                <button
+                  key={`sidebar-hot-${song.id}`}
+                  type="button"
+                  onClick={() => handleSongPlayAttempt(song)}
+                  className="w-full rounded-xl bg-secondary/35 hover:bg-secondary/50 transition-colors p-2 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-md overflow-hidden bg-background/60 flex items-center justify-center shrink-0">
+                      {song.coverImage ? (
+                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={logo} alt={song.title} className="w-6 h-6 object-contain opacity-80" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-foreground truncate">{song.title}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{song.artist}</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-primary mt-1">{playsToday.toLocaleString()} plays today</p>
+                </button>
+              ))}
+            </div>
+          </aside>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.15 }}
-            className="glass-card rounded-3xl p-6 shine-overlay"
-          >
-          <AnimatePresence mode="wait">
+          <main className="rounded-xl border border-border/40 bg-background/80 backdrop-blur p-4 md:p-5">
+            <section className="mb-7 lg:hidden">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-heading text-foreground">Hot Today</h2>
+                <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {hotTodaySongs.slice(0, 6).map(({ song, playsToday }) => (
+                  <button
+                    key={`mobile-hot-${song.id}`}
+                    type="button"
+                    onClick={() => handleSongPlayAttempt(song)}
+                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-colors p-2.5"
+                  >
+                    <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                      {song.coverImage ? (
+                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                    <p className="text-[11px] text-primary mt-1">{playsToday.toLocaleString()} plays today</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <div className="rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-primary/20 p-4 md:p-5 mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-primary font-semibold flex items-center gap-1.5 mb-1">
+                    <Disc3 className="w-3.5 h-3.5" />
+                    Daily mix now playing
+                  </p>
+                  <h1 className="font-heading text-2xl md:text-3xl text-foreground mb-1">Have a taste</h1>
+                  <p className="text-sm text-muted-foreground">
+                    Use accents and playlists. Find this and more mixes on SongChainn.
+                  </p>
+                </div>
+                <Button type="button" onClick={() => handleStartDailyMix('manual')} className="gradient-primary text-primary-foreground rounded-full px-5">
+                  <Play className="w-4 h-4 mr-2" />
+                  {currentSong?.id === DAILY_MIX_ID && isPlaying ? 'Playing' : 'Play mix'}
+                </Button>
+              </div>
+            </div>
+
+            <section className="mb-7">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-heading text-foreground">Today’s Featured Catalogs</h2>
+                <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {previewCatalogs.map((catalog) => (
+                  <button
+                    key={catalog.id}
+                    type="button"
+                    onClick={handleBrowseWithoutAuthModal}
+                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-colors p-2.5"
+                  >
+                    <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                      {catalog.coverImage ? (
+                        <img src={catalog.coverImage} alt={catalog.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={logo} alt={catalog.title} className="w-16 h-16 object-contain opacity-80" />
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-foreground truncate">{catalog.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{catalog.artist}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">{catalog.trackCount} tracks • {catalog.totalPlays.toLocaleString()} plays</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="mb-7">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-heading text-foreground">Trending Artists</h2>
+                <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
+              </div>
+              <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
+                {previewArtists.map((artist) => (
+                  <button key={artist.id} type="button" onClick={handleBrowseWithoutAuthModal} className="text-center">
+                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-secondary/40 border border-border/40 mx-auto mb-2 flex items-center justify-center">
+                      {artist.profileImage ? (
+                        <img src={artist.profileImage} alt={artist.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Users className="w-7 h-7 text-muted-foreground" />
+                      )}
+                    </div>
+                    <p className="text-xs text-foreground truncate">{artist.name}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{artist.location}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-heading text-foreground">Songs You Can Preview</h2>
+                <div className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium bg-primary/10 text-primary">
+                  Picked fresh today
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {previewSongs.map((song) => (
+                  <button
+                    key={song.id}
+                    type="button"
+                    onClick={() => handleSongPlayAttempt(song)}
+                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-colors p-2.5"
+                  >
+                    <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                      {song.coverImage ? (
+                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
+                      )}
+                    </div>
+                    <p className="text-sm text-foreground truncate">{song.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                    <div className="flex items-center justify-between mt-1 gap-2">
+                      <p className="text-[11px] text-muted-foreground truncate">{song.townSquare}</p>
+                      <p className="text-[11px] text-primary font-medium whitespace-nowrap">Tap to play</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </main>
+        </div>
+
+        {(authView !== 'landing' || connectionState === 'success') && (
+          <div className="fixed inset-0 z-[65] bg-background/70 backdrop-blur-sm p-3 sm:p-4 flex items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-[22.5rem] sm:max-w-sm border border-primary/25 bg-background/95 shadow-2xl rounded-2xl p-4 sm:p-5 shine-overlay max-h-[88vh] overflow-auto"
+            >
+              <AnimatePresence mode="wait">
             {connectionState === 'success' && !pendingWalletConnection ? (
               <motion.div
                 key="success"
@@ -372,7 +639,7 @@ export default function Auth() {
                     Connect Your Wallet
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Any wallet that supports Base network works — MetaMask, Coinbase Wallet, Rainbow, and more.
+                    Connect with Base App and Base-supported wallets like Coinbase Wallet, MetaMask, Rainbow, and more.
                   </p>
                 </div>
 
@@ -478,7 +745,7 @@ export default function Auth() {
                     Base Wallet (optional)
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Connect a wallet to unlock on-chain features — MetaMask, Coinbase Wallet, Rainbow, etc.
+                    Connect Base App or any Base-supported wallet for on-chain features.
                   </p>
                 </div>
 
@@ -817,18 +1084,66 @@ export default function Auth() {
               </motion.div>
             ) : null}
           </AnimatePresence>
-          </motion.div>
+            </motion.div>
+          </div>
+        )}
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="text-center text-xs text-muted-foreground mt-6"
-          >
-            Audience Edition • Building culture before ownership
-          </motion.p>
+        <div className="fixed bottom-0 left-0 right-0 z-20 bg-[#8A65FF] text-white px-4 py-3">
+          <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Preview SongChainn</p>
+              <p className="text-xs opacity-90">Sign up to unlock unlimited song playback and full artist experience.</p>
+            </div>
+            <Button
+              type="button"
+              className="rounded-full bg-white text-black hover:bg-white/90 px-5"
+              onClick={() => {
+                setAuthMode('signup');
+                setAuthView('email');
+              }}
+            >
+              Sign up free
+            </Button>
+          </div>
         </div>
-      </motion.div>
+      </div>
+      {showMixFinishedPrompt && (
+        <div className="fixed inset-0 z-[70] bg-background/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5">
+            <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-2">Daily Mix Finished</p>
+            <h3 className="font-heading text-xl text-foreground mb-2">Want more music?</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              Sign in or sign up to keep playing catalogs, discover artists, and unlock the full SongChainn experience.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  setAuthMode('signin');
+                  setAuthView('email');
+                  setShowMixFinishedPrompt(false);
+                }}
+                className="gradient-primary text-primary-foreground"
+              >
+                Sign In
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setAuthMode('signup');
+                  setAuthView('email');
+                  setShowMixFinishedPrompt(false);
+                }}
+                className="border-primary/40 text-primary"
+              >
+                Sign Up
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <AudioPlayer />
     </div>
   );
 }
