@@ -372,6 +372,8 @@ export default function Auth() {
 
   const handleBrowseWithoutAuthModal = useCallback(() => {
     setShowMixFinishedPrompt(false);
+    setAuthMode('signin');
+    setAuthView('main');
   }, []);
 
   useEffect(() => {
@@ -596,36 +598,38 @@ export default function Auth() {
                   One free play per song
                 </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                {previewSongs.map((song) => (
-                  <button
-                    key={song.id}
-                    type="button"
-                    onClick={() => handleSongPlayAttempt(song)}
-                    className={cn(
-                      "text-left rounded-xl transition-colors p-2.5",
-                      !user && guestLockedSongIds.has(song.id)
-                        ? "bg-secondary/20 border border-primary/30"
-                        : "bg-secondary/30 hover:bg-secondary/45"
-                    )}
-                  >
-                    <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
-                      {song.coverImage ? (
-                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
+              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                  {previewSongs.map((song) => (
+                    <button
+                      key={song.id}
+                      type="button"
+                      onClick={() => handleSongPlayAttempt(song)}
+                      className={cn(
+                        "text-left rounded-xl transition-colors p-2.5",
+                        !user && guestLockedSongIds.has(song.id)
+                          ? "bg-secondary/20 border border-primary/30"
+                          : "bg-secondary/30 hover:bg-secondary/45"
                       )}
-                    </div>
-                    <p className="text-sm text-foreground truncate">{song.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                    <div className="flex items-center justify-between mt-1 gap-2">
-                      <p className="text-[11px] text-muted-foreground truncate">{song.townSquare}</p>
-                      <p className="text-[11px] text-primary font-medium whitespace-nowrap">
-                        {!user && guestLockedSongIds.has(song.id) ? 'Locked' : 'Tap to play'}
-                      </p>
-                    </div>
-                  </button>
-                ))}
+                    >
+                      <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                        {song.coverImage ? (
+                          <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
+                        )}
+                      </div>
+                      <p className="text-sm text-foreground truncate">{song.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                      <div className="flex items-center justify-between mt-1 gap-2">
+                        <p className="text-[11px] text-muted-foreground truncate">{song.townSquare}</p>
+                        <p className="text-[11px] text-primary font-medium whitespace-nowrap">
+                          {!user && guestLockedSongIds.has(song.id) ? 'Locked' : 'Tap to play'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
           </main>
