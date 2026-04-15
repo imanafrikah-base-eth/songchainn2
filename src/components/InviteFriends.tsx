@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Gift, Copy, Share2, Check, X, Star, Sparkles } from 'lucide-react';
 import { useReferrals } from '@/hooks/useReferrals';
@@ -20,6 +20,33 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
     getInviteLink 
   } = useReferrals();
   const [copied, setCopied] = useState(false);
+  const autoCloseTimerRef = useRef<number | null>(null);
+
+  const resetAutoCloseTimer = useCallback(() => {
+    if (autoCloseTimerRef.current) {
+      window.clearTimeout(autoCloseTimerRef.current);
+    }
+    autoCloseTimerRef.current = window.setTimeout(() => {
+      onClose();
+    }, 10000);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (autoCloseTimerRef.current) {
+        window.clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = null;
+      }
+      return;
+    }
+    resetAutoCloseTimer();
+    return () => {
+      if (autoCloseTimerRef.current) {
+        window.clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = null;
+      }
+    };
+  }, [isOpen, resetAutoCloseTimer]);
 
   const handleCopy = async () => {
     const success = await copyInviteLink();
@@ -48,8 +75,12 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto z-50"
+            onMouseMove={resetAutoCloseTimer}
+            onClick={resetAutoCloseTimer}
+            onKeyDown={resetAutoCloseTimer}
+            onTouchStart={resetAutoCloseTimer}
           >
-            <div className="glass-card rounded-3xl p-6 shadow-glow">
+            <div className="rounded-3xl p-6 shadow-glow border border-border/70 bg-background/98 backdrop-blur-xl">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -71,7 +102,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="glass rounded-2xl p-4 text-center">
+                <div className="rounded-2xl p-4 text-center border border-border/60 bg-card/95">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Star className="w-4 h-4 text-primary" />
                     <span className="font-heading text-2xl font-bold text-foreground">
@@ -80,7 +111,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
                   </div>
                   <p className="text-xs text-muted-foreground">Total Points</p>
                 </div>
-                <div className="glass rounded-2xl p-4 text-center">
+                <div className="rounded-2xl p-4 text-center border border-border/60 bg-card/95">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Users className="w-4 h-4 text-primary" />
                     <span className="font-heading text-2xl font-bold text-foreground">
@@ -92,7 +123,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
               </div>
 
               {/* Rewards Info */}
-              <div className="glass rounded-2xl p-4 mb-6">
+              <div className="rounded-2xl p-4 mb-6 border border-border/60 bg-card/95">
                 <div className="flex items-start gap-3">
                   <Sparkles className="w-5 h-5 text-primary mt-0.5" />
                   <div>
@@ -110,7 +141,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
               {/* Referral Code */}
               <div className="mb-6">
                 <p className="text-sm text-muted-foreground mb-2">Your invite code</p>
-                <div className="glass rounded-xl p-4 flex items-center justify-between">
+                <div className="rounded-xl p-4 flex items-center justify-between border border-border/60 bg-card/95">
                   <code className="font-mono text-lg font-bold text-primary">
                     {referralCode || 'Loading...'}
                   </code>
@@ -129,7 +160,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
               {/* Invite Link */}
               <div className="mb-6">
                 <p className="text-sm text-muted-foreground mb-2">Or share this link</p>
-                <div className="glass rounded-xl p-3 overflow-hidden">
+                <div className="rounded-xl p-3 overflow-hidden border border-border/60 bg-card/95">
                   <p className="text-xs text-muted-foreground truncate">
                     {getInviteLink() || 'Generating link...'}
                   </p>

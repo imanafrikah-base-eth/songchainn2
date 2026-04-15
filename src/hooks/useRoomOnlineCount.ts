@@ -36,6 +36,23 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
     let isActive = true;
 
     const fetchCount = async () => {
+      const liveUsersCountRes = await (supabase as any)
+        .from('room_live_users')
+        .select('user_id')
+        .eq('room_id', roomId);
+
+      if (!isActive) return;
+      if (!liveUsersCountRes?.error && Array.isArray(liveUsersCountRes?.data)) {
+        const uniqueUsers = new Set(
+          (liveUsersCountRes.data as Array<{ user_id?: string | null }>)
+            .map((row) => (typeof row?.user_id === 'string' ? row.user_id : ''))
+            .filter((value) => value.length > 0)
+        );
+        const liveUsersCount = uniqueUsers.size;
+        setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
+        return;
+      }
+
       const { data, error } = await (supabase as any)
         .from('room_live_counts')
         .select('*')
@@ -79,6 +96,13 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
 
     const channel = supabase
       .channel(`room-live-counts:${roomId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_live_users', filter: `room_id=eq.${roomId}` },
+        () => {
+          void fetchCount();
+        },
+      )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'room_profiles', filter: `room_id=eq.${roomId}` },

@@ -54,6 +54,8 @@ const ROOM_SEGMENT_SECONDS = 180;
 const TYPING_IDLE_MS = 1400;
 const LOCAL_IDENTITY_KEY = 'room:identity_mode:v1';
 const ROOM_ID = 'global';
+const MOSHA_USER_ID = 'mosha-bot';
+const MOSHA_NAME = 'Mo$ha';
 
 const KNOWN_ARTIST_NAMES = new Set(
   ARTISTS.map(a => a.name.trim().toLowerCase()).filter(Boolean)
@@ -229,6 +231,30 @@ function getMentionTrigger(text: string, cursorIndex: number) {
   return { atIndex, query };
 }
 
+function buildMoshaReply(params: {
+  content: string;
+  currentSongTitle: string | null;
+  currentArtistName: string | null;
+}) {
+  const text = params.content.toLowerCase();
+  const songRef = params.currentSongTitle ? ` "${params.currentSongTitle}"` : '';
+  const artistRef = params.currentArtistName ? ` ${params.currentArtistName}` : '';
+
+  if (text.includes('hello') || text.includes('hi') || text.includes('hey')) {
+    return `Hey fam, Mo$ha here. Glad you pulled me in. We vibing${songRef ? ` with${songRef}` : ''}.`;
+  }
+  if (text.includes('recommend') || text.includes('suggest') || text.includes('play')) {
+    return `Try keeping it on${songRef || ' this wave'} and spin more from${artistRef || ' $ongChainn artists'} next.`;
+  }
+  if (text.includes('sad') || text.includes('down') || text.includes('tired')) {
+    return `I got you. Let us slow it down with soulful $ongChainn cuts, then build your energy back.`;
+  }
+  if (text.includes('hype') || text.includes('turn up') || text.includes('energy')) {
+    return `Say less. We can run high-energy $ongChainn anthems and keep the room loud.`;
+  }
+  return `I hear you. Based on this room context, I would keep pushing${artistRef ? ` ${artistRef}` : ' fresh $ongChainn artists'} while this vibe is hot.`;
+}
+
 export default function Room() {
   const navigate = useNavigate();
   const { user, isArtist, artistId } = useAuth();
@@ -281,6 +307,8 @@ export default function Room() {
   const beepUnlockedRef = useRef(false);
   const lastBeepAtRef = useRef(0);
   const pulseBannerTimeoutRef = useRef<number | null>(null);
+  const hasMoshaGreetedRef = useRef(false);
+  const lastMoshaReplyToIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     draftRef.current = draft;
@@ -916,6 +944,61 @@ export default function Room() {
     };
   }, [chatBackend, fetchRecentMessages, mergeRecentMessages, playBeep, user]);
 
+  const appendMoshaMessage = useCallback((text: string) => {
+    if (!text.trim()) return;
+    const next: RoomMessage = {
+      id: makeMessageId(),
+      user_id: MOSHA_USER_ID,
+      room_name: MOSHA_NAME,
+      content: text.trim().slice(0, 280),
+      message: text.trim().slice(0, 280),
+      created_at: new Date().toISOString(),
+      reply_to_message_id: null,
+    };
+    setMessages(prev => {
+      if (prev.some((m) => m.id === next.id)) return prev;
+      const updated = [...prev, next].slice(-50);
+      if (chatBackend === 'local') persistLocalMessages(updated);
+      return updated;
+    });
+  }, [chatBackend, persistLocalMessages]);
+
+  useEffect(() => {
+    if (!user || hasMoshaGreetedRef.current) return;
+    hasMoshaGreetedRef.current = true;
+    const timer = window.setTimeout(() => {
+      appendMoshaMessage('Hello fam, Mo$ha in the room. I stay quiet while you chat, just @ me when you need me.');
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [appendMoshaMessage, user]);
+
+  useEffect(() => {
+    if (!messages.length) return;
+    const latest = messages[messages.length - 1];
+    if (!latest || latest.user_id === MOSHA_USER_ID) return;
+    if (lastMoshaReplyToIdRef.current === latest.id) return;
+
+    const raw = (latest.content || latest.message || '').trim();
+    if (!raw) return;
+    const lower = raw.toLowerCase();
+    const isReplyToMosha = latest.reply_to_message_id
+      ? messages.some((m) => m.id === latest.reply_to_message_id && m.user_id === MOSHA_USER_ID)
+      : false;
+    const callsMosha = /@mosha|@mo\$ha|\bmosha\b|\bmo\$ha\b/i.test(lower);
+    if (!isReplyToMosha && !callsMosha) return;
+
+    lastMoshaReplyToIdRef.current = latest.id;
+    const timer = window.setTimeout(() => {
+      const reply = buildMoshaReply({
+        content: raw,
+        currentSongTitle: currentSong?.title || null,
+        currentArtistName: currentSong?.artist || null,
+      });
+      appendMoshaMessage(reply);
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [appendMoshaMessage, currentSong?.artist, currentSong?.title, messages]);
+
   useEffect(() => {
     if (!shouldAutoScrollRef.current) return;
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -1256,7 +1339,7 @@ export default function Room() {
   }, [autoplayBlocked, handleRetryAutoplay, setTyping]);
 
   const knownMentionNames = useMemo(() => {
-    const names = new Set<string>();
+    const names = new Set<string>([MOSHA_NAME]);
     for (const userEntry of liveUsers) {
       const normalized = normalizeRoomName(userEntry.room_name || '');
       if (normalized && normalized.toLowerCase() !== 'guest') names.add(normalized);
@@ -1267,7 +1350,12 @@ export default function Room() {
     }
     const selfName = normalizeRoomName(roomName || '');
     if (selfName && selfName.toLowerCase() !== 'guest') names.add(selfName);
-    return [...names].sort((a, b) => a.localeCompare(b)).slice(0, 50);
+    const ordered = [...names].sort((a, b) => {
+      if (a === MOSHA_NAME) return -1;
+      if (b === MOSHA_NAME) return 1;
+      return a.localeCompare(b);
+    });
+    return ordered.slice(0, 50);
   }, [liveUsers, messages, roomName]);
 
   const mentionSuggestions = useMemo(() => {
@@ -1280,14 +1368,19 @@ export default function Room() {
   }, [knownMentionNames, mentionState]);
 
   const onlineNames = useMemo(() => {
-    const merged = new Set<string>();
+    const merged = new Set<string>([MOSHA_NAME]);
     const selfName = normalizeRoomName(roomName || '');
     if (selfName && selfName.toLowerCase() !== 'guest') merged.add(selfName);
     for (const userEntry of liveUsers) {
       const normalized = normalizeRoomName(userEntry.room_name || '');
       if (normalized && normalized.toLowerCase() !== 'guest') merged.add(normalized);
     }
-    return [...merged].slice(0, 12);
+    const ordered = [...merged].sort((a, b) => {
+      if (a === MOSHA_NAME) return -1;
+      if (b === MOSHA_NAME) return 1;
+      return a.localeCompare(b);
+    });
+    return ordered.slice(0, 12);
   }, [liveUsers, roomName]);
 
   const messageById = useMemo(() => {

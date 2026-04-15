@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { MapPin, Music } from 'lucide-react';
 import { Artist, SONGS } from '@/data/musicData';
 import { Link } from 'react-router-dom';
-import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
+import { usePulseCounts } from '@/hooks/usePopularity';
 
 interface ArtistCardProps {
   artist: Artist;
@@ -11,24 +11,18 @@ interface ArtistCardProps {
 }
 
 export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: ArtistCardProps) {
-  const { data: popularityData } = useSongPopularity();
   const { data: pulseCounts } = usePulseCounts();
   
   // Calculate real stats from database
-  const { artistSongs, totalPlays, totalPulses } = useMemo(() => {
+  const { artistSongs, totalPulses } = useMemo(() => {
     const songs = SONGS.filter(s => s.artistId === artist.id);
-    let plays = 0;
     let pulses = 0;
-    songs.forEach(song => {
-      const songData = popularityData?.find(p => p.song_id === song.id);
-      plays += songData?.play_count || 0;
-    });
     songs.forEach(song => {
       const pulseData = pulseCounts?.find(p => p.song_id === song.id);
       pulses += pulseData?.pulse_count || 0;
     });
-    return { artistSongs: songs, totalPlays: plays, totalPulses: pulses };
-  }, [artist.id, popularityData, pulseCounts]);
+    return { artistSongs: songs, totalPulses: pulses };
+  }, [artist.id, pulseCounts]);
 
   return (
     <Link to={`/artist/${artist.id}`}>
@@ -96,7 +90,6 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
               {totalPulses > 0 && (
                 <span className="tabular-nums text-primary">❤️‍🔥 {totalPulses.toLocaleString()}</span>
               )}
-              <span className="tabular-nums">{totalPlays.toLocaleString()} plays</span>
             </div>
           </div>
 

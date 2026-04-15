@@ -1,29 +1,23 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { type UIEvent, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
-  TrendingUp,
   UserPlus,
   Headphones,
   Plus,
   Compass,
-  Heart,
   Search,
-  Bell,
   Sparkles,
   ArrowLeft
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Navigation } from '@/components/Navigation';
 import { PostComposer } from '@/components/social/PostComposer';
 import { MusicFeedCard } from '@/components/social/MusicFeedCard';
 import { CommentSheet } from '@/components/social/CommentSheet';
-import { UserCard } from '@/components/social/UserCard';
 import { useSocial } from '@/hooks/useSocial';
 import { useAuth } from '@/context/AuthContext';
 import { AudienceProfile } from '@/types/database';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,10 +26,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { supabase } from '@/integrations/supabase/client';
 import { useSafePlayerState } from '@/context/PlayerContext';
 import { AnimatedBackground } from '@/components/ui/animated-background';
-import logo from '@/assets/songchainn-logo.webp';
 
 export default function Social() {
-  const { user, audienceProfile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -175,7 +168,7 @@ export default function Social() {
     }
   }, [location.pathname, location.search, navigate]);
 
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleScroll = useCallback((e: UIEvent<HTMLDivElement>) => {
     if (sharedPostId) return;
     const container = e.currentTarget;
     const scrollTop = container.scrollTop;
@@ -204,10 +197,10 @@ export default function Social() {
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border">
           <div className="max-w-lg mx-auto px-4 py-3">
-            <div className="flex items-center justify-between">
-              {/* Left: Logo/Title */}
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -217,18 +210,86 @@ export default function Social() {
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
                   <Sparkles className="w-5 h-5 text-primary" />
-                  <h1 className="font-bold text-lg">SongFeed</h1>
+                  <h1 className="font-bold text-lg">Feen</h1>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                    TikTok-style music feed with autoplay moments.
+                  </p>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Thanks for listening early. Your plays shape what comes next.
-                </p>
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative">
+                        <Search className="w-5 h-5" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-80">
+                      <SheetHeader>
+                        <SheetTitle>Discover People</SheetTitle>
+                      </SheetHeader>
+                      <ScrollArea className="h-[calc(100vh-100px)] mt-4">
+                        <div className="space-y-3 pr-4">
+                          {loadingSuggestions ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                              <div key={i} className="flex items-center gap-3">
+                                <Skeleton className="w-12 h-12 rounded-full" />
+                                <div className="flex-1">
+                                  <Skeleton className="h-4 w-24 mb-1" />
+                                  <Skeleton className="h-3 w-16" />
+                                </div>
+                              </div>
+                            ))
+                          ) : suggestedUsers.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-8">
+                              No suggestions right now
+                            </p>
+                          ) : (
+                            suggestedUsers.map(profile => (
+                              <motion.div
+                                key={profile.id}
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted transition-colors cursor-pointer"
+                                onClick={() => void goToProfile(profile.user_id)}
+                              >
+                                <Avatar className="w-12 h-12">
+                                  <AvatarImage src={profile.profile_picture_url || ''} />
+                                  <AvatarFallback className="bg-primary/20 text-primary">
+                                    {profile.profile_name?.charAt(0) || '?'}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold truncate">{profile.profile_name}</p>
+                                  {profile.bio && (
+                                    <p className="text-xs text-muted-foreground truncate">{profile.bio}</p>
+                                  )}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant={isFollowing(profile.user_id) ? 'secondary' : 'default'}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    followUser(profile.user_id);
+                                  }}
+                                >
+                                  {isFollowing(profile.user_id) ? 'Following' : 'Follow'}
+                                </Button>
+                              </motion.div>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </SheetContent>
+                  </Sheet>
+                </div>
               </div>
 
-              {/* Center: Feed Tabs */}
-              <div className="flex items-center gap-1 bg-muted rounded-full p-1">
+              <div className="flex items-center justify-center gap-1 bg-muted rounded-full p-1 w-full">
                 <button
                   onClick={() => setFeedType('foryou')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  className={`flex-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                     feedType === 'foryou' 
                       ? 'bg-background text-foreground shadow-sm' 
                       : 'text-muted-foreground hover:text-foreground'
@@ -238,7 +299,7 @@ export default function Social() {
                 </button>
                 <button
                   onClick={() => setFeedType('following')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  className={`flex-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                     feedType === 'following' 
                       ? 'bg-background text-foreground shadow-sm' 
                       : 'text-muted-foreground hover:text-foreground'
@@ -246,74 +307,6 @@ export default function Social() {
                 >
                   Following
                 </button>
-              </div>
-
-              {/* Right: Actions */}
-              <div className="flex items-center gap-2">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="relative">
-                      <Search className="w-5 h-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-80">
-                    <SheetHeader>
-                      <SheetTitle>Discover People</SheetTitle>
-                    </SheetHeader>
-                    <ScrollArea className="h-[calc(100vh-100px)] mt-4">
-                      <div className="space-y-3 pr-4">
-                        {loadingSuggestions ? (
-                          Array.from({ length: 5 }).map((_, i) => (
-                            <div key={i} className="flex items-center gap-3">
-                              <Skeleton className="w-12 h-12 rounded-full" />
-                              <div className="flex-1">
-                                <Skeleton className="h-4 w-24 mb-1" />
-                                <Skeleton className="h-3 w-16" />
-                              </div>
-                            </div>
-                          ))
-                        ) : suggestedUsers.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-8">
-                            No suggestions right now
-                          </p>
-                        ) : (
-                          suggestedUsers.map(profile => (
-                            <motion.div
-                              key={profile.id}
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted transition-colors cursor-pointer"
-                              onClick={() => void goToProfile(profile.user_id)}
-                            >
-                              <Avatar className="w-12 h-12">
-                                <AvatarImage src={profile.profile_picture_url || ''} />
-                                <AvatarFallback className="bg-primary/20 text-primary">
-                                  {profile.profile_name?.charAt(0) || '?'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold truncate">{profile.profile_name}</p>
-                                {profile.bio && (
-                                  <p className="text-xs text-muted-foreground truncate">{profile.bio}</p>
-                                )}
-                              </div>
-                              <Button
-                                size="sm"
-                                variant={isFollowing(profile.user_id) ? 'secondary' : 'default'}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  followUser(profile.user_id);
-                                }}
-                              >
-                                {isFollowing(profile.user_id) ? 'Following' : 'Follow'}
-                              </Button>
-                            </motion.div>
-                          ))
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </SheetContent>
-                </Sheet>
               </div>
             </div>
           </div>
@@ -513,7 +506,6 @@ export default function Social() {
           commentsCount={effectiveCommentsCount}
         />
 
-        <Navigation />
       </div>
     </div>
   );

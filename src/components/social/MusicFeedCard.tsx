@@ -5,14 +5,14 @@ import {
   MessageCircle, 
   Share2, 
   Play, 
-  Pause,
   Music,
   UserPlus,
   Check,
   Disc3,
   Copy,
   PartyPopper,
-  Sparkles
+  Sparkles,
+  Flame
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SocialPostWithProfile } from '@/types/social';
@@ -36,8 +36,6 @@ interface MusicFeedCardProps {
   onLike: (postId: string) => void;
   onFollow: (userId: string) => void;
   isFollowing: boolean;
-  onFollowArtist?: (artistId: string) => void;
-  isFollowingArtist?: boolean;
   onComment: () => void;
   isVisible?: boolean;
 }
@@ -47,8 +45,6 @@ export function MusicFeedCard({
   onLike, 
   onFollow, 
   isFollowing,
-  onFollowArtist,
-  isFollowingArtist = false,
   onComment,
   isVisible = true
 }: MusicFeedCardProps) {
@@ -58,6 +54,7 @@ export function MusicFeedCard({
   const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard, shareToX } = useShare();
   const [showHeart, setShowHeart] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const autoPlayRequestedRef = useRef<string | null>(null);
   const { data: pulseCounts } = usePulseCounts();
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
@@ -68,6 +65,9 @@ export function MusicFeedCard({
   const isThisSongPlaying = currentSong?.id === song?.id && isPlaying;
   const isWelcomePost = post.post_type === 'welcome';
   const isSongLikePost = post.post_type === 'song_like';
+  const battleLiveMatch = post.content?.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)::(.*)/);
+  const battleLiveId = battleLiveMatch?.[1] ?? null;
+  const battleLiveTitle = battleLiveMatch?.[2]?.trim() ?? null;
 
   const totalPulses = pulseCounts && song
     ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count || 0)
@@ -107,13 +107,30 @@ export function MusicFeedCard({
 
   useEffect(() => {
     if (videoRef.current) {
-      if (isVisible && isThisSongPlaying) {
+      if (isVisible) {
         void videoRef.current.play().catch(() => {});
       } else {
         videoRef.current.pause();
       }
     }
-  }, [isVisible, isThisSongPlaying]);
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (!isVisible) {
+      autoPlayRequestedRef.current = null;
+      return;
+    }
+    if (!song) return;
+    if (currentSong?.id === song.id) {
+      if (!isPlaying) {
+        play();
+      }
+      return;
+    }
+    if (autoPlayRequestedRef.current === song.id) return;
+    autoPlayRequestedRef.current = song.id;
+    playSong(song);
+  }, [currentSong?.id, isPlaying, isVisible, play, playSong, song]);
 
   const handleDoubleTap = () => {
     if (!post.is_liked) {
@@ -147,7 +164,7 @@ export function MusicFeedCard({
 
   return (
     <motion.div 
-      className={`relative w-full h-[calc(100vh-180px)] min-h-[500px] max-h-[800px] bg-card rounded-3xl overflow-hidden ${
+      className={`relative w-full h-[calc(100vh-190px)] min-h-[420px] sm:min-h-[500px] max-h-[800px] bg-card rounded-2xl sm:rounded-3xl overflow-hidden ${
         isVisible ? 'ring-2 ring-primary/60 shadow-2xl shadow-primary/30' : ''
       }`}
       initial={{ opacity: 0, scale: 0.95 }}
@@ -304,11 +321,11 @@ export function MusicFeedCard({
       </div>
 
       {/* Right Side Actions */}
-      <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
+      <div className="absolute right-2 sm:right-4 bottom-28 sm:bottom-32 flex flex-col items-center gap-4 sm:gap-6">
         {/* Profile */}
         <div className="relative">
           <button onClick={goToProfile}>
-            <Avatar className="w-12 h-12 border-2 border-white shadow-lg">
+            <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-white shadow-lg">
               <AvatarImage src={post.profile?.profile_picture_url || ''} />
               <AvatarFallback className="bg-primary text-primary-foreground">
                 {post.profile?.profile_name?.charAt(0) || '?'}
@@ -318,11 +335,11 @@ export function MusicFeedCard({
           {!isOwnPost && (
             <button
               onClick={() => onFollow(post.user_id)}
-              className={`absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-lg ${
+              className={`absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-white shadow-lg ${
                 isFollowing ? 'bg-muted' : 'bg-primary'
               }`}
             >
-              {isFollowing ? <Check className="w-3 h-3" /> : <UserPlus className="w-3 h-3" />}
+              {isFollowing ? <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <UserPlus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
             </button>
           )}
         </div>
@@ -332,10 +349,10 @@ export function MusicFeedCard({
           className="flex flex-col items-center gap-1"
           onClick={() => onLike(post.id)}
         >
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center ${
             post.is_liked ? 'bg-red-500/20' : 'bg-white/10 backdrop-blur-sm'
           }`}>
-            <Heart className={`w-6 h-6 ${post.is_liked ? 'text-red-500 fill-red-500' : 'text-white'}`} />
+            <Heart className={`w-5 h-5 sm:w-6 sm:h-6 ${post.is_liked ? 'text-red-500 fill-red-500' : 'text-white'}`} />
           </div>
           <span className="text-xs text-white font-medium">{post.likes_count || 0}</span>
         </button>
@@ -345,8 +362,8 @@ export function MusicFeedCard({
           className="flex flex-col items-center gap-1"
           onClick={onComment}
         >
-          <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-            <MessageCircle className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+            <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <span className="text-xs text-white font-medium">{post.comments_count || 0}</span>
         </button>
@@ -355,8 +372,8 @@ export function MusicFeedCard({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex flex-col items-center gap-1">
-              <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                <Share2 className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                <Share2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <span className="text-xs text-white font-medium">Share</span>
             </button>
@@ -383,7 +400,7 @@ export function MusicFeedCard({
         <motion.div
           animate={isThisSongPlaying ? { rotate: 360 } : {}}
           transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
-          className="w-12 h-12 rounded-full border-2 border-white/50 overflow-hidden"
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white/50 overflow-hidden"
         >
           {song ? (
             <img
@@ -401,10 +418,10 @@ export function MusicFeedCard({
       </div>
 
       {/* Bottom Info */}
-      <div className="absolute bottom-0 left-0 right-20 p-4">
+      <div className="absolute bottom-0 left-0 right-16 sm:right-20 p-3 sm:p-4">
         {/* User Info */}
         <button onClick={goToProfile} className="flex items-center gap-2 mb-3">
-          <span className="font-bold text-white text-lg">
+          <span className="font-bold text-white text-base sm:text-lg truncate">
             @{post.profile?.profile_name || 'Anonymous'}
           </span>
           {isFollowing && (
@@ -430,8 +447,19 @@ export function MusicFeedCard({
             </p>
           </div>
         ) : post.content ? (
-          <p className="text-white/90 text-sm mb-3 line-clamp-2">{post.content}</p>
+          <p className="text-white/90 text-xs sm:text-sm mb-3 line-clamp-3">{post.content}</p>
         ) : null}
+
+        {battleLiveId && (
+          <button
+            type="button"
+            onClick={() => navigate(`/wavewarz-africa/room/${battleLiveId}`)}
+            className="mb-3 inline-flex items-center gap-2 rounded-full border border-rose-300/40 bg-rose-500/15 px-3 py-1 text-xs font-semibold text-rose-100 hover:bg-rose-500/25"
+          >
+            <Flame className="h-3.5 w-3.5" />
+            Join Live Battle{battleLiveTitle ? `: ${battleLiveTitle}` : ''}
+          </button>
+        )}
 
         {/* Song Info */}
         {song && !isWelcomePost && (

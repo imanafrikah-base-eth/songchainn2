@@ -94,8 +94,8 @@ export function PostCard({
       ? getSongShareUrl({ id: song.id, title: song.title, artist: artist?.name || song.artist, coverImage: song.coverImage })
       : getShareUrl('post', post.id);
     const text = song && artist 
-      ? `🎵 Listening to "${song.title}" by ${artist.name} on @SongChainn\n\n`
-      : `Check out this post on @SongChainn\n\n`;
+      ? `🎵 Listening to "${song.title}" by ${artist.name} on @$ongChainn\n\n`
+      : `Check out this post on @$ongChainn\n\n`;
     shareToX(text, url);
   };
 

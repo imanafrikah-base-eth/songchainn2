@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play, Pause, Heart, Music, Headphones, ListMusic, Lock, Globe } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Heart, Music, ListMusic, Lock, Globe } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -127,10 +127,9 @@ export default function SongDetail() {
 
   // Get real stats from database
   const songStats = useMemo(() => {
-    if (!song) return { plays: 0, likes: 0 };
+    if (!song) return { likes: 0 };
     const data = popularityData?.find(p => p.song_id === song.id);
     return {
-      plays: data?.play_count || 0,
       likes: data?.like_count || 0,
     };
   }, [popularityData, song]);
@@ -251,10 +250,6 @@ export default function SongDetail() {
 
               {/* Stats */}
               <div className="flex items-center gap-6 mb-6">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Headphones className="w-5 h-5" />
-                  <span className="text-lg font-medium">{songStats.plays.toLocaleString()} streams</span>
-                </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Heart className="w-5 h-5" />
                   <span className="text-lg font-medium">{songStats.likes.toLocaleString()} likes</span>

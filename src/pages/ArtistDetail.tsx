@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Headphones, Heart, Users, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2 } from 'lucide-react';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { SongCard } from '@/components/SongCard';
 import { Navigation } from '@/components/Navigation';
@@ -29,8 +29,6 @@ import {
 import { toast } from 'sonner';
 
 const NEW_ARTIST_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
-const DEFAULT_ARTIST_FOLLOWERS = 66;
-
 function isArtistNew(addedAt?: string) {
   if (!addedAt) return false;
   const ts = new Date(addedAt).getTime();
@@ -392,44 +390,9 @@ export default function ArtistDetail() {
     toast.success('Theme updated');
   }, [id, isOwner, queryClient]);
 
-  // Fetch follower count via RPC
-  const { data: followerCount = 0 } = useQuery({
-    queryKey: ['artist-followers', id],
-    queryFn: async () => {
-      if (!id) return 0;
-      const { data, error } = await (supabase as any).rpc('get_artist_follower_count', { p_artist_id: id });
-      if (error) return 0;
-      return typeof data === 'number' ? data : Number(data ?? 0);
-    },
-    enabled: !!id,
-    refetchInterval: 15000,
-  });
-  const displayedFollowerCount = Math.max(DEFAULT_ARTIST_FOLLOWERS, followerCount);
-
-  useEffect(() => {
-    if (!id) return;
-    const channel = supabase
-      .channel(`artist-followers-${id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'liked_artists', filter: `artist_id=eq.${id}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['artist-followers', id] });
-          queryClient.invalidateQueries({ queryKey: ['all-artist-followers'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [id, queryClient]);
-
   const handleToggleFollow = async () => {
     if (!id) return;
     await toggleLikeArtist(id);
-    queryClient.invalidateQueries({ queryKey: ['artist-followers', id] });
-    queryClient.invalidateQueries({ queryKey: ['all-artist-followers'] });
   };
 
   const timelineUserId = ownerUserId;
@@ -854,27 +817,13 @@ export default function ArtistDetail() {
               )}
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="glass-card p-4 rounded-xl text-center">
-                  <Users className="w-6 h-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-heading font-bold text-foreground">
-                    {displayedFollowerCount.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Followers</p>
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                 <div className="glass-card p-4 rounded-xl text-center">
                   <Music className="w-6 h-6 mx-auto mb-2 text-primary" />
                   <p className="text-2xl font-heading font-bold text-foreground">
                     {artistSongs.length}
                   </p>
                   <p className="text-sm text-muted-foreground">Songs</p>
-                </div>
-                <div className="glass-card p-4 rounded-xl text-center">
-                  <Headphones className="w-6 h-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-heading font-bold text-foreground">
-                    {artistStats.totalPlays.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Streams</p>
                 </div>
                 <div className="glass-card p-4 rounded-xl text-center">
                   <Heart className="w-6 h-6 mx-auto mb-2 text-primary" />

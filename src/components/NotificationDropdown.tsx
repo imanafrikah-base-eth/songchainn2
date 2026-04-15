@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, Heart, MessageCircle, UserPlus, X, ListMusic } from 'lucide-react';
+import { Bell, Check, Flame, Heart, MessageCircle, UserPlus, X, ListMusic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -31,6 +31,15 @@ const notificationMessages = {
   playlist: 'shared a new playlist',
 };
 
+function extractBattleRoute(message?: string | null) {
+  if (!message) return null;
+  const markerMatch = message.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)/);
+  if (markerMatch?.[1]) return `/wavewarz-africa/room/${markerMatch[1]}`;
+  const pathMatch = message.match(/\/wavewarz-africa\/room\/([a-zA-Z0-9-]+)/);
+  if (pathMatch?.[1]) return `/wavewarz-africa/room/${pathMatch[1]}`;
+  return null;
+}
+
 function NotificationItem({ 
   notification, 
   onRead, 
@@ -42,7 +51,8 @@ function NotificationItem({
   onDelete: (id: string) => void;
   onNavigate: (notification: Notification) => void | Promise<void>;
 }) {
-  const Icon = notificationIcons[notification.type];
+  const battleRoute = extractBattleRoute(notification.message);
+  const Icon = battleRoute ? Flame : notificationIcons[notification.type];
   const message = notification.message || notificationMessages[notification.type];
   const profile = notification.from_profile;
 
@@ -129,6 +139,11 @@ export function NotificationDropdown() {
 
   const handleNotificationNavigate = async (notification: Notification) => {
     setOpen(false);
+    const battleRoute = extractBattleRoute(notification.message);
+    if (battleRoute) {
+      navigate(battleRoute);
+      return;
+    }
     
     switch (notification.type) {
       case 'follow':

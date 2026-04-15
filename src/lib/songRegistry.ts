@@ -265,7 +265,7 @@ export async function getSongPriceFromContract(songId: string): Promise<bigint |
  * Buy/unlock a song by sending ETH to the contract
  * The contract automatically handles:
  * - 95% to artist wallet
- * - 5% to SongChainn treasury
+ * - 5% to $ongChainn treasury
  * - Minting ERC-1155 tokens to buyer
  * 
  * This function waits for blockchain confirmation before returning success

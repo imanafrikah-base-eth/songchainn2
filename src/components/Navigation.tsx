@@ -1,28 +1,32 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones, Sparkles, ListMusic } from 'lucide-react';
+import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones, Sparkles, ListMusic, Disc3, Bot, Lightbulb, Inbox } from 'lucide-react';
 import { useEngagement } from '@/context/EngagementContext';
 import { useAuth } from '@/context/AuthContext';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { cn } from '@/lib/utils';
-import logo from '@/assets/songchainn-logo.webp';
+const logo = '/songchainn-logo.webp';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { InviteFriends } from '@/components/InviteFriends';
+import { SuggestionDialog } from '@/components/SuggestionDialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { SONGS } from '@/data/musicData';
 
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
+  { path: '/wavewarz-africa', label: 'WaveWarz', icon: Flame },
+  { path: '/dj-shuffle', label: 'DJ Shuffle', icon: Disc3 },
   { path: '/playlists', label: 'Playlists', icon: ListMusic },
   { path: '/discover', label: 'Discover', icon: Compass },
   { path: '/room', label: 'The Room', icon: Headphones },
   { path: '/community', label: 'Community', icon: Users },
   { path: '/social', label: 'Feed', icon: MessageCircle },
+  { path: '/inbox', label: 'Inbox', icon: Inbox },
   { path: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -33,6 +37,7 @@ export function Navigation() {
   const { signOut, walletAddress, user, isArtist, artistId } = useAuth();
   const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const [showInvite, setShowInvite] = useState(false);
+  const [showSuggestionDialog, setShowSuggestionDialog] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showOfflineSaveAnnouncement, setShowOfflineSaveAnnouncement] = useState(false);
   const [showProfilePhotoAnnouncement, setShowProfilePhotoAnnouncement] = useState(false);
@@ -158,7 +163,7 @@ export function Navigation() {
             </Link>
 
             {/* Desktop Nav Links - hidden on mobile */}
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="hidden xl:flex items-center gap-1">
               {effectiveNavItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
@@ -181,12 +186,10 @@ export function Navigation() {
                       </span>
                       {item.label}
                       {item.path === '/room' && roomOnlineCount > 0 && (
-                        <>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                            <span>LIVE</span>
-                          </span>
-                        </>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                          <span>{`${roomOnlineCount}live`}</span>
+                        </span>
                       )}
                     </span>
                     {isActive && (
@@ -216,7 +219,7 @@ export function Navigation() {
                   <Headphones className="w-4 h-4" />
                   <span>Return to Room</span>
                   <span className="inline-flex items-center rounded-full bg-primary text-primary-foreground px-1.5 py-0.5 text-[10px] sm:text-xs leading-none">
-                    {roomOnlineCount} live
+                    {`${roomOnlineCount}live`}
                   </span>
                 </motion.button>
               )}
@@ -241,7 +244,7 @@ export function Navigation() {
               )}
 
               {/* Desktop stats - hidden on mobile */}
-              <div className="hidden md:flex items-center gap-2">
+              <div className="hidden 2xl:flex items-center gap-2">
                 <motion.div
                   whileHover={{ scale: 1.05 }}
                   animate={{ scale: [1, 1.04, 1] }}
@@ -266,6 +269,21 @@ export function Navigation() {
                   <Sparkles className="w-3.5 h-3.5 text-primary" />
                   <span>About $ongChainn</span>
                 </Link>
+                <Link
+                  to="/dj-shuffle"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass text-xs sm:text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-colors"
+                >
+                  <Disc3 className="w-3.5 h-3.5 text-primary" />
+                  <span>DJ Shuffle</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('songchainn:open-mosha'))}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass text-xs sm:text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-colors"
+                >
+                  <Bot className="w-3.5 h-3.5 text-primary" />
+                  <span>Mosha</span>
+                </button>
               </div>
 
               {/* Invite button */}
@@ -279,6 +297,16 @@ export function Navigation() {
                 <Gift className="w-4 h-4 sm:w-5 sm:h-5" />
               </motion.button>
 
+              <motion.button
+                onClick={() => setShowSuggestionDialog(true)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-2 rounded-xl glass text-primary hover:bg-primary/10 transition-colors"
+                aria-label="Suggest improvement"
+              >
+                <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5" />
+              </motion.button>
+
               <NotificationDropdown />
 
               {/* Desktop Sign Out button */}
@@ -286,7 +314,7 @@ export function Navigation() {
                 onClick={handleLogout}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
+                className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
                 aria-label="Sign out"
               >
                 <LogOut className="w-4 h-4" />
@@ -297,7 +325,7 @@ export function Navigation() {
               <motion.button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 whileTap={{ scale: 0.95 }}
-                className="lg:hidden p-2 rounded-xl glass text-foreground hover:bg-primary/10 transition-colors"
+                className="xl:hidden p-2 rounded-xl glass text-foreground hover:bg-primary/10 transition-colors"
                 aria-label="Toggle menu"
               >
                 <AnimatePresence mode="wait">
@@ -330,6 +358,8 @@ export function Navigation() {
 
         <InviteFriends isOpen={showInvite} onClose={() => setShowInvite(false)} />
       </header>
+
+      <SuggestionDialog open={showSuggestionDialog} onOpenChange={setShowSuggestionDialog} />
 
       {showProfilePhotoAnnouncement && (
         <div className="border-b border-indigo-500/30 bg-indigo-500/10 backdrop-blur-sm">
@@ -405,7 +435,7 @@ export function Navigation() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileMenuOpen(false)}
-              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 lg:hidden"
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 xl:hidden"
             />
             
             {/* Menu Panel */}
@@ -414,7 +444,7 @@ export function Navigation() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 w-72 glass-surface border-l border-border/50 z-50 lg:hidden"
+              className="fixed top-0 right-0 bottom-0 w-72 glass-surface border-l border-border/50 z-50 xl:hidden"
             >
               <div className="p-4 border-b border-border/50 flex items-center justify-between">
                 <span className="font-heading font-bold text-foreground">Menu</span>
@@ -482,10 +512,7 @@ export function Navigation() {
                           <>
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                              <span>LIVE</span>
-                            </span>
-                            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
-                              {roomOnlineCount}
+                              <span>{`${roomOnlineCount}live`}</span>
                             </span>
                           </>
                         )}
@@ -525,6 +552,34 @@ export function Navigation() {
                 >
                   <Sparkles className="w-5 h-5 text-primary" />
                   <span>About $ongChainn</span>
+                </motion.button>
+
+                <motion.button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('songchainn:open-mosha'));
+                    setMobileMenuOpen(false);
+                  }}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: (navItems.length + 2) * 0.05 }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left transition-all glass text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
+                >
+                  <Bot className="w-5 h-5" />
+                  <span>Mosha</span>
+                </motion.button>
+
+                <motion.button
+                  onClick={() => {
+                    setShowSuggestionDialog(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: (navItems.length + 3) * 0.05 }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left transition-all glass text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
+                >
+                  <Lightbulb className="w-5 h-5" />
+                  <span>Suggest improvement</span>
                 </motion.button>
 
                 {/* Logout Button */}

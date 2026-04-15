@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart } from 'lucide-react';
+import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart, PlayCircle, Disc3, Info } from 'lucide-react';
 import { CATALOGS, ARTISTS, SONGS, type Catalog, type Song } from '@/data/musicData';
 import { useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
-import { useSafePlayerState } from '@/context/PlayerContext';
+import { usePlayerActions, useSafePlayerState } from '@/context/PlayerContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useSocial } from '@/hooks/useSocial';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -22,12 +22,16 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
+import { WaveWarzHomeHero } from '@/components/wavewarz/WaveWarzHomeHero';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import djShuffleBranding from '@/assets/Dj Suffle Branding.png';
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -84,7 +88,9 @@ export default function Home() {
   const [newPlaylistVibe, setNewPlaylistVibe] = useState('');
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const [isSubmittingPlaylist, setIsSubmittingPlaylist] = useState(false);
+  const [moshaInfoOpen, setMoshaInfoOpen] = useState(false);
   const playerState = useSafePlayerState();
+  const { playQueue } = usePlayerActions();
   const roomOnlineCount = useRoomOnlineCount({
     roomId: 'global',
     viewerUserId: user?.id,
@@ -111,10 +117,6 @@ export default function Home() {
         .slice(0, 5),
     [catalogs],
   );
-  const totalTracks = useMemo(
-    () => catalogs.reduce((sum, catalog) => sum + (catalog.trackCount || 0), 0),
-    [catalogs],
-  );
   const songsByCatalog = useMemo(
     () =>
       catalogs
@@ -134,12 +136,6 @@ export default function Home() {
         .slice(0, 8),
     [likedArtists],
   );
-  const displayName =
-    audienceProfile?.profile_name ||
-    (user && typeof user.email === 'string'
-      ? user.email.split('@')[0]
-      : null);
-
   const allCatalogsCardRef = useRef<HTMLDivElement | null>(null);
   const { scrollYProgress: allCatalogsScrollProgress } = useScroll({
     target: allCatalogsCardRef,
@@ -147,6 +143,70 @@ export default function Home() {
   });
   const allCatalogsGlowY = useTransform(allCatalogsScrollProgress, [0, 1], [24, -24]);
   const allCatalogsGlowOpacity = useTransform(allCatalogsScrollProgress, [0, 1], [0.12, 0.35]);
+
+  const songsFromCatalogs = useCallback((catalogList: Catalog[]) => {
+    const songIds = Array.from(new Set(catalogList.flatMap((catalog) => catalog.songIds)));
+    return songIds
+      .map((songId) => SONGS.find((song) => song.id === songId))
+      .filter(Boolean) as Song[];
+  }, []);
+
+  const handlePlayAllHotToday = useCallback(() => {
+    const queueSongs = todayHotSongs.map((entry) => entry.song);
+    if (queueSongs.length) playQueue(queueSongs);
+  }, [playQueue, todayHotSongs]);
+
+  const handlePlayAllNewReleases = useCallback(() => {
+    const queueSongs = songsFromCatalogs(newReleases);
+    if (queueSongs.length) playQueue(queueSongs);
+  }, [newReleases, playQueue, songsFromCatalogs]);
+
+  const handlePlayAllFeatured = useCallback(() => {
+    const queueSongs = songsFromCatalogs(featuredCatalogs);
+    if (queueSongs.length) playQueue(queueSongs);
+  }, [featuredCatalogs, playQueue, songsFromCatalogs]);
+
+  const handlePlayAllCatalogs = useCallback(() => {
+    const queueSongs = songsFromCatalogs(allCatalogs);
+    if (queueSongs.length) playQueue(queueSongs);
+  }, [allCatalogs, playQueue, songsFromCatalogs]);
+
+  const handleOpenMosha = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('songchainn:open-mosha'));
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const newUserKey = `songchainn:new-user-tour-prompt:v1:${user.id}`;
+    const returningUserKey = `songchainn:returning-user-tour-prompt:v2:${user.id}`;
+    try {
+      if (localStorage.getItem(returningUserKey) === 'shown') return;
+      const hasSeenNewUserPrompt = localStorage.getItem(newUserKey) === 'shown';
+
+      if (!hasSeenNewUserPrompt) {
+        localStorage.setItem(newUserKey, 'shown');
+      } else {
+        localStorage.setItem(returningUserKey, 'shown');
+      }
+
+      window.setTimeout(() => {
+        const promptText = hasSeenNewUserPrompt
+          ? 'Yo welcome back fam. New app experience is live: cleaner UI, faster Feen autoplay flow, and upgraded WaveWarz BattleZone access. Tap in, catch live activity, vibe, trade smart, and stack up while the culture moves.'
+          : 'Welcome to $ongChainn Phase One: Audience First. Want a quick guided tour of sections and features? Music trading and rewards are coming soon.';
+        window.dispatchEvent(
+          new CustomEvent('songchainn:mosha-prompt', {
+            detail: {
+              text: promptText,
+              ctaLabel: 'Learn more',
+              ctaPath: '/about',
+            },
+          }),
+        );
+      }, 900);
+    } catch {
+      void 0;
+    }
+  }, [user?.id]);
 
   const handleToggleSongSelection = (songId: string) => {
     setSelectedSongIds((prev) =>
@@ -270,7 +330,7 @@ export default function Home() {
                   <Headphones className="w-3.5 h-3.5" />
                   <span>Jump into Room</span>
                   <span className="inline-flex items-center rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
-                    {roomOnlineCount} live
+                    {`${roomOnlineCount}live`}
                   </span>
                   <ArrowRight className="w-3 h-3" />
                 </Button>
@@ -278,124 +338,65 @@ export default function Home() {
             </div>
           </div>
         )}
-        {/* Hero Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-          className="mb-6 sm:mb-12"
-        >
-          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl glass-card p-4 sm:p-8 md:p-12 shine-overlay">
-            {/* Animated gradient orb - smaller on mobile */}
-            <div className="absolute top-0 right-0 w-[200px] sm:w-[400px] h-[200px] sm:h-[400px] opacity-30">
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: 'radial-gradient(circle, hsl(217 91% 60% / 0.4) 0%, transparent 70%)',
-                  filter: 'blur(60px)',
-                }}
-                animate={{
-                  scale: [1, 1.2, 1],
-                  x: [0, 30, 0],
-                  y: [0, -20, 0],
-                }}
-                transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-              />
-            </div>
+        <WaveWarzHomeHero />
 
-            <div className="relative z-10">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full glass text-xs font-medium text-primary mb-3 sm:mb-4"
-              >
-                <Sparkles className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>Audience Edition</span>
-              </motion.div>
-
-              {displayName && (
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3"
-                >
-                  Hey {displayName}.
-                </motion.p>
-              )}
-
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="font-heading text-xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-3 sm:mb-4 leading-tight"
-              >
-                Welcome to <span className="text-gradient">$ongChainn</span>
-                <span className="block text-sm sm:text-base md:text-lg text-muted-foreground mt-2">
-                  Your on-chain listening home for artists from Create On Base Local Town Squares around the world.
-                </span>
-              </motion.h1>
-
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mb-3 sm:mb-4 leading-relaxed"
-              >
-                Think of this as your shared living room for onchain music.
-                Settle in, explore the town squares, and let your listening build culture and future ownership.
-              </motion.p>
-
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                <Link to="/room">
-                  <motion.div
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.98 }}
-                    animate={{ boxShadow: ['0 0 0 0 rgba(16,185,129,0.4)', '0 0 40px 0 rgba(16,185,129,0.9)', '0 0 0 0 rgba(16,185,129,0.4)'] }}
-                    transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-                    className="inline-block rounded-full"
-                  >
-                    <Button className="gradient-primary text-primary-foreground shadow-glow gap-2">
-                      <Headphones className="w-4 h-4" />
-                      <span>Enter The Room</span>
-                      {roomOnlineCount > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-black/30 text-primary-foreground text-[10px] font-semibold px-2 py-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>Live now</span>
-                        </span>
-                      )}
-                      {roomOnlineCount > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-black/25 text-primary-foreground text-[11px] font-semibold">
-                          {roomOnlineCount}
-                        </span>
-                      )}
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </motion.div>
-                </Link>
+        <div className="my-4 sm:my-6 flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={handleOpenMosha}
+            className="flex-1 h-11 sm:h-12 rounded-2xl gradient-primary text-primary-foreground shadow-glow-intense text-sm sm:text-base font-semibold tracking-wide"
+          >
+            Call Mo$ha
+          </Button>
+          <div className="shrink-0">
+            <TooltipProvider>
+              <div className="hidden sm:block">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="What this button does"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/35 bg-background/80 text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[16rem] text-xs">
+                    Opens Mo$ha instantly if you closed chat and want help again.
+                  </TooltipContent>
+                </Tooltip>
               </div>
+            </TooltipProvider>
 
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="flex flex-wrap items-center gap-2 sm:gap-4"
-              >
-                <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl glass text-xs sm:text-sm">
-                  <Headphones className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
-                  <span className="text-foreground font-medium">{ARTISTS.length} Artists</span>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl glass text-xs sm:text-sm">
-                  <span className="text-foreground font-medium">{totalTracks} Tracks</span>
-                </div>
-                <div className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-primary/10 text-primary text-xs sm:text-sm font-medium">
-                  Zambia
-                </div>
-              </motion.div>
+            <div className="sm:hidden">
+              <Popover open={moshaInfoOpen} onOpenChange={setMoshaInfoOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="What this button does"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/35 bg-background/80 text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[16rem] p-3">
+                  <p className="text-xs text-foreground">
+                    Opens Mo$ha instantly if you closed chat and want help again.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 h-8 w-full text-xs"
+                    onClick={() => setMoshaInfoOpen(false)}
+                  >
+                    Close
+                  </Button>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
-        </motion.section>
+        </div>
 
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-8">
           {/* Main Content */}
@@ -428,11 +429,17 @@ export default function Home() {
                           Most played songs in the last 24 hours on $ongChainn.
                         </p>
                       </div>
-                      <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                          <span>Live Heat</span>
-                        </span>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" className="h-8 text-xs border-sky-400/40 text-sky-100 bg-sky-500/10 hover:bg-sky-500/20" onClick={handlePlayAllHotToday}>
+                          <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
+                          Play All
+                        </Button>
+                        <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                            <span>Live Heat</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="max-h-[420px] overflow-y-auto pr-2">
@@ -470,9 +477,15 @@ export default function Home() {
                         Fresh catalogs from the town square, just arrived on $ongChainn.
                       </p>
                     </div>
-                    <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
-                      <Sparkles className="w-4 h-4" />
-                      <span>{newReleases.length} catalogs</span>
+                    <div className="flex items-center gap-2 text-xs text-primary">
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllNewReleases}>
+                        <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
+                        Play All
+                      </Button>
+                      <div className="hidden sm:flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        <span>{newReleases.length} catalogs</span>
+                      </div>
                     </div>
                   </div>
                   <div className="max-h-[420px] overflow-y-auto pr-2">
@@ -530,9 +543,15 @@ export default function Home() {
                         Signature collections surfacing from the town square.
                       </p>
                     </div>
-                    <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
-                      <Sparkles className="w-4 h-4" />
-                      <span>{featuredCatalogs.length} catalogs</span>
+                    <div className="flex items-center gap-2 text-xs text-primary">
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllFeatured}>
+                        <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
+                        Play All
+                      </Button>
+                      <div className="hidden sm:flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        <span>{featuredCatalogs.length} catalogs</span>
+                      </div>
                     </div>
                   </div>
                   <div className="max-h-[420px] overflow-y-auto pr-2">
@@ -566,9 +585,15 @@ export default function Home() {
                         Every project on $ongChainn, ready to explore.
                       </p>
                     </div>
-                    <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-                      <Music className="w-4 h-4 text-primary" />
-                      <span>{allCatalogs.length} catalogs</span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllCatalogs}>
+                        <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
+                        Play All
+                      </Button>
+                      <div className="hidden sm:flex items-center gap-2">
+                        <Music className="w-4 h-4 text-primary" />
+                        <span>{allCatalogs.length} catalogs</span>
+                      </div>
                     </div>
                   </div>
                   <div className="max-h-[520px] overflow-y-auto pr-2">
@@ -706,6 +731,32 @@ export default function Home() {
             </motion.section>
 
             {/* Marketplace CTA - Featured Ad Style */}
+            <motion.section variants={itemVariants}>
+              <Link to="/dj-shuffle" className="block group">
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-cyan-300/35 bg-black/60 p-4 sm:p-5">
+                  <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr] items-center">
+                    <div className="space-y-2">
+                      <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-500/15 px-3 py-1 text-xs font-semibold text-cyan-100">
+                        <Disc3 className="w-3.5 h-3.5" />
+                        DJ Shuffle
+                      </p>
+                      <h3 className="text-xl sm:text-2xl font-semibold text-white">Meet DJ $huffle</h3>
+                      <p className="text-sm text-zinc-200">
+                        Shuffle artist picks, catalogs, or all songs with nonstop random playback.
+                      </p>
+                      <Button size="sm" className="bg-emerald-400 text-black hover:bg-emerald-300">
+                        Open DJ Shuffle
+                        <ArrowRight className="w-4 h-4 ml-1.5" />
+                      </Button>
+                    </div>
+                    <div className="rounded-2xl border border-cyan-300/25 bg-black/35 p-2">
+                      <img src={djShuffleBranding} alt="DJ Shuffle branding" className="h-full w-full rounded-xl object-cover" />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </motion.section>
+
             <motion.section variants={itemVariants}>
               <Link to="/marketplace" className="block group">
                 <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-primary/40 hover:border-primary/60 transition-all duration-300">

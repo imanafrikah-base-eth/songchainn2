@@ -1,14 +1,12 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Music, Play, Heart, TrendingUp } from 'lucide-react';
+import { Users, Music, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { useSongPopularity } from '@/hooks/usePopularity';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
-import { supabase } from '@/integrations/supabase/client';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -24,8 +22,6 @@ const itemVariants = {
 };
 
 const NEW_ARTIST_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
-const DEFAULT_ARTIST_FOLLOWERS = 66;
-
 function isArtistNew(addedAt?: string) {
   if (!addedAt) return false;
   const ts = new Date(addedAt).getTime();
@@ -35,76 +31,32 @@ function isArtistNew(addedAt?: string) {
 
 export default function Artists() {
   const { data: popularityData } = useSongPopularity();
-  const artistIds = useMemo(() => ARTISTS.map(a => a.id), []);
-  const queryClient = useQueryClient();
-
-  const { data: followerCounts = {} } = useQuery({
-    queryKey: ['all-artist-followers'],
-    queryFn: async () => {
-      const counts: Record<string, number> = {};
-      if (artistIds.length === 0) return counts;
-      const { data, error } = await (supabase as any).rpc('get_artist_follow_counts', { artist_ids: artistIds });
-      if (error || !Array.isArray(data)) return counts;
-      (data as Array<{ artist_id: string; follower_count: number }>).forEach(row => {
-        counts[row.artist_id] = Number(row.follower_count || 0);
-      });
-      return counts;
-    },
-    enabled: artistIds.length > 0,
-    staleTime: 1000 * 10,
-    refetchInterval: 15000,
-  });
-
-  // Realtime updates for follower counts
-  useEffect(() => {
-    if (artistIds.length === 0) return;
-    const channel = supabase
-      .channel('artist-followers-all')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'liked_artists' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['all-artist-followers'] });
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [artistIds.length, queryClient]);
 
   // Calculate stats for each artist
   const artistsWithStats = useMemo(() => {
     return ARTISTS.map(artist => {
       const songs = SONGS.filter(s => s.artistId === artist.id);
       let totalPlays = 0;
-      let totalLikes = 0;
       
       songs.forEach(song => {
         const songData = popularityData?.find(p => p.song_id === song.id);
         totalPlays += songData?.play_count || 0;
-        totalLikes += songData?.like_count || 0;
       });
       return {
         ...artist,
         songCount: songs.length,
         totalPlays,
-        totalLikes,
-        followers: Math.max(DEFAULT_ARTIST_FOLLOWERS, followerCounts[artist.id] || 0),
       };
     }).sort((a, b) => b.totalPlays - a.totalPlays);
-  }, [popularityData, followerCounts]);
+  }, [popularityData]);
 
   const totalStats = useMemo(() => {
     return artistsWithStats.reduce(
       (acc, artist) => ({
         artists: acc.artists + 1,
         songs: acc.songs + artist.songCount,
-        plays: acc.plays + artist.totalPlays,
-        followers: acc.followers + artist.followers,
       }),
-      { artists: 0, songs: 0, plays: 0, followers: 0 }
+      { artists: 0, songs: 0 }
     );
   }, [artistsWithStats]);
 
@@ -131,14 +83,13 @@ export default function Artists() {
           </p>
         </motion.div>
 
-        {/* Stats Overview */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="mb-10"
         >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="glass-card rounded-2xl p-4 text-center shine-overlay">
               <div className="text-2xl font-bold text-foreground">{totalStats.artists}</div>
               <div className="text-sm text-muted-foreground">Artists</div>
@@ -146,14 +97,6 @@ export default function Artists() {
             <div className="glass-card rounded-2xl p-4 text-center shine-overlay">
               <div className="text-2xl font-bold text-foreground">{totalStats.songs}</div>
               <div className="text-sm text-muted-foreground">Songs</div>
-            </div>
-            <div className="glass-card rounded-2xl p-4 text-center shine-overlay">
-              <div className="text-2xl font-bold text-primary">{totalStats.plays.toLocaleString()}</div>
-              <div className="text-sm text-muted-foreground">Total Streams</div>
-            </div>
-            <div className="glass-card rounded-2xl p-4 text-center shine-overlay">
-              <div className="text-2xl font-bold text-foreground">{totalStats.followers.toLocaleString()}</div>
-              <div className="text-sm text-muted-foreground">Total Followers</div>
             </div>
           </div>
         </motion.section>
@@ -237,25 +180,7 @@ export default function Artists() {
                     
                     {/* Stats */}
                     <div className="p-4 pt-2">
-                      <div className="grid grid-cols-3 gap-2 mb-3">
-                        <div className="text-center p-2 rounded-xl bg-muted/30">
-                          <div className="flex items-center justify-center gap-1 text-primary mb-1">
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                          </div>
-                          <div className="text-sm font-semibold text-foreground tabular-nums">
-                            {artist.totalPlays.toLocaleString()}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">Plays</div>
-                        </div>
-                        <div className="text-center p-2 rounded-xl bg-muted/30">
-                          <div className="flex items-center justify-center gap-1 text-pink-500 mb-1">
-                            <Heart className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="text-sm font-semibold text-foreground tabular-nums">
-                            {(artist.followers || 0).toLocaleString()}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">Followers</div>
-                        </div>
+                      <div className="grid grid-cols-1 gap-2 mb-3">
                         <div className="text-center p-2 rounded-xl bg-muted/30">
                           <div className="flex items-center justify-center gap-1 text-blue-500 mb-1">
                             <Music className="w-3.5 h-3.5" />

@@ -28,7 +28,7 @@ export function getEnv(): EnvConfig {
 
   if (problems.length > 0) {
     const message =
-      '[SongChainn ENV ERROR]\n' +
+      '[$ongChainn ENV ERROR]\n' +
       problems.map((p) => `- ${p}`).join('\n') +
       '\n\nFix in:\n- Local: .env.local\n- Vercel: Project Settings → Environment Variables\n\nExpected:\n' +
       'VITE_SUPABASE_URL=https://wsjhbfmzbonxmxaaassu.supabase.co';
@@ -44,4 +44,3 @@ export function getEnv(): EnvConfig {
 
   return { supabaseUrl, supabaseAnonKey };
 }
-

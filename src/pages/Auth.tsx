@@ -1,18 +1,19 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, QrCode, Play, Disc3, Flame } from 'lucide-react';
+import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, QrCode, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
-import logo from '@/assets/songchainn-logo.webp';
+const logo = '/songchainn-logo.webp';
+const wavewarzHeroBackground = '/wavewarz-africa-background.png';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { CountryCodeSelector } from '@/components/CountryCodeSelector';
 import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
 import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
 import { BaseWalletButton } from '@/components/wallet/BaseWalletButton';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { CATALOGS, SONGS, type Song } from '@/data/musicData';
 import { usePlayerActions, usePlayerState, usePlayerTime } from '@/context/PlayerContext';
@@ -28,9 +29,39 @@ const DEFAULT_COUNTRY = COUNTRY_CODES.find(c => c.code === 'ZM') || COUNTRY_CODE
 const DAILY_MIX_ID = 'songchainn-daily-mix-preview';
 const DAILY_MIX_URL = 'https://pub-6e7e2bb48a994314926f27fb90fa198f.r2.dev/SongChainn%20Playlist%201.mp3';
 const GUEST_LOCKED_SONGS_KEY = 'songchainn_guest_locked_songs';
+const ABOUT_HIGHLIGHTS = [
+  {
+    title: 'Music becomes signal',
+    description: 'Every listen, replay, share and conversation helps surface what actually matters in culture.',
+    icon: Sparkles,
+    accent: 'text-primary',
+    surface: 'bg-primary/10',
+  },
+  {
+    title: 'Listeners matter early',
+    description: '$ongChainn is built so early listeners, fans and communities are visible before the crowd arrives.',
+    icon: Headphones,
+    accent: 'text-emerald-400',
+    surface: 'bg-emerald-500/10',
+  },
+  {
+    title: 'Culture meets markets',
+    description: 'The long-term vision is onchain music where attention becomes measurable and songs can evolve into liquid assets.',
+    icon: LineChart,
+    accent: 'text-cyan-400',
+    surface: 'bg-cyan-500/10',
+  },
+] as const;
+
+const ABOUT_STEPS = [
+  'Preview music, catalogs and artists before creating an account.',
+  'Sign in when you are ready to save your vibe, unlock more playback and join the full experience.',
+  'Connect a Base wallet later for onchain identity, ownership and future drops.',
+] as const;
 
 export default function Auth() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail } = useAuth();
   const { openConnectModal, isConnected } = useWeb3Wallet();
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
@@ -49,10 +80,20 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [resendTimer, setResendTimer] = useState(0);
-  const [hasAutoStartedMix, setHasAutoStartedMix] = useState(false);
   const [showMixFinishedPrompt, setShowMixFinishedPrompt] = useState(false);
   const [mixFinishedHandled, setMixFinishedHandled] = useState(false);
   const [guestLockedSongIds, setGuestLockedSongIds] = useState<Set<string>>(new Set());
+  const [isMoshaOpen, setIsMoshaOpen] = useState(true);
+  const [moshaTransient, setMoshaTransient] = useState<string | null>(null);
+  const [moshaLeadMessage, setMoshaLeadMessage] = useState(
+    "I'm Mo$ha, your vibe mate and listening buddy. I can guide you through $ongChainn without pressure.",
+  );
+  const [isMoshaTourRunning, setIsMoshaTourRunning] = useState(false);
+  const [isMoshaTourCompleted, setIsMoshaTourCompleted] = useState(false);
+  const transientTimeoutRef = useRef<number | null>(null);
+  const tourTimeoutsRef = useRef<number[]>([]);
+  const mixPrompt30sSentRef = useRef(false);
+  const mixPrompt60sSentRef = useRef(false);
 
   // Track if user signed in via email/phone but needs wallet
   const [pendingWalletConnection, setPendingWalletConnection] = useState(false);
@@ -65,8 +106,8 @@ export default function Auth() {
 
   const dailyMixSong = useMemo<Song>(() => ({
     id: DAILY_MIX_ID,
-    title: 'SongChainn Daily Mix',
-    artist: 'SongChainn',
+    title: '$ongChainn Daily Mix',
+    artist: '$ongChainn',
     artistId: 'songchainn',
     audioUrl: DAILY_MIX_URL,
     coverImage: logo,
@@ -334,12 +375,30 @@ export default function Auth() {
 
   const passwordStrength = getPasswordStrength();
 
+  const showMoshaTransient = useCallback((text: string, durationMs = 10000) => {
+    setMoshaTransient(text);
+    if (transientTimeoutRef.current) {
+      window.clearTimeout(transientTimeoutRef.current);
+    }
+    transientTimeoutRef.current = window.setTimeout(() => {
+      setMoshaTransient(null);
+      transientTimeoutRef.current = null;
+    }, durationMs);
+  }, []);
+
+  const clearMoshaTourTimers = useCallback(() => {
+    tourTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
+    tourTimeoutsRef.current = [];
+  }, []);
+
   const handleStartDailyMix = useCallback((source: 'auto' | 'manual' = 'manual') => {
     setMixFinishedHandled(false);
     setShowMixFinishedPrompt(false);
+    mixPrompt30sSentRef.current = false;
+    mixPrompt60sSentRef.current = false;
     playSong(dailyMixSong, { force: true });
     if (source === 'manual') {
-      toast.success('Now playing SongChainn Daily Mix');
+      toast.success('Now playing $ongChainn Daily Mix');
     }
   }, [dailyMixSong, playSong]);
 
@@ -349,7 +408,8 @@ export default function Auth() {
       return;
     }
     if (guestLockedSongIds.has(song.id)) {
-      toast.error('This song is locked. Sign in or sign up to play it again.');
+      toast.error('Preview used. Sign in to unlock your full sound profile.');
+      setError('Unlock your full sound profile · Save your vibe · Join live rooms · Get smarter recommendations');
       setAuthView('main');
       setAuthMode('signin');
       return;
@@ -367,7 +427,8 @@ export default function Auth() {
       }
       return next;
     });
-    toast.success('Playing now. Guests get one play per song.');
+    setError(null);
+    toast.success('Preview unlocked. After this play, sign in to save your vibe and keep going.');
   }, [guestLockedSongIds, playSong, user]);
 
   const handleBrowseWithoutAuthModal = useCallback(() => {
@@ -376,11 +437,66 @@ export default function Auth() {
     setAuthView('main');
   }, []);
 
-  useEffect(() => {
-    if (hasAutoStartedMix) return;
-    handleStartDailyMix('auto');
-    setHasAutoStartedMix(true);
-  }, [handleStartDailyMix, hasAutoStartedMix]);
+  const openPublicAbout = useCallback(() => {
+    navigate('/about');
+    window.setTimeout(() => {
+      const section = document.getElementById('about-songchainn');
+      section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+  }, [navigate]);
+
+  const tellAboutWaveWarz = useCallback(() => {
+    showMoshaTransient(
+      'WaveWarz Africa is $ongChainn BattleZone energy. You can enter live battles, support artists, view results, and join battle rooms directly inside $ongChainn.',
+      11000,
+    );
+  }, [showMoshaTransient]);
+
+  const scrollToSection = useCallback((sectionId: string) => {
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  const startMoshaExploreTour = useCallback(() => {
+    if (isMoshaTourRunning) return;
+    clearMoshaTourTimers();
+    setIsMoshaOpen(true);
+    setIsMoshaTourRunning(true);
+    setIsMoshaTourCompleted(false);
+
+    const steps: Array<{ id?: string; text: string }> = [
+      { text: 'This is Hot Today. It surfaces songs listeners are actively pushing right now.' },
+      { id: 'wavewarz-preview', text: 'WaveWarz is where fans vote and support artists live in BattleZone energy.' },
+      { id: 'about-songchainn', text: 'This section explains $ongChainn vision and what early listeners unlock first.' },
+      { id: 'featured-catalogs', text: 'Featured Catalogs group the strongest drops so you can discover faster.' },
+      { id: 'trending-artists', text: 'Trending Artists helps you catch talent early and stay ahead of the crowd.' },
+      { id: 'all-songs', text: 'All Songs is your broad map. Sample quickly, then sign up to unlock full depth.' },
+    ];
+
+    const runStep = (index: number) => {
+      if (index >= steps.length) {
+        setMoshaLeadMessage('Tour complete. Are you ready to sign up, or do you want to have a taste first?');
+        setIsMoshaTourRunning(false);
+        setIsMoshaTourCompleted(true);
+        return;
+      }
+      const step = steps[index];
+      if (step.id) {
+        scrollToSection(step.id);
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      setMoshaLeadMessage(step.text);
+      showMoshaTransient(step.text, 3600);
+      const timerId = window.setTimeout(() => runStep(index + 1), 4500);
+      tourTimeoutsRef.current.push(timerId);
+    };
+
+    const starterId = window.setTimeout(() => runStep(0), 200);
+    tourTimeoutsRef.current.push(starterId);
+  }, [clearMoshaTourTimers, isMoshaTourRunning, scrollToSection, showMoshaTransient]);
 
   useEffect(() => {
     const isDailyMixActive = currentSong?.id === DAILY_MIX_ID;
@@ -393,6 +509,66 @@ export default function Auth() {
     setAuthView('main');
     setError(null);
   }, [currentSong?.id, currentTime, duration, mixFinishedHandled, pause]);
+
+  useEffect(() => {
+    if (currentSong?.id !== DAILY_MIX_ID || !isPlaying) return;
+    if (currentTime >= 30 && !mixPrompt30sSentRef.current) {
+      mixPrompt30sSentRef.current = true;
+      showMoshaTransient('Are you enjoying this mix so far?', 10000);
+    }
+    if (currentTime >= 60 && !mixPrompt60sSentRef.current) {
+      mixPrompt60sSentRef.current = true;
+      showMoshaTransient('Signup now to save your vibe and unlock full listening.', 10000);
+    }
+  }, [currentSong?.id, currentTime, isPlaying, showMoshaTransient]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    return () => {
+      if (transientTimeoutRef.current) {
+        window.clearTimeout(transientTimeoutRef.current);
+      }
+      clearMoshaTourTimers();
+    };
+  }, [clearMoshaTourTimers]);
+
+  useEffect(() => {
+    const handleOpen = () => setIsMoshaOpen(true);
+    window.addEventListener('songchainn:open-mosha', handleOpen as EventListener);
+    return () => {
+      window.removeEventListener('songchainn:open-mosha', handleOpen as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isMoshaOpen) return;
+    const cues: Array<{ id: string; text: string }> = [
+      { id: 'wavewarz-preview', text: 'WaveWarz is where fans vote and push artists live. Big energy there.' },
+      { id: 'about-songchainn', text: '$ongChainn turns listening into signal. Want the full story? Tap Learn More.' },
+      { id: 'featured-catalogs', text: 'These catalogs are trending now. You can preview first, then sign in when ready.' },
+      { id: 'trending-artists', text: 'Early ears catch artists before the crowd. Your taste matters here.' },
+      { id: 'all-songs', text: 'Tap any track for a quick feel. Sign in later to unlock full playback.' },
+    ];
+    const seen = new Set<string>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.find((entry) => entry.isIntersecting);
+        if (!visible) return;
+        const cue = cues.find((item) => item.id === visible.target.id);
+        if (!cue || seen.has(cue.id)) return;
+        seen.add(cue.id);
+        showMoshaTransient(cue.text, 3400);
+      },
+      { threshold: 0.4 }
+    );
+    cues.forEach((cue) => {
+      const el = document.getElementById(cue.id);
+      if (el) observer.observe(el);
+    });
+    return () => {
+      observer.disconnect();
+    };
+  }, [isMoshaOpen, location.pathname, showMoshaTransient]);
 
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden">
@@ -411,7 +587,8 @@ export default function Auth() {
               </button>
             </div>
             <div className="hidden lg:flex items-center gap-6 text-sm text-muted-foreground">
-              <button type="button" onClick={handleBrowseWithoutAuthModal} className="hover:text-foreground transition-colors">Premuim Music</button>
+              <button type="button" onClick={() => scrollToSection('about-songchainn')} className="hover:text-foreground transition-colors">About</button>
+              <button type="button" onClick={handleBrowseWithoutAuthModal} className="hover:text-foreground transition-colors">Premium Music</button>
               <button type="button" onClick={() => navigate('/install')} className="hover:text-foreground transition-colors">Install App</button>
             </div>
             <div className="flex items-center gap-2">
@@ -484,7 +661,7 @@ export default function Auth() {
           </aside>
 
           <main className="rounded-xl border border-border/40 bg-background/80 backdrop-blur p-4 md:p-5">
-            <section className="mb-7 lg:hidden">
+            <section id="hot-today" className="mb-7 lg:hidden">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-heading text-foreground">Hot Today</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
@@ -527,21 +704,153 @@ export default function Auth() {
                 <div>
                   <p className="text-xs uppercase tracking-wide text-primary font-semibold flex items-center gap-1.5 mb-1">
                     <Disc3 className="w-3.5 h-3.5" />
-                    Daily mix now playing
+                    Daily mix preview
                   </p>
                   <h1 className="font-heading text-2xl md:text-3xl text-foreground mb-1">Have a taste</h1>
                   <p className="text-sm text-muted-foreground">
-                    Use accents and playlists. Find this and more mixes on SongChainn.
+                    Use accents and playlists. Find this and more mixes on $ongChainn.
                   </p>
                 </div>
-                <Button type="button" onClick={() => handleStartDailyMix('manual')} className="gradient-primary text-primary-foreground rounded-full px-5">
-                  <Play className="w-4 h-4 mr-2" />
-                  {currentSong?.id === DAILY_MIX_ID && isPlaying ? 'Playing' : 'Play mix'}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => scrollToSection('about-songchainn')}
+                    className="rounded-full border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    About $ongChainn
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                  <Button type="button" onClick={() => handleStartDailyMix('manual')} className="gradient-primary text-primary-foreground rounded-full px-5">
+                    <Play className="w-4 h-4 mr-2" />
+                    {currentSong?.id === DAILY_MIX_ID && isPlaying ? 'Playing' : 'Play mix'}
+                  </Button>
+                </div>
               </div>
             </div>
 
-            <section className="mb-7">
+            <section id="wavewarz-preview" className="mb-7">
+              <div
+                className="overflow-hidden rounded-3xl border border-cyan-400/35 bg-black/75 p-4 md:p-5"
+                style={{
+                  backgroundImage: `linear-gradient(120deg, rgba(0,0,0,0.9), rgba(0,0,0,0.5)), url(${wavewarzHeroBackground})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                <div className="space-y-3">
+                  <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/35 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-100">
+                    <Flame className="h-3.5 w-3.5" />
+                    WaveWarz Africa
+                  </p>
+                  <h2 className="text-2xl md:text-3xl font-bold text-white">Enter The African BattleZone</h2>
+                  <p className="max-w-2xl text-sm md:text-base text-zinc-200">
+                    Make some money while voting and supporting your favorite artist or song. Feel the live battle energy before you sign in.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" className="bg-emerald-400 text-black hover:bg-emerald-300" onClick={handleBrowseWithoutAuthModal}>
+                      Enter BattleZ
+                    </Button>
+                    <Button type="button" variant="outline" className="border-cyan-300/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20" onClick={handleBrowseWithoutAuthModal}>
+                      Watch Live Battles
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-emerald-300/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
+                      onClick={() => window.open('https://subscribepage.io/XFM0pk', '_blank', 'noopener,noreferrer')}
+                    >
+                      Learn How It Works
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="about-songchainn" className="mb-7 scroll-mt-24">
+              <div className="rounded-3xl border border-border/50 bg-gradient-to-br from-background via-background to-primary/5 p-5 md:p-6">
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary mb-3">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      About $ongChainn
+                    </div>
+                    <h2 className="font-heading text-2xl md:text-3xl text-foreground mb-3">
+                      Understand $ongChainn better
+                    </h2>
+                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-4">
+                      $ongChainn is a music-first onchain platform where listening is not passive. People discover songs,
+                      build taste, join community and help reveal which sounds are truly moving culture.
+                    </p>
+                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-5">
+                      New visitors can preview the vibe first. When they are ready, they can create an account to save
+                      their profile, unlock more playback and step into deeper community and ownership features.
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {ABOUT_HIGHLIGHTS.map(({ title, description, icon: Icon, accent, surface }) => (
+                        <div key={title} className="rounded-2xl border border-border/40 bg-background/70 p-4">
+                          <div className={`inline-flex rounded-xl p-2 ${surface} mb-3`}>
+                            <Icon className={`w-4 h-4 ${accent}`} />
+                          </div>
+                          <h3 className="text-sm font-semibold text-foreground mb-1.5">{title}</h3>
+                          <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 md:p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                        How the visitor journey works
+                      </p>
+                      <div className="space-y-3">
+                        {ABOUT_STEPS.map((step, index) => (
+                          <div key={step} className="flex items-start gap-3">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                              {index + 1}
+                            </div>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{step}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/40 bg-background/80 p-4 md:p-5">
+                      <p className="text-sm font-semibold text-foreground mb-2">Why it feels different</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                        Imagine trading music as an actual onchain asset. What does this mean? Sign up to learn more.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          className="rounded-full gradient-primary text-primary-foreground"
+                          onClick={() => {
+                            setAuthMode('signup');
+                            setAuthView('email');
+                          }}
+                        >
+                          Sign up free
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-full border-primary/30 text-primary hover:bg-primary/10"
+                          onClick={() => {
+                            setAuthMode('signin');
+                            setAuthView('email');
+                          }}
+                        >
+                          Log in
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="featured-catalogs" className="mb-7">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-heading text-foreground">Today’s Featured Catalogs</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
@@ -569,7 +878,7 @@ export default function Auth() {
               </div>
             </section>
 
-            <section className="mb-7">
+            <section id="trending-artists" className="mb-7">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-heading text-foreground">Trending Artists</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
@@ -591,7 +900,7 @@ export default function Auth() {
               </div>
             </section>
 
-            <section>
+            <section id="all-songs">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-heading text-foreground">All Songs</h2>
                 <div className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium bg-primary/10 text-primary">
@@ -634,6 +943,85 @@ export default function Auth() {
             </section>
           </main>
         </div>
+
+        {isMoshaOpen ? (
+          <div className="fixed right-3 sm:right-5 bottom-24 z-[64] w-[min(calc(100vw-1.25rem),22rem)]">
+            <div className="rounded-2xl border border-primary/30 bg-background/95 backdrop-blur p-3 shadow-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">Hey fam.</span> {moshaLeadMessage}
+                </p>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsMoshaOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button type="button" className="h-9 text-xs" onClick={openPublicAbout}>
+                  Learn more about $ongChainn
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 text-xs border-primary/30 text-primary"
+                  onClick={startMoshaExploreTour}
+                  disabled={isMoshaTourRunning}
+                >
+                  {isMoshaTourRunning ? 'Exploring...' : 'Click here if ready to explore'}
+                </Button>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2 h-9 w-full text-xs border-primary/30 text-primary"
+                onClick={tellAboutWaveWarz}
+              >
+                Tell me about WaveWarz
+              </Button>
+              {isMoshaTourCompleted && !isMoshaTourRunning && (
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    className="h-9 text-xs"
+                    onClick={() => {
+                      setAuthMode('signup');
+                      setAuthView('email');
+                    }}
+                  >
+                    Signup now
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 text-xs border-primary/30 text-primary"
+                    onClick={() => handleStartDailyMix('manual')}
+                  >
+                    Want to have a taste
+                  </Button>
+                </div>
+              )}
+              {moshaTransient && (
+                <div className="mt-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                  {moshaTransient}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="fixed right-3 sm:right-5 bottom-24 z-[64] flex flex-col items-end gap-2">
+            {moshaTransient && (
+              <div className="max-w-xs rounded-xl border border-primary/30 bg-background/95 px-3 py-2 text-xs text-foreground shadow-xl">
+                {moshaTransient}
+              </div>
+            )}
+            <Button type="button" className="rounded-full h-10 px-4 gradient-primary text-primary-foreground" onClick={() => setIsMoshaOpen(true)}>
+              Call Mo$ha
+            </Button>
+          </div>
+        )}
 
         {(authView !== 'landing' || connectionState === 'success') && (
           <div className="fixed inset-0 z-[65] bg-background/70 backdrop-blur-sm p-3 sm:p-4 flex items-center justify-center">
@@ -1138,24 +1526,6 @@ export default function Auth() {
           </div>
         )}
 
-        <div className="fixed bottom-0 left-0 right-0 z-20 bg-[#8A65FF] text-white px-4 py-3">
-          <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">Preview SongChainn</p>
-              <p className="text-xs opacity-90">Sign up to unlock unlimited song playback and full artist experience.</p>
-            </div>
-            <Button
-              type="button"
-              className="rounded-full bg-white text-black hover:bg-white/90 px-5"
-              onClick={() => {
-                setAuthMode('signup');
-                setAuthView('email');
-              }}
-            >
-              Sign up free
-            </Button>
-          </div>
-        </div>
       </div>
       {showMixFinishedPrompt && (
         <div className="fixed inset-0 z-[70] bg-background/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1163,7 +1533,7 @@ export default function Auth() {
             <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-2">Daily Mix Finished</p>
             <h3 className="font-heading text-xl text-foreground mb-2">Want more music?</h3>
             <p className="text-sm text-muted-foreground mb-5">
-              Sign in or sign up to keep playing catalogs, discover artists, and unlock the full SongChainn experience.
+              Sign in or sign up to keep playing catalogs, discover artists, and unlock the full $ongChainn experience.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Button

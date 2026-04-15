@@ -14,7 +14,7 @@ import type { Playlist } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { setPlaylistSongs } from '@/lib/localDb';
-import logo from '@/assets/songchainn-logo.webp';
+const logo = '/songchainn-logo.webp';
 
 export default function PlaylistDetail() {
   const { id } = useParams<{ id: string }>();

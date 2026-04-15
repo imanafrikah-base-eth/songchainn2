@@ -1,13 +1,13 @@
 import artist7roo7hBasedLocal from '@/assets/artist-7roo7h-based.png';
-import artistDenajahLocal from '@/assets/artist-denajah.png';
-import artistImanAfrikahLocal from '@/assets/artist-iman-afrikah.png';
-import artistNdaLocal from '@/assets/artist-nda.png';
-import artistPrpLocal from '@/assets/artist-prp.png';
-import artistSanchyLocal from '@/assets/artist-sanchy.png';
-import artistSantanaLocal from '@/assets/artist-santana.png';
-import artistCover1Local from '@/assets/artist-cover-1.jpg';
-import artistCover2Local from '@/assets/artist-cover-2.jpg';
-import artistCover3Local from '@/assets/artist-cover-3.jpg';
+import artistDenajahLocal from '@/assets/DenaJah/DenaJah.png';
+import artistImanAfrikahLocal from '@/assets/IMan Afrikah/IMan Afrikah (1).png';
+import artistNdaLocal from '@/assets/NDA/NDA (1).png';
+import artistPrpLocal from '@/assets/PRP/PRP.png';
+import artistSanchyLocal from '@/assets/Sanchy/Sanchy (1).png';
+import artistSantanaLocal from '@/assets/Santana/Santana (1).png';
+import artistCover1Local from '@/assets/FAITH/Faith (1).png';
+const artistCover2Local = '/songchainn-logo.webp';
+const artistCover3Local = '/songchainn-logo.webp';
 
 export type Genre =
   | 'Trap'
@@ -101,6 +101,23 @@ export interface AdminUser {
   email: string;
   baseAddress?: string;
   isAdmin: boolean;
+}
+
+const UNSTABLE_COVER_FALLBACKS: Array<{ match: string; fallback: string }> = [
+  { match: 'NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg', fallback: artistNdaLocal },
+  { match: 'IMan%20Arikah%20-3.0%20art.png', fallback: artistImanAfrikahLocal },
+  { match: 'Santana%20vol2%20Art.png', fallback: artistSantanaLocal },
+  { match: '7ROO7H%20BASED%20vol4.png', fallback: artist7roo7hBasedLocal },
+  { match: '7ROO7H%20BASED%20vol5.png', fallback: artist7roo7hBasedLocal },
+];
+
+function withStableCoverImage(coverImage?: string, artist?: string): string | undefined {
+  if (typeof coverImage === 'string' && coverImage.length > 0) {
+    const fallback = UNSTABLE_COVER_FALLBACKS.find((entry) => coverImage.includes(entry.match));
+    if (fallback) return fallback.fallback;
+    return coverImage;
+  }
+  return ARTWORK_BY_ARTIST[String(artist ?? '').trim()] || undefined;
 }
 
 const artist7roo7hBased =
@@ -205,7 +222,7 @@ function buildCatalogs(songs: Song[]): Catalog[] {
   });
 }
 
-export const SONGS: Song[] = [
+const SONGS_RAW: Song[] = [
   {
     id: '1',
     title: "Eve's Daughter",
@@ -1761,7 +1778,7 @@ export const SONGS: Song[] = [
     volume: 'Vol4',
   },
   {
-    id: '149',
+    id: '204',
     title: 'INSIDE LIBALA RMS',
     artist: '7ROO7H BASED',
     artistId: '1',
@@ -3007,6 +3024,11 @@ export const SONGS: Song[] = [
     volume: "ER'TING FLEX",
   },
 ];
+
+export const SONGS: Song[] = SONGS_RAW.map((song): Song => ({
+  ...song,
+  coverImage: withStableCoverImage(song.coverImage, song.artist),
+}));
 
 export const CATALOGS: Catalog[] = buildCatalogs(SONGS);
 

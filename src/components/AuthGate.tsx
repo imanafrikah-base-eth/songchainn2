@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { ExternalLink, Shield, Music, Users } from 'lucide-react';
-import logo from '@/assets/songchainn-logo.webp';
+const logo = '/songchainn-logo.webp';
 import { Button } from '@/components/ui/button';
 
 interface AuthGateProps {

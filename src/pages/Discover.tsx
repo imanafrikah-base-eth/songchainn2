@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { getLikedSongs } from '@/lib/localDb';
-import { useSafePlayerState } from '@/context/PlayerContext';
+import { usePlayerActions, useSafePlayerState } from '@/context/PlayerContext';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 
@@ -63,6 +63,7 @@ export default function Discover() {
   const { user } = useAuth();
   const { data: todayHotSongs = [] } = useTodayHotSongs(5);
   const playerState = useSafePlayerState();
+  const { playQueue } = usePlayerActions();
   const { data: likedSongIds = [] } = useUserLikes();
   const { isSongCached } = useOfflineAudio();
   const roomOnlineCount = useRoomOnlineCount({
@@ -180,6 +181,15 @@ export default function Discover() {
     return [...catalogs].sort(() => Math.random() - 0.5).slice(0, 3);
   }, [catalogs]);
 
+  const songsFromCatalogs = useMemo(() => {
+    return (catalogList: Catalog[]) => {
+      const songIds = Array.from(new Set(catalogList.flatMap((catalog) => catalog.songIds)));
+      return songIds
+        .map((songId) => SONGS.find((song) => song.id === songId))
+        .filter(Boolean) as typeof SONGS;
+    };
+  }, []);
+
   const getGenreColor = (genre: Genre) => {
     const colors: Record<Genre, string> = {
       Trap: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -244,7 +254,7 @@ export default function Discover() {
                   <Headphones className="w-3.5 h-3.5" />
                   <span>Jump into Room</span>
                   <span className="inline-flex items-center rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
-                    {roomOnlineCount} live
+                    {`${roomOnlineCount}live`}
                   </span>
                 </button>
               </Link>
@@ -321,11 +331,22 @@ export default function Discover() {
                       Most played songs since midnight across the town square.
                     </p>
                   </div>
-                  <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30">
-                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                      <span>Live Heat</span>
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs border-sky-400/40 text-sky-100 bg-sky-500/10 hover:bg-sky-500/20"
+                      onClick={() => playQueue(todayHotSongs.map((entry) => entry.song))}
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1.5" />
+                      Play All
+                    </Button>
+                    <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                        <span>Live Heat</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="max-h-[420px] overflow-y-auto pr-2">
@@ -406,9 +427,20 @@ export default function Discover() {
                     Fresh catalogs landing in the town square.
                   </p>
                 </div>
-                <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
-                  <Music className="w-4 h-4" />
-                  <span>{newReleases.length} catalogs</span>
+                <div className="flex items-center gap-2 text-xs text-primary">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20"
+                    onClick={() => playQueue(songsFromCatalogs(newReleases))}
+                  >
+                    <Play className="w-3.5 h-3.5 mr-1.5" />
+                    Play All
+                  </Button>
+                  <div className="hidden sm:flex items-center gap-2">
+                    <Music className="w-4 h-4" />
+                    <span>{newReleases.length} catalogs</span>
+                  </div>
                 </div>
                 </div>
               <div className="max-h-[420px] overflow-y-auto pr-2">
@@ -500,16 +532,27 @@ export default function Discover() {
                   <motion.div variants={itemVariants} className="flex items-center justify-between gap-2 mb-4">
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-primary" />
-                      <h2 className="font-heading text-xl font-semibold text-foreground">For You</h2>
+                      <h2 className="font-heading text-xl font-semibold text-foreground">Featured Catalogs</h2>
                       {preferredGenres.length > 0 && (
                         <Badge variant="secondary" className="text-xs">
                           Based on your {preferredGenres[0]} likes
                         </Badge>
                       )}
                     </div>
-                    <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
-                      <Heart className="w-3.5 h-3.5 text-primary" />
-                      <span>Personalized catalogs</span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20"
+                        onClick={() => playQueue(songsFromCatalogs(recommendedCatalogs))}
+                      >
+                        <Play className="w-3.5 h-3.5 mr-1.5" />
+                        Play All
+                      </Button>
+                      <div className="hidden sm:flex items-center gap-1">
+                        <Heart className="w-3.5 h-3.5 text-primary" />
+                        <span>Personalized catalogs</span>
+                      </div>
                     </div>
                   </motion.div>
                   <div className="max-h-[420px] overflow-y-auto pr-2">
@@ -541,7 +584,7 @@ export default function Discover() {
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-primary" />
                       <h2 className="font-heading text-xl font-semibold text-foreground">
-                        {selectedGenre === 'all' ? 'Trending Now' : selectedGenre}
+                        {selectedGenre === 'all' ? 'All Catalogs' : selectedGenre}
                       </h2>
                       <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
                         <Music className="w-3.5 h-3.5 text-primary" />
@@ -549,6 +592,17 @@ export default function Discover() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs">
+                      {selectedGenre === 'all' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20"
+                          onClick={() => playQueue(songsFromCatalogs(sortedCatalogs))}
+                        >
+                          <Play className="w-3.5 h-3.5 mr-1.5" />
+                          Play All
+                        </Button>
+                      )}
                       <span className="hidden sm:inline text-muted-foreground">Sort</span>
                       <button
                         type="button"

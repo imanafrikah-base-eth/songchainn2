@@ -22,7 +22,7 @@ import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import logo from '@/assets/songchainn-logo.webp';
+const logo = '/songchainn-logo.webp';
 import { uploadPublicImage } from '../lib/storage';
 
 const first = <T,>(arr: T[] | null | undefined): T | undefined =>

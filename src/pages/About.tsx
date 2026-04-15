@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Sparkles, Headphones, Users, Music, ArrowRight, Radio, Brain, ShieldCheck, LineChart } from 'lucide-react';
@@ -20,6 +21,30 @@ const itemVariants = {
 };
 
 export default function About() {
+  const hasTriggeredBottomPromptRef = useRef(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (hasTriggeredBottomPromptRef.current) return;
+      const viewportBottom = window.scrollY + window.innerHeight;
+      const threshold = document.documentElement.scrollHeight - 120;
+      if (viewportBottom < threshold) return;
+      hasTriggeredBottomPromptRef.current = true;
+      window.dispatchEvent(
+        new CustomEvent('songchainn:mosha-prompt', {
+          detail: {
+            text: 'Malaka?? ready to move on now??',
+            ctaLabel: 'Lets Go..',
+            ctaPath: '/',
+          },
+        })
+      );
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background pb-24 relative">
       <AnimatedBackground variant="default" />

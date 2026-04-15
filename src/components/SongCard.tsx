@@ -63,12 +63,6 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     return Date.now() - ts < NEW_SONG_WINDOW_MS;
   })();
   
-  // Get real play count from database (total across all users)
-  const totalPlays = useMemo(() => {
-    const songData = popularityData?.find(p => p.song_id === song.id);
-    return songData?.play_count || 0;
-  }, [popularityData, song.id]);
-  
   const totalLikes = useMemo(() => {
     const songData = popularityData?.find(p => p.song_id === song.id);
     return songData?.like_count || 0;
@@ -246,7 +240,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   Saved
                 </span>
               )}
-              <span>{totalPlays.toLocaleString()} plays</span>
+              <span>{totalLikes.toLocaleString()} likes</span>
             </span>
             {totalPulses > 0 && (
               <span className="text-[10px] sm:text-xs text-primary tabular-nums hidden xs:block">
@@ -414,8 +408,6 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           </div>
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="tabular-nums">{totalPlays.toLocaleString()} plays</span>
-            <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
             <span className="tabular-nums">{totalLikes.toLocaleString()} likes</span>
             {totalPulses > 0 && (
               <>
@@ -523,7 +515,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 Saved
               </span>
             )}
-            <span>{totalPlays.toLocaleString()} plays</span>
+            <span>{totalLikes.toLocaleString()} likes</span>
           </span>
           <div className="flex items-center gap-1">
             {totalPulses > 0 && (

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play, Pause, Heart, Headphones, Music } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Heart, Music } from 'lucide-react';
 import { CATALOGS, SONGS, ARTISTS, type Song } from '@/data/musicData';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -118,10 +118,6 @@ export default function CatalogDetail() {
               )}
 
               <div className="flex items-center gap-6 mb-6">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Headphones className="w-5 h-5" />
-                  <span className="text-lg font-medium">{catalog.totalPlays.toLocaleString()} streams</span>
-                </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Heart className="w-5 h-5" />
                   <span className="text-lg font-medium">{catalog.totalLikes.toLocaleString()} likes</span>

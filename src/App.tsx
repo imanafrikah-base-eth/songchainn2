@@ -10,6 +10,8 @@ import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { NotificationBanner } from "@/components/NotificationBanner";
+import { VibeAgent } from "@/components/VibeAgent";
+import { BehaviorCtaPopups } from "@/components/BehaviorCtaPopups";
 import { useUserPresence } from "@/hooks/useUserPresence";
 import { supabase } from "@/integrations/supabase/client";
 // Lazy load pages for better initial load performance
@@ -34,6 +36,11 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Room = lazy(() => import("./pages/Room"));
 const About = lazy(() => import("./pages/About"));
+const WaveWarzAfricaOnboarding = lazy(() => import("./pages/WaveWarzAfricaOnboarding"));
+const WaveWarzAfricaEmbed = lazy(() => import("./pages/WaveWarzAfricaEmbed"));
+const WaveWarzBattleZone = lazy(() => import("./pages/WaveWarzBattleZone"));
+const DjShuffle = lazy(() => import("./pages/DjShuffle"));
+const Inbox = lazy(() => import("./pages/Inbox"));
 
 
 // Loading spinner component
@@ -69,6 +76,9 @@ function AppShell() {
   const location = useLocation();
   const { user } = useAuth();
   const hideChrome = location.pathname.startsWith('/room');
+  const isWaveWarzEmbedRoute =
+    location.pathname === '/wavewarz-africa/results';
+  const hideFloatingChrome = hideChrome || isWaveWarzEmbedRoute;
   const [isGlobalPulsing, setIsGlobalPulsing] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const pulseTimeoutRef = useRef<number | null>(null);
@@ -133,7 +143,7 @@ function AppShell() {
 
   return (
     <>
-      <div className={`${hideChrome ? '' : 'pb-20 lg:pb-0'} ${rootPulseClass}`.trim()}>
+      <div className={`${hideFloatingChrome ? '' : 'pb-20 lg:pb-0'} ${rootPulseClass}`.trim()}>
         <RedirectHandler />
         <Routes>
           <Route path="/" element={<Home />} />
@@ -148,9 +158,17 @@ function AppShell() {
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/social" element={<Social />} />
+          <Route path="/inbox" element={<Inbox />} />
           <Route path="/community" element={<Community />} />
           <Route path="/audience/:userId" element={<AudienceProfile />} />
           <Route path="/about" element={<About />} />
+          <Route path="/wavewarz-africa" element={<WaveWarzBattleZone />} />
+          <Route path="/wavewarz-africa/live" element={<WaveWarzBattleZone />} />
+          <Route path="/wavewarz-africa/create" element={<WaveWarzBattleZone />} />
+          <Route path="/wavewarz-africa/results" element={<WaveWarzAfricaEmbed />} />
+          <Route path="/wavewarz-africa/room/:battleId" element={<WaveWarzBattleZone />} />
+          <Route path="/wavewarz-africa/onboarding" element={<WaveWarzAfricaOnboarding />} />
+          <Route path="/dj-shuffle" element={<DjShuffle />} />
           <Route path="/install" element={<Install />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/room" element={<Room />} />
@@ -158,7 +176,9 @@ function AppShell() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
-      {!hideChrome && <BottomTabBar />}
+      {!hideFloatingChrome && <VibeAgent />}
+      {!hideFloatingChrome && <BehaviorCtaPopups />}
+      {!hideFloatingChrome && <BottomTabBar />}
     </>
   );
 }

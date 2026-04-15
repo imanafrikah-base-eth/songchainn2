@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import logo from '@/assets/songchainn-logo.webp';
+const logo = '/songchainn-logo.webp';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { uploadPublicImage } from '../lib/storage';
