@@ -16,6 +16,7 @@ import { SuggestionDialog } from '@/components/SuggestionDialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { SONGS } from '@/data/musicData';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
@@ -42,6 +43,8 @@ export function Navigation() {
   const [showOfflineSaveAnnouncement, setShowOfflineSaveAnnouncement] = useState(false);
   const [showProfilePhotoAnnouncement, setShowProfilePhotoAnnouncement] = useState(false);
   const [pulseBanner, setPulseBanner] = useState<{ songId: string; title: string } | null>(null);
+  const [showStreakInfo, setShowStreakInfo] = useState(false);
+  const [showPointsInfo, setShowPointsInfo] = useState(false);
   const playerState = useSafePlayerState();
   const roomUsername = (() => {
     if (!user?.id) return null;
@@ -478,13 +481,27 @@ export function Navigation() {
 
               {/* Mobile Stats */}
               <div className="p-4 border-b border-border/50 flex items-center gap-3">
-                <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl glass text-sm">
-                  <Flame className="w-4 h-4 text-orange-500" />
-                  <span className="text-foreground font-medium">{currentStreak} streak</span>
-                </div>
-                <div className="px-3 py-2 rounded-xl gradient-primary text-primary-foreground font-semibold text-sm shadow-glow">
-                  {engagementPoints.toLocaleString()} pts
-                </div>
+                <Popover open={showStreakInfo} onOpenChange={setShowStreakInfo}>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="flex items-center gap-1.5 px-3 py-2 rounded-xl glass text-sm">
+                      <Flame className="w-4 h-4 text-orange-500" />
+                      <span className="text-foreground font-medium">{currentStreak} streak</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 text-xs">
+                    Your streak is how many days in a row you use $ongChainn. Longer streaks increase your points bonus.
+                  </PopoverContent>
+                </Popover>
+                <Popover open={showPointsInfo} onOpenChange={setShowPointsInfo}>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="px-3 py-2 rounded-xl gradient-primary text-primary-foreground font-semibold text-sm shadow-glow">
+                      {engagementPoints.toLocaleString()} pts
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 text-xs">
+                    Points track your activity. In the next phases, points are planned for early access, digital assets, and cash reward pathways.
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Nav Links */}

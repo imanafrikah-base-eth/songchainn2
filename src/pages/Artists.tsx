@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Music, TrendingUp } from 'lucide-react';
+import { Users, Music, TrendingUp, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ARTISTS, SONGS } from '@/data/musicData';
-import { useSongPopularity } from '@/hooks/usePopularity';
+import { useSongPopularity, useArtistFollowerCounts, useArtistStreamTotals } from '@/hooks/usePopularity';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
@@ -31,6 +31,8 @@ function isArtistNew(addedAt?: string) {
 
 export default function Artists() {
   const { data: popularityData } = useSongPopularity();
+  const { data: followerCounts } = useArtistFollowerCounts();
+  const { data: streamTotals } = useArtistStreamTotals();
 
   // Calculate stats for each artist
   const artistsWithStats = useMemo(() => {
@@ -46,17 +48,21 @@ export default function Artists() {
         ...artist,
         songCount: songs.length,
         totalPlays,
+        totalStreams: streamTotals?.find((entry) => entry.artist_id === artist.id)?.stream_count || totalPlays,
+        followerCount: followerCounts?.find((entry) => entry.artist_id === artist.id)?.follower_count || 0,
       };
-    }).sort((a, b) => b.totalPlays - a.totalPlays);
-  }, [popularityData]);
+    }).sort((a, b) => b.totalStreams - a.totalStreams);
+  }, [popularityData, streamTotals, followerCounts]);
 
   const totalStats = useMemo(() => {
     return artistsWithStats.reduce(
       (acc, artist) => ({
         artists: acc.artists + 1,
         songs: acc.songs + artist.songCount,
+        streams: acc.streams + artist.totalStreams,
+        followers: acc.followers + artist.followerCount,
       }),
-      { artists: 0, songs: 0 }
+      { artists: 0, songs: 0, streams: 0, followers: 0 }
     );
   }, [artistsWithStats]);
 
@@ -89,7 +95,7 @@ export default function Artists() {
           transition={{ delay: 0.1 }}
           className="mb-10"
         >
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="glass-card rounded-2xl p-4 text-center shine-overlay">
               <div className="text-2xl font-bold text-foreground">{totalStats.artists}</div>
               <div className="text-sm text-muted-foreground">Artists</div>
@@ -97,6 +103,14 @@ export default function Artists() {
             <div className="glass-card rounded-2xl p-4 text-center shine-overlay">
               <div className="text-2xl font-bold text-foreground">{totalStats.songs}</div>
               <div className="text-sm text-muted-foreground">Songs</div>
+            </div>
+            <div className="glass-card rounded-2xl p-4 text-center shine-overlay">
+              <div className="text-2xl font-bold text-foreground">{totalStats.streams.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Streams</div>
+            </div>
+            <div className="glass-card rounded-2xl p-4 text-center shine-overlay">
+              <div className="text-2xl font-bold text-foreground">{totalStats.followers.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Followers</div>
             </div>
           </div>
         </motion.section>
@@ -180,7 +194,7 @@ export default function Artists() {
                     
                     {/* Stats */}
                     <div className="p-4 pt-2">
-                      <div className="grid grid-cols-1 gap-2 mb-3">
+                      <div className="grid grid-cols-3 gap-2 mb-3">
                         <div className="text-center p-2 rounded-xl bg-muted/30">
                           <div className="flex items-center justify-center gap-1 text-blue-500 mb-1">
                             <Music className="w-3.5 h-3.5" />
@@ -189,6 +203,24 @@ export default function Artists() {
                             {artist.songCount}
                           </div>
                           <div className="text-[10px] text-muted-foreground">Songs</div>
+                        </div>
+                        <div className="text-center p-2 rounded-xl bg-muted/30">
+                          <div className="flex items-center justify-center gap-1 text-primary mb-1">
+                            <PlayCircle className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="text-sm font-semibold text-foreground tabular-nums">
+                            {artist.totalStreams.toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">Streams</div>
+                        </div>
+                        <div className="text-center p-2 rounded-xl bg-muted/30">
+                          <div className="flex items-center justify-center gap-1 text-primary mb-1">
+                            <Users className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="text-sm font-semibold text-foreground tabular-nums">
+                            {artist.followerCount.toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">Followers</div>
                         </div>
                       </div>
                       

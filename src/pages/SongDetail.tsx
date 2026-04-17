@@ -106,7 +106,7 @@ export default function SongDetail() {
       };
 
       const shareUrl = `${window.location.origin}/song/${song.id}`;
-      const description = `Listen to "${song.title}" by ${artist.name} on $ongChainn - the audience-first music streaming platform.`;
+      const description = `Listen to "${song.title}" by ${artist.name} on $ongChainn and shape your discovery in real time.`;
       const imageUrl = song.coverImage || `${window.location.origin}/og.png`;
 
       updateMeta('og:title', `${song.title} - ${artist.name}`);

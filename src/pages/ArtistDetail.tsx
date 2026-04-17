@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle } from 'lucide-react';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { SongCard } from '@/components/SongCard';
 import { Navigation } from '@/components/Navigation';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useAuth } from '@/context/AuthContext';
-import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
+import { useSongPopularity, useArtistFollowerCounts } from '@/hooks/usePopularity';
 import { useShare } from '@/hooks/useShare';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
@@ -41,7 +41,7 @@ export default function ArtistDetail() {
   const { user, isArtist, artistId } = useAuth();
   const { isArtistLiked, toggleLikeArtist } = useAudienceInteractions();
   const { data: popularityData } = useSongPopularity();
-  const { data: pulseCounts } = usePulseCounts();
+  const { data: followerCounts } = useArtistFollowerCounts();
   const { copyToClipboard, getShareUrl, shareToX, nativeShare, copied } = useShare();
   const queryClient = useQueryClient();
   const {
@@ -492,23 +492,24 @@ export default function ArtistDetail() {
 
   const artistStats = useMemo(() => {
     if (!artistSongs.length || !popularityData) {
-      return { totalPlays: 0, totalLikes: 0, totalPulses: 0 };
+      return { totalPlays: 0, totalLikes: 0 };
     }
 
     let totalPlays = 0;
     let totalLikes = 0;
-    let totalPulses = 0;
 
     artistSongs.forEach(song => {
       const songData = popularityData.find(p => p.song_id === song.id);
       totalPlays += songData?.play_count || 0;
       totalLikes += songData?.like_count || 0;
-      const pulseData = pulseCounts?.find(p => p.song_id === song.id);
-      totalPulses += pulseData?.pulse_count || 0;
     });
 
-    return { totalPlays, totalLikes, totalPulses };
-  }, [artistSongs, popularityData, pulseCounts]);
+    return { totalPlays, totalLikes };
+  }, [artistSongs, popularityData]);
+  const artistFollowers = useMemo(
+    () => followerCounts?.find((entry) => entry.artist_id === id)?.follower_count || 0,
+    [followerCounts, id],
+  );
 
   if (!artist) {
     return (
@@ -794,6 +795,14 @@ export default function ArtistDetail() {
                   <Music className="w-4 h-4" />
                   <span>{artistSongs.length} songs</span>
                 </div>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <PlayCircle className="w-4 h-4" />
+                  <span>{artistStats.totalPlays.toLocaleString()} streams</span>
+                </div>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Users className="w-4 h-4" />
+                  <span>{artistFollowers.toLocaleString()} followers</span>
+                </div>
               </div>
 
               {isOwner && isEditingProfile ? (
@@ -817,7 +826,7 @@ export default function ArtistDetail() {
               )}
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="glass-card p-4 rounded-xl text-center">
                   <Music className="w-6 h-6 mx-auto mb-2 text-primary" />
                   <p className="text-2xl font-heading font-bold text-foreground">
@@ -826,18 +835,25 @@ export default function ArtistDetail() {
                   <p className="text-sm text-muted-foreground">Songs</p>
                 </div>
                 <div className="glass-card p-4 rounded-xl text-center">
+                  <PlayCircle className="w-6 h-6 mx-auto mb-2 text-primary" />
+                  <p className="text-2xl font-heading font-bold text-foreground">
+                    {artistStats.totalPlays.toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Streams</p>
+                </div>
+                <div className="glass-card p-4 rounded-xl text-center">
+                  <Users className="w-6 h-6 mx-auto mb-2 text-primary" />
+                  <p className="text-2xl font-heading font-bold text-foreground">
+                    {artistFollowers.toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Followers</p>
+                </div>
+                <div className="glass-card p-4 rounded-xl text-center">
                   <Heart className="w-6 h-6 mx-auto mb-2 text-primary" />
                   <p className="text-2xl font-heading font-bold text-foreground">
                     {artistStats.totalLikes.toLocaleString()}
                   </p>
                   <p className="text-sm text-muted-foreground">Likes</p>
-                </div>
-                <div className="glass-card p-4 rounded-xl text-center">
-                  <Heart className="w-6 h-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-heading font-bold text-foreground">
-                    {artistStats.totalPulses.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Pulses</p>
                 </div>
               </div>
 

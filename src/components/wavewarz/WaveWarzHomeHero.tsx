@@ -88,7 +88,7 @@ export function WaveWarzHomeHero() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
             <Music2 className="h-5 w-5 text-emerald-300" />
-            Live & Upcoming BattleZ
+            Passed BattleZ
           </h2>
           <Link
             to={WAVEWARZ_AFRICA_LINKS.quickBattles}

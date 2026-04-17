@@ -4,8 +4,8 @@ const heroLogoWithBackground = '/wavewarz-africa-background.png';
 import onboardingHeroImage from '@/assets/WaveWarz Africa New Page Mock up.png';
 import imanAfrikahImage from '@/assets/IMan Afrikah/IMan Afrikah (1).png';
 import ndaImage from '@/assets/NDA/NDA (1).png';
+import purposeImage from '@/assets/PRP/PRP.png';
 import santanaImage from '@/assets/Santana/Santana (1).png';
-import sanchyImage from '@/assets/Sanchy/Sanchy (1).png';
 
 export const WAVEWARZ_AFRICA_LINKS = {
   enterBattlez: '/wavewarz-africa',
@@ -45,7 +45,7 @@ export const WAVEWARZ_COUNTRY_ROLLOUT: CountryRolloutItem[] = [
 
 export interface BattleCardItem {
   id: string;
-  status: 'live' | 'upcoming';
+  status: 'live' | 'upcoming' | 'passed';
   title: string;
   subtitle: string;
   artistA: string;
@@ -57,10 +57,10 @@ export interface BattleCardItem {
 
 export const WAVEWARZ_BATTLE_CARDS: BattleCardItem[] = [
   {
-    id: 'battle-live-iman-nda',
-    status: 'live',
+    id: 'battle-passed-iman-nda',
+    status: 'passed',
     title: 'IMan Afrikah vs NDA',
-    subtitle: 'Live now: high-volume token battle from Zambia.',
+    subtitle: 'Passed battle: NDA won on votes, IMan Afrikah won on trades.',
     artistA: 'IMan Afrikah',
     artistB: 'NDA',
     artistAImage: imanAfrikahImage,
@@ -68,25 +68,14 @@ export const WAVEWARZ_BATTLE_CARDS: BattleCardItem[] = [
     ctaUrl: WAVEWARZ_AFRICA_LINKS.quickBattles,
   },
   {
-    id: 'battle-upcoming-santana-sanchy',
-    status: 'upcoming',
-    title: 'Santana vs Sanchy',
-    subtitle: 'Upcoming: Afro energy vs late-night atmospheric sound.',
+    id: 'battle-passed-santana-purpose',
+    status: 'passed',
+    title: 'Santana vs PRP',
+    subtitle: 'Passed battle: Santana won both trades and votes vs PRP.',
     artistA: 'Santana',
-    artistB: 'Sanchy',
+    artistB: 'PRP',
     artistAImage: santanaImage,
-    artistBImage: sanchyImage,
-    ctaUrl: WAVEWARZ_AFRICA_LINKS.quickBattles,
-  },
-  {
-    id: 'battle-upcoming-nda-santana',
-    status: 'upcoming',
-    title: 'NDA vs Santana',
-    subtitle: 'Upcoming: dark sonic edge against crowd-lifting anthems.',
-    artistA: 'NDA',
-    artistB: 'Santana',
-    artistAImage: ndaImage,
-    artistBImage: santanaImage,
+    artistBImage: purposeImage,
     ctaUrl: WAVEWARZ_AFRICA_LINKS.quickBattles,
   },
 ];

@@ -13,6 +13,16 @@ interface SongPopularity {
   popularity_score: number | null;
 }
 
+export interface ArtistFollowerCount {
+  artist_id: string;
+  follower_count: number;
+}
+
+export interface ArtistStreamTotal {
+  artist_id: string;
+  stream_count: number;
+}
+
 interface ProfilePopularity {
   profile_id: string | null;
   user_id: string | null;
@@ -68,9 +78,13 @@ function usePopularityRealtime() {
       .channel('popularity-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'song_analytics' }, () => {
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
+        queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'liked_songs' }, () => {
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'liked_artists' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['artist-follower-counts'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
         queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
@@ -212,6 +226,80 @@ export function usePulseCounts() {
     },
     staleTime: 1000 * 60,
     refetchInterval: 1000 * 60,
+  });
+}
+
+export function useArtistFollowerCounts() {
+  usePopularityRealtime();
+
+  return useQuery({
+    queryKey: ['artist-follower-counts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('liked_artists')
+        .select('artist_id');
+
+      if (error || !data) {
+        return [] as ArtistFollowerCount[];
+      }
+
+      const counts = new Map<string, number>();
+      (data as any[]).forEach((row) => {
+        const artistId = String(row.artist_id || '').trim();
+        if (!artistId) return;
+        counts.set(artistId, (counts.get(artistId) || 0) + 1);
+      });
+
+      return Array.from(counts.entries()).map(([artist_id, follower_count]) => ({
+        artist_id,
+        follower_count,
+      }));
+    },
+    staleTime: 1000 * 10,
+    refetchInterval: 10000,
+  });
+}
+
+export function useArtistStreamTotals() {
+  usePopularityRealtime();
+
+  return useQuery({
+    queryKey: ['artist-stream-totals'],
+    queryFn: async () => {
+      let popularityData: SongPopularity[] = [];
+      try {
+        const { data, error } = await supabase.rpc('get_song_popularity');
+        if (!error && data) {
+          popularityData = data as SongPopularity[];
+        }
+      } catch {
+        popularityData = [];
+      }
+
+      if (!popularityData.length) {
+        const { data: fallbackData } = await supabase.from('song_popularity').select('*');
+        popularityData = (fallbackData as SongPopularity[]) || [];
+      }
+
+      const songToArtist = new Map<string, string>(SONGS.map((song) => [song.id, song.artistId]));
+      const totals = new Map<string, number>();
+
+      popularityData.forEach((row) => {
+        const songId = String(row.song_id || '').trim();
+        if (!songId) return;
+        const artistId = songToArtist.get(songId);
+        if (!artistId) return;
+        const count = Number(row.play_count || 0);
+        totals.set(artistId, (totals.get(artistId) || 0) + count);
+      });
+
+      return Array.from(totals.entries()).map(([artist_id, stream_count]) => ({
+        artist_id,
+        stream_count,
+      }));
+    },
+    staleTime: 1000 * 10,
+    refetchInterval: 10000,
   });
 }
 

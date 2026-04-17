@@ -48,7 +48,7 @@ export function AuthGate({ onLogin }: AuthGateProps) {
             </h1>
             <p className="text-primary font-medium mb-2">Audience Edition · Phase One</p>
             <p className="text-muted-foreground text-sm mb-8">
-              A decentralized music platform built by artists and the audience together
+              Your decentralized music platform built with artists and fans together.
             </p>
           </motion.div>
 
@@ -67,7 +67,7 @@ export function AuthGate({ onLogin }: AuthGateProps) {
             </div>
             
             <p className="text-sm text-muted-foreground mb-5 leading-relaxed px-1">
-              $ongChainn is built on Base. Base App is required to access the platform and participate in the audience experience.
+              $ongChainn runs on Base. You need the Base App to access your platform experience.
             </p>
 
             {/* Features */}
@@ -118,7 +118,7 @@ export function AuthGate({ onLogin }: AuthGateProps) {
             transition={{ delay: 0.7 }}
             className="mt-8 text-xs text-muted-foreground"
           >
-            This is an early audience edition designed to build listening behavior and culture before ownership begins.
+            You are in an early edition designed to build your listening culture before ownership features begin.
           </motion.p>
         </motion.div>
       </div>

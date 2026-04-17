@@ -9,22 +9,28 @@ interface WaveWarzBattleCardProps {
 
 export function WaveWarzBattleCard({ battle }: WaveWarzBattleCardProps) {
   const isExternal = /^https?:\/\//i.test(battle.ctaUrl);
+  const isLive = battle.status === 'live';
+  const isPassed = battle.status === 'passed';
 
   return (
     <article className="rounded-2xl border border-cyan-500/25 bg-black/45 p-3 shadow-[0_0_30px_rgba(3,169,244,0.15)] backdrop-blur">
       <div className="mb-3 flex items-center justify-between">
         <span
           className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-            battle.status === 'live'
+            isLive
               ? 'bg-rose-500/20 text-rose-100 border border-rose-400/40'
-              : 'bg-cyan-500/15 text-cyan-100 border border-cyan-300/30'
+              : isPassed
+                ? 'bg-emerald-500/20 text-emerald-100 border border-emerald-400/40'
+                : 'bg-cyan-500/15 text-cyan-100 border border-cyan-300/30'
           }`}
         >
-          {battle.status === 'live' ? (
+          {isLive ? (
             <>
               <Flame className="h-3 w-3" />
               Live
             </>
+          ) : isPassed ? (
+            'Passed'
           ) : (
             'Upcoming'
           )}

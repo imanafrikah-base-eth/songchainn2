@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Link2, ListMusic, Settings, Share2, HardDrive } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Link2, ListMusic, Settings, Share2, HardDrive, Bot } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
@@ -56,6 +56,8 @@ const LOCAL_IDENTITY_KEY = 'room:identity_mode:v1';
 const ROOM_ID = 'global';
 const MOSHA_USER_ID = 'mosha-bot';
 const MOSHA_NAME = 'Mo$ha';
+const MOSHA_ROOM_GREETING_PREFIX = 'songchainn:mosha-room-greeted:v1:';
+const MOSHA_MODE_KEY = 'songchainn:mosha-room-mode:v1';
 
 const KNOWN_ARTIST_NAMES = new Set(
   ARTISTS.map(a => a.name.trim().toLowerCase()).filter(Boolean)
@@ -235,24 +237,36 @@ function buildMoshaReply(params: {
   content: string;
   currentSongTitle: string | null;
   currentArtistName: string | null;
+  mode: 'vibe' | 'chat';
 }) {
   const text = params.content.toLowerCase();
   const songRef = params.currentSongTitle ? ` "${params.currentSongTitle}"` : '';
   const artistRef = params.currentArtistName ? ` ${params.currentArtistName}` : '';
+  const vibeMode = params.mode === 'vibe';
 
   if (text.includes('hello') || text.includes('hi') || text.includes('hey')) {
-    return `Hey fam, Mo$ha here. Glad you pulled me in. We vibing${songRef ? ` with${songRef}` : ''}.`;
+    return vibeMode
+      ? `Hey fam, Mo$ha here. Glad you pulled me in. We vibing${songRef ? ` with${songRef}` : ''}.`
+      : `Hey. Mo$ha here. I am active in this room and ready to help.`;
   }
   if (text.includes('recommend') || text.includes('suggest') || text.includes('play')) {
-    return `Try keeping it on${songRef || ' this wave'} and spin more from${artistRef || ' $ongChainn artists'} next.`;
+    return vibeMode
+      ? `Try keeping it on${songRef || ' this wave'} and spin more from${artistRef || ' $ongChainn artists'} next.`
+      : `Recommendation: continue with${songRef || ' this song'}, then queue more from${artistRef || ' top $ongChainn artists'}.`;
   }
   if (text.includes('sad') || text.includes('down') || text.includes('tired')) {
-    return `I got you. Let us slow it down with soulful $ongChainn cuts, then build your energy back.`;
+    return vibeMode
+      ? `I got you. Let us slow it down with soulful $ongChainn cuts, then build your energy back.`
+      : `Noted. I suggest a calmer sequence first, then a gradual energy build.`;
   }
   if (text.includes('hype') || text.includes('turn up') || text.includes('energy')) {
-    return `Say less. We can run high-energy $ongChainn anthems and keep the room loud.`;
+    return vibeMode
+      ? `Say less. We can run high-energy $ongChainn anthems and keep the room loud.`
+      : `Understood. I suggest switching to high-energy tracks for this room.`;
   }
-  return `I hear you. Based on this room context, I would keep pushing${artistRef ? ` ${artistRef}` : ' fresh $ongChainn artists'} while this vibe is hot.`;
+  return vibeMode
+    ? `I hear you. Based on this room context, I would keep pushing${artistRef ? ` ${artistRef}` : ' fresh $ongChainn artists'} while this vibe is hot.`
+    : `I hear you. Based on room context, I recommend${artistRef ? ` ${artistRef}` : ' fresh $ongChainn artists'} for the next run.`;
 }
 
 export default function Room() {
@@ -274,6 +288,14 @@ export default function Room() {
   const [chatBackend, setChatBackend] = useState<'supabase' | 'local'>('supabase');
   const [liveUsers, setLiveUsers] = useState<RoomLiveUser[]>([]);
   const [mentionState, setMentionState] = useState<{ atIndex: number; query: string; activeIndex: number } | null>(null);
+  const [moshaMode, setMoshaMode] = useState<'vibe' | 'chat'>(() => {
+    try {
+      const stored = localStorage.getItem(MOSHA_MODE_KEY);
+      return stored === 'chat' ? 'chat' : 'vibe';
+    } catch {
+      return 'vibe';
+    }
+  });
 
   const [isNamePromptOpen, setIsNamePromptOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -317,6 +339,14 @@ export default function Room() {
   useEffect(() => {
     roomNameRef.current = roomName;
   }, [roomName]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MOSHA_MODE_KEY, moshaMode);
+    } catch {
+      void 0;
+    }
+  }, [moshaMode]);
 
   const unlockBeep = useCallback(async () => {
     if (beepUnlockedRef.current) return;
@@ -965,9 +995,19 @@ export default function Room() {
 
   useEffect(() => {
     if (!user || hasMoshaGreetedRef.current) return;
+    const greetingKey = `${MOSHA_ROOM_GREETING_PREFIX}${user.id}`;
+    if (typeof window !== 'undefined' && localStorage.getItem(greetingKey) === 'shown') {
+      hasMoshaGreetedRef.current = true;
+      return;
+    }
     hasMoshaGreetedRef.current = true;
     const timer = window.setTimeout(() => {
       appendMoshaMessage('Hello fam, Mo$ha in the room. I stay quiet while you chat, just @ me when you need me.');
+      try {
+        localStorage.setItem(greetingKey, 'shown');
+      } catch {
+        void 0;
+      }
     }, 5000);
     return () => window.clearTimeout(timer);
   }, [appendMoshaMessage, user]);
@@ -984,20 +1024,26 @@ export default function Room() {
     const isReplyToMosha = latest.reply_to_message_id
       ? messages.some((m) => m.id === latest.reply_to_message_id && m.user_id === MOSHA_USER_ID)
       : false;
-    const callsMosha = /@mosha|@mo\$ha|\bmosha\b|\bmo\$ha\b/i.test(lower);
+    const callsMosha =
+      lower.includes('mosha') ||
+      lower.includes('mo$ha') ||
+      /@mo[a-z$]*/i.test(lower);
     if (!isReplyToMosha && !callsMosha) return;
 
     lastMoshaReplyToIdRef.current = latest.id;
+    const minDelayMs = 2200;
+    const jitterMs = Math.floor(Math.random() * 2200);
     const timer = window.setTimeout(() => {
       const reply = buildMoshaReply({
         content: raw,
         currentSongTitle: currentSong?.title || null,
         currentArtistName: currentSong?.artist || null,
+        mode: moshaMode,
       });
       appendMoshaMessage(reply);
-    }, 700);
+    }, minDelayMs + jitterMs);
     return () => window.clearTimeout(timer);
-  }, [appendMoshaMessage, currentSong?.artist, currentSong?.title, messages]);
+  }, [appendMoshaMessage, currentSong?.artist, currentSong?.title, messages, moshaMode]);
 
   useEffect(() => {
     if (!shouldAutoScrollRef.current) return;
@@ -1341,15 +1387,15 @@ export default function Room() {
   const knownMentionNames = useMemo(() => {
     const names = new Set<string>([MOSHA_NAME]);
     for (const userEntry of liveUsers) {
-      const normalized = normalizeRoomName(userEntry.room_name || '');
-      if (normalized && normalized.toLowerCase() !== 'guest') names.add(normalized);
+      const normalized = normalizeRoomName(userEntry.room_name || '') || `user-${userEntry.user_id.slice(0, 6)}`;
+      if (normalized) names.add(normalized);
     }
     for (const message of messages) {
       const normalized = normalizeRoomName(message.room_name);
-      if (normalized && normalized.toLowerCase() !== 'guest') names.add(normalized);
+      if (normalized) names.add(normalized);
     }
     const selfName = normalizeRoomName(roomName || '');
-    if (selfName && selfName.toLowerCase() !== 'guest') names.add(selfName);
+    if (selfName) names.add(selfName);
     const ordered = [...names].sort((a, b) => {
       if (a === MOSHA_NAME) return -1;
       if (b === MOSHA_NAME) return 1;
@@ -1370,17 +1416,17 @@ export default function Room() {
   const onlineNames = useMemo(() => {
     const merged = new Set<string>([MOSHA_NAME]);
     const selfName = normalizeRoomName(roomName || '');
-    if (selfName && selfName.toLowerCase() !== 'guest') merged.add(selfName);
+    if (selfName) merged.add(selfName);
     for (const userEntry of liveUsers) {
-      const normalized = normalizeRoomName(userEntry.room_name || '');
-      if (normalized && normalized.toLowerCase() !== 'guest') merged.add(normalized);
+      const normalized = normalizeRoomName(userEntry.room_name || '') || `user-${userEntry.user_id.slice(0, 6)}`;
+      if (normalized) merged.add(normalized);
     }
     const ordered = [...merged].sort((a, b) => {
       if (a === MOSHA_NAME) return -1;
       if (b === MOSHA_NAME) return 1;
       return a.localeCompare(b);
     });
-    return ordered.slice(0, 12);
+    return ordered;
   }, [liveUsers, roomName]);
 
   const messageById = useMemo(() => {
@@ -1432,7 +1478,8 @@ export default function Room() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  await exitRoomMode();
                   hideRoom();
                   navigate('/');
                 }}
@@ -1496,6 +1543,14 @@ export default function Room() {
             >
               <Share2 className="w-4 h-4" />
               <span className="hidden sm:inline">Share song</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMoshaMode((prev) => (prev === 'vibe' ? 'chat' : 'vibe'))}
+              className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+            >
+              <Bot className="w-4 h-4" />
+              <span>{`Mo$ha: ${moshaMode === 'vibe' ? 'Vibe' : 'Chat'}`}</span>
             </button>
             <button
               type="button"

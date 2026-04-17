@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music, Flame, HardDrive } from 'lucide-react';
+import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music, Flame, HardDrive, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CATALOGS, SONGS, GENRES, Genre, type Catalog } from '@/data/musicData';
@@ -58,7 +58,7 @@ function useUserLikes() {
 
 export default function Discover() {
   const [selectedGenre, setSelectedGenre] = useState<Genre | 'all'>('all');
-  const [sortMode, setSortMode] = useState<'trending' | 'newest' | 'mostPlayed' | 'mostLiked'>('trending');
+  const [sortMode, setSortMode] = useState<'trending' | 'newest'>('trending');
   const [showFilters, setShowFilters] = useState(true);
   const { user } = useAuth();
   const { data: todayHotSongs = [] } = useTodayHotSongs(5);
@@ -122,9 +122,21 @@ export default function Discover() {
     return map;
   }, [catalogs]);
 
+  const hotScoreByCatalog = useMemo(() => {
+    const scores = new Map<string, number>();
+    for (const { song, playsToday } of todayHotSongs) {
+      const catalog = catalogBySongId.get(song.id);
+      if (!catalog) continue;
+      scores.set(catalog.id, (scores.get(catalog.id) || 0) + playsToday);
+    }
+    return scores;
+  }, [todayHotSongs, catalogBySongId]);
+
   const recommendedCatalogs = useMemo(() => {
     if (preferredGenres.length === 0) {
-      return [...catalogs].sort((a, b) => b.totalPlays - a.totalPlays).slice(0, 6);
+      return [...catalogs]
+        .sort((a, b) => (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0))
+        .slice(0, 6);
     }
 
     const catalogSet = new Map<string, Catalog>();
@@ -135,9 +147,9 @@ export default function Discover() {
     });
 
     return Array.from(catalogSet.values())
-      .sort((a, b) => b.totalPlays - a.totalPlays)
+      .sort((a, b) => (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0))
       .slice(0, 6);
-  }, [catalogs, preferredGenres]);
+  }, [catalogs, preferredGenres, hotScoreByCatalog]);
 
   const filteredCatalogs = useMemo(() => {
     if (selectedGenre === 'all') return catalogs;
@@ -156,26 +168,12 @@ export default function Discover() {
       });
     }
 
-    if (sortMode === 'mostPlayed') {
-      return items.sort((a, b) => {
-        if (a.totalPlays !== b.totalPlays) return b.totalPlays - a.totalPlays;
-        return b.totalLikes - a.totalLikes;
-      });
-    }
-
-    if (sortMode === 'mostLiked') {
-      return items.sort((a, b) => {
-        if (a.totalLikes !== b.totalLikes) return b.totalLikes - a.totalLikes;
-        return b.totalPlays - a.totalPlays;
-      });
-    }
-
     return items.sort((a, b) => {
-      const scoreA = a.totalPlays + a.totalLikes;
-      const scoreB = b.totalPlays + b.totalLikes;
+      const scoreA = hotScoreByCatalog.get(a.id) || 0;
+      const scoreB = hotScoreByCatalog.get(b.id) || 0;
       return scoreB - scoreA;
     });
-  }, [filteredCatalogs, sortMode]);
+  }, [filteredCatalogs, sortMode, hotScoreByCatalog]);
 
   const shuffledCatalogs = useMemo(() => {
     return [...catalogs].sort(() => Math.random() - 0.5).slice(0, 3);
@@ -625,28 +623,6 @@ export default function Discover() {
                         }`}
                       >
                         Newest
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSortMode('mostPlayed')}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all hidden md:inline-flex ${
-                          sortMode === 'mostPlayed'
-                            ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
-                            : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
-                        }`}
-                      >
-                        Plays
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSortMode('mostLiked')}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all hidden md:inline-flex ${
-                          sortMode === 'mostLiked'
-                            ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
-                            : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
-                        }`}
-                      >
-                        Likes
                       </button>
                     </div>
                   </motion.div>

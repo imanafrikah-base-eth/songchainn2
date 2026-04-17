@@ -745,7 +745,7 @@ export default function Auth() {
                   </p>
                   <h2 className="text-2xl md:text-3xl font-bold text-white">Enter The African BattleZone</h2>
                   <p className="max-w-2xl text-sm md:text-base text-zinc-200">
-                    Make some money while voting and supporting your favorite artist or song. Feel the live battle energy before you sign in.
+                    Make some money while voting for and supporting your favorite artist or song. Feel the live battle energy before you sign in.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button type="button" className="bg-emerald-400 text-black hover:bg-emerald-300" onClick={handleBrowseWithoutAuthModal}>
@@ -783,8 +783,8 @@ export default function Auth() {
                       build taste, join community and help reveal which sounds are truly moving culture.
                     </p>
                     <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-5">
-                      New visitors can preview the vibe first. When they are ready, they can create an account to save
-                      their profile, unlock more playback and step into deeper community and ownership features.
+                      You can preview the vibe first. When you are ready, you can create an account to save
+                      your profile, unlock more playback and step into deeper community and ownership features.
                     </p>
                     <div className="grid gap-3 md:grid-cols-3">
                       {ABOUT_HIGHLIGHTS.map(({ title, description, icon: Icon, accent, surface }) => (
@@ -802,7 +802,7 @@ export default function Auth() {
                   <div className="space-y-4">
                     <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 md:p-5">
                       <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
-                        How the visitor journey works
+                        How your journey works
                       </p>
                       <div className="space-y-3">
                         {ABOUT_STEPS.map((step, index) => (

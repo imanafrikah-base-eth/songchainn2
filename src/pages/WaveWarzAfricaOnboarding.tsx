@@ -191,7 +191,7 @@ export default function WaveWarzAfricaOnboarding() {
         <section className="rounded-3xl border border-emerald-400/25 bg-black/55 p-4 sm:p-6">
           <div className="mb-4 flex items-center gap-2">
             <Flame className="h-5 w-5 text-emerald-300" />
-            <h2 className="text-2xl font-semibold text-white">Zambia Live Now</h2>
+            <h2 className="text-2xl font-semibold text-white">Passed Battles</h2>
           </div>
           <div className="grid gap-3 lg:grid-cols-3">
             {WAVEWARZ_BATTLE_CARDS.map((battle) => (

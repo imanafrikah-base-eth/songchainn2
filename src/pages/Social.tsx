@@ -210,7 +210,7 @@ export default function Social() {
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
                   <Sparkles className="w-5 h-5 text-primary" />
-                  <h1 className="font-bold text-lg">Feen</h1>
+                  <h1 className="font-bold text-lg">Feed</h1>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
                     TikTok-style music feed with autoplay moments.
@@ -382,7 +382,7 @@ export default function Social() {
         {/* Main Feed - Vertical Scroll Snap */}
         <div 
           ref={feedRef}
-          className="flex-1 overflow-y-auto snap-y snap-mandatory scroll-smooth scroll-smooth-gpu fast-tap"
+          className="flex-1 overflow-y-auto overscroll-y-contain snap-y snap-mandatory scroll-smooth scroll-smooth-gpu fast-tap"
           onScroll={handleScroll}
           style={{ scrollSnapType: 'y mandatory', WebkitOverflowScrolling: 'touch' }}
         >
@@ -435,7 +435,7 @@ export default function Social() {
               {postsToRender.map((post, index) => (
                 <div 
                   key={post.id} 
-                  className="snap-start py-2"
+                  className="snap-start h-[calc(100vh-12rem)] py-1"
                   style={{ scrollSnapAlign: 'start' }}
                 >
                   <MusicFeedCard

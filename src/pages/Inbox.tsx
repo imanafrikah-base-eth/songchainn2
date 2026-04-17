@@ -22,21 +22,39 @@ function isRelevantToMoshaReply(text: string) {
   return /(songchainn|wavewarz|battle|room|dj|shuffle|playlist|catalog|artist|how|help|feature|signup|login|about)/i.test(query);
 }
 
-function buildMoshaReply(text: string) {
+function isFollowUpMessage(text: string) {
+  const query = text.toLowerCase().trim();
+  return /^(and|also|what about|why|how|then|ok|so|that|it|this|they)\b/.test(query) || query.length <= 14;
+}
+
+function buildMoshaReply(text: string, history: DirectMessage[]) {
   const query = text.toLowerCase();
+  const recentUserText = history
+    .filter((m) => m.sender === 'user')
+    .slice(-4)
+    .map((m) => m.text.toLowerCase())
+    .join(' ');
+  const contextualQuery = `${recentUserText} ${query}`;
+
+  if ((query.includes('share') || query.includes('post')) && contextualQuery.includes('song')) {
+    return 'To share a song to feed: open a song card, tap share to feed, then post. If it fails, refresh feed once and try again while signed in.';
+  }
   if (query.includes('wavewarz') || query.includes('battle')) {
     return 'WaveWarz Africa is $ongChainn BattleZone mode: live battles, fan voting, room energy, and results. Open /wavewarz-africa to start.';
   }
-  if (query.includes('dj') || query.includes('shuffle')) {
+  if (contextualQuery.includes('dj') || contextualQuery.includes('shuffle')) {
     return 'DJ Shuffle can run Artist, All Songs, or Catalog shuffle. I can guide you to the best mode for your vibe.';
   }
-  if (query.includes('room')) {
+  if (contextualQuery.includes('room')) {
     return 'The Room is live community listening plus chat. Join it for shared discovery and real-time reactions.';
   }
   if (query.includes('phase') || query.includes('audience first')) {
     return '$ongChainn is in Phase One: Audience First. Your preferences and listening behavior shape discovery early.';
   }
-  return 'Great question. Based on $ongChainn info, I can guide you through features, WaveWarz, DJ Shuffle, playlists, and next best actions.';
+  if (contextualQuery.includes('playlist') || contextualQuery.includes('catalog')) {
+    return 'For follow-up discovery, start from your favorite catalog, then branch by artist and room reactions to find the next best songs.';
+  }
+  return 'I got your follow-up. Based on this conversation, I can help with feed sharing, rooms, WaveWarz, DJ Shuffle, playlists, or profile growth next.';
 }
 
 const SEED_TEXT =
@@ -106,24 +124,28 @@ export default function Inbox() {
     void persistMessage(userMessage);
     setDraft('');
 
-    if (!isRelevantToMoshaReply(userMessage.text)) {
+    const conversation = [...sortedMessages, userMessage];
+    const shouldReply = isRelevantToMoshaReply(userMessage.text) || isFollowUpMessage(userMessage.text) || conversation.length <= 3;
+
+    if (!shouldReply) {
       setIsSending(false);
-      toast.message('Message sent. Mo$ha replies when context is relevant.');
+      toast.message('Message sent.');
       return;
     }
 
+    const replyDelay = 650 + Math.floor(Math.random() * 700);
     window.setTimeout(() => {
       const reply: DirectMessage = {
         id: `${Date.now()}-mosha`,
         user_id: userId,
         sender: 'mosha',
-        text: buildMoshaReply(userMessage.text),
+        text: buildMoshaReply(userMessage.text, conversation),
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, reply]);
       void persistMessage(reply);
       setIsSending(false);
-    }, 700);
+    }, replyDelay);
   };
 
   return (

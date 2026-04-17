@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useShare } from '@/hooks/useShare';
+import { useSocial } from '@/hooks/useSocial';
 import { toast } from 'sonner';
 
 interface ShareSongButtonProps {
@@ -35,6 +36,7 @@ export function ShareSongButton({
   const [showDropdown, setShowDropdown] = useState(false);
   const [copied, setCopied] = useState(false);
   const { getSongShareUrl, shareToX } = useShare();
+  const { createPost } = useSocial();
 
   const shareUrl = getSongShareUrl({ id: songId, title: songTitle, artist: artistName, coverImage });
   const shareText = `Check out "${songTitle}" by ${artistName} on $ongChainn!`;
@@ -134,7 +136,14 @@ export function ShareSongButton({
     setShowDropdown(false);
   }, [shareUrl, shareText]);
 
+  const handleShareToFeed = useCallback(async () => {
+    await createPost('', 'song_share', songId);
+    toast.success('Song shared to feed');
+    setShowDropdown(false);
+  }, [createPost, songId]);
+
   const shareOptions = [
+    { icon: <Share2 className="w-4 h-4" />, label: 'Share to Feed', action: handleShareToFeed },
     { icon: <Link2 className="w-4 h-4" />, label: 'Copy Link', action: handleCopyLink, highlight: copied },
     { icon: <Twitter className="w-4 h-4" />, label: 'Share on X', action: handleShareToX },
     { icon: <MessageCircle className="w-4 h-4" />, label: 'WhatsApp', action: handleShareToWhatsApp },

@@ -35,7 +35,6 @@ export function getEnv(): EnvConfig {
 
     console.error(message);
     if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-alert
       alert(message);
     }
 

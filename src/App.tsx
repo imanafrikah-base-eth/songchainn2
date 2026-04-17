@@ -36,9 +36,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Room = lazy(() => import("./pages/Room"));
 const About = lazy(() => import("./pages/About"));
-const WaveWarzAfricaOnboarding = lazy(() => import("./pages/WaveWarzAfricaOnboarding"));
-const WaveWarzAfricaEmbed = lazy(() => import("./pages/WaveWarzAfricaEmbed"));
-const WaveWarzBattleZone = lazy(() => import("./pages/WaveWarzBattleZone"));
+const WaveWarzBattleZoneFeature = lazy(() => import("./pages/WaveWarzBattleZoneFeature"));
 const DjShuffle = lazy(() => import("./pages/DjShuffle"));
 const Inbox = lazy(() => import("./pages/Inbox"));
 
@@ -162,12 +160,7 @@ function AppShell() {
           <Route path="/community" element={<Community />} />
           <Route path="/audience/:userId" element={<AudienceProfile />} />
           <Route path="/about" element={<About />} />
-          <Route path="/wavewarz-africa" element={<WaveWarzBattleZone />} />
-          <Route path="/wavewarz-africa/live" element={<WaveWarzBattleZone />} />
-          <Route path="/wavewarz-africa/create" element={<WaveWarzBattleZone />} />
-          <Route path="/wavewarz-africa/results" element={<WaveWarzAfricaEmbed />} />
-          <Route path="/wavewarz-africa/room/:battleId" element={<WaveWarzBattleZone />} />
-          <Route path="/wavewarz-africa/onboarding" element={<WaveWarzAfricaOnboarding />} />
+          <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
           <Route path="/dj-shuffle" element={<DjShuffle />} />
           <Route path="/install" element={<Install />} />
           <Route path="/admin" element={<Admin />} />

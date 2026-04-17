@@ -67,6 +67,10 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     const songData = popularityData?.find(p => p.song_id === song.id);
     return songData?.like_count || 0;
   }, [popularityData, song.id]);
+  const totalStreams = useMemo(() => {
+    const songData = popularityData?.find(p => p.song_id === song.id);
+    return songData?.play_count || 0;
+  }, [popularityData, song.id]);
 
   const totalPulses = useMemo(() => {
     const pulseData = pulseCounts?.find(p => p.song_id === song.id);
@@ -240,6 +244,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   Saved
                 </span>
               )}
+              <span>{totalStreams.toLocaleString()} streams</span>
               <span>{totalLikes.toLocaleString()} likes</span>
             </span>
             {totalPulses > 0 && (
@@ -408,6 +413,8 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           </div>
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="tabular-nums">{totalStreams.toLocaleString()} streams</span>
+            <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
             <span className="tabular-nums">{totalLikes.toLocaleString()} likes</span>
             {totalPulses > 0 && (
               <>
@@ -515,6 +522,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 Saved
               </span>
             )}
+            <span>{totalStreams.toLocaleString()} streams</span>
             <span>{totalLikes.toLocaleString()} likes</span>
           </span>
           <div className="flex items-center gap-1">

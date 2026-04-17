@@ -1,12 +1,13 @@
 import { type ChangeEvent, type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive, Plus, Lock, Globe, Trash2 } from 'lucide-react';
+import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive, Plus, Lock, Globe, Trash2, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
+import { useEngagement } from '@/context/EngagementContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import { useReferrals } from '@/hooks/useReferrals';
@@ -80,6 +81,7 @@ const BaseIcon = () => (
 
 export default function Profile() {
   const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding, isLoading } = useAuth();
+  const { engagementPoints, currentStreak } = useEngagement();
   const { likedSongs, playlists, savedCatalogs, createPlaylist, deletePlaylist, updatePlaylistVisibility } = useAudienceInteractions();
   const { points, completedReferrals, shareInviteLink } = useReferrals();
   const { toast } = useToast();
@@ -1256,8 +1258,13 @@ export default function Profile() {
           )}
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <Star className="w-5 h-5 mx-auto text-primary mb-2" />
-            <p className="text-2xl font-bold text-foreground">{points?.total_points || 0}</p>
+            <p className="text-2xl font-bold text-foreground">{engagementPoints.toLocaleString()}</p>
             <p className="text-sm text-muted-foreground">Points</p>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-4 text-center">
+            <Flame className="w-5 h-5 mx-auto text-orange-500 mb-2" />
+            <p className="text-2xl font-bold text-foreground">{currentStreak}</p>
+            <p className="text-sm text-muted-foreground">Streak</p>
           </div>
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <Users className="w-5 h-5 mx-auto text-primary mb-2" />

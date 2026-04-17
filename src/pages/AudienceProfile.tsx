@@ -13,7 +13,9 @@ import {
   Share2,
   MoreHorizontal,
   Camera,
-  Loader2
+  Loader2,
+  Star,
+  Flame
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -178,6 +180,8 @@ export default function AudienceProfile() {
   }, [userId, fetchProfile]);
 
   const userPosts = posts.filter((p) => p.user_id === userId);
+  const profilePoints = Number((profile as any)?.engagement_points ?? (profile as any)?.points ?? 0);
+  const profileStreak = Number((profile as any)?.current_streak ?? 0);
 
   const handleProfilePictureChange = useCallback(
     async (e: ChangeEvent<HTMLInputElement>) => {
@@ -375,7 +379,7 @@ export default function AudienceProfile() {
           </div>
 
           {/* Stats */}
-          <div className="flex items-center justify-center gap-6 mt-6">
+          <div className="flex flex-wrap items-center justify-center gap-6 mt-6">
             <div className="text-center">
               <p className="text-xl font-bold">{userPosts.length}</p>
               <p className="text-sm text-muted-foreground">Posts</p>
@@ -391,6 +395,20 @@ export default function AudienceProfile() {
             <div className="text-center">
               <p className="text-xl font-bold">{likedSongsCount}</p>
               <p className="text-sm text-muted-foreground">Liked</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-bold">{profilePoints.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 text-primary" />
+                Points
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-bold">{profileStreak}</p>
+              <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-orange-500" />
+                Streak
+              </p>
             </div>
           </div>
 

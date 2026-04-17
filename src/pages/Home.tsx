@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart, PlayCircle, Disc3, Info } from 'lucide-react';
+import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart, PlayCircle, Disc3, Info, Sword, Wand2 } from 'lucide-react';
 import { CATALOGS, ARTISTS, SONGS, type Catalog, type Song } from '@/data/musicData';
 import { useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
@@ -98,13 +98,41 @@ export default function Home() {
   });
 
   const catalogs = useMemo(() => CATALOGS, []);
+  const catalogBySongId = useMemo(() => {
+    const map = new Map<string, Catalog>();
+    catalogs.forEach((catalog) => {
+      catalog.songIds.forEach((songId) => map.set(songId, catalog));
+    });
+    return map;
+  }, [catalogs]);
+  const hotScoreByCatalog = useMemo(() => {
+    const scores = new Map<string, number>();
+    for (const { song, playsToday } of todayHotSongs) {
+      const catalog = catalogBySongId.get(song.id);
+      if (!catalog) continue;
+      scores.set(catalog.id, (scores.get(catalog.id) || 0) + playsToday);
+    }
+    return scores;
+  }, [todayHotSongs, catalogBySongId]);
   const featuredCatalogs = useMemo(
-    () => [...catalogs].sort((a, b) => b.totalPlays - a.totalPlays).slice(0, 6),
-    [catalogs],
+    () =>
+      [...catalogs]
+        .sort((a, b) => {
+          const scoreDelta = (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0);
+          if (scoreDelta !== 0) return scoreDelta;
+          return a.title.localeCompare(b.title);
+        })
+        .slice(0, 6),
+    [catalogs, hotScoreByCatalog],
   );
   const allCatalogs = useMemo(
-    () => [...catalogs].sort((a, b) => b.totalPlays - a.totalPlays),
-    [catalogs],
+    () =>
+      [...catalogs].sort((a, b) => {
+        const scoreDelta = (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0);
+        if (scoreDelta !== 0) return scoreDelta;
+        return a.title.localeCompare(b.title);
+      }),
+    [catalogs, hotScoreByCatalog],
   );
   const newReleases = useMemo(
     () =>
@@ -130,11 +158,20 @@ export default function Home() {
     [catalogs],
   );
   const likedArtistSongs = useMemo(
-    () =>
-      SONGS.filter((song) => likedArtists.includes(song.artistId))
-        .sort((a, b) => b.plays - a.plays)
-        .slice(0, 8),
-    [likedArtists],
+    () => {
+      const hotRank = new Map<string, number>(todayHotSongs.map((entry, index) => [entry.song.id, index]));
+      return SONGS.filter((song) => likedArtists.includes(song.artistId))
+        .sort((a, b) => {
+          const rankA = hotRank.get(a.id);
+          const rankB = hotRank.get(b.id);
+          if (typeof rankA === 'number' && typeof rankB === 'number') return rankA - rankB;
+          if (typeof rankA === 'number') return -1;
+          if (typeof rankB === 'number') return 1;
+          return a.title.localeCompare(b.title);
+        })
+        .slice(0, 8);
+    },
+    [likedArtists, todayHotSongs],
   );
   const allCatalogsCardRef = useRef<HTMLDivElement | null>(null);
   const { scrollYProgress: allCatalogsScrollProgress } = useScroll({
@@ -175,6 +212,33 @@ export default function Home() {
     window.dispatchEvent(new CustomEvent('songchainn:open-mosha'));
   }, []);
 
+  const quickActions = useMemo(() => ([
+    {
+      label: 'Join The Room',
+      description: 'Hop into live global listening now.',
+      icon: Headphones,
+      to: '/room',
+    },
+    {
+      label: 'Open BattleZone',
+      description: 'See live battles and enter your battle room.',
+      icon: Sword,
+      to: '/wavewarz-africa/battles/live',
+    },
+    {
+      label: 'Open DJ Shuffle',
+      description: 'Instant random vibe across $ongChainn.',
+      icon: Wand2,
+      to: '/dj-shuffle',
+    },
+    {
+      label: 'Create Playlist',
+      description: 'Save your taste lane in one tap.',
+      icon: ListMusic,
+      action: () => setIsCreatePlaylistOpen(true),
+    },
+  ]), []);
+
   useEffect(() => {
     if (!user?.id) return;
     const newUserKey = `songchainn:new-user-tour-prompt:v1:${user.id}`;
@@ -191,14 +255,14 @@ export default function Home() {
 
       window.setTimeout(() => {
         const promptText = hasSeenNewUserPrompt
-          ? 'Yo welcome back fam. New app experience is live: cleaner UI, faster Feen autoplay flow, and upgraded WaveWarz BattleZone access. Tap in, catch live activity, vibe, trade smart, and stack up while the culture moves.'
+          ? 'Yo welcome back fam. New app experience is live: cleaner UI, faster feed autoplay flow, and upgraded WaveWarz BattleZone access. Click here to explore your navigation sections, quick actions, and live zones.'
           : 'Welcome to $ongChainn Phase One: Audience First. Want a quick guided tour of sections and features? Music trading and rewards are coming soon.';
         window.dispatchEvent(
           new CustomEvent('songchainn:mosha-prompt', {
             detail: {
               text: promptText,
-              ctaLabel: 'Learn more',
-              ctaPath: '/about',
+              ctaLabel: hasSeenNewUserPrompt ? 'Click here to explore' : 'Learn more',
+              ctaPath: hasSeenNewUserPrompt ? '/' : '/about',
             },
           }),
         );
@@ -338,6 +402,41 @@ export default function Home() {
             </div>
           </div>
         )}
+        <section className="mb-4 sm:mb-6 rounded-2xl border border-primary/20 bg-primary/5 p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm sm:text-base font-semibold text-foreground">$ongChainn Quick Actions</h2>
+            <span className="text-[11px] sm:text-xs text-muted-foreground">Smart shortcuts</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+            {quickActions.map((item) => {
+              const Icon = item.icon;
+              const content = (
+                <div className="w-full rounded-xl border border-border bg-card/60 px-3 py-2.5 text-left hover:border-primary/35 hover:bg-primary/5 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">{item.label}</span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground">{item.description}</p>
+                </div>
+              );
+
+              if (item.to) {
+                return (
+                  <Link key={item.label} to={item.to}>
+                    {content}
+                  </Link>
+                );
+              }
+
+              return (
+                <button key={item.label} type="button" onClick={item.action}>
+                  {content}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         <WaveWarzHomeHero />
 
         <div className="my-4 sm:my-6 flex items-center gap-2">

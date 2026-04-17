@@ -1,9 +1,9 @@
 import { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Music } from 'lucide-react';
+import { MapPin, Music, Users } from 'lucide-react';
 import { Artist, SONGS } from '@/data/musicData';
 import { Link } from 'react-router-dom';
-import { usePulseCounts } from '@/hooks/usePopularity';
+import { useArtistFollowerCounts, useArtistStreamTotals, usePulseCounts } from '@/hooks/usePopularity';
 
 interface ArtistCardProps {
   artist: Artist;
@@ -12,17 +12,21 @@ interface ArtistCardProps {
 
 export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: ArtistCardProps) {
   const { data: pulseCounts } = usePulseCounts();
+  const { data: followerCounts } = useArtistFollowerCounts();
+  const { data: streamTotals } = useArtistStreamTotals();
   
   // Calculate real stats from database
-  const { artistSongs, totalPulses } = useMemo(() => {
+  const { artistSongs, totalPulses, totalStreams, totalFollowers } = useMemo(() => {
     const songs = SONGS.filter(s => s.artistId === artist.id);
     let pulses = 0;
     songs.forEach(song => {
       const pulseData = pulseCounts?.find(p => p.song_id === song.id);
       pulses += pulseData?.pulse_count || 0;
     });
-    return { artistSongs: songs, totalPulses: pulses };
-  }, [artist.id, pulseCounts]);
+    const streams = streamTotals?.find((row) => row.artist_id === artist.id)?.stream_count || 0;
+    const followers = followerCounts?.find((row) => row.artist_id === artist.id)?.follower_count || 0;
+    return { artistSongs: songs, totalPulses: pulses, totalStreams: streams, totalFollowers: followers };
+  }, [artist.id, pulseCounts, streamTotals, followerCounts]);
 
   return (
     <Link to={`/artist/${artist.id}`}>
@@ -85,8 +89,14 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
             <div className="flex items-center gap-1.5">
               <Music className="w-3.5 h-3.5" />
               <span>{artistSongs.length} songs</span>
+              <span>•</span>
+              <span>{totalStreams.toLocaleString()} streams</span>
             </div>
             <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1">
+                <Users className="w-3.5 h-3.5" />
+                <span>{totalFollowers.toLocaleString()}</span>
+              </span>
               {totalPulses > 0 && (
                 <span className="tabular-nums text-primary">❤️‍🔥 {totalPulses.toLocaleString()}</span>
               )}

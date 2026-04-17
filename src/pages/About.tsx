@@ -33,7 +33,7 @@ export default function About() {
       window.dispatchEvent(
         new CustomEvent('songchainn:mosha-prompt', {
           detail: {
-            text: 'Malaka?? ready to move on now??',
+            text: 'Malakas, ready to move on now?',
             ctaLabel: 'Lets Go..',
             ctaPath: '/',
           },
