@@ -77,6 +77,14 @@ const HostCreate = () => {
     });
     return map;
   }, []);
+
+  const artistById = useMemo(() => {
+    const map = new Map<string, (typeof ARTISTS)[number]>();
+    ARTISTS.forEach((artist) => {
+      map.set(artist.id, artist);
+    });
+    return map;
+  }, []);
   
   // Fetch songchainn users for co-host search
   useEffect(() => {
@@ -199,6 +207,20 @@ const HostCreate = () => {
       );
   };
 
+  const upsertCoHostsInRoom = async (battleId: string) => {
+    if (!selectedCoHosts.length) return;
+    const rows = selectedCoHosts.map((coHost) => ({
+      battle_id: battleId,
+      user_id: coHost.user_id,
+      role: "co-host",
+      display_name: coHost.display_name || coHost.username || "Co-Host",
+      is_active: false,
+      is_muted: true,
+      is_speaking: false,
+    }));
+    await supabase.from("battle_rooms").upsert(rows, { onConflict: "battle_id,user_id" });
+  };
+
   const broadcastBattleLaunch = async (battleId: string, title: string) => {
     if (!user) return;
     const { data: profiles } = await supabase
@@ -272,44 +294,59 @@ const HostCreate = () => {
     }
 
     setIsSubmitting(true);
-    const status = isLaunchNow ? "live" : "upcoming";
-    const scheduledTime = isLaunchNow ? null : form.schedule || null;
-    const { data, error } = await supabase.from("battles").insert({
-      title: form.title,
-      region: form.region,
-      artist_a_name: form.artistA || "TBD",
-      artist_b_name: form.artistB || "TBD",
-      artist_a_image: null,
-      artist_b_image: null,
-      song_a: form.songA || "TBD",
-      song_b: form.songB || "TBD",
-      host_user_id: user.id,
-      host_name: profile.display_name || profile.username || "Host",
-      co_hosts: selectedCoHosts.map(c => c.display_name || c.username || ""),
-      scheduled_time: scheduledTime,
-      status,
-      total_rounds: 3,
-    }).select().single();
+    try {
+      const status = isLaunchNow ? "live" : "upcoming";
+      const scheduledTime = isLaunchNow ? null : form.schedule || null;
+      const artistA = artistById.get(form.artistAId);
+      const artistB = artistById.get(form.artistBId);
 
-    if (error || !data) {
+      const { data, error } = await supabase
+        .from("battles")
+        .insert({
+          title: form.title,
+          region: form.region,
+          artist_a_name: form.artistA || "TBD",
+          artist_b_name: form.artistB || "TBD",
+          artist_a_image: artistA?.profileImage ?? null,
+          artist_b_image: artistB?.profileImage ?? null,
+          artist_a_region: artistA?.location ?? form.region,
+          artist_b_region: artistB?.location ?? form.region,
+          song_a: form.songA || "TBD",
+          song_b: form.songB || "TBD",
+          host_user_id: user.id,
+          host_name: profile.display_name || profile.username || "Host",
+          co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
+          scheduled_time: scheduledTime,
+          status,
+          round: 1,
+          total_rounds: 3,
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        toast({ title: "Failed to create battle", description: "Please try again." });
+        return;
+      }
+
+      await sendCoHostInvites(data.id, form.title);
+
+      if (isLaunchNow) {
+        await upsertHostInRoom(data.id);
+        await upsertCoHostsInRoom(data.id);
+        await broadcastBattleLaunch(data.id, form.title);
+        toast({ title: "Battle launched", description: "Your battle is live with host controls and room features active." });
+        setLiveBattlesCount((n) => n + 1);
+        navigate(embedTo(`/room/${data.id}`));
+      } else {
+        toast({ title: "Battle scheduled", description: "Your battle is now in the upcoming feed." });
+        navigate(embedTo("/battles/upcoming"));
+      }
+    } catch {
       toast({ title: "Failed to create battle", description: "Please try again." });
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    await sendCoHostInvites(data.id, form.title);
-
-    if (isLaunchNow) {
-      await upsertHostInRoom(data.id);
-      await broadcastBattleLaunch(data.id, form.title);
-      toast({ title: "Battle launched", description: "Your battle is live and users have been notified." });
-      setLiveBattlesCount((n) => n + 1);
-      navigate(embedTo(`/entry/${data.id}`));
-    } else {
-      toast({ title: "Battle scheduled", description: "Your battle is now in the upcoming feed." });
-      navigate(embedTo("/battles/upcoming"));
-    }
-    setIsSubmitting(false);
   };
 
   const selectClass = "w-full rounded-xl border border-border bg-card/80 backdrop-blur pl-14 pr-4 py-3.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/30 shadow-[0_2px_10px_rgba(0,0,0,0.2)] transition-all appearance-none cursor-pointer hover:border-primary/20";
