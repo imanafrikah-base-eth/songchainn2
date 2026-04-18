@@ -16,7 +16,7 @@ const CountryChips = () => (
             Live
           </span>
         ) : (
-          <span className="text-muted-foreground">â€” Coming Soon</span>
+          <span className="text-muted-foreground">- Coming Soon</span>
         )}
       </div>
     ))}

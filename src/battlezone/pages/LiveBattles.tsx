@@ -26,7 +26,7 @@ const LiveBattles = () => {
       {isEmbedded ? <EmbedTopBar title="Live Battles" /> : <Navbar />}
       <div className={`mx-auto max-w-7xl px-4 ${isEmbedded ? "py-6" : "py-12"} space-y-8`}>
         <div className="text-center">
-          <h1 className="text-3xl font-display font-black text-foreground mb-2">ðŸ”´ Live Battles</h1>
+          <h1 className="text-3xl font-display font-black text-foreground mb-2">Live Battles</h1>
           <p className="text-muted-foreground">Jump into a battle happening right now</p>
         </div>
 

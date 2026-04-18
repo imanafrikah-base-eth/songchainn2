@@ -8,6 +8,7 @@ export async function checkSupabaseReachability(): Promise<void> {
     const res = await fetch(url, { method: 'GET' });
     if (!res) throw new Error('No response object');
   } catch (e) {
-    console.error('[$ongChainn] Supabase reachability check failed:', e);
+    // Dev-only signal: avoid noisy error-level logs for transient network issues.
+    console.warn('[$ongChainn] Supabase reachability check unavailable');
   }
 }

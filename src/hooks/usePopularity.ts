@@ -13,6 +13,46 @@ interface SongPopularity {
   popularity_score: number | null;
 }
 
+const numberOrZero = (value: number | null | undefined) => Number(value || 0);
+
+function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined): SongPopularity[] {
+  const merged = new Map<string, SongPopularity>();
+
+  SONGS.forEach((song) => {
+    merged.set(song.id, {
+      song_id: song.id,
+      play_count: numberOrZero(song.plays),
+      like_count: numberOrZero(song.likes),
+      comment_count: 0,
+      share_count: 0,
+      view_count: 0,
+      popularity_score: null,
+    });
+  });
+
+  (rows || []).forEach((row) => {
+    const songId = String(row.song_id || '').trim();
+    if (!songId) return;
+    const seed = merged.get(songId);
+    const seedPlays = numberOrZero(seed?.play_count);
+    const seedLikes = numberOrZero(seed?.like_count);
+    const dbPlays = numberOrZero(row.play_count);
+    const dbLikes = numberOrZero(row.like_count);
+
+    merged.set(songId, {
+      song_id: songId,
+      play_count: Math.max(seedPlays, dbPlays),
+      like_count: Math.max(seedLikes, dbLikes),
+      comment_count: numberOrZero(row.comment_count),
+      share_count: numberOrZero(row.share_count),
+      view_count: numberOrZero(row.view_count),
+      popularity_score: row.popularity_score ?? null,
+    });
+  });
+
+  return Array.from(merged.values());
+}
+
 export interface ArtistFollowerCount {
   artist_id: string;
   follower_count: number;
@@ -22,6 +62,8 @@ export interface ArtistStreamTotal {
   artist_id: string;
   stream_count: number;
 }
+
+const ARTIST_FOLLOWER_BASELINE = 71;
 
 interface ProfilePopularity {
   profile_id: string | null;
@@ -80,6 +122,10 @@ function usePopularityRealtime() {
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
         queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'song_popularity' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
+        queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'liked_songs' }, () => {
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
       })
@@ -115,7 +161,7 @@ export function useSongPopularity() {
       try {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error) {
-          return (data as SongPopularity[]) || [];
+          return mergeSongPopularityWithSeed((data as SongPopularity[]) || []);
         }
       } catch {
         // Ignore RPC failures and continue to fallback query.
@@ -123,9 +169,9 @@ export function useSongPopularity() {
 
       try {
         const { data: fallbackData } = await supabase.from('song_popularity').select('*');
-        return (fallbackData as SongPopularity[]) || [];
+        return mergeSongPopularityWithSeed((fallbackData as SongPopularity[]) || []);
       } catch {
-        return [] as SongPopularity[];
+        return mergeSongPopularityWithSeed([] as SongPopularity[]);
       }
     },
     staleTime: 1000 * 10,
@@ -235,22 +281,55 @@ export function useArtistFollowerCounts() {
   return useQuery({
     queryKey: ['artist-follower-counts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('liked_artists')
-        .select('artist_id');
-
-      if (error || !data) {
-        return [] as ArtistFollowerCount[];
-      }
-
-      const counts = new Map<string, number>();
-      (data as any[]).forEach((row) => {
-        const artistId = String(row.artist_id || '').trim();
-        if (!artistId) return;
-        counts.set(artistId, (counts.get(artistId) || 0) + 1);
+      const artistIds = ARTISTS.map((artist) => artist.id);
+      const countsByArtist = new Map<string, number>();
+      artistIds.forEach((artistId) => {
+        countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE);
       });
 
-      return Array.from(counts.entries()).map(([artist_id, follower_count]) => ({
+      try {
+        const { data, error } = await (supabase as any).rpc('get_artist_follow_counts', {
+          artist_ids: artistIds,
+        });
+
+        if (!error && Array.isArray(data)) {
+          data.forEach((row: any) => {
+            const artistId = String(row?.artist_id || '').trim();
+            if (!artistId) return;
+            const count = Number(row?.follower_count || 0);
+            const normalizedCount = Math.max(0, Number.isFinite(count) ? Math.floor(count) : 0);
+            countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE + normalizedCount);
+          });
+
+          return Array.from(countsByArtist.entries()).map(([artist_id, follower_count]) => ({
+            artist_id,
+            follower_count,
+          }));
+        }
+      } catch {
+        // Ignore RPC failures and continue to table fallback.
+      }
+
+      const { data, error } = await supabase.from('liked_artists').select('artist_id, user_id');
+      if (!error && data) {
+        const perArtistFollowers = new Map<string, Set<string>>();
+        (data as any[]).forEach((row, index) => {
+          const artistId = String(row.artist_id || '').trim();
+          if (!artistId) return;
+          const userId = String(row.user_id || '').trim() || `anon-${index}`;
+          const existing = perArtistFollowers.get(artistId);
+          if (existing) {
+            existing.add(userId);
+          } else {
+            perArtistFollowers.set(artistId, new Set([userId]));
+          }
+        });
+        perArtistFollowers.forEach((userIds, artistId) => {
+          countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE + userIds.size);
+        });
+      }
+
+      return Array.from(countsByArtist.entries()).map(([artist_id, follower_count]) => ({
         artist_id,
         follower_count,
       }));
@@ -266,19 +345,19 @@ export function useArtistStreamTotals() {
   return useQuery({
     queryKey: ['artist-stream-totals'],
     queryFn: async () => {
-      let popularityData: SongPopularity[] = [];
+      let popularityData: SongPopularity[] = mergeSongPopularityWithSeed([]);
       try {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error && data) {
-          popularityData = data as SongPopularity[];
+          popularityData = mergeSongPopularityWithSeed(data as SongPopularity[]);
         }
       } catch {
-        popularityData = [];
+        popularityData = mergeSongPopularityWithSeed([]);
       }
 
       if (!popularityData.length) {
         const { data: fallbackData } = await supabase.from('song_popularity').select('*');
-        popularityData = (fallbackData as SongPopularity[]) || [];
+        popularityData = mergeSongPopularityWithSeed((fallbackData as SongPopularity[]) || []);
       }
 
       const songToArtist = new Map<string, string>(SONGS.map((song) => [song.id, song.artistId]));

@@ -11,7 +11,7 @@ const StatsRow = () => {
     { icon: Radio, label: "Live Rooms", value: String(liveBattles.length), color: "text-live" },
     { icon: Users, label: "Artists Battling", value: String(totalArtists), color: "text-primary" },
     { icon: Headphones, label: "Listeners Active", value: totalListeners.toLocaleString(), color: "text-neon-cyan" },
-    { icon: MapPin, label: "Zambia Live", value: "ðŸ‡¿ðŸ‡²", color: "text-neon-gold" },
+    { icon: MapPin, label: "Zambia Live", value: "ZM", color: "text-neon-gold" },
   ];
 
   return (

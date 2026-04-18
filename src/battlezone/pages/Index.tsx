@@ -27,10 +27,10 @@ const Index = () => {
         <div className={`relative mx-auto max-w-7xl px-4 ${isEmbedded ? "py-10 md:py-14" : "py-20 md:py-28"} flex flex-col md:flex-row items-center gap-10`}>
           <div className="flex-1 text-center md:text-left">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
-              <Zap className="h-3 w-3" /> WaveWarz Africa Battle Zone
+              <Zap className="h-3 w-3" /> WaveWarz Africa BattleZone
             </div>
             <h1 className="text-4xl md:text-6xl font-display font-black text-foreground leading-tight mb-6">
-              Prepare For The Next Music Battle Wave{" "}
+              Prepare for the Next Wave of Music Battles{" "}
               <span className="text-primary text-glow-green">Across Africa</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8 max-w-lg">
@@ -49,7 +49,7 @@ const Index = () => {
             </div>
           </div>
           <div className="flex-shrink-0">
-            <img src={wavewarzLogo} alt="WaveWarz Africa Battle Zone" className="w-64 md:w-80 float-slow" />
+            <img src={wavewarzLogo} alt="WaveWarz Africa BattleZone" className="w-64 md:w-80 float-slow" />
           </div>
         </div>
       </section>
@@ -75,7 +75,7 @@ const Index = () => {
         </section>
 
         <section>
-          <SectionHeader title="Passed Battles" subtitle="See completed battle outcomes" linkTo="/battles/results" linkLabel="All Results" />
+          <SectionHeader title="Past Battles" subtitle="See completed battle outcomes" linkTo="/battles/results" linkLabel="All Results" />
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {endedBattles.map((b) => <BattleCard key={b.id} battle={b} />)}
           </div>

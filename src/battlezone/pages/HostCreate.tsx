@@ -207,7 +207,7 @@ const HostCreate = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {isEmbedded ? <EmbedTopBar title="Host A Battle" /> : <Navbar />}
+      {isEmbedded ? <EmbedTopBar title="Host a Battle" /> : <Navbar />}
       <div className="mx-auto max-w-2xl px-4 py-8">
         <AppLink to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
           <ArrowLeft className="h-4 w-4" /> Back
@@ -301,7 +301,7 @@ const HostCreate = () => {
 
           {/* Schedule */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Schedule (optional â€” leave blank to go live now)</label>
+            <label className="text-sm font-medium text-foreground">Schedule (optional - leave blank to go live now)</label>
             <div className="relative">
               <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <input type="datetime-local" value={form.schedule} onChange={(e) => update("schedule", e.target.value)} className={inputClass} />
@@ -314,7 +314,7 @@ const HostCreate = () => {
 
           {/* Co-Host Invites */}
           <div className="space-y-3">
-            <label className="text-sm font-medium text-foreground">Co-Host Invites (max 4) â€” $ongChainn users</label>
+            <label className="text-sm font-medium text-foreground">Co-Host Invites (max 4) - $ongChainn users</label>
 
             {selectedCoHosts.length > 0 && (
               <div className="flex flex-wrap gap-2">

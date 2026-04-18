@@ -58,7 +58,7 @@ const BattleDetail = () => {
             <h3 className="font-bold text-foreground">{battle.artistA.name}</h3>
             <span className="text-xs text-muted-foreground">{battle.songA}</span>
             <span className="text-xs text-muted-foreground">{battle.artistA.region}</span>
-            {battle.winner === "A" && <span className="rounded-full bg-neon-gold/20 px-3 py-1 text-xs font-bold text-neon-gold">ðŸ† Winner</span>}
+            {battle.winner === "A" && <span className="rounded-full bg-neon-gold/20 px-3 py-1 text-xs font-bold text-neon-gold">Winner</span>}
           </div>
           <div className="flex flex-col items-center">
             <span className="text-2xl font-display font-bold text-muted-foreground">VS</span>
@@ -68,7 +68,7 @@ const BattleDetail = () => {
             <h3 className="font-bold text-foreground">{battle.artistB.name}</h3>
             <span className="text-xs text-muted-foreground">{battle.songB}</span>
             <span className="text-xs text-muted-foreground">{battle.artistB.region}</span>
-            {battle.winner === "B" && <span className="rounded-full bg-neon-gold/20 px-3 py-1 text-xs font-bold text-neon-gold">ðŸ† Winner</span>}
+            {battle.winner === "B" && <span className="rounded-full bg-neon-gold/20 px-3 py-1 text-xs font-bold text-neon-gold">Winner</span>}
           </div>
         </div>
 

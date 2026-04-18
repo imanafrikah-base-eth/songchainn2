@@ -8,7 +8,7 @@ import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 
 const steps = [
   { icon: Users, title: "Join a Battle Room", desc: "Browse live battles and enter a room as an audience member. It's free and instant." },
-  { icon: Mic, title: "Vote Live or Request to Speak", desc: "Cast your vote for your favourite artist. Request the mic to share your take." },
+  { icon: Mic, title: "Vote Live or Request to Speak", desc: "Cast your vote for your favorite artist. Request the mic to share your take." },
   { icon: Trophy, title: "See Results and Follow Artists", desc: "Watch the results unfold and follow winning artists on $ongChainn." },
 ];
 
@@ -27,7 +27,7 @@ const HowItWorks = () => {
       {isEmbedded ? <EmbedTopBar title="How It Works" /> : <Navbar />}
       <div className={`mx-auto max-w-4xl px-4 ${isEmbedded ? "py-8" : "py-16"} space-y-16`}>
       <div className="text-center">
-        <h1 className="text-4xl font-display font-black text-foreground mb-4">How AfricaBattleZone Works</h1>
+        <h1 className="text-4xl font-display font-black text-foreground mb-4">How WaveWarz Africa BattleZone Works</h1>
         <p className="text-lg text-muted-foreground">Join live music battles, vote for your favorites, and discover Africa's hottest talent.</p>
       </div>
 

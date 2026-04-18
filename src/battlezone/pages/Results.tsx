@@ -14,7 +14,7 @@ const Results = () => {
       {isEmbedded ? <EmbedTopBar title="Battle Results" /> : <Navbar />}
       <div className={`mx-auto max-w-7xl px-4 ${isEmbedded ? "py-6" : "py-12"} space-y-8`}>
         <div className="text-center">
-          <h1 className="text-3xl font-display font-black text-foreground mb-2">ðŸ† Battle Results</h1>
+          <h1 className="text-3xl font-display font-black text-foreground mb-2">Battle Results</h1>
           <p className="text-muted-foreground">See who came out on top</p>
         </div>
         {isLoading ? (

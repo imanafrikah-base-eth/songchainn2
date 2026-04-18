@@ -36,62 +36,67 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
     let isActive = true;
 
     const fetchCount = async () => {
-      const liveUsersCountRes = await (supabase as any)
-        .from('room_live_users')
-        .select('user_id')
-        .eq('room_id', roomId);
+      try {
+        const liveUsersCountRes = await (supabase as any)
+          .from('room_live_users')
+          .select('user_id')
+          .eq('room_id', roomId);
 
-      if (!isActive) return;
-      if (!liveUsersCountRes?.error && Array.isArray(liveUsersCountRes?.data)) {
-        const uniqueUsers = new Set(
-          (liveUsersCountRes.data as Array<{ user_id?: string | null }>)
-            .map((row) => (typeof row?.user_id === 'string' ? row.user_id : ''))
-            .filter((value) => value.length > 0)
-        );
-        const liveUsersCount = uniqueUsers.size;
-        setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
-        return;
+        if (!isActive) return;
+        if (!liveUsersCountRes?.error && Array.isArray(liveUsersCountRes?.data)) {
+          const uniqueUsers = new Set(
+            (liveUsersCountRes.data as Array<{ user_id?: string | null }>)
+              .map((row) => (typeof row?.user_id === 'string' ? row.user_id : ''))
+              .filter((value) => value.length > 0)
+          );
+          const liveUsersCount = uniqueUsers.size;
+          setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
+          return;
+        }
+
+        const { data, error } = await (supabase as any)
+          .from('room_live_counts')
+          .select('*')
+          .eq('room_id', roomId)
+          .maybeSingle();
+
+        if (!isActive) return;
+        if (!error) {
+          const nextCount = resolveLiveCount((data ?? null) as RoomLiveCountRow | null);
+          setCount(isListening ? Math.max(1, nextCount) : nextCount);
+          return;
+        }
+
+        const fallback = await (supabase as any)
+          .from('room_profiles')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('room_id', roomId)
+          .eq('is_active', true);
+
+        if (!isActive) return;
+        if (!fallback?.error) {
+          const fallbackCount = Math.max(0, Number(fallback?.count ?? 0));
+          setCount(isListening ? Math.max(1, fallbackCount) : fallbackCount);
+          return;
+        }
+
+        const liveUsersFallback = await (supabase as any)
+          .from('room_live_users')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('room_id', roomId);
+
+        if (!isActive) return;
+        if (!liveUsersFallback?.error) {
+          const liveUsersCount = Math.max(0, Number(liveUsersFallback?.count ?? 0));
+          setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
+          return;
+        }
+
+        setCount(isListening ? 1 : 0);
+      } catch {
+        if (!isActive) return;
+        setCount(isListening ? 1 : 0);
       }
-
-      const { data, error } = await (supabase as any)
-        .from('room_live_counts')
-        .select('*')
-        .eq('room_id', roomId)
-        .maybeSingle();
-
-      if (!isActive) return;
-      if (!error) {
-        const nextCount = resolveLiveCount((data ?? null) as RoomLiveCountRow | null);
-        setCount(isListening ? Math.max(1, nextCount) : nextCount);
-        return;
-      }
-
-      const fallback = await (supabase as any)
-        .from('room_profiles')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('room_id', roomId)
-        .eq('is_active', true);
-
-      if (!isActive) return;
-      if (!fallback?.error) {
-        const fallbackCount = Math.max(0, Number(fallback?.count ?? 0));
-        setCount(isListening ? Math.max(1, fallbackCount) : fallbackCount);
-        return;
-      }
-
-      const liveUsersFallback = await (supabase as any)
-        .from('room_live_users')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('room_id', roomId);
-
-      if (!isActive) return;
-      if (!liveUsersFallback?.error) {
-        const liveUsersCount = Math.max(0, Number(liveUsersFallback?.count ?? 0));
-        setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
-        return;
-      }
-
-      setCount(isListening ? 1 : 0);
     };
 
     const channel = supabase

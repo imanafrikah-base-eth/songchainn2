@@ -56,11 +56,11 @@ const AuthGate = ({ children }: { children: React.ReactNode }) => {
           
           <div className="space-y-3">
             <h1 className="text-3xl font-display font-black text-foreground">
-              WaveWarz Africa Battle Zone
+              WaveWarz Africa BattleZone
             </h1>
             <p className="text-muted-foreground">
               Access WaveWarz through your <span className="text-primary font-semibold">$ongChainn</span> account. 
-              Only registered $ongChainn users can enter the battle zone.
+              Only registered $ongChainn users can enter BattleZone.
             </p>
           </div>
 
@@ -84,9 +84,9 @@ const AuthGate = ({ children }: { children: React.ReactNode }) => {
           <div className="rounded-xl border border-border bg-card/60 p-4 text-left space-y-2">
             <p className="text-xs font-semibold text-foreground">Why $ongChainn?</p>
             <ul className="text-xs text-muted-foreground space-y-1">
-              <li>â€¢ Your $ongChainn profile is your battle identity</li>
-              <li>â€¢ Only $ongChainn artists & songs are featured</li>
-              <li>â€¢ Votes & activity sync to your $ongChainn account</li>
+              <li>- Your $ongChainn profile is your battle identity</li>
+              <li>- Only $ongChainn artists and songs are featured</li>
+              <li>- Votes and activity sync to your $ongChainn account</li>
             </ul>
           </div>
         </div>

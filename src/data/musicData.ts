@@ -3039,7 +3039,106 @@ const SONGS_RAW: Song[] = [
   },
 ];
 
-export const SONGS: Song[] = SONGS_RAW.map((song): Song => ({
+const ARTIST_STREAM_TARGETS: Record<string, number> = {
+  '1': 14850, // 7ROO7H BASED
+  '2': 7420,  // DenaJah
+  '3': 26540, // IMan Afrikah (leader)
+  '4': 13210, // NDA
+  '5': 9800,  // PRP
+  '6': 8160,  // Sanchy
+  '7': 11970, // Santana
+  '8': 4120,  // FAITH
+  '9': 2875,  // JMN
+  '10': 3340, // SAMMIE
+};
+
+function seededRandom(seed: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) % 1000000) / 1000000;
+}
+
+function distributeArtistStreams(songs: Song[], targetTotal: number): Map<string, number> {
+  const allocations = new Map<string, number>();
+  if (!songs.length) return allocations;
+
+  const safeTarget = Math.max(0, Math.floor(targetTotal));
+  const minPerSong = safeTarget >= songs.length ? 1 : 0;
+  const baselineTotal = minPerSong * songs.length;
+  const remaining = Math.max(0, safeTarget - baselineTotal);
+
+  const weighted = songs.map((song, index) => {
+    const weight = 0.2 + seededRandom(`${song.artistId}:${song.id}:${index}:stream-weight`);
+    return { song, weight };
+  });
+
+  const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0) || 1;
+
+  let distributed = 0;
+  const fractionalBuckets: Array<{ songId: string; fraction: number }> = [];
+
+  weighted.forEach(({ song, weight }) => {
+    const exact = (weight / totalWeight) * remaining;
+    const base = Math.floor(exact);
+    const value = minPerSong + base;
+    allocations.set(song.id, value);
+    distributed += value;
+    fractionalBuckets.push({
+      songId: song.id,
+      fraction: exact - base,
+    });
+  });
+
+  const remainder = safeTarget - distributed;
+  if (remainder > 0) {
+    fractionalBuckets.sort((a, b) => {
+      if (b.fraction !== a.fraction) return b.fraction - a.fraction;
+      const tieA = seededRandom(`${a.songId}:tie`);
+      const tieB = seededRandom(`${b.songId}:tie`);
+      return tieB - tieA;
+    });
+
+    for (let i = 0; i < remainder; i += 1) {
+      const bucket = fractionalBuckets[i % fractionalBuckets.length];
+      allocations.set(bucket.songId, (allocations.get(bucket.songId) || 0) + 1);
+    }
+  }
+
+  return allocations;
+}
+
+function applyArtistStreamDistribution(songs: Song[]): Song[] {
+  const songsByArtist = new Map<string, Song[]>();
+  songs.forEach((song) => {
+    const group = songsByArtist.get(song.artistId);
+    if (group) {
+      group.push(song);
+    } else {
+      songsByArtist.set(song.artistId, [song]);
+    }
+  });
+
+  const allocatedBySongId = new Map<string, number>();
+
+  songsByArtist.forEach((artistSongs, artistId) => {
+    const fallbackSeedTotal = artistSongs.reduce((sum, song) => sum + Math.max(0, Math.floor(song.plays || 0)), 0);
+    const targetTotal = ARTIST_STREAM_TARGETS[artistId] ?? fallbackSeedTotal;
+    const allocations = distributeArtistStreams(artistSongs, targetTotal);
+    allocations.forEach((plays, songId) => allocatedBySongId.set(songId, plays));
+  });
+
+  return songs.map((song) => ({
+    ...song,
+    plays: allocatedBySongId.get(song.id) ?? Math.max(0, Math.floor(song.plays || 0)),
+  }));
+}
+
+const SONGS_WITH_DISTRIBUTED_STREAMS = applyArtistStreamDistribution(SONGS_RAW);
+
+export const SONGS: Song[] = SONGS_WITH_DISTRIBUTED_STREAMS.map((song): Song => ({
   ...song,
   coverImage: withStableCoverImage(song.coverImage, song.artist),
 }));
