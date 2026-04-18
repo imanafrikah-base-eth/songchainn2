@@ -25,16 +25,16 @@ const HowItWorks = () => {
   return (
     <div className="min-h-screen bg-background">
       {isEmbedded ? <EmbedTopBar title="How It Works" /> : <Navbar />}
-      <div className={`mx-auto max-w-4xl px-4 ${isEmbedded ? "py-8" : "py-16"} space-y-16`}>
+      <div className={`mx-auto max-w-4xl px-4 ${isEmbedded ? "py-8" : "py-10 md:py-16"} space-y-10 md:space-y-16`}>
       <div className="text-center">
-        <h1 className="text-4xl font-display font-black text-foreground mb-4">How WaveWarz Africa BattleZone Works</h1>
-        <p className="text-lg text-muted-foreground">Join live music battles, vote for your favorites, and discover Africa's hottest talent.</p>
+        <h1 className="text-3xl sm:text-4xl font-display font-black text-foreground mb-4">How WaveWarz Africa BattleZone Works</h1>
+        <p className="text-base sm:text-lg text-muted-foreground">Join live music battles, vote for your favorites, and discover Africa's hottest talent.</p>
       </div>
 
       {/* Steps */}
-      <div className="grid gap-8 md:grid-cols-3">
+      <div className="grid gap-5 sm:gap-6 md:gap-8 md:grid-cols-3">
         {steps.map((s, i) => (
-          <div key={s.title} className="rounded-2xl border border-border bg-card/80 p-6 text-center backdrop-blur">
+          <div key={s.title} className="rounded-2xl border border-border bg-card/80 p-5 sm:p-6 text-center backdrop-blur">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary font-display font-bold text-xl">
               {i + 1}
             </div>
@@ -50,7 +50,7 @@ const HowItWorks = () => {
         <h2 className="text-2xl font-display font-bold text-foreground mb-6 text-center">Participant Roles</h2>
         <div className="grid gap-6 md:grid-cols-2">
           {roles.map((r) => (
-            <div key={r.title} className="rounded-2xl border border-border bg-card/80 p-6 backdrop-blur flex gap-4">
+            <div key={r.title} className="rounded-2xl border border-border bg-card/80 p-5 sm:p-6 backdrop-blur flex items-start gap-4">
               <r.icon className={`h-8 w-8 shrink-0 ${r.color}`} />
               <div>
                 <h3 className={`font-bold ${r.color} mb-1`}>{r.title}</h3>
@@ -62,7 +62,7 @@ const HowItWorks = () => {
       </div>
 
       {/* Voting */}
-      <div className="rounded-2xl border border-border bg-card/80 p-8 text-center backdrop-blur">
+      <div className="rounded-2xl border border-border bg-card/80 p-5 sm:p-8 text-center backdrop-blur">
         <h2 className="text-2xl font-display font-bold text-foreground mb-4">Live Voting</h2>
         <p className="text-muted-foreground max-w-lg mx-auto">
           During each round, audience members vote for Artist A or Artist B. Votes are tallied live with real-time percentage bars. The artist with the most votes wins the round.
@@ -76,14 +76,14 @@ const HowItWorks = () => {
       </div>
 
       {/* CTA */}
-      <div className="flex flex-wrap justify-center gap-4">
-        <Link to="/wavewarz-africa/battles/live" className="rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-all">
+      <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+        <Link to="/wavewarz-africa/battles/live" className="w-full sm:w-auto rounded-xl bg-primary px-6 py-3 text-center font-bold text-primary-foreground hover:bg-primary/90 transition-all">
           Browse Live Battles
         </Link>
-        <Link to="/wavewarz-africa/host/create" className="rounded-xl border border-border bg-card px-6 py-3 font-bold text-foreground hover:bg-muted transition-colors">
+        <Link to="/wavewarz-africa/host/create" className="w-full sm:w-auto rounded-xl border border-border bg-card px-6 py-3 text-center font-bold text-foreground hover:bg-muted transition-colors">
           Become a Host
         </Link>
-        <Link to="/wavewarz-africa" className="rounded-xl border border-border bg-card px-6 py-3 font-medium text-muted-foreground hover:bg-muted transition-colors">
+        <Link to="/wavewarz-africa" className="w-full sm:w-auto rounded-xl border border-border bg-card px-6 py-3 text-center font-medium text-muted-foreground hover:bg-muted transition-colors">
           Back to Home
         </Link>
       </div>

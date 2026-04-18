@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bot, Send } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Navigation } from '@/components/Navigation';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -16,6 +17,33 @@ type DirectMessage = {
   text: string;
   created_at: string;
 };
+
+type MessageCta = {
+  label: string;
+  route: string;
+};
+
+function parseMessageWithCtas(text: string): { content: string; ctas: MessageCta[] } {
+  const lines = text.split('\n');
+  const ctas: MessageCta[] = [];
+  const contentLines: string[] = [];
+
+  lines.forEach((line) => {
+    const match = line.match(/^CTA::(.+?)::(.+)$/);
+    if (match) {
+      const label = match[1]?.trim();
+      const route = match[2]?.trim();
+      if (label && route) ctas.push({ label, route });
+      return;
+    }
+    contentLines.push(line);
+  });
+
+  return {
+    content: contentLines.join('\n').trim(),
+    ctas,
+  };
+}
 
 function isRelevantToMoshaReply(text: string) {
   const query = text.toLowerCase();
@@ -62,6 +90,7 @@ const SEED_TEXT =
 
 export default function Inbox() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -148,6 +177,14 @@ export default function Inbox() {
     }, replyDelay);
   };
 
+  const openCtaRoute = (route: string) => {
+    if (/^https?:\/\//i.test(route)) {
+      window.open(route, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    navigate(route);
+  };
+
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       <AnimatedBackground variant="default" />
@@ -165,6 +202,9 @@ export default function Inbox() {
 
           <div className="max-h-[58vh] overflow-y-auto rounded-xl border border-border/40 bg-black/20 p-2 sm:p-3 space-y-2">
             {sortedMessages.map((message) => (
+              (() => {
+                const parsed = parseMessageWithCtas(message.text);
+                return (
               <div
                 key={message.id}
                 className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
@@ -176,8 +216,25 @@ export default function Inbox() {
                 <p className="text-[11px] text-muted-foreground mb-1">
                   {message.sender === 'mosha' ? 'Mo$ha' : 'You'}
                 </p>
-                <p>{message.text}</p>
+                <p className="whitespace-pre-line">{parsed.content}</p>
+                {message.sender === 'mosha' && parsed.ctas.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {parsed.ctas.map((cta) => (
+                      <Button
+                        key={`${message.id}-${cta.label}-${cta.route}`}
+                        type="button"
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => openCtaRoute(cta.route)}
+                      >
+                        {cta.label}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
+                );
+              })()
             ))}
           </div>
 

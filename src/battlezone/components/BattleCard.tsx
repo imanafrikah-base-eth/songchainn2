@@ -2,10 +2,21 @@ import { Users, Music } from "lucide-react";
 import type { Battle } from "@/battlezone/hooks/useBattles";
 import LiveBadge from "./LiveBadge";
 import AppLink from "./AppLink";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
 
 const ArtistAvatar = ({ name, image, side }: { name: string; image: string; side: "A" | "B" }) => (
   image ? (
-    <img src={image} alt={name} className={`h-14 w-14 rounded-full object-cover border-2 ${side === "A" ? "border-primary/50" : "border-secondary/50"}`} />
+    <img
+      src={image}
+      alt={name}
+      className={`h-14 w-14 rounded-full object-cover border-2 ${side === "A" ? "border-primary/50" : "border-secondary/50"}`}
+      onError={(event) => {
+        const target = event.currentTarget;
+        if (target.dataset.fallbackApplied === "true") return;
+        target.dataset.fallbackApplied = "true";
+        target.src = wavewarzLogo;
+      }}
+    />
   ) : (
     <div className={`flex h-14 w-14 items-center justify-center rounded-full font-bold text-lg ${side === "A" ? "bg-primary/20 text-primary" : "bg-secondary/20 text-secondary"}`}>
       {name.charAt(0)}

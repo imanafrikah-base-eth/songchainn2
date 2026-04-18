@@ -9,6 +9,7 @@ import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import AppLink from "@/battlezone/components/AppLink";
 import { toast } from "@/battlezone/hooks/use-toast";
+import { ARTISTS, SONGS } from "@/data/musicData";
 
 const regions = ["Zambia", "South Africa", "Nigeria", "Zimbabwe", "Botswana"];
 
@@ -35,8 +36,12 @@ const HostCreate = () => {
   const [form, setForm] = useState({
     title: "",
     region: "Zambia",
+    artistAId: "",
+    artistBId: "",
     artistA: "",
     artistB: "",
+    songAId: "",
+    songBId: "",
     songA: "",
     songB: "",
     schedule: "",
@@ -48,17 +53,58 @@ const HostCreate = () => {
   const [users, setUsers] = useState<SongchainUser[]>([]);
   const [liveBattlesCount, setLiveBattlesCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const artistOptions = useMemo(
+    () =>
+      [...ARTISTS]
+        .map((artist) => ({ id: artist.id, name: artist.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    []
+  );
+
+  const songsByArtist = useMemo(() => {
+    const map = new Map<string, Array<{ id: string; title: string }>>();
+    SONGS.forEach((song) => {
+      const next = map.get(song.artistId) || [];
+      next.push({ id: song.id, title: song.title });
+      map.set(song.artistId, next);
+    });
+    map.forEach((songs, artistId) => {
+      map.set(
+        artistId,
+        songs.sort((a, b) => a.title.localeCompare(b.title))
+      );
+    });
+    return map;
+  }, []);
   
   // Fetch songchainn users for co-host search
   useEffect(() => {
     const fetchUsers = async () => {
       const { data } = await supabase
         .from("audience_profiles")
-        .select("id, user_id, username, display_name, avatar_url")
-        .eq("onboarding_completed", true)
+        .select("id, user_id, username, display_name, avatar_url, created_at")
         .not("user_id", "is", null)
-        .limit(50);
-      if (data) setUsers(data as SongchainUser[]);
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (!data) return;
+
+      const uniqueByUserId = new Map<string, SongchainUser>();
+      (data as any[]).forEach((row) => {
+        const userId = String(row?.user_id || "").trim();
+        if (!userId) return;
+        if (!uniqueByUserId.has(userId)) {
+          uniqueByUserId.set(userId, {
+            id: String(row?.id || userId),
+            user_id: userId,
+            username: row?.username ?? null,
+            display_name: row?.display_name ?? row?.username ?? "Listener",
+            avatar_url: row?.avatar_url ?? null,
+          });
+        }
+      });
+
+      setUsers(Array.from(uniqueByUserId.values()));
     };
     fetchUsers();
   }, []);
@@ -77,10 +123,10 @@ const HostCreate = () => {
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   const filteredUsers = useMemo(() => {
-    if (!coHostSearch.trim()) return users.filter(u => !selectedCoHosts.find(s => s.id === u.id));
+    if (!coHostSearch.trim()) return users.filter(u => !selectedCoHosts.find(s => s.user_id === u.user_id));
     return users.filter(
       (u) =>
-        !selectedCoHosts.find((s) => s.id === u.id) &&
+        !selectedCoHosts.find((s) => s.user_id === u.user_id) &&
         ((u.username?.toLowerCase().includes(coHostSearch.toLowerCase())) ||
           (u.display_name?.toLowerCase().includes(coHostSearch.toLowerCase())))
     );
@@ -94,7 +140,45 @@ const HostCreate = () => {
   };
 
   const removeCoHost = (userId: string) => {
-    setSelectedCoHosts((prev) => prev.filter((u) => u.id !== userId));
+    setSelectedCoHosts((prev) => prev.filter((u) => u.user_id !== userId));
+  };
+
+  const selectArtist = (slot: "A" | "B", artistId: string) => {
+    const selectedArtist = artistOptions.find((a) => a.id === artistId);
+    if (slot === "A") {
+      setForm((prev) => ({
+        ...prev,
+        artistAId: artistId,
+        artistA: selectedArtist?.name || "",
+        songAId: "",
+        songA: "",
+      }));
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      artistBId: artistId,
+      artistB: selectedArtist?.name || "",
+      songBId: "",
+      songB: "",
+    }));
+  };
+
+  const selectSong = (slot: "A" | "B", songId: string) => {
+    const song = SONGS.find((s) => s.id === songId);
+    if (slot === "A") {
+      setForm((prev) => ({
+        ...prev,
+        songAId: songId,
+        songA: song?.title || "",
+      }));
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      songBId: songId,
+      songB: song?.title || "",
+    }));
   };
 
   const upsertHostInRoom = async (battleId: string) => {
@@ -149,6 +233,30 @@ const HostCreate = () => {
     });
   };
 
+  const sendCoHostInvites = async (battleId: string, title: string) => {
+    if (!selectedCoHosts.length) return;
+
+    const roomRoute = `/wavewarz-africa/entry/${battleId}`;
+    const hostRoute = `/wavewarz-africa/host/control/${battleId}`;
+    const directMessages = selectedCoHosts.map((coHost) => ({
+      id: crypto.randomUUID(),
+      user_id: coHost.user_id,
+      sender: "mosha",
+      text: `You have been selected as a co-host for "${title}".\nCTA::Open Battle Room::${roomRoute}\nCTA::Open Host Controls::${hostRoute}\nCTA::BattleZone Home::/wavewarz-africa`,
+      created_at: new Date().toISOString(),
+    }));
+    await (supabase as any).from("direct_messages").insert(directMessages);
+
+    const notificationsPayload = selectedCoHosts.map((coHost) => ({
+      user_id: coHost.user_id,
+      type: "cohost_invite",
+      title: "Co-host Invite",
+      message: `You have been selected as a co-host for "${title}".`,
+      metadata: { battle_id: battleId, route: roomRoute, host_control_route: hostRoute },
+    }));
+    await supabase.from("notifications").insert(notificationsPayload);
+  };
+
   const createBattle = async (isLaunchNow: boolean) => {
     if (!user || !profile) return;
     if (!form.title.trim()) {
@@ -188,6 +296,8 @@ const HostCreate = () => {
       setIsSubmitting(false);
       return;
     }
+
+    await sendCoHostInvites(data.id, form.title);
 
     if (isLaunchNow) {
       await upsertHostInRoom(data.id);
@@ -243,31 +353,41 @@ const HostCreate = () => {
             </SelectWrapper>
           </div>
 
-          {/* Artist names (free text for now until artists table exists) */}
+          {/* Artist and song selection */}
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Artist A Name</label>
-              <div className="relative">
-                <Music className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <input
-                  value={form.artistA}
-                  onChange={(e) => update("artistA", e.target.value)}
-                  placeholder="$ongChainn artist name"
-                  className={inputClass}
-                />
-              </div>
+              <label className="text-sm font-medium text-foreground">Artist A</label>
+              <SelectWrapper icon={Music}>
+                <select
+                  value={form.artistAId}
+                  onChange={(e) => selectArtist("A", e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">Select Artist A</option>
+                  {artistOptions.map((artist) => (
+                    <option key={artist.id} value={artist.id}>
+                      {artist.name}
+                    </option>
+                  ))}
+                </select>
+              </SelectWrapper>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Artist B Name</label>
-              <div className="relative">
-                <Music className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <input
-                  value={form.artistB}
-                  onChange={(e) => update("artistB", e.target.value)}
-                  placeholder="$ongChainn artist name"
-                  className={inputClass}
-                />
-              </div>
+              <label className="text-sm font-medium text-foreground">Artist B</label>
+              <SelectWrapper icon={Music}>
+                <select
+                  value={form.artistBId}
+                  onChange={(e) => selectArtist("B", e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">Select Artist B</option>
+                  {artistOptions.map((artist) => (
+                    <option key={artist.id} value={artist.id}>
+                      {artist.name}
+                    </option>
+                  ))}
+                </select>
+              </SelectWrapper>
             </div>
           </div>
 
@@ -275,27 +395,39 @@ const HostCreate = () => {
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Song A</label>
-              <div className="relative">
-                <Music className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <input
-                  value={form.songA}
-                  onChange={(e) => update("songA", e.target.value)}
-                  placeholder="Song from $ongChainn"
-                  className={inputClass}
-                />
-              </div>
+              <SelectWrapper icon={Music}>
+                <select
+                  value={form.songAId}
+                  onChange={(e) => selectSong("A", e.target.value)}
+                  className={selectClass}
+                  disabled={!form.artistAId}
+                >
+                  <option value="">{form.artistAId ? "Select Song A" : "Select Artist A first"}</option>
+                  {(songsByArtist.get(form.artistAId) || []).map((song) => (
+                    <option key={song.id} value={song.id}>
+                      {song.title}
+                    </option>
+                  ))}
+                </select>
+              </SelectWrapper>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Song B</label>
-              <div className="relative">
-                <Music className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <input
-                  value={form.songB}
-                  onChange={(e) => update("songB", e.target.value)}
-                  placeholder="Song from $ongChainn"
-                  className={inputClass}
-                />
-              </div>
+              <SelectWrapper icon={Music}>
+                <select
+                  value={form.songBId}
+                  onChange={(e) => selectSong("B", e.target.value)}
+                  className={selectClass}
+                  disabled={!form.artistBId}
+                >
+                  <option value="">{form.artistBId ? "Select Song B" : "Select Artist B first"}</option>
+                  {(songsByArtist.get(form.artistBId) || []).map((song) => (
+                    <option key={song.id} value={song.id}>
+                      {song.title}
+                    </option>
+                  ))}
+                </select>
+              </SelectWrapper>
             </div>
           </div>
 
@@ -319,7 +451,7 @@ const HostCreate = () => {
             {selectedCoHosts.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {selectedCoHosts.map((u) => (
-                  <div key={u.id} className="flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1.5">
+                  <div key={u.user_id} className="flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1.5">
                     <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
                       {(u.display_name || u.username || "?").charAt(0)}
                     </div>
@@ -327,7 +459,7 @@ const HostCreate = () => {
                       <span className="font-medium text-foreground">{u.display_name || u.username}</span>
                       {u.username && <span className="text-muted-foreground ml-1">@{u.username}</span>}
                     </div>
-                    <button onClick={() => removeCoHost(u.id)} className="text-muted-foreground hover:text-live transition-colors ml-1">
+                    <button onClick={() => removeCoHost(u.user_id)} className="text-muted-foreground hover:text-live transition-colors ml-1">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
@@ -360,7 +492,17 @@ const HostCreate = () => {
                       >
                         <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold overflow-hidden">
                           {u.avatar_url ? (
-                            <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
+                            <img
+                              src={u.avatar_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              onError={(event) => {
+                                const target = event.currentTarget;
+                                if (target.dataset.fallbackApplied === "true") return;
+                                target.dataset.fallbackApplied = "true";
+                                target.src = "/placeholder.svg";
+                              }}
+                            />
                           ) : (
                             (u.display_name || u.username || "?").charAt(0)
                           )}

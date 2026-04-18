@@ -7,6 +7,7 @@ import { useBattle } from "@/battlezone/hooks/useBattles";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import AppLink from "@/battlezone/components/AppLink";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
 
 const BattleDetail = () => {
   const { isEmbedded } = useEmbedMode();
@@ -54,7 +55,17 @@ const BattleDetail = () => {
 
         <div className="grid grid-cols-3 gap-6 items-center">
           <div className="flex flex-col items-center gap-3 text-center">
-            <img src={battle.artistA.image} alt={battle.artistA.name} className="h-24 w-24 rounded-full object-cover border-2 border-primary/50" />
+            <img
+              src={battle.artistA.image}
+              alt={battle.artistA.name}
+              className="h-24 w-24 rounded-full object-cover border-2 border-primary/50"
+              onError={(event) => {
+                const target = event.currentTarget;
+                if (target.dataset.fallbackApplied === "true") return;
+                target.dataset.fallbackApplied = "true";
+                target.src = wavewarzLogo;
+              }}
+            />
             <h3 className="font-bold text-foreground">{battle.artistA.name}</h3>
             <span className="text-xs text-muted-foreground">{battle.songA}</span>
             <span className="text-xs text-muted-foreground">{battle.artistA.region}</span>
@@ -64,7 +75,17 @@ const BattleDetail = () => {
             <span className="text-2xl font-display font-bold text-muted-foreground">VS</span>
           </div>
           <div className="flex flex-col items-center gap-3 text-center">
-            <img src={battle.artistB.image} alt={battle.artistB.name} className="h-24 w-24 rounded-full object-cover border-2 border-secondary/50" />
+            <img
+              src={battle.artistB.image}
+              alt={battle.artistB.name}
+              className="h-24 w-24 rounded-full object-cover border-2 border-secondary/50"
+              onError={(event) => {
+                const target = event.currentTarget;
+                if (target.dataset.fallbackApplied === "true") return;
+                target.dataset.fallbackApplied = "true";
+                target.src = wavewarzLogo;
+              }}
+            />
             <h3 className="font-bold text-foreground">{battle.artistB.name}</h3>
             <span className="text-xs text-muted-foreground">{battle.songB}</span>
             <span className="text-xs text-muted-foreground">{battle.artistB.region}</span>

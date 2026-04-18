@@ -98,6 +98,9 @@ if (typeof window !== "undefined" && import.meta.env.PROD) {
 
 if (typeof window !== "undefined" && typeof window.fetch === "function") {
   const originalFetch = window.fetch.bind(window);
+
+  const neverAbortedSignal = () => new AbortController().signal;
+
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
       typeof input === "string"
@@ -124,11 +127,13 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
 
     const nextInput =
       shouldIgnoreAbortSignal && input instanceof Request
-        ? new Request(input, { signal: undefined })
+        ? new Request(input, { signal: neverAbortedSignal() })
         : input;
-    const nextInit = shouldIgnoreAbortSignal && init?.signal ? { ...init, signal: undefined } : init;
+    const nextInit = shouldIgnoreAbortSignal && init?.signal ? { ...init, signal: neverAbortedSignal() } : init;
 
-    return originalFetch(nextInput, nextInit).catch((error: any) => {
+    const runFetch = () => originalFetch(nextInput, nextInit);
+
+    return runFetch().catch(async (error: any) => {
       const isSupabase = isSupabaseRestOrFn || isSupabaseAuth;
       const message = String(error?.message ?? error ?? "");
       const normalized = message.toLowerCase();
@@ -139,10 +144,24 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
       const isFetchFailed =
         normalized.includes("failed to fetch") ||
         normalized.includes("network changed") ||
+        normalized.includes("http2") ||
         normalized.includes("timed out") ||
         normalized.includes("timeout") ||
         normalized.includes("name not resolved") ||
         normalized.includes("dns");
+
+      const shouldRetrySupabase =
+        isSupabase &&
+        (isAbortError || isFetchFailed);
+
+      if (shouldRetrySupabase) {
+        try {
+          // Retry once to smooth over transient browser/network transport failures.
+          return await runFetch();
+        } catch {
+          // Fall through to suppressed response below.
+        }
+      }
 
       if (isSupabase && isAbortError) {
         return new Response(null, { status: 499, statusText: "Client Abort Suppressed" });

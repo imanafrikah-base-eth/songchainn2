@@ -14,6 +14,7 @@ import { fetchSongchainUserIdSet } from "@/battlezone/lib/songchain";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import { useToast } from "@/battlezone/hooks/use-toast";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
 
 interface ChatMessage {
   id: string;
@@ -491,13 +492,13 @@ const LiveRoom = () => {
 
       {/* Main */}
       <div className="flex-1 flex flex-col lg:flex-row">
-        <div className={`flex-1 ${isEmbedded ? "p-3" : "p-4"} space-y-6 overflow-y-auto`}>
+        <div className={`flex-1 ${isEmbedded ? "p-2.5 sm:p-3" : "p-3 sm:p-4"} space-y-4 sm:space-y-6 overflow-y-auto`}>
           {/* Speaking Area */}
-          <div className="rounded-2xl border border-border bg-card/60 p-6 backdrop-blur">
-            <h3 className="text-sm font-bold text-muted-foreground mb-4 flex items-center gap-2">
+          <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
+            <h3 className="text-sm font-bold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2">
               <Mic className="h-4 w-4" /> Speaking Now
             </h3>
-            <div className="flex flex-wrap gap-6 justify-center">
+            <div className={`flex flex-wrap justify-center ${isVerySmallMobile ? "gap-3" : "gap-4 sm:gap-6"}`}>
               {host && <ParticipantCircle p={host} size="lg" />}
               {coHosts.map((p) => <ParticipantCircle key={p.id} p={p} />)}
               {speakers.map((p) => <ParticipantCircle key={p.id} p={p} />)}
@@ -508,16 +509,26 @@ const LiveRoom = () => {
           </div>
 
           {/* Battle Panel */}
-          <div className="rounded-2xl border border-border bg-card/60 p-6 backdrop-blur">
+          <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-display text-muted-foreground">Round {round} of {battle.totalRounds}</span>
               <span className="text-xs text-primary flex items-center gap-1"><Play className="h-3 w-3" /> Now Playing</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 items-center mb-6">
+            <div className={`${isVerySmallMobile ? "space-y-3" : "grid grid-cols-3 gap-4 items-center"} mb-6`}>
               <div className="flex flex-col items-center gap-2 text-center">
                 {battle.artistA.image && (
-                  <img src={battle.artistA.image} alt={battle.artistA.name} className="h-16 w-16 rounded-full object-cover border-2 border-primary/50" />
+                  <img
+                    src={battle.artistA.image}
+                    alt={battle.artistA.name}
+                    className={`${isVerySmallMobile ? "h-14 w-14" : "h-16 w-16"} rounded-full object-cover border-2 border-primary/50`}
+                    onError={(event) => {
+                      const target = event.currentTarget;
+                      if (target.dataset.fallbackApplied === "true") return;
+                      target.dataset.fallbackApplied = "true";
+                      target.src = wavewarzLogo;
+                    }}
+                  />
                 )}
                 <span className="text-sm font-bold text-foreground">{battle.artistA.name}</span>
                 <span className="text-[10px] text-muted-foreground">{battle.songA}</span>
@@ -528,7 +539,17 @@ const LiveRoom = () => {
               <div className="text-center font-display font-bold text-muted-foreground text-lg">VS</div>
               <div className="flex flex-col items-center gap-2 text-center">
                 {battle.artistB.image && (
-                  <img src={battle.artistB.image} alt={battle.artistB.name} className="h-16 w-16 rounded-full object-cover border-2 border-secondary/50" />
+                  <img
+                    src={battle.artistB.image}
+                    alt={battle.artistB.name}
+                    className={`${isVerySmallMobile ? "h-14 w-14" : "h-16 w-16"} rounded-full object-cover border-2 border-secondary/50`}
+                    onError={(event) => {
+                      const target = event.currentTarget;
+                      if (target.dataset.fallbackApplied === "true") return;
+                      target.dataset.fallbackApplied = "true";
+                      target.src = wavewarzLogo;
+                    }}
+                  />
                 )}
                 <span className="text-sm font-bold text-foreground">{battle.artistB.name}</span>
                 <span className="text-[10px] text-muted-foreground">{battle.songB}</span>
@@ -541,11 +562,11 @@ const LiveRoom = () => {
             {/* Voting Panel */}
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-foreground text-center">Cast Your Vote</h3>
-              <div className="flex gap-3">
+              <div className={`flex ${isVerySmallMobile ? "flex-col" : "gap-3"}`}>
                 <button
                   onClick={() => vote("A")}
                   disabled={!!votedFor}
-                  className={`flex-1 rounded-2xl py-4 font-bold text-lg transition-all duration-300 ${
+                  className={`flex-1 rounded-2xl ${isVerySmallMobile ? "py-3 text-sm" : "py-4 text-base sm:text-lg"} font-bold transition-all duration-300 ${
                     votedFor === "A"
                       ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-[0_0_25px_hsl(var(--neon-green)/0.4)]"
                       : votedFor
@@ -558,7 +579,7 @@ const LiveRoom = () => {
                 <button
                   onClick={() => vote("B")}
                   disabled={!!votedFor}
-                  className={`flex-1 rounded-2xl py-4 font-bold text-lg transition-all duration-300 ${
+                  className={`flex-1 rounded-2xl ${isVerySmallMobile ? "mt-2 py-3 text-sm" : "py-4 text-base sm:text-lg"} font-bold transition-all duration-300 ${
                     votedFor === "B"
                       ? "bg-gradient-to-br from-secondary to-secondary/80 text-secondary-foreground shadow-[0_0_25px_hsl(var(--cyan)/0.4)]"
                       : votedFor
@@ -595,45 +616,45 @@ const LiveRoom = () => {
           <div className="flex flex-wrap gap-2">
             {currentRole === "host" && (
               <>
-                <button onClick={() => setIsPaused(!isPaused)} className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2">
+                <button onClick={() => setIsPaused(!isPaused)} className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2">
                   {isPaused ? <><Play className="h-4 w-4" /> Resume</> : <><Pause className="h-4 w-4" /> Pause Round</>}
                 </button>
-                <button onClick={() => setRound((r) => Math.min(r + 1, battle.totalRounds))} className="rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center gap-2">
+                <button onClick={() => setRound((r) => Math.min(r + 1, battle.totalRounds))} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
                   <SkipForward className="h-4 w-4" /> Next Round
                 </button>
-                <button className="rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center gap-2">
+                <button className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center justify-center gap-2">
                   <UserPlus className="h-4 w-4" /> Invite Co-Host
                 </button>
-                <button onClick={muteActiveSpeaker} className="rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center gap-2">
+                <button onClick={muteActiveSpeaker} className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center justify-center gap-2">
                   <Volume2 className="h-4 w-4" /> Mute Speaker
                 </button>
-                <button onClick={() => removeSpeaker()} className="rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center gap-2">
+                <button onClick={() => removeSpeaker()} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
                   <Square className="h-4 w-4" /> Remove Speaker
                 </button>
-                <button onClick={endBattle} className="ml-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center gap-2">
+                <button onClick={endBattle} className="w-full sm:ml-auto sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
                   <Square className="h-4 w-4" /> End Battle
                 </button>
               </>
             )}
             {currentRole === "co-host" && (
               <>
-                <button onClick={() => approveSpeaker()} className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary flex items-center gap-2"><Hand className="h-4 w-4" /> Approve Speaker</button>
-                <button onClick={muteActiveSpeaker} className="rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground flex items-center gap-2"><Volume2 className="h-4 w-4" /> Mute</button>
-                <button onClick={() => removeSpeaker()} className="rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live flex items-center gap-2"><Square className="h-4 w-4" /> Remove Speaker</button>
+                <button onClick={() => approveSpeaker()} className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary flex items-center justify-center gap-2"><Hand className="h-4 w-4" /> Approve Speaker</button>
+                <button onClick={muteActiveSpeaker} className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground flex items-center justify-center gap-2"><Volume2 className="h-4 w-4" /> Mute</button>
+                <button onClick={() => removeSpeaker()} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live flex items-center justify-center gap-2"><Square className="h-4 w-4" /> Remove Speaker</button>
               </>
             )}
             {currentRole === "speaker" && (
               <>
                 <button
                   onClick={() => setStageMuted(!(me?.is_muted ?? true))}
-                  className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2"
+                  className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2"
                 >
                   {(me?.is_muted ?? true) ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
                   {(me?.is_muted ?? true) ? "Unmute Mic" : "Mute Mic"}
                 </button>
                 <button
                   onClick={leaveSpeakerStage}
-                  className="rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center gap-2"
+                  className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center justify-center gap-2"
                 >
                   <ArrowLeft className="h-4 w-4" /> Leave Stage
                 </button>
@@ -644,7 +665,7 @@ const LiveRoom = () => {
                 <button
                   onClick={requestToSpeak}
                   disabled={requestedToSpeak}
-                  className={`rounded-xl px-4 py-2.5 text-sm font-semibold flex items-center gap-2 transition-all ${
+                  className={`w-full sm:w-auto rounded-xl px-4 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
                     requestedToSpeak
                       ? "bg-muted text-muted-foreground cursor-not-allowed"
                       : "bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20"
@@ -652,7 +673,7 @@ const LiveRoom = () => {
                 >
                   <Hand className="h-4 w-4" /> {requestedToSpeak ? "Request Sent" : "Request to Speak"}
                 </button>
-                <button onClick={shareRoomLink} className="rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <button onClick={shareRoomLink} className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
                   <ExternalLink className="h-4 w-4" /> Share
                 </button>
               </>

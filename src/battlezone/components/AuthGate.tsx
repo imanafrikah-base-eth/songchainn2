@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
 import { Zap, ExternalLink, Loader2 } from "lucide-react";
-import wavewarzLogo from "@/battlezone/assets/wavewarz-logo-2.png";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
 
 const SONGCHAINN_URL = "https://www.songchainn.xyz";
 const SONGCHAINN_SSO_URL = import.meta.env.VITE_SONGCHAINN_SSO_URL as string | undefined;

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Zap, Menu, X, Home, Radio, Calendar, Trophy, HelpCircle, LogOut } from "lucide-react";
-import wavewarzLogo from "@/battlezone/assets/wavewarz-logo-2.png";
+import { Link, useLocation } from "react-router-dom";
+import { Zap, Menu, X, Home, Radio, Calendar, Trophy, HelpCircle, LogOut, ArrowLeft } from "lucide-react";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
 import NotificationsDropdown from "@/battlezone/components/NotificationsDropdown";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
 import AppLink from "@/battlezone/components/AppLink";
@@ -22,9 +22,9 @@ const Navbar = () => {
   return (
     <>
       <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:px-4">
           <AppLink to="/" className="flex items-center gap-2">
-            <img src={wavewarzLogo} alt="WaveWarz Africa" className="h-10 w-auto" />
+            <img src={wavewarzLogo} alt="WaveWarz Africa" className="h-9 w-auto sm:h-10" />
           </AppLink>
 
           <div className="hidden md:flex items-center gap-1">
@@ -49,6 +49,13 @@ const Navbar = () => {
 
           <div className="flex items-center gap-2">
             <NotificationsDropdown />
+            <Link
+              to="/"
+              className="hidden md:flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to $ongChainn
+            </Link>
             <AppLink
               to="/host/create"
               className="hidden md:flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -61,7 +68,17 @@ const Navbar = () => {
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary overflow-hidden">
                   {profile.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={profile.avatar_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(event) => {
+                        const target = event.currentTarget;
+                        if (target.dataset.fallbackApplied === "true") return;
+                        target.dataset.fallbackApplied = "true";
+                        target.src = "/placeholder.svg";
+                      }}
+                    />
                   ) : (
                     (profile.display_name || profile.username || "?").charAt(0)
                   )}
@@ -101,7 +118,17 @@ const Navbar = () => {
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/5 border border-primary/10 mb-2">
                 <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary overflow-hidden">
                   {profile.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={profile.avatar_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(event) => {
+                        const target = event.currentTarget;
+                        if (target.dataset.fallbackApplied === "true") return;
+                        target.dataset.fallbackApplied = "true";
+                        target.src = "/placeholder.svg";
+                      }}
+                    />
                   ) : (
                     (profile.display_name || profile.username || "?").charAt(0)
                   )}
@@ -138,6 +165,14 @@ const Navbar = () => {
               <Zap className="h-4 w-4" />
               Host a Battle
             </AppLink>
+            <Link
+              to="/"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-primary bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-all"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to $ongChainn
+            </Link>
             <button
               onClick={() => { setMobileOpen(false); signOut(); }}
               className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50"
