@@ -91,11 +91,27 @@ const HostCreate = () => {
     const fetchUsers = async () => {
       const { data } = await supabase
         .from("audience_profiles")
-        .select("id, user_id, username, display_name, avatar_url, created_at")
+        .select(
+          "id, user_id, username, display_name, profile_name, avatar_url, created_at"
+        )
         .not("user_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(300);
       if (!data) return;
+
+      const pickName = (row: Record<string, unknown>): string => {
+        const candidates = [
+          row?.display_name,
+          row?.profile_name,
+          row?.username,
+        ];
+        for (const value of candidates) {
+          if (typeof value === "string" && value.trim()) return value.trim();
+        }
+        const userId = String(row?.user_id || "");
+        if (userId) return `User ${userId.slice(0, 6)}`;
+        return "Listener";
+      };
 
       const uniqueByUserId = new Map<string, SongchainUser>();
       (data as any[]).forEach((row) => {
@@ -106,7 +122,7 @@ const HostCreate = () => {
             id: String(row?.id || userId),
             user_id: userId,
             username: row?.username ?? null,
-            display_name: row?.display_name ?? row?.username ?? "Listener",
+            display_name: pickName(row),
             avatar_url: row?.avatar_url ?? null,
           });
         }
@@ -280,15 +296,50 @@ const HostCreate = () => {
   };
 
   const createBattle = async (isLaunchNow: boolean) => {
-    if (!user || !profile) return;
-    if (!form.title.trim()) {
-      toast({ title: "Battle title required", description: "Please add a title before creating a battle." });
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "You need to sign in before you can launch or schedule a battle.",
+      });
       return;
     }
+    if (!profile) {
+      toast({
+        title: "Finish your profile",
+        description:
+          "Complete your $ongChainn profile (onboarding) before hosting a battle.",
+      });
+      return;
+    }
+
+    const missing: string[] = [];
+    if (!form.title.trim()) missing.push("Battle title");
+    if (!form.artistAId || !form.artistA.trim()) missing.push("Artist A");
+    if (!form.artistBId || !form.artistB.trim()) missing.push("Artist B");
+    if (!form.songAId || !form.songA.trim()) missing.push("Song A");
+    if (!form.songBId || !form.songB.trim()) missing.push("Song B");
+
+    if (missing.length) {
+      toast({
+        title: "Missing required fields",
+        description: `Add ${missing.join(", ")} before ${isLaunchNow ? "launching" : "scheduling"} the battle.`,
+      });
+      return;
+    }
+
+    if (!isLaunchNow && !form.schedule) {
+      toast({
+        title: "Pick a start time",
+        description: "Scheduled battles need a start time. Set one and try again.",
+      });
+      return;
+    }
+
     if (isLaunchNow && liveBattlesCount >= 5) {
       toast({
         title: "Live battle limit reached",
-        description: "BattleZone supports 5 concurrent live battles. End one first, then launch a new battle.",
+        description:
+          "BattleZone supports 5 concurrent live battles. End one first, then launch a new battle.",
       });
       return;
     }
@@ -325,7 +376,10 @@ const HostCreate = () => {
         .single();
 
       if (error || !data) {
-        toast({ title: "Failed to create battle", description: "Please try again." });
+        toast({
+          title: "Failed to create battle",
+          description: error?.message || "Supabase did not return a battle row. Please try again.",
+        });
         return;
       }
 
@@ -342,8 +396,10 @@ const HostCreate = () => {
         toast({ title: "Battle scheduled", description: "Your battle is now in the upcoming feed." });
         navigate(embedTo("/battles/upcoming"));
       }
-    } catch {
-      toast({ title: "Failed to create battle", description: "Please try again." });
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message ? err.message : "Unexpected error. Please try again.";
+      toast({ title: "Failed to create battle", description: message });
     } finally {
       setIsSubmitting(false);
     }
