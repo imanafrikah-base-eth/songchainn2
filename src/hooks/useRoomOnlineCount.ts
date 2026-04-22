@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 type RoomLiveCountRow = {
@@ -31,6 +31,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
   const roomId = params?.roomId || 'global';
   const isListening = Boolean(params?.isListening);
   const [count, setCount] = useState(0);
+  const instanceId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     let isActive = true;
@@ -100,7 +101,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
     };
 
     const channel = supabase
-      .channel(`room-live-counts:${roomId}`)
+      .channel(`room-live-counts:${roomId}:${instanceId.current}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'room_live_users', filter: `room_id=eq.${roomId}` },
