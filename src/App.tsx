@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PlayerProvider } from "@/context/PlayerContext";
 import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
@@ -171,69 +172,73 @@ function AppShell() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
-      {!hideFloatingChrome && <VibeAgent />}
-      {!hideFloatingChrome && <BehaviorCtaPopups />}
-      {!hideFloatingChrome && <BottomTabBar />}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><VibeAgent /></ErrorBoundary>}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><BehaviorCtaPopups /></ErrorBoundary>}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
     </>
   );
 }
 
-// AppContent must be rendered inside AuthProvider
+// AppContent must be rendered inside AuthProvider and BrowserRouter
 function AppContent() {
   const { isAuthenticated, isLoading, needsOnboarding, user } = useAuth();
   useUserPresence(user?.id ?? null, { includeLastSeen: true });
 
   if (isLoading) {
-    return (
-      <BrowserRouter>
-        <PageLoader />
-      </BrowserRouter>
-    );
+    return <PageLoader />;
   }
 
   return (
-    <BrowserRouter>
-      <NotificationBanner />
+    <>
+      <ErrorBoundary fallback={null}><NotificationBanner /></ErrorBoundary>
       {!isAuthenticated ? (
-        <PlayerProvider>
-          <EngagementProvider>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/install" element={<Install />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/bettercallzaal" element={<BetterCallZaal />} />
-                <Route path="*" element={<Auth />} />
-              </Routes>
-            </Suspense>
-          </EngagementProvider>
-        </PlayerProvider>
-      ) : needsOnboarding ? (
-        <Suspense fallback={<PageLoader />}>
-          <Onboarding />
-        </Suspense>
-      ) : (
-        <OfflineQueueProvider>
+        <ErrorBoundary>
           <PlayerProvider>
             <EngagementProvider>
               <Suspense fallback={<PageLoader />}>
-                <AppShell />
+                <Routes>
+                  <Route path="/install" element={<Install />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/bettercallzaal" element={<BetterCallZaal />} />
+                  <Route path="*" element={<Auth />} />
+                </Routes>
               </Suspense>
             </EngagementProvider>
           </PlayerProvider>
-        </OfflineQueueProvider>
+        </ErrorBoundary>
+      ) : needsOnboarding ? (
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Onboarding />
+          </Suspense>
+        </ErrorBoundary>
+      ) : (
+        <ErrorBoundary>
+          <OfflineQueueProvider>
+            <PlayerProvider>
+              <EngagementProvider>
+                <Suspense fallback={<PageLoader />}>
+                  <AppShell />
+                </Suspense>
+              </EngagementProvider>
+            </PlayerProvider>
+          </OfflineQueueProvider>
+        </ErrorBoundary>
       )}
-    </BrowserRouter>
+    </>
   );
 }
 
 const App = () => (
-  <AuthProvider>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AppContent />
-    </TooltipProvider>
-  </AuthProvider>
+  <BrowserRouter>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AppContent />
+      </TooltipProvider>
+    </AuthProvider>
+  </BrowserRouter>
 );
 
 export default App;
