@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SONGS, ARTISTS, Song, Artist } from '@/data/musicData';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface SongPopularity {
   song_id: string | null;
@@ -111,44 +112,74 @@ function calculateSongScore(dbData?: SongPopularity): number {
   return plays + (likes * 3) + (comments * 5) + (shares * 7);
 }
 
+let popularityChannel: RealtimeChannel | null = null;
+let popularityChannelConsumers = 0;
+let popularityChannelTeardownTimer: ReturnType<typeof setTimeout> | null = null;
+
+function invalidatePopularityQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
+  queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
+}
+
+function ensurePopularityChannel(queryClient: ReturnType<typeof useQueryClient>) {
+  if (popularityChannel) return popularityChannel;
+
+  popularityChannel = supabase
+    .channel('popularity-updates')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'song_analytics' }, () => {
+      invalidatePopularityQueries(queryClient);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'song_popularity' }, () => {
+      invalidatePopularityQueries(queryClient);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'liked_songs' }, () => {
+      queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'liked_artists' }, () => {
+      queryClient.invalidateQueries({ queryKey: ['artist-follower-counts'] });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
+      queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => {
+      queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_follows' }, () => {
+      queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_views' }, () => {
+      queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
+    })
+    .subscribe();
+
+  return popularityChannel;
+}
+
 // Hook to subscribe to real-time popularity updates
 function usePopularityRealtime() {
   const queryClient = useQueryClient();
-  const instanceId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`popularity-updates:${instanceId.current}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'song_analytics' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
-        queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'song_popularity' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
-        queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'liked_songs' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'liked_artists' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['artist-follower-counts'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_follows' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_views' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['profile-popularity'] });
-      })
-      .subscribe();
+    // Keep exactly one shared realtime channel across hooks/components.
+    if (popularityChannelTeardownTimer) {
+      clearTimeout(popularityChannelTeardownTimer);
+      popularityChannelTeardownTimer = null;
+    }
+    popularityChannelConsumers += 1;
+    const channel = ensurePopularityChannel(queryClient);
 
     return () => {
-      supabase.removeChannel(channel);
+      popularityChannelConsumers = Math.max(0, popularityChannelConsumers - 1);
+      if (popularityChannelConsumers === 0) {
+        // Delay teardown to survive StrictMode mount/unmount remount cycle in dev.
+        popularityChannelTeardownTimer = setTimeout(() => {
+          if (popularityChannelConsumers === 0 && popularityChannel) {
+            supabase.removeChannel(popularityChannel);
+            popularityChannel = null;
+          }
+          popularityChannelTeardownTimer = null;
+        }, 1500);
+      }
     };
   }, [queryClient]);
 }
