@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
@@ -353,28 +353,40 @@ export function useSocial() {
     ));
   }, [user, toast]);
 
+  // Stable refs so the channel effect below never needs fetchPosts/fetchFollowData
+  // as dependencies — those functions change whenever `following` state changes,
+  // which would tear down and recreate the channel and hit Supabase's rule that
+  // `.on()` cannot be called after `.subscribe()`.
+  const fetchPostsRef = useRef(fetchPosts);
+  fetchPostsRef.current = fetchPosts;
+  const fetchFollowDataRef = useRef(fetchFollowData);
+  fetchFollowDataRef.current = fetchFollowData;
+
   useEffect(() => {
     if (!user) return;
+    // Append timestamp so a rapid unmount/remount cycle never reuses a
+    // channel name that Supabase still considers subscribed.
+    const channelName = `social-feed-${user.id}-${Date.now()}`;
     const channel = supabase
-      .channel(`social-feed-${user.id}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => {
-        void fetchPosts();
+        void fetchPostsRef.current();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
-        void fetchPosts();
+        void fetchPostsRef.current();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => {
-        void fetchPosts();
+        void fetchPostsRef.current();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_follows' }, () => {
-        void fetchFollowData();
+        void fetchFollowDataRef.current();
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [user, fetchPosts, fetchFollowData]);
+  }, [user]); // only recreate when the logged-in user changes
 
   return {
     posts,
