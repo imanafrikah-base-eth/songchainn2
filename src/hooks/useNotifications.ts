@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { AudienceProfile } from '@/types/database';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface Notification {
   id: string;
@@ -13,6 +14,34 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
   from_profile?: AudienceProfile;
+}
+
+const notificationChannelsByUser = new Map<string, RealtimeChannel>();
+const notificationConsumersByUser = new Map<string, number>();
+const notificationTeardownTimersByUser = new Map<string, ReturnType<typeof setTimeout>>();
+
+function ensureNotificationsChannel(userId: string, onInsert: (payload: any) => Promise<void>) {
+  const existing = notificationChannelsByUser.get(userId);
+  if (existing) return existing;
+
+  const channel = supabase
+    .channel(`notifications-realtime:${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        void onInsert(payload);
+      }
+    )
+    .subscribe();
+
+  notificationChannelsByUser.set(userId, channel);
+  return channel;
 }
 
 export function useNotifications() {
@@ -142,47 +171,58 @@ export function useNotifications() {
 
   // Real-time subscription
   useEffect(() => {
-    if (!user) return;
+    const userId = user?.id;
+    if (!userId) return;
 
-    const channel = supabase
-      .channel('notifications-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        async (payload) => {
-          const newNotification = payload.new as Notification;
-          
-          // Fetch the from_user's profile
-          const { data: profileData } = await supabase
-            .from('audience_profiles')
-            .select('*')
-            .eq('id', newNotification.from_user_id)
-            .single();
+    const pendingTimer = notificationTeardownTimersByUser.get(userId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      notificationTeardownTimersByUser.delete(userId);
+    }
 
-          const enrichedNotification: Notification = {
-            ...newNotification,
-            type: newNotification.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist',
-            from_profile: profileData
-              ? ({
-                  ...(profileData as any),
-                  user_id: (profileData as any)?.user_id ?? (profileData as any)?.id ?? newNotification.from_user_id,
-                } as AudienceProfile)
-              : undefined,
-          };
+    notificationConsumersByUser.set(userId, (notificationConsumersByUser.get(userId) || 0) + 1);
+    const channel = ensureNotificationsChannel(userId, async (payload) => {
+      const newNotification = payload.new as Notification;
 
-          setNotifications(prev => [enrichedNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
-        }
-      )
-      .subscribe();
+      // Fetch the from_user's profile
+      const { data: profileData } = await supabase
+        .from('audience_profiles')
+        .select('*')
+        .eq('id', newNotification.from_user_id)
+        .single();
+
+      const enrichedNotification: Notification = {
+        ...newNotification,
+        type: newNotification.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist',
+        from_profile: profileData
+          ? ({
+              ...(profileData as any),
+              user_id: (profileData as any)?.user_id ?? (profileData as any)?.id ?? newNotification.from_user_id,
+            } as AudienceProfile)
+          : undefined,
+      };
+
+      setNotifications(prev => [enrichedNotification, ...prev]);
+      setUnreadCount(prev => prev + 1);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      const current = Math.max(0, (notificationConsumersByUser.get(userId) || 0) - 1);
+      notificationConsumersByUser.set(userId, current);
+      if (current === 0) {
+        // Delay cleanup to survive React StrictMode remount cycle in development.
+        const timer = setTimeout(() => {
+          if ((notificationConsumersByUser.get(userId) || 0) === 0) {
+            const liveChannel = notificationChannelsByUser.get(userId);
+            if (liveChannel) {
+              supabase.removeChannel(liveChannel);
+              notificationChannelsByUser.delete(userId);
+            }
+          }
+          notificationTeardownTimersByUser.delete(userId);
+        }, 1500);
+        notificationTeardownTimersByUser.set(userId, timer);
+      }
     };
   }, [user]);
 

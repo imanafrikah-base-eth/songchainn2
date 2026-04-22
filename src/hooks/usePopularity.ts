@@ -115,6 +115,9 @@ function calculateSongScore(dbData?: SongPopularity): number {
 let popularityChannel: RealtimeChannel | null = null;
 let popularityChannelConsumers = 0;
 let popularityChannelTeardownTimer: ReturnType<typeof setTimeout> | null = null;
+let canUseGetSongPopularityRpc: boolean | null = null;
+let canUseSongPopularityView: boolean | null = null;
+let canUseGetArtistFollowCountsRpc: boolean | null = null;
 
 function invalidatePopularityQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
@@ -190,21 +193,25 @@ export function useSongPopularity() {
   return useQuery({
     queryKey: ['song-popularity'],
     queryFn: async () => {
-      try {
+      if (canUseGetSongPopularityRpc !== false) {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error) {
+          canUseGetSongPopularityRpc = true;
           return mergeSongPopularityWithSeed((data as SongPopularity[]) || []);
         }
-      } catch {
-        // Ignore RPC failures and continue to fallback query.
+        canUseGetSongPopularityRpc = false;
       }
 
-      try {
-        const { data: fallbackData } = await supabase.from('song_popularity').select('*');
-        return mergeSongPopularityWithSeed((fallbackData as SongPopularity[]) || []);
-      } catch {
-        return mergeSongPopularityWithSeed([] as SongPopularity[]);
+      if (canUseSongPopularityView !== false) {
+        const { data: fallbackData, error: fallbackError } = await supabase.from('song_popularity').select('*');
+        if (!fallbackError) {
+          canUseSongPopularityView = true;
+          return mergeSongPopularityWithSeed((fallbackData as SongPopularity[]) || []);
+        }
+        canUseSongPopularityView = false;
       }
+
+      return mergeSongPopularityWithSeed([] as SongPopularity[]);
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,
@@ -320,23 +327,28 @@ export function useArtistFollowerCounts() {
       });
 
       try {
-        const { data, error } = await (supabase as any).rpc('get_artist_follow_counts', {
-          artist_ids: artistIds,
-        });
-
-        if (!error && Array.isArray(data)) {
-          data.forEach((row: any) => {
-            const artistId = String(row?.artist_id || '').trim();
-            if (!artistId) return;
-            const count = Number(row?.follower_count || 0);
-            const normalizedCount = Math.max(0, Number.isFinite(count) ? Math.floor(count) : 0);
-            countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE + normalizedCount);
+        if (canUseGetArtistFollowCountsRpc !== false) {
+          const { data, error } = await (supabase as any).rpc('get_artist_follow_counts', {
+            artist_ids: artistIds,
           });
 
-          return Array.from(countsByArtist.entries()).map(([artist_id, follower_count]) => ({
-            artist_id,
-            follower_count,
-          }));
+          if (!error && Array.isArray(data)) {
+            canUseGetArtistFollowCountsRpc = true;
+            data.forEach((row: any) => {
+              const artistId = String(row?.artist_id || '').trim();
+              if (!artistId) return;
+              const count = Number(row?.follower_count || 0);
+              const normalizedCount = Math.max(0, Number.isFinite(count) ? Math.floor(count) : 0);
+              countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE + normalizedCount);
+            });
+
+            return Array.from(countsByArtist.entries()).map(([artist_id, follower_count]) => ({
+              artist_id,
+              follower_count,
+            }));
+          }
+
+          canUseGetArtistFollowCountsRpc = false;
         }
       } catch {
         // Ignore RPC failures and continue to table fallback.
@@ -378,18 +390,24 @@ export function useArtistStreamTotals() {
     queryKey: ['artist-stream-totals'],
     queryFn: async () => {
       let popularityData: SongPopularity[] = mergeSongPopularityWithSeed([]);
-      try {
+      if (canUseGetSongPopularityRpc !== false) {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error && data) {
+          canUseGetSongPopularityRpc = true;
           popularityData = mergeSongPopularityWithSeed(data as SongPopularity[]);
+        } else {
+          canUseGetSongPopularityRpc = false;
         }
-      } catch {
-        popularityData = mergeSongPopularityWithSeed([]);
       }
 
-      if (!popularityData.length) {
-        const { data: fallbackData } = await supabase.from('song_popularity').select('*');
-        popularityData = mergeSongPopularityWithSeed((fallbackData as SongPopularity[]) || []);
+      if (!popularityData.length && canUseSongPopularityView !== false) {
+        const { data: fallbackData, error: fallbackError } = await supabase.from('song_popularity').select('*');
+        if (!fallbackError) {
+          canUseSongPopularityView = true;
+          popularityData = mergeSongPopularityWithSeed((fallbackData as SongPopularity[]) || []);
+        } else {
+          canUseSongPopularityView = false;
+        }
       }
 
       const songToArtist = new Map<string, string>(SONGS.map((song) => [song.id, song.artistId]));
