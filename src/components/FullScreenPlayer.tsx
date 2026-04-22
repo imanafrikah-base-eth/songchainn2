@@ -1,4 +1,5 @@
 import { memo, useEffect, useState, useRef, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, Share2, ListMusic, Shuffle, Repeat, Repeat1, Copy, Check, MessageCircle } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
@@ -57,14 +58,12 @@ interface FullScreenPlayerProps {
 export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose }: FullScreenPlayerProps) {
   const { currentSong, isPlaying, queue, isRoomMode } = usePlayerState();
   const { currentTime, duration } = usePlayerTime();
-  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume } = usePlayerActions();
+  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume, repeatMode, setRepeatMode, shuffleMode, toggleShuffle } = usePlayerActions();
 
   const { toggleLike, isLiked, sendPulse } = useEngagement();
   const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
   const { copied, shareSong, copyToClipboard, shareToX, getSongShareUrl } = useShare();
   const [showQueue, setShowQueue] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
-  const [shuffle, setShuffle] = useState(false);
   const [pulseRipples, setPulseRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const [showPulseHint, setShowPulseHint] = useState(false);
   const [showSoftHint, setShowSoftHint] = useState(false);
@@ -166,19 +165,12 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
   };
 
   const toggleRepeat = () => {
-    setRepeatMode(prev => {
-      if (prev === 'off') return 'all';
-      if (prev === 'all') return 'one';
-      return 'off';
-    });
+    setRepeatMode(repeatMode === 'off' ? 'all' : repeatMode === 'all' ? 'one' : 'off');
   };
 
-  const toggleShuffle = () => {
-    setShuffle(prev => {
-      const next = !prev;
-      toast({ title: next ? 'Shuffle on' : 'Shuffle off' });
-      return next;
-    });
+  const handleToggleShuffle = () => {
+    toggleShuffle();
+    toast({ title: !shuffleMode ? 'Shuffle on' : 'Shuffle off' });
   };
 
   // Media Session API for lock screen / notification controls
@@ -319,6 +311,26 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
       pulseTimerRef.current = null;
     }
   }, []);
+
+  // Subscribe to incoming pulses from other users and show ripple animations
+  useEffect(() => {
+    if (!isOpen || !currentSong) return;
+    const channel = supabase
+      .channel('pulse-global')
+      .on('broadcast', { event: 'pulse' }, (msg) => {
+        const { songId: pulseSongId } = (msg.payload ?? {}) as { songId?: string };
+        if (!pulseSongId || pulseSongId !== currentSong.id) return;
+        const id = pulseIdRef.current++;
+        const x = Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 400);
+        const y = Math.random() * (typeof window !== 'undefined' ? window.innerHeight * 0.6 : 300);
+        setPulseRipples(prev => [...prev, { id, x, y }]);
+        window.setTimeout(() => {
+          setPulseRipples(prev => prev.filter(r => r.id !== id));
+        }, 600);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [isOpen, currentSong]);
 
   if (!currentSong) return null;
 
@@ -486,11 +498,11 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                 transition={{ delay: 0.35 }}
                 className="flex items-center justify-center gap-6 mb-8"
               >
-                <button 
-                  onClick={toggleShuffle}
+                <button
+                  onClick={handleToggleShuffle}
                   className={cn(
                     "p-2 transition-colors press-effect",
-                    shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    shuffleMode ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <Shuffle className="w-5 h-5" />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 type RoomLiveCountRow = {
@@ -31,6 +31,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
   const roomId = params?.roomId || 'global';
   const isListening = Boolean(params?.isListening);
   const [count, setCount] = useState(0);
+  const instanceId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     let isActive = true;
@@ -50,7 +51,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
               .filter((value) => value.length > 0)
           );
           const liveUsersCount = uniqueUsers.size;
-          setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
+          setCount(liveUsersCount);
           return;
         }
 
@@ -63,7 +64,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
         if (!isActive) return;
         if (!error) {
           const nextCount = resolveLiveCount((data ?? null) as RoomLiveCountRow | null);
-          setCount(isListening ? Math.max(1, nextCount) : nextCount);
+          setCount(nextCount);
           return;
         }
 
@@ -76,7 +77,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
         if (!isActive) return;
         if (!fallback?.error) {
           const fallbackCount = Math.max(0, Number(fallback?.count ?? 0));
-          setCount(isListening ? Math.max(1, fallbackCount) : fallbackCount);
+          setCount(fallbackCount);
           return;
         }
 
@@ -88,19 +89,19 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
         if (!isActive) return;
         if (!liveUsersFallback?.error) {
           const liveUsersCount = Math.max(0, Number(liveUsersFallback?.count ?? 0));
-          setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
+          setCount(liveUsersCount);
           return;
         }
 
-        setCount(isListening ? 1 : 0);
+        setCount(0);
       } catch {
         if (!isActive) return;
-        setCount(isListening ? 1 : 0);
+        setCount(0);
       }
     };
 
     const channel = supabase
-      .channel(`room-live-counts:${roomId}`)
+      .channel(`room-live-counts:${roomId}:${instanceId.current}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'room_live_users', filter: `room_id=eq.${roomId}` },

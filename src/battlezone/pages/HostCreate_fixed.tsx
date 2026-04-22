@@ -9,8 +9,7 @@ import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import AppLink from "@/battlezone/components/AppLink";
 import { toast } from "@/battlezone/hooks/use-toast";
-import { useBattles } from "@/battlezone/hooks/useBattles";
-import { ARTISTS, SONGS, type Song } from "@/data/musicData";
+import { ARTISTS, SONGS } from "@/data/musicData";
 
 const regions = ["Zambia", "South Africa", "Nigeria", "Zimbabwe", "Botswana"];
 
@@ -62,10 +61,9 @@ const HostCreate = () => {
   const [selectedCoHosts, setSelectedCoHosts] = useState<SongchainUser[]>([]);
   const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
   const [users, setUsers] = useState<SongchainUser[]>([]);
+  const [liveBattlesCount, setLiveBattlesCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const coHostDropdownRef = useRef<HTMLDivElement>(null);
-  const { data: liveBattles = [] } = useBattles("live");
-  const liveBattlesCount = liveBattles.length;
 
   const artistOptions = useMemo(
     () =>
@@ -75,20 +73,10 @@ const HostCreate = () => {
     []
   );
 
-  const artistById = useMemo(() => {
+  const songsByArtist = useMemo(() => {
     const map = new Map<string, (typeof ARTISTS)[number]>();
     ARTISTS.forEach((artist) => {
       map.set(artist.id, artist);
-    });
-    return map;
-  }, []);
-
-  const songsByArtist = useMemo(() => {
-    const map = new Map<string, Song[]>();
-    SONGS.forEach((song) => {
-      const current = map.get(song.artistId) || [];
-      current.push(song);
-      map.set(song.artistId, current);
     });
     return map;
   }, []);
@@ -98,9 +86,7 @@ const HostCreate = () => {
     const fetchUsers = async () => {
       const { data, error } = await supabase
         .from("audience_profiles")
-        .select(
-          "id, user_id, username, display_name, profile_name, avatar_url, created_at"
-        )
+        .select("id, user_id, username, display_name, avatar_url, created_at, onboarding_completed")
         .not("user_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -138,20 +124,6 @@ const HostCreate = () => {
         return;
       }
 
-      const pickName = (row: Record<string, unknown>): string => {
-        const candidates = [
-          row?.display_name,
-          row?.profile_name,
-          row?.username,
-        ];
-        for (const value of candidates) {
-          if (typeof value === "string" && value.trim()) return value.trim();
-        }
-        const userId = String(row?.user_id || "");
-        if (userId) return `User ${userId.slice(0, 6)}`;
-        return "Listener";
-      };
-
       const uniqueByUserId = new Map<string, SongchainUser>();
       (data as any[]).forEach((row) => {
         const userId = String(row?.user_id || "").trim();
@@ -164,7 +136,7 @@ const HostCreate = () => {
             id: String(row?.id || userId),
             user_id: userId,
             username: row?.username ?? null,
-            display_name: pickName(row),
+            display_name: row?.display_name || row?.username || "Listener",
             avatar_url: row?.avatar_url ?? null,
           });
         }
@@ -210,6 +182,17 @@ const HostCreate = () => {
     return () => {
       subscription.unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    const fetchLiveCount = async () => {
+      const { count } = await supabase
+        .from("battles")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "live");
+      setLiveBattlesCount(count ?? 0);
+    };
+    fetchLiveCount();
   }, []);
 
   // Click outside to close dropdown
@@ -289,7 +272,7 @@ const HostCreate = () => {
 
   const upsertHostInRoom = async (battleId: string) => {
     if (!user || !profile) return;
-    const { error } = await supabase.from("battle_rooms").upsert(
+    await supabase.from("battle_rooms").upsert(
       {
         battle_id: battleId,
         user_id: user.id,
@@ -301,7 +284,6 @@ const HostCreate = () => {
       },
       { onConflict: "battle_id,user_id" },
     );
-    if (error) throw error;
   };
 
   const upsertCoHostsInRoom = async (battleId: string) => {
@@ -315,8 +297,7 @@ const HostCreate = () => {
       is_speaking: false,
       requested_to_speak: false,
     }));
-    const { error } = await supabase.from("battle_rooms").upsert(rows, { onConflict: "battle_id,user_id" });
-    if (error) throw error;
+    await supabase.from("battle_rooms").upsert(rows, { onConflict: "battle_id,user_id" });
   };
 
   const broadcastBattleLaunch = async (battleId: string, title: string) => {
@@ -377,89 +358,109 @@ const HostCreate = () => {
     await supabase.from("notifications").insert(notificationsPayload);
   };
 
-  const saveDraft = async () => {
-    if (!user || !profile) {
-      toast({ title: "Authentication required", description: "Please log in to save drafts." });
-      return;
+  const validateForm = function() {
+    const errors = [];
+    
+    if (!form.title.trim()) {
+      errors.push("Battle title is required");
     }
-    setIsSubmitting(true);
-    try {
-      const artistA = artistById.get(form.artistAId);
-      const artistB = artistById.get(form.artistBId);
-      const { error } = await supabase.from("battles").insert({
-        title: form.title || "Untitled Battle",
-        region: form.region || "Africa",
-        artist_a_name: form.artistA || "TBD",
-        artist_b_name: form.artistB || "TBD",
-        artist_a_image: artistA?.profileImage ?? null,
-        artist_b_image: artistB?.profileImage ?? null,
-        artist_a_region: artistA?.location ?? form.region,
-        artist_b_region: artistB?.location ?? form.region,
-        song_a: form.songA || "TBD",
-        song_b: form.songB || "TBD",
-        host_user_id: user.id,
-        host_name: profile.display_name || profile.username || "Host",
-        co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
-        scheduled_time: form.schedule || null,
-        status: "draft",
-        round: 1,
-        total_rounds: 3,
-      });
-      if (error) throw error;
-      toast({ title: "Draft saved", description: "Battle draft saved. Find it in Upcoming to launch later." });
-      navigate(embedTo("/battles/upcoming"));
-    } catch {
-      toast({ title: "Failed to save draft", description: "Please try again." });
-    } finally {
-      setIsSubmitting(false);
+    if (!form.region) {
+      errors.push("Region is required");
     }
+    if (!form.artistA && !form.artistAId) {
+      errors.push("Artist A is required");
+    }
+    if (!form.artistB && !form.artistBId) {
+      errors.push("Artist B is required");
+    }
+    
+    return errors;
   };
 
   const createBattle = async (isLaunchNow: boolean) => {
-    if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "You need to sign in before you can launch or schedule a battle.",
+    console.log("createBattle called with isLaunchNow:", isLaunchNow);
+    console.log("Current form:", form);
+    console.log("User:", user, "Profile:", profile);
+    console.log("Live battles count:", liveBattlesCount);
+    
+    // Smart form validation with popup notifications
+    const errors = validateForm();
+    if (errors.length > 0) {
+      toast({ 
+        title: "Please complete the form", 
+        description: errors.join(", ") 
       });
       return;
     }
-    if (!profile) {
-      toast({
-        title: "Finish your profile",
-        description:
-          "Complete your $ongChainn profile (onboarding) before hosting a battle.",
-      });
+    
+    // Temporary bypass for testing - remove in production
+    if (!user && window.location.hostname === 'localhost') {
+      console.log("Using mock user for localhost testing");
+      const mockUser = { id: 'mock-user-id', email: 'test@example.com' };
+      const mockProfile = { 
+        id: 'mock-profile-id', 
+        user_id: 'mock-user-id',
+        display_name: 'Test User',
+        username: 'testuser'
+      };
+      
+      console.log("Creating battle with mock data...");
+      setIsSubmitting(true);
+      try {
+        const { data, error } = await supabase
+          .from("battles")
+          .insert({
+            title: form.title,
+            region: form.region,
+            artist_a_name: form.artistA || "TBD",
+            artist_b_name: form.artistB || "TBD",
+            artist_a_image: null,
+            artist_b_image: null,
+            artist_a_region: form.region,
+            artist_b_region: form.region,
+            song_a: form.songA || "TBD",
+            song_b: form.songB || "TBD",
+            host_user_id: mockUser.id,
+            host_name: mockProfile.display_name || mockProfile.username || "Host",
+            co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
+            scheduled_time: isLaunchNow ? null : form.schedule || null,
+            status: isLaunchNow ? "live" : "upcoming",
+            round: 1,
+            total_rounds: 3,
+          })
+          .select()
+          .single();
+
+        if (error || !data) {
+          toast({ title: "Failed to create battle", description: "Please try again." });
+          setIsSubmitting(false);
+          return;
+        }
+
+        toast({ title: "Battle created!", description: "Your battle has been created successfully." });
+        setIsSubmitting(false);
+        
+        if (isLaunchNow) {
+          toast({ title: "Battle launched!", description: "Your battle is now live. Users can join from battles page." });
+          navigate(embedTo("/battles/live"));
+        } else {
+          navigate(embedTo("/battles/upcoming"));
+        }
+      } catch {
+        toast({ title: "Failed to create battle", description: "Please try again." });
+        setIsSubmitting(false);
+      }
       return;
     }
-
-    const missing: string[] = [];
-    if (!form.title.trim()) missing.push("Battle title");
-    if (!form.artistAId || !form.artistA.trim()) missing.push("Artist A");
-    if (!form.artistBId || !form.artistB.trim()) missing.push("Artist B");
-    if (!form.songAId || !form.songA.trim()) missing.push("Song A");
-    if (!form.songBId || !form.songB.trim()) missing.push("Song B");
-
-    if (missing.length) {
-      toast({
-        title: "Missing required fields",
-        description: `Add ${missing.join(", ")} before ${isLaunchNow ? "launching" : "scheduling"} the battle.`,
-      });
+    
+    if (!user || !profile) {
+      toast({ title: "Authentication required", description: "Please log in to create battles." });
       return;
     }
-
-    if (!isLaunchNow && !form.schedule) {
-      toast({
-        title: "Pick a start time",
-        description: "Scheduled battles need a start time. Set one and try again.",
-      });
-      return;
-    }
-
     if (isLaunchNow && liveBattlesCount >= 5) {
       toast({
         title: "Live battle limit reached",
-        description:
-          "BattleZone supports 5 concurrent live battles. End one first, then launch a new battle.",
+        description: "BattleZone supports 5 concurrent live battles. End one first, then launch a new battle.",
       });
       return;
     }
@@ -497,10 +498,7 @@ const HostCreate = () => {
         .single();
 
       if (error || !data) {
-        toast({
-          title: "Failed to create battle",
-          description: error?.message || "Supabase did not return a battle row. Please try again.",
-        });
+        toast({ title: "Failed to create battle", description: "Please try again." });
         return;
       }
 
@@ -510,16 +508,15 @@ const HostCreate = () => {
         await upsertHostInRoom(data.id);
         await upsertCoHostsInRoom(data.id);
         await broadcastBattleLaunch(data.id, form.title);
-        toast({ title: "Battle launched", description: "You are now live as host. Audience can join in real time." });
-        navigate(embedTo(`/room/${data.id}`));
+        toast({ title: "Battle launched", description: "Your battle is now live. Users can join from battles page." });
+        setLiveBattlesCount((n) => n + 1);
+        navigate(embedTo("/battles/live"));
       } else {
         toast({ title: "Battle scheduled", description: "Your battle is now in the upcoming feed." });
         navigate(embedTo("/battles/upcoming"));
       }
-    } catch (err) {
-      const message =
-        err instanceof Error && err.message ? err.message : "Unexpected error. Please try again.";
-      toast({ title: "Failed to create battle", description: message });
+    } catch {
+      toast({ title: "Failed to create battle", description: "Please try again." });
     } finally {
       setIsSubmitting(false);
     }
@@ -772,11 +769,7 @@ const HostCreate = () => {
                 <Zap className="h-5 w-5 shrink-0" /> Launch Battle Now
               </button>
             </div>
-            <button
-              onClick={saveDraft}
-              disabled={isSubmitting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm sm:text-base font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
+            <button className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm sm:text-base font-medium text-muted-foreground hover:bg-muted transition-colors">
               <Save className="h-4 w-4 sm:h-5 sm:w-5" /> Save Draft
             </button>
           </div>

@@ -191,9 +191,9 @@ export default function Social() {
   const followersCount = followers.length;
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="h-dvh bg-background relative overflow-hidden">
       <AnimatedBackground variant="default" />
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-10 flex flex-col h-full">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border">
           <div className="max-w-lg mx-auto px-4 py-3">
@@ -380,9 +380,9 @@ export default function Social() {
         )}
 
         {/* Main Feed - Vertical Scroll Snap */}
-        <div 
+        <div
           ref={feedRef}
-          className="flex-1 overflow-y-auto overscroll-y-contain snap-y snap-mandatory scroll-smooth scroll-smooth-gpu fast-tap"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain snap-y snap-mandatory scroll-smooth fast-tap"
           onScroll={handleScroll}
           style={{ scrollSnapType: 'y mandatory', WebkitOverflowScrolling: 'touch' }}
         >
@@ -433,9 +433,9 @@ export default function Social() {
           ) : (
             <div className="max-w-lg mx-auto px-2">
               {postsToRender.map((post, index) => (
-                <div 
-                  key={post.id} 
-                  className="snap-start h-[calc(100vh-12rem)] py-1"
+                <div
+                  key={post.id}
+                  className="snap-start snap-always h-[calc(100dvh-12rem)]"
                   style={{ scrollSnapAlign: 'start' }}
                 >
                   <MusicFeedCard

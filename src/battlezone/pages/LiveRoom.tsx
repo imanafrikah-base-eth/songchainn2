@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Mic, MicOff, Hand, Send, Play, Pause, SkipForward,
-  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile,
+  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile, Music, X,
 } from "lucide-react";
 import LiveBadge from "@/battlezone/components/LiveBadge";
 import { useBattle } from "@/battlezone/hooks/useBattles";
 import { useBattles } from "@/battlezone/hooks/useBattles";
+import { useBattleRoles, type BattleParticipant } from "@/battlezone/hooks/useBattleRoles";
 import { supabase } from "@/battlezone/integrations/supabase/client";
 import type { Tables } from "@/battlezone/integrations/supabase/types";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
@@ -14,7 +15,13 @@ import { fetchSongchainUserIdSet } from "@/battlezone/lib/songchain";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import { useToast } from "@/battlezone/hooks/use-toast";
+import { Room, RoomEvent } from "livekit-client";
+import { getLiveKitToken } from "@/battlezone/lib/livekit";
+import MicControls from "@/battlezone/components/MicControls";
+import SpeakerManagement from "@/battlezone/components/SpeakerManagement";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
+import { useHostAudio } from "@/battlezone/hooks/useHostAudio";
+import { SONGS } from "@/data/musicData";
 
 interface ChatMessage {
   id: string;
@@ -24,16 +31,7 @@ interface ChatMessage {
   type: "message" | "system" | "reaction";
 }
 
-interface RoomParticipant {
-  id: string;
-  display_name: string | null;
-  role: string;
-  is_muted: boolean;
-  is_speaking: boolean;
-  user_id: string;
-}
-
-type ViewRole = "host" | "co-host" | "speaker" | "audience";
+// RoomParticipant interface is now imported from useBattleRoles hook
 type SidebarTab = "audience" | "requests" | "chat";
 type RoomMessageRow = Tables<"room_messages">;
 type MicPermissionState = "unknown" | "granted" | "denied";
@@ -55,9 +53,22 @@ const LiveRoom = () => {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("chat");
   const [requestedToSpeak, setRequestedToSpeak] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [isVerySmallMobile, setIsVerySmallMobile] = useState(false);
-  const [micPermission, setMicPermission] = useState<MicPermissionState>("unknown");
+  const [audioConnected, setAudioConnected] = useState(false);
+  const [micPermission, setMicPermission] = useState<MicPermissionState>('unknown');
+  const [showSongPicker, setShowSongPicker] = useState(false);
+  const liveKitRoomRef = useRef<Room | null>(null);
+
+  const hostAudio = useHostAudio();
+  
+  // Use new role management system
+  const {
+    participants,
+    myRole,
+    permissions,
+    hasPermission,
+    getParticipantsByRole,
+  } = useBattleRoles(roomId || '');
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -88,71 +99,9 @@ const LiveRoom = () => {
     }
   }, [battle]);
 
-  useEffect(() => {
-    if (!roomId || !user) return;
+  // Participant management is now handled by useBattleRoles hook
 
-    const displayName = profile?.display_name || profile?.username || "Listener";
-    void supabase.from("battle_rooms").upsert(
-      {
-        battle_id: roomId,
-        user_id: user.id,
-        role: "audience",
-        display_name: displayName,
-        is_active: true,
-        is_muted: true,
-        is_speaking: false,
-      },
-      { onConflict: "battle_id,user_id" },
-    );
-
-    const heartbeat = window.setInterval(() => {
-      void supabase
-        .from("battle_rooms")
-        .update({ is_active: true, last_seen_at: new Date().toISOString() })
-        .eq("battle_id", roomId)
-        .eq("user_id", user.id);
-    }, 20000);
-
-    return () => {
-      window.clearInterval(heartbeat);
-      void supabase
-        .from("battle_rooms")
-        .update({ is_active: false, is_speaking: false, last_seen_at: new Date().toISOString() })
-        .eq("battle_id", roomId)
-        .eq("user_id", user.id);
-    };
-  }, [roomId, user, profile?.display_name, profile?.username]);
-
-  useEffect(() => {
-    if (!roomId) return;
-    let mounted = true;
-
-    const fetchParticipants = async () => {
-      const songchainUserIds = await fetchSongchainUserIdSet();
-      const { data } = await supabase
-        .from("battle_rooms")
-        .select("id, display_name, role, is_muted, is_speaking, user_id")
-        .eq("battle_id", roomId)
-        .eq("is_active", true);
-      if (!mounted || !data) return;
-      setParticipants(data.filter((participant) => songchainUserIds.has(participant.user_id)));
-    };
-
-    void fetchParticipants();
-    const participantChannel = supabase
-      .channel(`battle-room-participants-${roomId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "battle_rooms", filter: `battle_id=eq.${roomId}` },
-        () => void fetchParticipants(),
-      )
-      .subscribe();
-
-    return () => {
-      mounted = false;
-      void supabase.removeChannel(participantChannel);
-    };
-  }, [roomId]);
+  // Real-time participant management is now handled by useBattleRoles hook
 
   const [chatInput, setChatInput] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -224,39 +173,11 @@ const LiveRoom = () => {
     }
   };
 
-  const requestToSpeak = async () => {
-    if (!roomId || !user || requestedToSpeak || me?.role === "speaker" || me?.role === "co-host" || me?.role === "host") return;
-    setRequestedToSpeak(true);
-    await supabase
-      .from("battle_rooms")
-      .update({ role: "speaker-request", is_speaking: false })
-      .eq("battle_id", roomId)
-      .eq("user_id", user.id);
-  };
+  // Speaker request functionality is now handled by MicControls component
 
-  const approveSpeaker = async (requestUserId?: string) => {
-    if (!roomId || !iAmHostOrCoHost) return;
-    const requester = requestUserId
-      ? participants.find((p) => p.role === "speaker-request" && p.user_id === requestUserId)
-      : participants.find((p) => p.role === "speaker-request");
-    if (!requester) return;
-    await supabase
-      .from("battle_rooms")
-      .update({ role: "speaker", is_muted: false, is_speaking: true })
-      .eq("battle_id", roomId)
-      .eq("user_id", requester.user_id);
-  };
+  // Speaker approval functionality is now handled by SpeakerManagement component
 
-  const muteActiveSpeaker = async () => {
-    if (!roomId) return;
-    const target = participants.find((p) => p.role === "speaker" && !p.is_muted);
-    if (!target) return;
-    await supabase
-      .from("battle_rooms")
-      .update({ is_muted: true, is_speaking: false })
-      .eq("battle_id", roomId)
-      .eq("user_id", target.user_id);
-  };
+  // Speaker muting functionality is now handled by SpeakerManagement component
 
   const shareRoomLink = async () => {
     if (!roomId || typeof window === "undefined") return;
@@ -295,16 +216,118 @@ const LiveRoom = () => {
     });
   };
 
-  const host = participants.find((p) => p.role === "host");
-  const coHosts = participants.filter((p) => p.role === "co-host");
-  const speakers = participants.filter((p) => p.role === "speaker");
-  const audience = participants.filter((p) => p.role === "audience");
-  const speakerRequests = participants.filter((p) => p.role === "speaker-request");
-  const me = user ? participants.find((p) => p.user_id === user.id) : undefined;
-  const currentRole: ViewRole =
-    me?.role === "host" || me?.role === "co-host" || me?.role === "speaker" ? me.role : "audience";
-  const iAmHostOrCoHost = currentRole === "host" || currentRole === "co-host";
-  const iCanSpeak = currentRole === "host" || currentRole === "co-host" || currentRole === "speaker";
+  // Publish host mixed audio (mic + song) to LiveKit room when state changes
+  const { audioState: hostAudioState, publishToRoom: hostPublish, unpublishFromRoom: hostUnpublish } = hostAudio;
+  useEffect(() => {
+    const room = liveKitRoomRef.current;
+    if (!room || myRole !== 'host') return;
+    if (hostAudioState === 'idle') {
+      hostUnpublish(room);
+    } else {
+      void hostPublish(room);
+    }
+  }, [hostAudioState, myRole, hostPublish, hostUnpublish]);
+
+  const host = getParticipantsByRole('host')[0];
+  const coHosts = getParticipantsByRole('co-host');
+  const speakers = getParticipantsByRole('speaker');
+  const audience = getParticipantsByRole('audience');
+  const iAmHostOrCoHost = hasPermission('canApproveSpeakers');
+  const iCanSpeak = hasPermission('canPublishAudio');
+
+  useEffect(() => {
+    if (!roomId || !user) return;
+    let active = true;
+
+    const ensurePresence = async () => {
+      const { data: existing } = await supabase
+        .from("battle_rooms")
+        .select("id, role")
+        .eq("battle_id", roomId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!active) return;
+
+      const displayName = profile?.display_name || profile?.username || "Listener";
+
+      if (existing?.id) {
+        await supabase
+          .from("battle_rooms")
+          .update({ display_name: displayName, last_seen_at: new Date().toISOString() })
+          .eq("id", existing.id);
+        return;
+      }
+
+      await supabase.from("battle_rooms").insert({
+        battle_id: roomId,
+        user_id: user.id,
+        role: "audience",
+        display_name: displayName,
+        is_muted: true,
+        is_speaking: false,
+        requested_to_speak: false,
+      });
+    };
+
+    void ensurePresence();
+    return () => {
+      active = false;
+    };
+  }, [roomId, user, profile?.display_name, profile?.username]);
+
+  useEffect(() => {
+    if (!roomId || !user) return;
+    let cancelled = false;
+    const participantName = profile?.display_name || profile?.username || "WaveWarz Listener";
+
+    const connectLiveKit = async () => {
+      try {
+        const { token, wsUrl } = await getLiveKitToken(roomId, user.id, participantName);
+        if (cancelled) return;
+
+        if (!wsUrl || !token) {
+          toast({
+            title: "Voice connection unavailable",
+            description: "Live audio is not configured for this deployment. Contact support.",
+          });
+          return;
+        }
+
+        const room = new Room({
+          adaptiveStream: true,
+          dynacast: true,
+          stopLocalTrackOnUnpublish: true,
+        });
+        liveKitRoomRef.current = room;
+
+        room
+          .on(RoomEvent.Connected, () => {
+            if (cancelled) return;
+            setAudioConnected(true);
+          })
+          .on(RoomEvent.Disconnected, () => {
+            if (cancelled) return;
+            setAudioConnected(false);
+          });
+
+        await room.connect(wsUrl, token, { autoSubscribe: true });
+      } catch (error) {
+        console.error("[LiveKit] connect failed", error);
+        if (!cancelled) setAudioConnected(false);
+      }
+    };
+
+    void connectLiveKit();
+
+    return () => {
+      cancelled = true;
+      const room = liveKitRoomRef.current;
+      liveKitRoomRef.current = null;
+      if (room) room.disconnect();
+      setAudioConnected(false);
+    };
+  }, [roomId, user, profile?.display_name, profile?.username]);
 
   const requestMicAccess = async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -342,29 +365,20 @@ const LiveRoom = () => {
       .update({ is_muted: muted, is_speaking: !muted, last_seen_at: new Date().toISOString() })
       .eq("battle_id", roomId)
       .eq("user_id", user.id);
+
+    const room = liveKitRoomRef.current;
+    if (room) {
+      try {
+        await room.localParticipant.setMicrophoneEnabled(!muted);
+      } catch {
+        // Keep UI/state consistent even if LiveKit device permissions fail.
+      }
+    }
   };
 
-  const leaveSpeakerStage = async () => {
-    if (!roomId || !user || currentRole !== "speaker") return;
-    await supabase
-      .from("battle_rooms")
-      .update({ role: "audience", is_muted: true, is_speaking: false, last_seen_at: new Date().toISOString() })
-      .eq("battle_id", roomId)
-      .eq("user_id", user.id);
-  };
+  // Leaving speaker stage is now handled by MicControls component
 
-  const removeSpeaker = async (targetUserId?: string) => {
-    if (!roomId || !iAmHostOrCoHost) return;
-    const target = targetUserId
-      ? participants.find((p) => p.user_id === targetUserId && p.role === "speaker")
-      : participants.find((p) => p.role === "speaker");
-    if (!target) return;
-    await supabase
-      .from("battle_rooms")
-      .update({ role: "audience", is_muted: true, is_speaking: false })
-      .eq("battle_id", roomId)
-      .eq("user_id", target.user_id);
-  };
+  // Speaker removal functionality is now handled by SpeakerManagement component
 
   useEffect(() => {
     if (!roomId) return;
@@ -403,19 +417,19 @@ const LiveRoom = () => {
     if (!user) return;
     const me = participants.find((p) => p.user_id === user.id);
     if (!me) return;
-    setRequestedToSpeak(me.role === "speaker-request");
+    setRequestedToSpeak(me.requested_to_speak);
     if (!me.is_muted) setMicPermission("granted");
   }, [participants, user]);
 
   const getSidebarTabs = () => {
-    if (!iAmHostOrCoHost) return ["audience", "chat"] as const;
+    if (!hasPermission('canApproveSpeakers')) return ["audience", "chat"] as const;
     return ["audience", "requests", "chat"] as const;
   };
 
   const sidebarTabs = getSidebarTabs();
   const switchableBattles = liveBattles.filter((b) => b.id !== roomId).slice(0, 4);
 
-  const ParticipantCircle = ({ p, size = "md" }: { p: RoomParticipant; size?: "sm" | "md" | "lg" }) => {
+  const ParticipantCircle = ({ p, size = "md" }: { p: BattleParticipant; size?: "sm" | "md" | "lg" }) => {
     const sizes = {
       sm: "h-10 w-10 text-xs",
       md: "h-14 w-14 text-sm",
@@ -470,7 +484,10 @@ const LiveRoom = () => {
           </div>
           <div className="flex items-center gap-2">
             <div className={`rounded-lg border border-border bg-card text-foreground ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
-              {currentRole === "host" ? "Host" : currentRole === "co-host" ? "Co-Host" : currentRole === "speaker" ? "Speaker" : "Audience"}
+              {myRole === "host" ? "Host" : myRole === "co-host" ? "Co-Host" : myRole === "speaker" ? "Speaker" : "Audience"}
+            </div>
+            <div className={`rounded-lg border ${audioConnected ? "border-primary/40 text-primary" : "border-border text-muted-foreground"} bg-card ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
+              {audioConnected ? "Audio On" : "Audio Reconnecting"}
             </div>
           </div>
         </div>
@@ -612,73 +629,123 @@ const LiveRoom = () => {
             </div>
           </div>
 
-          {/* Bottom Actions */}
-          <div className="flex flex-wrap gap-2">
-            {currentRole === "host" && (
-              <>
+          {/* Microphone Controls */}
+          <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
+            <h3 className="text-sm font-bold text-muted-foreground mb-3">Audio Controls</h3>
+            <MicControls 
+              battleId={roomId || ''} 
+              liveKitRoom={liveKitRoomRef.current}
+              onAudioPermissionChange={(granted) => console.log('Audio permission:', granted)}
+            />
+          </div>
+
+          {/* Speaker Management */}
+          {hasPermission('canApproveSpeakers') && (
+            <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
+              <h3 className="text-sm font-bold text-muted-foreground mb-3">Speaker Management</h3>
+              <SpeakerManagement battleId={roomId || ''} maxSpeakers={10} />
+            </div>
+          )}
+
+          {/* Host Controls */}
+          {myRole === "host" && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
                 <button onClick={() => setIsPaused(!isPaused)} className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2">
                   {isPaused ? <><Play className="h-4 w-4" /> Resume</> : <><Pause className="h-4 w-4" /> Pause Round</>}
                 </button>
                 <button onClick={() => setRound((r) => Math.min(r + 1, battle.totalRounds))} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
                   <SkipForward className="h-4 w-4" /> Next Round
                 </button>
-                <button className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center justify-center gap-2">
-                  <UserPlus className="h-4 w-4" /> Invite Co-Host
-                </button>
-                <button onClick={muteActiveSpeaker} className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center justify-center gap-2">
-                  <Volume2 className="h-4 w-4" /> Mute Speaker
-                </button>
-                <button onClick={() => removeSpeaker()} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
-                  <Square className="h-4 w-4" /> Remove Speaker
-                </button>
-                <button onClick={endBattle} className="w-full sm:ml-auto sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
+                <button onClick={endBattle} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
                   <Square className="h-4 w-4" /> End Battle
                 </button>
-              </>
-            )}
-            {currentRole === "co-host" && (
-              <>
-                <button onClick={() => approveSpeaker()} className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary flex items-center justify-center gap-2"><Hand className="h-4 w-4" /> Approve Speaker</button>
-                <button onClick={muteActiveSpeaker} className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground flex items-center justify-center gap-2"><Volume2 className="h-4 w-4" /> Mute</button>
-                <button onClick={() => removeSpeaker()} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live flex items-center justify-center gap-2"><Square className="h-4 w-4" /> Remove Speaker</button>
-              </>
-            )}
-            {currentRole === "speaker" && (
-              <>
-                <button
-                  onClick={() => setStageMuted(!(me?.is_muted ?? true))}
-                  className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2"
-                >
-                  {(me?.is_muted ?? true) ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-                  {(me?.is_muted ?? true) ? "Unmute Mic" : "Mute Mic"}
-                </button>
-                <button
-                  onClick={leaveSpeakerStage}
-                  className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-3 flex items-center justify-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Leave Stage
-                </button>
-              </>
-            )}
-            {currentRole === "audience" && (
-              <>
-                <button
-                  onClick={requestToSpeak}
-                  disabled={requestedToSpeak}
-                  className={`w-full sm:w-auto rounded-xl px-4 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
-                    requestedToSpeak
-                      ? "bg-muted text-muted-foreground cursor-not-allowed"
-                      : "bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20"
-                  }`}
-                >
-                  <Hand className="h-4 w-4" /> {requestedToSpeak ? "Request Sent" : "Request to Speak"}
-                </button>
-                <button onClick={shareRoomLink} className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
-                  <ExternalLink className="h-4 w-4" /> Share
-                </button>
-              </>
-            )}
-          </div>
+              </div>
+
+              {/* Host Music Broadcast */}
+              <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+                    <Music className="h-4 w-4" /> Broadcast Music
+                  </h3>
+                  {hostAudio.isSongPlaying && (
+                    <span className="text-xs font-semibold text-primary animate-pulse">● LIVE</span>
+                  )}
+                </div>
+
+                {hostAudio.error && (
+                  <p className="text-xs text-live">{hostAudio.error}</p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {!hostAudio.isSongPlaying ? (
+                    <button
+                      onClick={() => setShowSongPicker(true)}
+                      className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2"
+                    >
+                      <Music className="h-4 w-4" /> Play Song to Room
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => hostAudio.stopSong()}
+                      className="rounded-xl bg-live/10 border border-live/30 px-4 py-2 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center gap-2"
+                    >
+                      <Square className="h-3 w-3" /> Stop Music
+                    </button>
+                  )}
+                </div>
+
+                {/* Volume slider for song */}
+                {hostAudio.isSongPlaying && (
+                  <div className="flex items-center gap-3">
+                    <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <input
+                      type="range" min={0} max={1} step={0.05}
+                      value={hostAudio.songVolume}
+                      onChange={(e) => hostAudio.setSongVolume(parseFloat(e.target.value))}
+                      className="flex-1 accent-primary"
+                    />
+                    <span className="text-xs text-muted-foreground w-8">{Math.round(hostAudio.songVolume * 100)}%</span>
+                  </div>
+                )}
+
+                {/* Song picker overlay */}
+                {showSongPicker && (
+                  <div className="rounded-xl border border-border bg-background p-3 space-y-2 max-h-64 overflow-y-auto">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-muted-foreground">Choose a song to broadcast</span>
+                      <button onClick={() => setShowSongPicker(false)} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {SONGS.slice(0, 15).map((song) => (
+                      <button
+                        key={song.id}
+                        onClick={async () => {
+                          setShowSongPicker(false);
+                          await hostAudio.playSong(song.audioUrl);
+                          const room = liveKitRoomRef.current;
+                          if (room) await hostAudio.publishToRoom(room);
+                        }}
+                        className="w-full text-left rounded-lg px-3 py-2 hover:bg-primary/10 transition-colors flex items-center gap-3"
+                      >
+                        <Music className="h-4 w-4 text-primary shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Share Link */}
+          <button onClick={shareRoomLink} className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
+            <ExternalLink className="h-4 w-4" /> Share Room
+          </button>
         </div>
 
         {/* Sidebar */}
@@ -700,34 +767,13 @@ const LiveRoom = () => {
           <div className="flex-1 overflow-y-auto p-4">
             {sidebarTab === "audience" && (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground mb-3">{audience.length} in audience</p>
-                {audience.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/30">
-                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold">{(p.display_name || "?").charAt(0)}</div>
-                    <span className="text-sm text-foreground">{p.display_name || "Anonymous"}</span>
-                  </div>
-                ))}
-                {audience.length === 0 && <p className="text-sm text-muted-foreground">No audience members yet</p>}
+                <SpeakerManagement battleId={roomId || ''} maxSpeakers={10} />
               </div>
             )}
 
             {sidebarTab === "requests" && (
               <div className="space-y-2">
-                {speakerRequests.length === 0 ? (
-                  <p className="text-xs text-muted-foreground mb-3">No speaker requests</p>
-                ) : (
-                  speakerRequests.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-muted/30">
-                      <span className="text-sm text-foreground">{p.display_name || "Anonymous"}</span>
-                      <button
-                        onClick={() => approveSpeaker(p.user_id)}
-                        className="rounded-md bg-primary/15 px-2 py-1 text-xs text-primary hover:bg-primary/25"
-                      >
-                        Approve
-                      </button>
-                    </div>
-                  ))
-                )}
+                <SpeakerManagement battleId={roomId || ''} maxSpeakers={10} />
               </div>
             )}
 

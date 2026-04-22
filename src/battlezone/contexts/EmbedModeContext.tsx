@@ -90,7 +90,17 @@ export const EmbedModeProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<EmbedModeContextType>(
     () => ({
       isEmbedded,
-      embedTo: (to: To) => (isEmbedded ? toEmbeddedTarget(to) : to),
+      embedTo: (to: To) => {
+        if (isEmbedded) return toEmbeddedTarget(to);
+        if (typeof to === "string") return withBasePath(to);
+        if (typeof to.pathname === "string") {
+          return {
+            ...to,
+            pathname: withBasePath(to.pathname),
+          };
+        }
+        return to;
+      },
       openStandalone: (path?: string) => {
         sessionStorage.removeItem(EMBED_SESSION_KEY);
         setSessionEmbedded(false);

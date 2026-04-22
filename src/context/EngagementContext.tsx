@@ -263,7 +263,6 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       roomId: options?.roomName || null,
     };
 
-    void payload;
     window.dispatchEvent(new CustomEvent('songchainn:pulse', {
       detail: {
         songId,
@@ -272,6 +271,14 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
         timestamp: payload.timestamp,
       },
     }));
+
+    // Broadcast to other online users via Supabase Realtime
+    const channelName = `pulse-${payload.roomId || 'global'}`;
+    void supabase.channel(channelName).send({
+      type: 'broadcast',
+      event: 'pulse',
+      payload: { songId, userId: user?.id ?? null, timestamp: payload.timestamp },
+    });
 
     (async () => {
       try {

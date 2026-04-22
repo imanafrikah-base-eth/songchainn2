@@ -27,6 +27,10 @@ interface PlayerActionsContext {
   addToQueue: (song: Song) => void;
   playQueue: (songs: Song[], options?: { startIndex?: number }) => void;
   volume: number;
+  repeatMode: 'off' | 'all' | 'one';
+  setRepeatMode: (mode: 'off' | 'all' | 'one') => void;
+  shuffleMode: boolean;
+  toggleShuffle: () => void;
   enterRoomMode: (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => Promise<boolean>;
   exitRoomMode: () => Promise<void>;
   hideRoom: () => void;
@@ -47,6 +51,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [isCrossfading, setIsCrossfading] = useState(false);
   const [audioVersion, setAudioVersion] = useState(0);
   const [isRoomMode, setIsRoomMode] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
+  const [shuffleMode, setShuffleMode] = useState(false);
   const [isRoomHidden, setIsRoomHidden] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -492,19 +498,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const advanceToNext = useCallback(() => {
-    if (currentSong && queue.length > 0) {
-      const currentIndex = queue.findIndex(s => s.id === currentSong.id);
-      const nextIndex = (currentIndex + 1) % queue.length;
-      const nextSong = queue[nextIndex];
-      
-      // Use crossfade for automatic transitions
-      if (isPlaying) {
-        crossfadeToSong(nextSong);
-      } else {
-        playSong(nextSong, { force: isRoomMode });
-      }
+    if (!currentSong || queue.length === 0) return;
+
+    if (repeatMode === 'one') {
+      if (isPlaying) crossfadeToSong(currentSong);
+      else playSong(currentSong, { force: true });
+      return;
     }
-  }, [currentSong, queue, isPlaying, crossfadeToSong, playSong, isRoomMode]);
+
+    const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+    let nextIndex: number;
+
+    if (shuffleMode) {
+      let randomIndex: number;
+      do { randomIndex = Math.floor(Math.random() * queue.length); }
+      while (queue.length > 1 && randomIndex === currentIndex);
+      nextIndex = randomIndex;
+    } else if (currentIndex === queue.length - 1) {
+      nextIndex = repeatMode === 'all' ? 0 : currentIndex;
+    } else {
+      nextIndex = currentIndex + 1;
+    }
+
+    const nextSong = queue[nextIndex];
+    if (isPlaying) crossfadeToSong(nextSong);
+    else playSong(nextSong, { force: isRoomMode });
+  }, [currentSong, queue, repeatMode, shuffleMode, isPlaying, crossfadeToSong, playSong, isRoomMode]);
 
   useEffect(() => {
     playNextRef.current = advanceToNext;
@@ -675,6 +694,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     duration,
   }), [currentTime, duration]);
 
+  const toggleShuffle = useCallback(() => {
+    setShuffleMode(prev => !prev);
+  }, []);
+
   const actionsValue = useMemo(() => ({
     playSong,
     togglePlay,
@@ -687,11 +710,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     addToQueue,
     playQueue,
     volume,
+    repeatMode,
+    setRepeatMode,
+    shuffleMode,
+    toggleShuffle,
     enterRoomMode,
     exitRoomMode,
     hideRoom,
     showRoom,
-  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, pause, play, playNext, playPrevious, playQueue, playSong, seekTo, setVolume, togglePlay, volume]);
+  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, pause, play, playNext, playPrevious, playQueue, playSong, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
 
   return (
     <PlayerStateCtx.Provider value={stateValue}>

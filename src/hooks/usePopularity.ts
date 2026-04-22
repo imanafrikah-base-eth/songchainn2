@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SONGS, ARTISTS, Song, Artist } from '@/data/musicData';
 
@@ -114,10 +114,11 @@ function calculateSongScore(dbData?: SongPopularity): number {
 // Hook to subscribe to real-time popularity updates
 function usePopularityRealtime() {
   const queryClient = useQueryClient();
+  const instanceId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     const channel = supabase
-      .channel('popularity-updates')
+      .channel(`popularity-updates:${instanceId.current}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'song_analytics' }, () => {
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
         queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });

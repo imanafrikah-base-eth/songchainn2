@@ -449,28 +449,19 @@ export default function Room() {
   useEffect(() => {
     if (!roomName) return;
     const channel = supabase
-      .channel(`room-pulses-${roomName}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'song_analytics' },
-        payload => {
-          const row = (payload as any)?.new as { event_type?: string; song_id?: string } | undefined;
-          if (!row || row.event_type !== 'pulse') return;
-          if (!currentSong || row.song_id !== currentSong.id) return;
-          setRoomPulseSummary(prev => {
-            if (!prev) {
-              return { count: 1 };
-            }
-            return { count: prev.count + 1 };
-          });
-          if (pulseBannerTimeoutRef.current) {
-            window.clearTimeout(pulseBannerTimeoutRef.current);
-          }
-          pulseBannerTimeoutRef.current = window.setTimeout(() => {
-            setRoomPulseSummary(null);
-          }, 4000);
+      .channel(`pulse-${roomName}`)
+      .on('broadcast', { event: 'pulse' }, (msg) => {
+        const { songId: pulseSongId } = (msg.payload ?? {}) as { songId?: string };
+        if (!pulseSongId) return;
+        if (currentSong && pulseSongId !== currentSong.id) return;
+        setRoomPulseSummary(prev => ({ count: (prev?.count ?? 0) + 1 }));
+        if (pulseBannerTimeoutRef.current) {
+          window.clearTimeout(pulseBannerTimeoutRef.current);
         }
-      )
+        pulseBannerTimeoutRef.current = window.setTimeout(() => {
+          setRoomPulseSummary(null);
+        }, 4000);
+      })
       .subscribe();
 
     return () => {
@@ -778,7 +769,7 @@ export default function Room() {
         const withoutSelf = prev.filter((entry) => entry.user_id !== user.id);
         return [optimisticUser, ...withoutSelf];
       });
-      setOnlineCount((prev) => Math.max(1, prev));
+      setOnlineCount((prev) => prev + 1);
     };
 
     const refreshLiveUsers = async () => {
@@ -835,12 +826,17 @@ export default function Room() {
         });
 
       setLiveUsers(nextUsers);
-      setOnlineCount(Math.max(1, nextUsers.length));
+      setOnlineCount(nextUsers.length);
     };
 
     const joinRoom = async () => {
       setOptimisticSelf();
       await callRoomRpc('join_room');
+      // Direct upsert as fallback in case the RPC doesn't write to room_live_users
+      await (supabase as any).from('room_live_users').upsert(
+        { room_id: ROOM_ID, user_id: user.id, joined_at: new Date().toISOString(), last_seen_at: new Date().toISOString() },
+        { onConflict: 'room_id,user_id' }
+      );
       await refreshLiveUsers();
     };
 
@@ -875,6 +871,8 @@ export default function Room() {
       if (heartbeatInterval) window.clearInterval(heartbeatInterval);
       supabase.removeChannel(profilesChannel);
       void callRoomRpc('leave_room');
+      void (supabase as any).from('room_live_users').delete()
+        .eq('room_id', ROOM_ID).eq('user_id', user.id);
       setLiveUsers([]);
       setOnlineCount(0);
     };
