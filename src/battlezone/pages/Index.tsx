@@ -1,4 +1,5 @@
-import { Zap, Play, HelpCircle } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Zap, Play, HelpCircle, Radio, PlusCircle, ArrowRight } from "lucide-react";
 import AppLink from "@/battlezone/components/AppLink";
 import Navbar from "@/battlezone/components/Navbar";
 import Footer from "@/battlezone/components/Footer";
@@ -16,6 +17,29 @@ const Index = () => {
   const { data: liveBattles = [] } = useBattles("live");
   const { data: upcomingBattles = [] } = useBattles("upcoming");
   const { data: endedBattles = [] } = useBattles("ended");
+  const [selectedLiveBattleId, setSelectedLiveBattleId] = useState("");
+  const [manualBattleId, setManualBattleId] = useState("");
+
+  const featuredLiveBattles = useMemo(() => liveBattles.slice(0, 8), [liveBattles]);
+
+  const onboardingSteps = [
+    {
+      title: "Connect Wallet",
+      copy: "Use Phantom or Solflare to join battles and support artists in real time.",
+    },
+    {
+      title: "Join Or Host",
+      copy: "Jump into a live room, or launch your own battle with co-hosts and audience voting.",
+    },
+    {
+      title: "Go Live Voice",
+      copy: "Use LiveKit-powered room audio so hosts, speakers, and fans can react instantly.",
+    },
+    {
+      title: "Grow Community",
+      copy: "WaveWarz Africa helps onboard local creators and cities into the battle ecosystem.",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -57,6 +81,114 @@ const Index = () => {
       <div className={`mx-auto max-w-7xl px-4 ${isEmbedded ? "space-y-10 pb-6" : "space-y-12 md:space-y-16 pb-10"}`}>
         <StatsRow />
         <CountryChips />
+
+        <section className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 to-secondary/10 p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionHeader
+              title="WaveWarz Africa Onboarding"
+              subtitle="Everything needed to onboard, then create or join on this same page."
+            />
+          </div>
+          <div className="mt-3 overflow-x-auto pb-2">
+            <div className="flex min-w-full gap-3">
+              {onboardingSteps.map((step) => (
+                <article
+                  key={step.title}
+                  className="min-w-[240px] flex-1 rounded-xl border border-border bg-card/70 p-4 sm:min-w-[260px]"
+                >
+                  <p className="text-sm font-bold text-foreground">{step.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{step.copy}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-primary/20 bg-card/70 p-5 sm:p-6">
+          <h2 className="text-xl font-display font-bold text-foreground">Join Or Create From Here</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pick a live battle, enter by room ID, or launch a new battle without leaving this page.
+          </p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-xl border border-border bg-background/60 p-4">
+              <p className="text-sm font-semibold text-foreground">Join Selected Live Battle</p>
+              <select
+                value={selectedLiveBattleId}
+                onChange={(event) => setSelectedLiveBattleId(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
+              >
+                <option value="">Select live battle...</option>
+                {liveBattles.map((battle) => (
+                  <option key={battle.id} value={battle.id}>
+                    {battle.title}
+                  </option>
+                ))}
+              </select>
+              <AppLink
+                to={selectedLiveBattleId ? `/entry/${selectedLiveBattleId}` : "#"}
+                className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold ${
+                  selectedLiveBattleId
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "pointer-events-none bg-muted text-muted-foreground"
+                }`}
+              >
+                <Radio className="h-4 w-4" /> Enter Live Room
+              </AppLink>
+            </div>
+            <div className="rounded-xl border border-border bg-background/60 p-4">
+              <p className="text-sm font-semibold text-foreground">Enter By Battle ID</p>
+              <input
+                value={manualBattleId}
+                onChange={(event) => setManualBattleId(event.target.value)}
+                placeholder="Paste room/battle ID"
+                className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
+              />
+              <AppLink
+                to={manualBattleId.trim() ? `/entry/${manualBattleId.trim()}` : "#"}
+                className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold ${
+                  manualBattleId.trim()
+                    ? "bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                    : "pointer-events-none bg-muted text-muted-foreground"
+                }`}
+              >
+                <ArrowRight className="h-4 w-4" /> Open Battle Entry
+              </AppLink>
+            </div>
+            <div className="rounded-xl border border-border bg-background/60 p-4">
+              <p className="text-sm font-semibold text-foreground">Create A New Battle</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Host flow includes artist/song selection, co-host invites, and launch-now controls.
+              </p>
+              <AppLink
+                to="/host/create"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+              >
+                <PlusCircle className="h-4 w-4" /> Create Battle
+              </AppLink>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <SectionHeader
+            title="Live Scroller"
+            subtitle="Swipe/scroll through active rooms and jump in quickly."
+            linkTo="/battles/live"
+            linkLabel="All Live"
+          />
+          <div className="overflow-x-auto pb-2">
+            <div className="flex gap-4">
+              {featuredLiveBattles.map((b) => (
+                <div key={b.id} className="min-w-[280px] sm:min-w-[320px]">
+                  <BattleCard battle={b} />
+                </div>
+              ))}
+              {featuredLiveBattles.length === 0 && (
+                <p className="w-full py-6 text-center text-muted-foreground">No live battles right now.</p>
+              )}
+            </div>
+          </div>
+        </section>
 
         <section>
           <SectionHeader title="Live Now" subtitle="Join active battles happening right now" linkTo="/battles/live" linkLabel="All Live" />

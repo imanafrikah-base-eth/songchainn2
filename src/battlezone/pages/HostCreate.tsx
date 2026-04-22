@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Zap, Save, X, Search, UserPlus, ChevronDown, Music, MapPin, Calendar, FileText, Radio } from "lucide-react";
 import Navbar from "@/battlezone/components/Navbar";
@@ -9,7 +9,8 @@ import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import AppLink from "@/battlezone/components/AppLink";
 import { toast } from "@/battlezone/hooks/use-toast";
-import { ARTISTS, SONGS } from "@/data/musicData";
+import { useBattles } from "@/battlezone/hooks/useBattles";
+import { ARTISTS, SONGS, type Song } from "@/data/musicData";
 
 const regions = ["Zambia", "South Africa", "Nigeria", "Zimbabwe", "Botswana"];
 
@@ -32,7 +33,17 @@ const SelectWrapper = ({ icon: Icon, children }: { icon: React.ElementType; chil
 const HostCreate = () => {
   const { isEmbedded, embedTo } = useEmbedMode();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+
+  // Debug authentication state
+  useEffect(() => {
+    console.log("=== HostCreate Auth Debug ===");
+    console.log("User:", user);
+    console.log("Profile:", profile);
+    console.log("Loading:", loading);
+    console.log("==========================");
+  }, [user, profile, loading]);
+  
   const [form, setForm] = useState({
     title: "",
     region: "Zambia",
@@ -51,8 +62,10 @@ const HostCreate = () => {
   const [selectedCoHosts, setSelectedCoHosts] = useState<SongchainUser[]>([]);
   const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
   const [users, setUsers] = useState<SongchainUser[]>([]);
-  const [liveBattlesCount, setLiveBattlesCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const coHostDropdownRef = useRef<HTMLDivElement>(null);
+  const { data: liveBattles = [] } = useBattles("live");
+  const liveBattlesCount = liveBattles.length;
 
   const artistOptions = useMemo(
     () =>
@@ -62,22 +75,6 @@ const HostCreate = () => {
     []
   );
 
-  const songsByArtist = useMemo(() => {
-    const map = new Map<string, Array<{ id: string; title: string }>>();
-    SONGS.forEach((song) => {
-      const next = map.get(song.artistId) || [];
-      next.push({ id: song.id, title: song.title });
-      map.set(song.artistId, next);
-    });
-    map.forEach((songs, artistId) => {
-      map.set(
-        artistId,
-        songs.sort((a, b) => a.title.localeCompare(b.title))
-      );
-    });
-    return map;
-  }, []);
-
   const artistById = useMemo(() => {
     const map = new Map<string, (typeof ARTISTS)[number]>();
     ARTISTS.forEach((artist) => {
@@ -85,19 +82,61 @@ const HostCreate = () => {
     });
     return map;
   }, []);
+
+  const songsByArtist = useMemo(() => {
+    const map = new Map<string, Song[]>();
+    SONGS.forEach((song) => {
+      const current = map.get(song.artistId) || [];
+      current.push(song);
+      map.set(song.artistId, current);
+    });
+    return map;
+  }, []);
   
   // Fetch songchainn users for co-host search
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("audience_profiles")
         .select(
           "id, user_id, username, display_name, profile_name, avatar_url, created_at"
         )
         .not("user_id", "is", null)
         .order("created_at", { ascending: false })
-        .limit(300);
-      if (!data) return;
+        .limit(500);
+      
+      console.log("Users data fetch:", { data, error });
+      
+      if (!data || error) {
+        console.log("No data or error:", error);
+        // Create mock users for testing if no real users
+        const mockUsers: SongchainUser[] = [
+          {
+            id: "mock1",
+            user_id: "mock1",
+            username: "jessi",
+            display_name: "Jessi",
+            avatar_url: null,
+          },
+          {
+            id: "mock2", 
+            user_id: "mock2",
+            username: "mosha",
+            display_name: "Mo$ha",
+            avatar_url: null,
+          },
+          {
+            id: "mock3",
+            user_id: "mock3", 
+            username: "testuser",
+            display_name: "Test User",
+            avatar_url: null,
+          }
+        ];
+        console.log("Using mock users:", mockUsers);
+        setUsers(mockUsers);
+        return;
+      }
 
       const pickName = (row: Record<string, unknown>): string => {
         const candidates = [
@@ -117,6 +156,9 @@ const HostCreate = () => {
       (data as any[]).forEach((row) => {
         const userId = String(row?.user_id || "").trim();
         if (!userId) return;
+        
+        console.log("Processing user:", { userId, username: row?.username, displayName: row?.display_name });
+        
         if (!uniqueByUserId.has(userId)) {
           uniqueByUserId.set(userId, {
             id: String(row?.id || userId),
@@ -128,20 +170,60 @@ const HostCreate = () => {
         }
       });
 
-      setUsers(Array.from(uniqueByUserId.values()));
+      const finalUsers = Array.from(uniqueByUserId.values());
+      console.log("Final users list:", finalUsers);
+      setUsers(finalUsers);
     };
+
     fetchUsers();
+
+    // Set up real-time subscription for new users
+    const subscription = supabase
+      .channel('audience_profiles_changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'audience_profiles' },
+        (payload) => {
+          const newUser = payload.new as any;
+          if (newUser.user_id) {
+            setUsers(prev => {
+              const existing = prev.find(u => u.user_id === newUser.user_id);
+              if (!existing) {
+                return [
+                  {
+                    id: String(newUser.id || newUser.user_id),
+                    user_id: newUser.user_id,
+                    username: newUser.username ?? null,
+                    display_name: newUser.display_name || newUser.username || "Listener",
+                    avatar_url: newUser.avatar_url ?? null,
+                  },
+                  ...prev
+                ].slice(0, 500); // Keep latest 500 users
+              }
+              return prev;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
+  // Click outside to close dropdown
   useEffect(() => {
-    const fetchLiveCount = async () => {
-      const { count } = await supabase
-        .from("battles")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "live");
-      setLiveBattlesCount(count ?? 0);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (coHostDropdownRef.current && !coHostDropdownRef.current.contains(event.target as Node)) {
+        setShowCoHostDropdown(false);
+      }
     };
-    fetchLiveCount();
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
@@ -207,20 +289,19 @@ const HostCreate = () => {
 
   const upsertHostInRoom = async (battleId: string) => {
     if (!user || !profile) return;
-    await supabase
-      .from("battle_rooms")
-      .upsert(
-        {
-          battle_id: battleId,
-          user_id: user.id,
-          role: "host",
-          display_name: profile.display_name || profile.username || "Host",
-          is_active: true,
-          is_muted: false,
-          is_speaking: true,
-        },
-        { onConflict: "battle_id,user_id" },
-      );
+    const { error } = await supabase.from("battle_rooms").upsert(
+      {
+        battle_id: battleId,
+        user_id: user.id,
+        role: "host",
+        display_name: profile.display_name || profile.username || "Host",
+        is_muted: false,
+        is_speaking: true,
+        requested_to_speak: false,
+      },
+      { onConflict: "battle_id,user_id" },
+    );
+    if (error) throw error;
   };
 
   const upsertCoHostsInRoom = async (battleId: string) => {
@@ -230,11 +311,12 @@ const HostCreate = () => {
       user_id: coHost.user_id,
       role: "co-host",
       display_name: coHost.display_name || coHost.username || "Co-Host",
-      is_active: false,
       is_muted: true,
       is_speaking: false,
+      requested_to_speak: false,
     }));
-    await supabase.from("battle_rooms").upsert(rows, { onConflict: "battle_id,user_id" });
+    const { error } = await supabase.from("battle_rooms").upsert(rows, { onConflict: "battle_id,user_id" });
+    if (error) throw error;
   };
 
   const broadcastBattleLaunch = async (battleId: string, title: string) => {
@@ -295,6 +377,44 @@ const HostCreate = () => {
     await supabase.from("notifications").insert(notificationsPayload);
   };
 
+  const saveDraft = async () => {
+    if (!user || !profile) {
+      toast({ title: "Authentication required", description: "Please log in to save drafts." });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const artistA = artistById.get(form.artistAId);
+      const artistB = artistById.get(form.artistBId);
+      const { error } = await supabase.from("battles").insert({
+        title: form.title || "Untitled Battle",
+        region: form.region || "Africa",
+        artist_a_name: form.artistA || "TBD",
+        artist_b_name: form.artistB || "TBD",
+        artist_a_image: artistA?.profileImage ?? null,
+        artist_b_image: artistB?.profileImage ?? null,
+        artist_a_region: artistA?.location ?? form.region,
+        artist_b_region: artistB?.location ?? form.region,
+        song_a: form.songA || "TBD",
+        song_b: form.songB || "TBD",
+        host_user_id: user.id,
+        host_name: profile.display_name || profile.username || "Host",
+        co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
+        scheduled_time: form.schedule || null,
+        status: "draft",
+        round: 1,
+        total_rounds: 3,
+      });
+      if (error) throw error;
+      toast({ title: "Draft saved", description: "Battle draft saved. Find it in Upcoming to launch later." });
+      navigate(embedTo("/battles/upcoming"));
+    } catch {
+      toast({ title: "Failed to save draft", description: "Please try again." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const createBattle = async (isLaunchNow: boolean) => {
     if (!user) {
       toast({
@@ -344,6 +464,7 @@ const HostCreate = () => {
       return;
     }
 
+    console.log("Starting battle creation...");
     setIsSubmitting(true);
     try {
       const status = isLaunchNow ? "live" : "upcoming";
@@ -389,8 +510,7 @@ const HostCreate = () => {
         await upsertHostInRoom(data.id);
         await upsertCoHostsInRoom(data.id);
         await broadcastBattleLaunch(data.id, form.title);
-        toast({ title: "Battle launched", description: "Your battle is live with host controls and room features active." });
-        setLiveBattlesCount((n) => n + 1);
+        toast({ title: "Battle launched", description: "You are now live as host. Audience can join in real time." });
         navigate(embedTo(`/room/${data.id}`));
       } else {
         toast({ title: "Battle scheduled", description: "Your battle is now in the upcoming feed." });
@@ -560,7 +680,7 @@ const HostCreate = () => {
               </div>
             )}
 
-            <div className="relative">
+            <div className="relative" ref={coHostDropdownRef}>
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <input
                 value={coHostSearch}
@@ -568,9 +688,19 @@ const HostCreate = () => {
                 onFocus={() => setShowCoHostDropdown(true)}
                 placeholder="Search $ongChainn username..."
                 disabled={selectedCoHosts.length >= 4}
-                className={`${inputClass} disabled:opacity-50 pr-10`}
+                className={`${inputClass} disabled:opacity-50 pr-20`}
               />
-              <UserPlus className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowCoHostDropdown(!showCoHostDropdown)}
+                  className="p-1 rounded hover:bg-muted transition-colors"
+                  disabled={selectedCoHosts.length >= 4}
+                >
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showCoHostDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+              </div>
 
               {showCoHostDropdown && selectedCoHosts.length < 4 && (
                 <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-border bg-card shadow-2xl max-h-48 overflow-y-auto z-10">
@@ -642,7 +772,11 @@ const HostCreate = () => {
                 <Zap className="h-5 w-5 shrink-0" /> Launch Battle Now
               </button>
             </div>
-            <button className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm sm:text-base font-medium text-muted-foreground hover:bg-muted transition-colors">
+            <button
+              onClick={saveDraft}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm sm:text-base font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               <Save className="h-4 w-4 sm:h-5 sm:w-5" /> Save Draft
             </button>
           </div>

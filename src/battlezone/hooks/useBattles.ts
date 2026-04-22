@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/battlezone/integrations/supabase/client";
-import { fetchSongchainUserIds } from "@/battlezone/lib/songchain";
 
 export interface BattleRow {
   id: string;
@@ -81,13 +80,9 @@ function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Bat
 }
 
 async function fetchBattles(status?: string): Promise<Battle[]> {
-  const songchainUserIds = await fetchSongchainUserIds();
-  if (!songchainUserIds.length) return [];
-
   let query = supabase
     .from("battles")
-    .select("*")
-    .in("host_user_id", songchainUserIds);
+    .select("*");
 
   if (status) query = query.eq("status", status);
   query = query.order("created_at", { ascending: false });
@@ -132,6 +127,7 @@ export function useBattles(status?: string) {
   return useQuery({
     queryKey: ["battles", status],
     queryFn: () => fetchBattles(status),
+    refetchInterval: status === "live" ? 5000 : 15000,
   });
 }
 

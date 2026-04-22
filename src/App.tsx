@@ -39,6 +39,7 @@ const About = lazy(() => import("./pages/About"));
 const WaveWarzBattleZoneFeature = lazy(() => import("./pages/WaveWarzBattleZoneFeature"));
 const DjShuffle = lazy(() => import("./pages/DjShuffle"));
 const Inbox = lazy(() => import("./pages/Inbox"));
+const BetterCallZaal = lazy(() => import("./pages/BetterCallZaal"));
 
 
 // Loading spinner component
@@ -166,6 +167,7 @@ function AppShell() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/room" element={<Room />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/bettercallzaal" element={<BetterCallZaal />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
@@ -199,6 +201,7 @@ function AppContent() {
               <Routes>
                 <Route path="/install" element={<Install />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/bettercallzaal" element={<BetterCallZaal />} />
                 <Route path="*" element={<Auth />} />
               </Routes>
             </Suspense>

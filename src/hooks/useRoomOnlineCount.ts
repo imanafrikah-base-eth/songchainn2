@@ -50,7 +50,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
               .filter((value) => value.length > 0)
           );
           const liveUsersCount = uniqueUsers.size;
-          setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
+          setCount(liveUsersCount);
           return;
         }
 
@@ -63,7 +63,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
         if (!isActive) return;
         if (!error) {
           const nextCount = resolveLiveCount((data ?? null) as RoomLiveCountRow | null);
-          setCount(isListening ? Math.max(1, nextCount) : nextCount);
+          setCount(nextCount);
           return;
         }
 
@@ -76,7 +76,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
         if (!isActive) return;
         if (!fallback?.error) {
           const fallbackCount = Math.max(0, Number(fallback?.count ?? 0));
-          setCount(isListening ? Math.max(1, fallbackCount) : fallbackCount);
+          setCount(fallbackCount);
           return;
         }
 
@@ -88,14 +88,14 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
         if (!isActive) return;
         if (!liveUsersFallback?.error) {
           const liveUsersCount = Math.max(0, Number(liveUsersFallback?.count ?? 0));
-          setCount(isListening ? Math.max(1, liveUsersCount) : liveUsersCount);
+          setCount(liveUsersCount);
           return;
         }
 
-        setCount(isListening ? 1 : 0);
+        setCount(0);
       } catch {
         if (!isActive) return;
-        setCount(isListening ? 1 : 0);
+        setCount(0);
       }
     };
 
