@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Mic, MicOff, Hand, Send, Play, Pause, SkipForward,
-  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile,
+  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile, Music, X,
 } from "lucide-react";
 import LiveBadge from "@/battlezone/components/LiveBadge";
 import { useBattle } from "@/battlezone/hooks/useBattles";
@@ -20,6 +20,8 @@ import { getLiveKitToken } from "@/battlezone/lib/livekit";
 import MicControls from "@/battlezone/components/MicControls";
 import SpeakerManagement from "@/battlezone/components/SpeakerManagement";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
+import { useHostAudio } from "@/battlezone/hooks/useHostAudio";
+import { SONGS } from "@/data/musicData";
 
 interface ChatMessage {
   id: string;
@@ -54,7 +56,10 @@ const LiveRoom = () => {
   const [isVerySmallMobile, setIsVerySmallMobile] = useState(false);
   const [audioConnected, setAudioConnected] = useState(false);
   const [micPermission, setMicPermission] = useState<MicPermissionState>('unknown');
+  const [showSongPicker, setShowSongPicker] = useState(false);
   const liveKitRoomRef = useRef<Room | null>(null);
+
+  const hostAudio = useHostAudio();
   
   // Use new role management system
   const {
@@ -210,6 +215,18 @@ const LiveRoom = () => {
       round,
     });
   };
+
+  // Publish host mixed audio (mic + song) to LiveKit room when state changes
+  const { audioState: hostAudioState, publishToRoom: hostPublish, unpublishFromRoom: hostUnpublish } = hostAudio;
+  useEffect(() => {
+    const room = liveKitRoomRef.current;
+    if (!room || myRole !== 'host') return;
+    if (hostAudioState === 'idle') {
+      hostUnpublish(room);
+    } else {
+      void hostPublish(room);
+    }
+  }, [hostAudioState, myRole, hostPublish, hostUnpublish]);
 
   const host = getParticipantsByRole('host')[0];
   const coHosts = getParticipantsByRole('co-host');
@@ -632,16 +649,96 @@ const LiveRoom = () => {
 
           {/* Host Controls */}
           {myRole === "host" && (
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setIsPaused(!isPaused)} className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2">
-                {isPaused ? <><Play className="h-4 w-4" /> Resume</> : <><Pause className="h-4 w-4" /> Pause Round</>}
-              </button>
-              <button onClick={() => setRound((r) => Math.min(r + 1, battle.totalRounds))} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
-                <SkipForward className="h-4 w-4" /> Next Round
-              </button>
-              <button onClick={endBattle} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
-                <Square className="h-4 w-4" /> End Battle
-              </button>
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setIsPaused(!isPaused)} className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2">
+                  {isPaused ? <><Play className="h-4 w-4" /> Resume</> : <><Pause className="h-4 w-4" /> Pause Round</>}
+                </button>
+                <button onClick={() => setRound((r) => Math.min(r + 1, battle.totalRounds))} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
+                  <SkipForward className="h-4 w-4" /> Next Round
+                </button>
+                <button onClick={endBattle} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
+                  <Square className="h-4 w-4" /> End Battle
+                </button>
+              </div>
+
+              {/* Host Music Broadcast */}
+              <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+                    <Music className="h-4 w-4" /> Broadcast Music
+                  </h3>
+                  {hostAudio.isSongPlaying && (
+                    <span className="text-xs font-semibold text-primary animate-pulse">● LIVE</span>
+                  )}
+                </div>
+
+                {hostAudio.error && (
+                  <p className="text-xs text-live">{hostAudio.error}</p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {!hostAudio.isSongPlaying ? (
+                    <button
+                      onClick={() => setShowSongPicker(true)}
+                      className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2"
+                    >
+                      <Music className="h-4 w-4" /> Play Song to Room
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => hostAudio.stopSong()}
+                      className="rounded-xl bg-live/10 border border-live/30 px-4 py-2 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center gap-2"
+                    >
+                      <Square className="h-3 w-3" /> Stop Music
+                    </button>
+                  )}
+                </div>
+
+                {/* Volume slider for song */}
+                {hostAudio.isSongPlaying && (
+                  <div className="flex items-center gap-3">
+                    <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <input
+                      type="range" min={0} max={1} step={0.05}
+                      value={hostAudio.songVolume}
+                      onChange={(e) => hostAudio.setSongVolume(parseFloat(e.target.value))}
+                      className="flex-1 accent-primary"
+                    />
+                    <span className="text-xs text-muted-foreground w-8">{Math.round(hostAudio.songVolume * 100)}%</span>
+                  </div>
+                )}
+
+                {/* Song picker overlay */}
+                {showSongPicker && (
+                  <div className="rounded-xl border border-border bg-background p-3 space-y-2 max-h-64 overflow-y-auto">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-muted-foreground">Choose a song to broadcast</span>
+                      <button onClick={() => setShowSongPicker(false)} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {SONGS.slice(0, 15).map((song) => (
+                      <button
+                        key={song.id}
+                        onClick={async () => {
+                          setShowSongPicker(false);
+                          await hostAudio.playSong(song.audioUrl);
+                          const room = liveKitRoomRef.current;
+                          if (room) await hostAudio.publishToRoom(room);
+                        }}
+                        className="w-full text-left rounded-lg px-3 py-2 hover:bg-primary/10 transition-colors flex items-center gap-3"
+                      >
+                        <Music className="h-4 w-4 text-primary shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

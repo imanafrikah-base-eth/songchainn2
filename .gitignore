@@ -30,3 +30,6 @@ bun.lockb
 
 Song Arts/
 *.tsbuildinfo
+
+# Private credentials — never commit this folder
+.private/
