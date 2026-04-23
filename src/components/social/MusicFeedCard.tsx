@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type SyntheticEvent } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Heart, 
@@ -28,7 +28,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import songArtVideo from '@/assets/song-art.mp4';
 import { usePulseCounts } from '@/hooks/usePopularity';
 
 interface MusicFeedCardProps {
@@ -37,24 +36,20 @@ interface MusicFeedCardProps {
   onFollow: (userId: string) => void;
   isFollowing: boolean;
   onComment: () => void;
-  isVisible?: boolean;
 }
 
-export function MusicFeedCard({ 
-  post, 
-  onLike, 
-  onFollow, 
+export function MusicFeedCard({
+  post,
+  onLike,
+  onFollow,
   isFollowing,
   onComment,
-  isVisible = true
 }: MusicFeedCardProps) {
   const { user } = useAuth();
   const { currentSong, isPlaying, playSong, pause, play } = usePlayer();
   const navigate = useNavigate();
-  const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard, shareToX } = useShare();
+  const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard } = useShare();
   const [showHeart, setShowHeart] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const autoPlayRequestedRef = useRef<string | null>(null);
   const { data: pulseCounts } = usePulseCounts();
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
@@ -95,43 +90,6 @@ export function MusicFeedCard({
     copyToClipboard(url);
   };
 
-  const handleShareToX = () => {
-    const url = song
-      ? getSongShareUrl({ id: song.id, title: song.title, artist: artist?.name || song.artist, coverImage: song.coverImage })
-      : getShareUrl('post', post.id);
-    const text = song && artist 
-      ? `🎵 Listening to "${song.title}" by ${artist.name} on @$ongChainn\n\n`
-      : `Check out this post on @$ongChainn\n\n`;
-    shareToX(text, url);
-  };
-
-  useEffect(() => {
-    if (videoRef.current) {
-      if (isVisible) {
-        void videoRef.current.play().catch(() => {});
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  }, [isVisible]);
-
-  useEffect(() => {
-    if (!isVisible) {
-      autoPlayRequestedRef.current = null;
-      return;
-    }
-    if (!song) return;
-    if (currentSong?.id === song.id) {
-      if (!isPlaying) {
-        play();
-      }
-      return;
-    }
-    if (autoPlayRequestedRef.current === song.id) return;
-    autoPlayRequestedRef.current = song.id;
-    playSong(song);
-  }, [currentSong?.id, isPlaying, isVisible, play, playSong, song]);
-
   const handleDoubleTap = () => {
     if (!post.is_liked) {
       onLike(post.id);
@@ -163,10 +121,8 @@ export function MusicFeedCard({
   };
 
   return (
-    <motion.div 
-      className={`relative w-full h-full min-h-[420px] sm:min-h-[500px] bg-card rounded-2xl sm:rounded-3xl overflow-hidden ${
-        isVisible ? 'ring-2 ring-primary/60 shadow-2xl shadow-primary/30' : ''
-      }`}
+    <motion.div
+      className="relative w-full min-h-[420px] sm:min-h-[500px] bg-card rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
@@ -221,13 +177,11 @@ export function MusicFeedCard({
                   animate={isThisSongPlaying ? { rotate: 360 } : {}}
                   transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
                 >
-                  <video
-                    ref={videoRef}
-                    src={songArtVideo}
-                    loop
-                    muted
-                    playsInline
+                  <img
+                    src={song.coverImage}
+                    alt={song.title}
                     className="w-full h-full object-cover"
+                    onError={handleSongImageError}
                   />
                 </motion.div>
                 <motion.div
@@ -272,13 +226,11 @@ export function MusicFeedCard({
                 animate={isThisSongPlaying ? { rotate: 360 } : {}}
                 transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
               >
-                <video
-                  ref={videoRef}
-                  src={songArtVideo}
-                  loop
-                  muted
-                  playsInline
+                <img
+                  src={song.coverImage}
+                  alt={song.title}
                   className="w-full h-full object-cover"
+                  onError={handleSongImageError}
                 />
               </motion.div>
               
@@ -386,12 +338,6 @@ export function MusicFeedCard({
             <DropdownMenuItem onClick={handleCopyLink} className="gap-2">
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
               Copy Link
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleShareToX} className="gap-2">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg>
-              Share on X
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

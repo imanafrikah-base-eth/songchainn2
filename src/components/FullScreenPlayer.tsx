@@ -14,34 +14,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import songArtVideo from '@/assets/song-art.mp4';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
-
-const FullScreenVideoArt = memo(function FullScreenVideoArt({ isPlaying }: { isPlaying: boolean }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        void videoRef.current.play().catch(() => {});
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  }, [isPlaying]);
-
-  return (
-    <video
-      ref={videoRef}
-      src={songArtVideo}
-      loop
-      muted
-      playsInline
-      className="w-full h-full object-cover"
-    />
-  );
-});
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -432,7 +406,15 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
               >
                 <div className="absolute inset-0 rounded-3xl shadow-glow-intense opacity-60" />
                 <div className="relative w-full h-full rounded-3xl overflow-hidden glass-card shine-overlay">
-                  <FullScreenVideoArt isPlaying={isPlaying} />
+                  {currentSong.coverImage ? (
+                    <img
+                      src={currentSong.coverImage}
+                      alt={currentSong.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-primary/40 to-primary/10" />
+                  )}
                 </div>
 
                 {/* Vinyl ring effect (optional decorative) */}
