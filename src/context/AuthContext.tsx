@@ -208,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { data, error } = await supabase.auth.signInWithWeb3({
-        chain: 'ethereum',
+        chain: 'base',
         statement: 'Sign in to $ongChainn on Base',
       } as any);
 

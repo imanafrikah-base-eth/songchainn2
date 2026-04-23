@@ -1,14 +1,17 @@
 import { getEnv } from './env';
+import { supabase } from '@/integrations/supabase/client';
 
 export async function checkSupabaseReachability(): Promise<void> {
   const { supabaseUrl } = getEnv();
-  const url = `${supabaseUrl}/auth/v1/settings`;
+  if (!supabaseUrl) return;
 
   try {
-    const res = await fetch(url, { method: 'GET' });
-    if (!res) throw new Error('No response object');
-  } catch (e) {
-    // Dev-only signal: avoid noisy error-level logs for transient network issues.
-    console.warn('[$ongChainn] Supabase reachability check unavailable');
+    // Use a lightweight authenticated ping instead of an unauthenticated /settings request
+    const { error } = await supabase.from('audience_profiles').select('id').limit(1);
+    if (error && import.meta.env.DEV) {
+      console.warn('[$ongChainn] Supabase reachability check failed:', error.message);
+    }
+  } catch {
+    console.warn('[$ongChainn] Supabase unreachable');
   }
 }

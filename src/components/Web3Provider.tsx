@@ -9,7 +9,7 @@ interface Web3ProviderProps {
 
 export function Web3Provider({ children }: Web3ProviderProps) {
   return (
-    <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
+    <WagmiProvider config={wagmiConfig} reconnectOnMount={true}>
       <OnchainKitProvider
         apiKey={import.meta.env.VITE_ONCHAINKIT_API_KEY as string | undefined}
         projectId={import.meta.env.VITE_ONCHAINKIT_PROJECT_ID as string | undefined}
