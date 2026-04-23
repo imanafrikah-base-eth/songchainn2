@@ -408,8 +408,10 @@ const HostCreate = () => {
       if (error) throw error;
       toast({ title: "Draft saved", description: "Battle draft saved. Find it in Upcoming to launch later." });
       navigate(embedTo("/battles/upcoming"));
-    } catch {
-      toast({ title: "Failed to save draft", description: "Please try again." });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? "Unknown error");
+      console.error("[HostCreate] saveDraft failed:", msg);
+      toast({ title: "Failed to save draft", description: msg || "Please try again." });
     } finally {
       setIsSubmitting(false);
     }

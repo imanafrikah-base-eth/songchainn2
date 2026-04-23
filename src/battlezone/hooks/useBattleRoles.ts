@@ -309,39 +309,41 @@ export const useBattleRoles = (battleId: string) => {
     // Initial fetch
     fetchParticipants();
 
-    // Subscribe to participant changes
+    // Timestamp suffix prevents Supabase from reusing an already-subscribed
+    // channel on rapid unmount/remount cycles (same bug as social-feed).
+    const ts = Date.now();
+
     const participantChannel = supabase
-      .channel(`battle-participants-${battleId}`)
+      .channel(`battle-participants-${battleId}-${ts}`)
       .on(
         'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'battle_rooms', 
-          filter: `battle_id=eq.${battleId}` 
+        {
+          event: '*',
+          schema: 'public',
+          table: 'battle_rooms',
+          filter: `battle_id=eq.${battleId}`,
         },
         () => fetchParticipants()
       )
       .subscribe();
 
-    // Subscribe to speaker request changes
     const speakerRequestChannel = supabase
-      .channel(`speaker-requests-${battleId}`)
+      .channel(`speaker-requests-${battleId}-${ts}`)
       .on(
         'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'battle_speaker_requests', 
-          filter: `battle_id=eq.${battleId}` 
+        {
+          event: '*',
+          schema: 'public',
+          table: 'battle_speaker_requests',
+          filter: `battle_id=eq.${battleId}`,
         },
         () => fetchParticipants()
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(participantChannel);
-      supabase.removeChannel(speakerRequestChannel);
+      void supabase.removeChannel(participantChannel);
+      void supabase.removeChannel(speakerRequestChannel);
     };
   }, [battleId, user?.id]);
 

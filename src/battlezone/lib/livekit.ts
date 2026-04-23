@@ -43,27 +43,32 @@ export async function getLiveKitToken(roomId: string, userId: string, participan
     }
   }
 
-  // Final fallback: local Node token service.
-  const localTokenEndpoint = String(import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT || "http://127.0.0.1:7880/token").trim();
-  const localRes = await fetch(localTokenEndpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ roomName: roomId, participantName, userId }),
-  }).catch(() => null);
+  // Optional local dev token server — only used when the env var is explicitly set
+  // and we are NOT in a production build (prevents hitting 127.0.0.1 in prod).
+  const localTokenEndpoint = String(import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT || "").trim();
+  if (localTokenEndpoint && !import.meta.env.PROD) {
+    const localRes = await fetch(localTokenEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomName: roomId, participantName, userId }),
+    }).catch(() => null);
 
-  if (localRes?.ok) {
-    const localData = (await localRes.json().catch(() => null)) as LiveKitTokenResponse | null;
-    const fallbackWsUrl = String(import.meta.env.VITE_LIVEKIT_WS_URL || "").trim();
-    if (localData && !localData.wsUrl && fallbackWsUrl) {
-      localData.wsUrl = fallbackWsUrl;
-    }
-    if (localData?.token && localData?.wsUrl) {
-      return localData;
+    if (localRes?.ok) {
+      const localData = (await localRes.json().catch(() => null)) as LiveKitTokenResponse | null;
+      const fallbackWsUrl = String(import.meta.env.VITE_LIVEKIT_WS_URL || "").trim();
+      if (localData && !localData.wsUrl && fallbackWsUrl) {
+        localData.wsUrl = fallbackWsUrl;
+      }
+      if (localData?.token && localData?.wsUrl) {
+        return localData;
+      }
     }
   }
 
+  // All token sources exhausted — surface a clear message so the Vercel
+  // dashboard / Supabase edge-function config can be fixed without guessing.
   throw new Error(
     (error?.message && `Failed to get LiveKit token: ${error.message}`) ||
-      "LiveKit token response is invalid. Check /api/livekit-token, supabase function, or local token server."
+      "LiveKit is not configured. Set LIVEKIT_API_KEY, LIVEKIT_SECRET and LIVEKIT_URL in your Vercel environment variables, then redeploy."
   );
 }
