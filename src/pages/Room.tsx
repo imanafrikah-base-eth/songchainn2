@@ -483,7 +483,6 @@ export default function Room() {
   useEffect(() => {
     if (!user) return;
     if (playlist.length === 0) return;
-    if (isRoomMode) return;
 
     let isActive = true;
     const nowSeconds = Date.now() / 1000;
@@ -499,7 +498,7 @@ export default function Room() {
     return () => {
       isActive = false;
     };
-  }, [enterRoomMode, isRoomMode, playlist, user]);
+  }, [enterRoomMode, playlist, user]);
 
   useEffect(() => {
     if (!isRoomMode) return;
@@ -1476,8 +1475,7 @@ export default function Room() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={async () => {
-                  await exitRoomMode();
+                onClick={() => {
                   hideRoom();
                   navigate('/');
                 }}
@@ -1489,8 +1487,8 @@ export default function Room() {
               <button
                 type="button"
                 onClick={async () => {
-                  await exitRoomMode();
                   navigate('/');
+                  await exitRoomMode();
                 }}
                 className="inline-flex sm:hidden items-center gap-2 text-sm text-zinc-400 hover:text-red-400 transition-colors"
               >
@@ -1501,8 +1499,8 @@ export default function Room() {
             <button
               type="button"
               onClick={async () => {
-                await exitRoomMode();
                 navigate('/');
+                await exitRoomMode();
               }}
               className="hidden sm:inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-red-400 transition-colors"
             >
