@@ -362,6 +362,7 @@ export function useSocial() {
   // as dependencies — those functions change whenever `following` state changes,
   // which would tear down and recreate the channel and hit Supabase's rule that
   // `.on()` cannot be called after `.subscribe()`.
+  const feedTypeRef = useRef<'all' | 'following'>('all');
   const fetchPostsRef = useRef(fetchPosts);
   fetchPostsRef.current = fetchPosts;
   const fetchFollowDataRef = useRef(fetchFollowData);
@@ -375,13 +376,13 @@ export function useSocial() {
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => {
-        void fetchPostsRef.current();
+        void fetchPostsRef.current(feedTypeRef.current);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
-        void fetchPostsRef.current();
+        void fetchPostsRef.current(feedTypeRef.current);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => {
-        void fetchPostsRef.current();
+        void fetchPostsRef.current(feedTypeRef.current);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_follows' }, () => {
         void fetchFollowDataRef.current();
@@ -392,6 +393,11 @@ export function useSocial() {
       void supabase.removeChannel(channel);
     };
   }, [user]); // only recreate when the logged-in user changes
+
+  const fetchPostsTracked = useCallback((feedType: 'all' | 'following' = 'all') => {
+    feedTypeRef.current = feedType;
+    return fetchPosts(feedType);
+  }, [fetchPosts]);
 
   return {
     posts,
@@ -405,6 +411,6 @@ export function useSocial() {
     isFollowing,
     getPostComments,
     addComment,
-    refetchPosts: fetchPosts
+    refetchPosts: fetchPostsTracked
   };
 }

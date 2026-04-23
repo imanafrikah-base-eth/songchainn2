@@ -31,21 +31,27 @@ if (import.meta.env.DEV) {
 }
 
 if (typeof window !== "undefined" && import.meta.env.PROD) {
-  const AUTO_RELOAD_KEY = "__songchainn_auto_reload_at";
-  const AUTO_RELOAD_WINDOW_MS = 30_000;
+  const AUTO_RELOAD_COUNT_KEY = "__songchainn_reload_count";
+  const AUTO_RELOAD_TS_KEY = "__songchainn_reload_at";
+  const AUTO_RELOAD_WINDOW_MS = 60_000;
+  const MAX_AUTO_RELOADS = 2;
 
   const canAutoReload = () => {
     try {
-      const last = Number(sessionStorage.getItem(AUTO_RELOAD_KEY) || "0");
+      const count = Number(sessionStorage.getItem(AUTO_RELOAD_COUNT_KEY) || "0");
+      if (count >= MAX_AUTO_RELOADS) return false;
+      const last = Number(sessionStorage.getItem(AUTO_RELOAD_TS_KEY) || "0");
       return !last || Date.now() - last > AUTO_RELOAD_WINDOW_MS;
     } catch {
-      return true;
+      return false;
     }
   };
 
   const markAutoReload = () => {
     try {
-      sessionStorage.setItem(AUTO_RELOAD_KEY, String(Date.now()));
+      const count = Number(sessionStorage.getItem(AUTO_RELOAD_COUNT_KEY) || "0");
+      sessionStorage.setItem(AUTO_RELOAD_COUNT_KEY, String(count + 1));
+      sessionStorage.setItem(AUTO_RELOAD_TS_KEY, String(Date.now()));
     } catch {
       void 0;
     }

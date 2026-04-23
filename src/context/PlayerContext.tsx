@@ -66,6 +66,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const nextAudioRef = useRef<HTMLAudioElement | null>(null);
   const playNextRef = useRef<() => void>(() => {});
   const crossfadeTriggeredRef = useRef(false);
+  const isCrossfadingRef = useRef(false);
   const volumeRef = useRef(0.8);
   const queueRef = useRef<Song[]>(SONGS);
   const currentSongRef = useRef<Song | null>(null);
@@ -101,7 +102,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     return () => {
       current.pause();
+      current.src = '';
       next.pause();
+      next.src = '';
+      audioRef.current = null;
+      nextAudioRef.current = null;
     };
   }, []);
 
@@ -199,8 +204,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Crossfade transition function
   const crossfadeToSong = useCallback(async (song: Song) => {
-    if (!audioRef.current || !nextAudioRef.current || isCrossfading) return;
-    
+    if (!audioRef.current || !nextAudioRef.current || isCrossfadingRef.current) return;
+
+    isCrossfadingRef.current = true;
     setIsCrossfading(true);
     const currentAudio = audioRef.current;
     const nextAudio = nextAudioRef.current;
@@ -221,10 +227,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         currentAudio.volume = volumeRef.current;
         await currentAudio.play();
         setCurrentSong(song);
+        isCrossfadingRef.current = false;
         setIsCrossfading(false);
         setIsPlaying(true);
         setAudioVersion(v => v + 1);
       } catch {
+        isCrossfadingRef.current = false;
         setIsCrossfading(false);
         setIsPlaying(false);
       }
@@ -251,21 +259,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       
       if (step >= steps) {
         clearInterval(fadeInterval);
-        
-        // Swap audio elements
+
         currentAudio.pause();
         currentAudio.src = '';
-        
-        // Swap refs - the next audio becomes current
+
+        // Swap refs — next audio becomes current
         const temp = audioRef.current;
         audioRef.current = nextAudioRef.current;
         nextAudioRef.current = temp;
-        
+
+        isCrossfadingRef.current = false;
         setIsCrossfading(false);
         setAudioVersion(v => v + 1);
       }
     }, stepDuration);
-  }, [isCrossfading, crossfadeDuration]);
+  }, [crossfadeDuration]);
 
   const forceSetSong = useCallback(async (
     song: Song,
@@ -414,15 +422,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [audioVersion, recoverRoomPlayback]);
 
   const playSong = useCallback((song: Song, options?: { userAddress?: string; hasOwnership?: boolean; force?: boolean }) => {
-    if (isRoomMode && !options?.force) return;
+    if (isRoomModeRef.current && !options?.force) return;
     if (audioRef.current) {
-      if (isPlaying && currentSong) {
+      if (isPlayingRef.current && currentSongRef.current) {
         crossfadeToSong(song);
       } else {
         void forceSetSong(song, { shouldPlay: true });
       }
     }
-  }, [crossfadeToSong, currentSong, forceSetSong, isPlaying, isRoomMode]);
+  }, [crossfadeToSong, forceSetSong]);
 
   const togglePlay = useCallback(() => {
     if (audioRef.current) {
@@ -459,12 +467,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [currentSong]);
 
   const seekTo = useCallback((time: number) => {
-    if (isRoomMode) return;
+    if (isRoomModeRef.current) return;
     if (audioRef.current) {
       audioRef.current.currentTime = time;
       setCurrentTime(time);
     }
-  }, [isRoomMode]);
+  }, []);
 
   const setVolume = useCallback((newVolume: number) => {
     volumeRef.current = newVolume;
