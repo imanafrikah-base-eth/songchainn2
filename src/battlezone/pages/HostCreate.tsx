@@ -289,32 +289,31 @@ const HostCreate = () => {
 
   const upsertHostInRoom = async (battleId: string, displayName: string) => {
     if (!user) return;
-    const { error } = await supabase.from("battle_rooms").upsert(
-      {
-        battle_id: battleId,
-        user_id: user.id,
-        role: "host",
-        display_name: displayName,
-        is_muted: false,
-        is_speaking: true,
-      },
-      { onConflict: "battle_id,user_id" },
-    );
+    await supabase.from("battle_rooms").delete().eq("battle_id", battleId).eq("user_id", user.id);
+    const { error } = await supabase.from("battle_rooms").insert({
+      battle_id: battleId,
+      user_id: user.id,
+      role: "host",
+      display_name: displayName,
+      is_muted: false,
+      is_speaking: true,
+    });
     if (error) throw error;
   };
 
   const upsertCoHostsInRoom = async (battleId: string) => {
     if (!selectedCoHosts.length) return;
-    const rows = selectedCoHosts.map((coHost) => ({
-      battle_id: battleId,
-      user_id: coHost.user_id,
-      role: "co-host",
-      display_name: coHost.display_name || coHost.username || "Co-Host",
-      is_muted: true,
-      is_speaking: false,
-    }));
-    const { error } = await supabase.from("battle_rooms").upsert(rows, { onConflict: "battle_id,user_id" });
-    if (error) throw error;
+    for (const coHost of selectedCoHosts) {
+      await supabase.from("battle_rooms").delete().eq("battle_id", battleId).eq("user_id", coHost.user_id);
+      await supabase.from("battle_rooms").insert({
+        battle_id: battleId,
+        user_id: coHost.user_id,
+        role: "co-host",
+        display_name: coHost.display_name || coHost.username || "Co-Host",
+        is_muted: true,
+        is_speaking: false,
+      });
+    }
   };
 
   const broadcastBattleLaunch = async (battleId: string, title: string) => {
@@ -363,7 +362,7 @@ const HostCreate = () => {
       text: `You have been selected as a co-host for "${title}".\nCTA::Open Battle Room::${roomRoute}\nCTA::Open Host Controls::${hostRoute}\nCTA::BattleZone Home::/wavewarz-africa`,
       created_at: new Date().toISOString(),
     }));
-    await (supabase as any).from("direct_messages").insert(directMessages);
+    try { await (supabase as any).from("direct_messages").insert(directMessages); } catch { void 0; }
 
     const notificationsPayload = selectedCoHosts.map((coHost) => ({
       user_id: coHost.user_id,
@@ -516,8 +515,7 @@ const HostCreate = () => {
         navigate(embedTo("/battles/upcoming"));
       }
     } catch (err) {
-      const message =
-        err instanceof Error && err.message ? err.message : "Unexpected error. Please try again.";
+      const message = (err as any)?.message || "Unexpected error. Please try again.";
       toast({ title: "Failed to create battle", description: message });
     } finally {
       setIsSubmitting(false);
