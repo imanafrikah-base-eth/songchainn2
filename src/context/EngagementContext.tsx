@@ -178,13 +178,13 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     setTotalPlays(prev => prev + 1);
     setEngagementPoints(prev => prev + POINTS_PER_PLAY);
 
-    (async () => {
-      await supabase.from('song_analytics').insert({
-        event_type: 'play',
-        song_id: songId,
-        user_id: user?.id ?? null,
-      } as any);
-    })();
+    supabase.from('song_analytics').insert({
+      event_type: 'play',
+      song_id: songId,
+      user_id: user?.id ?? null,
+    } as any).then(({ error }) => {
+      if (error && import.meta.env.DEV) console.error('Failed to record play', error);
+    });
   }, [user]);
 
   const addOfflinePlay = useCallback((songId: string, durationSeconds: number) => {
@@ -314,9 +314,11 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     if (user) {
       try {
         if (isCurrentlyLiked) {
-          await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
+          const { error } = await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
+          if (error) throw error;
         } else {
-          await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
+          const { error: insertError } = await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
+          if (insertError) throw insertError;
 
           const { data: existingLikes, error: selectError } = await supabase
             .from('social_posts')
@@ -337,8 +339,20 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error) {
+        // Revert optimistic update
+        setLikedSongsState(prev => {
+          const reverted = new Set(prev);
+          if (isCurrentlyLiked) {
+            reverted.add(songId);
+            setEngagementPoints(p => p + POINTS_PER_LIKE);
+          } else {
+            reverted.delete(songId);
+            setEngagementPoints(p => Math.max(0, p - POINTS_PER_LIKE));
+          }
+          return reverted;
+        });
         if (import.meta.env.DEV) {
-          console.error('Failed to toggle like or create social post', error);
+          console.error('Failed to toggle like', error);
         }
       }
     }
