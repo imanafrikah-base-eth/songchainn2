@@ -11,8 +11,8 @@ import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { NotificationBanner } from "@/components/NotificationBanner";
-import { VibeAgent } from "@/components/VibeAgent";
-import { BehaviorCtaPopups } from "@/components/BehaviorCtaPopups";
+const VibeAgent = lazy(() => import("@/components/VibeAgent").then(m => ({ default: m.VibeAgent })));
+const BehaviorCtaPopups = lazy(() => import("@/components/BehaviorCtaPopups").then(m => ({ default: m.BehaviorCtaPopups })));
 import { useUserPresence } from "@/hooks/useUserPresence";
 import { supabase } from "@/integrations/supabase/client";
 // Lazy load pages for better initial load performance
@@ -173,8 +173,8 @@ function AppShell() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
-      {!hideFloatingChrome && <ErrorBoundary fallback={null}><VibeAgent /></ErrorBoundary>}
-      {!hideFloatingChrome && <ErrorBoundary fallback={null}><BehaviorCtaPopups /></ErrorBoundary>}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><VibeAgent /></Suspense></ErrorBoundary>}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><BehaviorCtaPopups /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
     </>
   );

@@ -157,14 +157,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = data.session?.user ?? null;
       if (u) {
         setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-        await refreshRoles(u.id);
       } else {
         setUser(null);
         setIsAdmin(false);
       }
       setIsArtist(false);
       setArtistId(null);
+      // Unblock render immediately — roles load in background
       setIsLoading(false);
+      if (u) void refreshRoles(u.id);
     };
 
     bootstrap();

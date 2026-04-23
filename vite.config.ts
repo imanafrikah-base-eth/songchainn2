@@ -19,6 +19,58 @@ export default defineConfig(() => ({
   },
   build: {
     sourcemap: false,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          // Core React — always needed, cached aggressively
+          if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) {
+            return 'vendor-react';
+          }
+          // Animation — needed on most pages
+          if (id.includes('framer-motion')) {
+            return 'vendor-motion';
+          }
+          // Supabase — needed on most pages
+          if (id.includes('@supabase')) {
+            return 'vendor-supabase';
+          }
+          // Server-state — small, needed at app root (QueryClientProvider in main.tsx)
+          if (id.includes('@tanstack')) {
+            return 'vendor-query';
+          }
+          // Wagmi core — needed at root (WagmiProvider in main.tsx)
+          if (
+            id.includes('wagmi') ||
+            id.includes('/viem/') ||
+            id.includes('@wagmi') ||
+            id.includes('web3modal') ||
+            id.includes('walletconnect') ||
+            id.includes('@walletconnect')
+          ) {
+            return 'vendor-web3';
+          }
+          // Coinbase OnchainKit — only used on Auth/Marketplace pages (lazy)
+          if (id.includes('@coinbase') || id.includes('onchainkit')) {
+            return 'vendor-coinbase';
+          }
+          // LiveKit — only used in Room page (lazy)
+          if (id.includes('livekit') || id.includes('@livekit')) {
+            return 'vendor-livekit';
+          }
+          // UI primitives — needed on most pages
+          if (id.includes('@radix-ui') || id.includes('lucide-react')) {
+            return 'vendor-ui';
+          }
+          // Date utils — small, lazy (only pages that format dates)
+          if (id.includes('date-fns')) {
+            return 'vendor-date';
+          }
+          return 'vendor-misc';
+        },
+      },
+    },
   },
   plugins: [
     {
