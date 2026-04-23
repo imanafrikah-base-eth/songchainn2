@@ -287,17 +287,16 @@ const HostCreate = () => {
     }));
   };
 
-  const upsertHostInRoom = async (battleId: string) => {
-    if (!user || !profile) return;
+  const upsertHostInRoom = async (battleId: string, displayName: string) => {
+    if (!user) return;
     const { error } = await supabase.from("battle_rooms").upsert(
       {
         battle_id: battleId,
         user_id: user.id,
         role: "host",
-        display_name: profile.display_name || profile.username || "Host",
+        display_name: displayName,
         is_muted: false,
         is_speaking: true,
-        requested_to_speak: false,
       },
       { onConflict: "battle_id,user_id" },
     );
@@ -313,7 +312,6 @@ const HostCreate = () => {
       display_name: coHost.display_name || coHost.username || "Co-Host",
       is_muted: true,
       is_speaking: false,
-      requested_to_speak: false,
     }));
     const { error } = await supabase.from("battle_rooms").upsert(rows, { onConflict: "battle_id,user_id" });
     if (error) throw error;
@@ -398,10 +396,10 @@ const HostCreate = () => {
         song_a: form.songA || "TBD",
         song_b: form.songB || "TBD",
         host_user_id: user.id,
-        host_name: profile.display_name || profile.username || "Host",
+        host_name: profile?.display_name || profile?.username || (user as any).user_metadata?.display_name || (user as any).user_metadata?.username || (user.email || "").split("@")[0] || "Host",
         co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
         scheduled_time: form.schedule || null,
-        status: "draft",
+        status: "upcoming",
         round: 1,
         total_rounds: 3,
       });
@@ -425,14 +423,13 @@ const HostCreate = () => {
       });
       return;
     }
-    if (!profile) {
-      toast({
-        title: "Finish your profile",
-        description:
-          "Complete your $ongChainn profile (onboarding) before hosting a battle.",
-      });
-      return;
-    }
+    const hostName =
+      profile?.display_name ||
+      profile?.username ||
+      (user as any).user_metadata?.display_name ||
+      (user as any).user_metadata?.username ||
+      (user.email || "").split("@")[0] ||
+      "Host";
 
     const missing: string[] = [];
     if (!form.title.trim()) missing.push("Battle title");
@@ -488,7 +485,7 @@ const HostCreate = () => {
           song_a: form.songA || "TBD",
           song_b: form.songB || "TBD",
           host_user_id: user.id,
-          host_name: profile.display_name || profile.username || "Host",
+          host_name: hostName,
           co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
           scheduled_time: scheduledTime,
           status,
@@ -509,7 +506,7 @@ const HostCreate = () => {
       await sendCoHostInvites(data.id, form.title);
 
       if (isLaunchNow) {
-        await upsertHostInRoom(data.id);
+        await upsertHostInRoom(data.id, hostName);
         await upsertCoHostsInRoom(data.id);
         await broadcastBattleLaunch(data.id, form.title);
         toast({ title: "Battle launched", description: "You are now live as host. Audience can join in real time." });

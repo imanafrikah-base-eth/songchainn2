@@ -276,7 +276,6 @@ const LiveRoom = () => {
         display_name: displayName,
         is_muted: true,
         is_speaking: false,
-        requested_to_speak: false,
       });
     };
 
