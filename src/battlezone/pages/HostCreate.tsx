@@ -179,7 +179,7 @@ const HostCreate = () => {
 
     // Set up real-time subscription for new users
     const subscription = supabase
-      .channel('audience_profiles_changes')
+      .channel(`audience_profiles_changes-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audience_profiles' },
@@ -208,7 +208,7 @@ const HostCreate = () => {
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      void supabase.removeChannel(subscription);
     };
   }, []);
 

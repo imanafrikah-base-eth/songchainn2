@@ -70,22 +70,25 @@ const NotificationsDropdown = () => {
     void fetchNotifications();
   }, [fetchNotifications]);
 
+  const fetchNotificationsRef = useRef(fetchNotifications);
+  fetchNotificationsRef.current = fetchNotifications;
+
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`battlezone-notifications-${user.id}`)
+      .channel(`battlezone-notifications-${user.id}-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
         () => {
-          void fetchNotifications();
+          void fetchNotificationsRef.current();
         },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [fetchNotifications, user?.id]);
+  }, [user?.id]);
 
   const markAllRead = useCallback(async () => {
     if (!user?.id) return;

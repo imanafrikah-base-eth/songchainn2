@@ -24,7 +24,7 @@ export default async function handler(req: any, res: any) {
     const livekitUrl = process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_WS_URL;
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-    const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.service_role;
 
     if (!apiKey || !apiSecret || !livekitUrl) {
       return sendJson(res, 500, { error: "Missing LIVEKIT_API_KEY / LIVEKIT_SECRET / LIVEKIT_URL" });
