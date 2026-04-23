@@ -136,7 +136,7 @@ export function Navigation() {
       await signOut();
       setMobileMenuOpen(false);
       toast.success('Signed out successfully');
-      navigate('/auth');
+      // No explicit navigate needed — auth state change re-renders to Auth page
     } catch (error) {
       toast.error('Failed to sign out');
     }

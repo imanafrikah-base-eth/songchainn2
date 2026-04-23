@@ -60,6 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const refreshRoles = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+    setIsAdmin(data?.role === 'admin');
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     if (!isSupabaseConfigured) {
@@ -147,10 +157,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = data.session?.user ?? null;
       if (u) {
         setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+        await refreshRoles(u.id);
       } else {
         setUser(null);
+        setIsAdmin(false);
       }
-      setIsAdmin(false);
       setIsArtist(false);
       setArtistId(null);
       setIsLoading(false);
@@ -158,10 +169,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     bootstrap();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const u = session?.user ?? null;
       setUser(u ? { id: u.id, email: u.email, user_metadata: u.user_metadata as any } : null);
-      setIsAdmin(false);
+      if (u) {
+        await refreshRoles(u.id);
+      } else {
+        setIsAdmin(false);
+      }
       setIsArtist(false);
       setArtistId(null);
       setWalletAddress(null);
@@ -201,7 +216,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       }
 
-      setIsAdmin(false);
       setIsArtist(false);
       setArtistId(null);
       setNeedsOnboarding(true);
@@ -217,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       return { error: new Error(err?.message || 'Wallet sign-in failed') };
     }
-  }, [refreshProfile]);
+  }, [refreshProfile, refreshRoles]);
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
     try {
@@ -229,7 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!u) return { error: new Error('Failed to create user') };
 
       setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-      setIsAdmin(false);
+      await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
       setNeedsOnboarding(true);
@@ -243,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       return { error: new Error(err?.message || 'Sign up failed') };
     }
-  }, [refreshProfile]);
+  }, [refreshProfile, refreshRoles]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     try {
@@ -255,7 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!u) return { error: new Error('Failed to sign in') };
 
       setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-      setIsAdmin(false);
+      await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
       await refreshProfile();
@@ -263,7 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       return { error: new Error(err?.message || 'Sign in failed') };
     }
-  }, [refreshProfile]);
+  }, [refreshProfile, refreshRoles]);
 
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured) {

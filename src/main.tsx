@@ -101,8 +101,6 @@ if (typeof window !== "undefined" && import.meta.env.PROD) {
 if (typeof window !== "undefined" && typeof window.fetch === "function") {
   const originalFetch = window.fetch.bind(window);
 
-  const neverAbortedSignal = () => new AbortController().signal;
-
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
       typeof input === "string"
@@ -113,70 +111,34 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
             ? input.href
             : String(input);
 
+    // Silence noisy WalletConnect telemetry pings
     if (url.includes("pulse.walletconnect.org/batch")) {
       return Promise.resolve(new Response(null, { status: 204 }));
     }
 
-    const isSupabaseRestOrFn =
-      url.includes(".supabase.co/rest/v1/") || url.includes(".supabase.co/functions/v1/");
-    const isSupabaseAuth = url.includes(".supabase.co/auth/v1/");
+    const isSupabase =
+      url.includes(".supabase.co/rest/v1/") ||
+      url.includes(".supabase.co/functions/v1/") ||
+      url.includes(".supabase.co/auth/v1/");
 
-    const isSupabaseRequest = isSupabaseRestOrFn || isSupabaseAuth;
-    const shouldIgnoreAbortSignal =
-      isSupabaseRequest &&
-      (typeof init?.signal !== "undefined" ||
-        (input instanceof Request && typeof input.signal !== "undefined"));
+    const runFetch = () => originalFetch(input, init);
 
-    const nextInput =
-      shouldIgnoreAbortSignal && input instanceof Request
-        ? new Request(input, { signal: neverAbortedSignal() })
-        : input;
-    const nextInit = shouldIgnoreAbortSignal && init?.signal ? { ...init, signal: neverAbortedSignal() } : init;
+    if (!isSupabase) return runFetch();
 
-    const runFetch = () => originalFetch(nextInput, nextInit);
-
+    // Single retry for transient network failures; real errors propagate to callers
     return runFetch().catch(async (error: any) => {
-      const isSupabase = isSupabaseRestOrFn || isSupabaseAuth;
-      const message = String(error?.message ?? error ?? "");
-      const normalized = message.toLowerCase();
-      const isAbortError =
-        error?.name === "AbortError" ||
-        normalized.includes("abort") ||
-        normalized.includes("aborted");
-      const isFetchFailed =
-        normalized.includes("failed to fetch") ||
-        normalized.includes("network changed") ||
-        normalized.includes("http2") ||
-        normalized.includes("timed out") ||
-        normalized.includes("timeout") ||
-        normalized.includes("name not resolved") ||
-        normalized.includes("dns");
+      const message = String(error?.message ?? error ?? "").toLowerCase();
+      const isTransient =
+        error?.name !== "AbortError" &&
+        (message.includes("failed to fetch") ||
+          message.includes("network changed") ||
+          message.includes("http2") ||
+          message.includes("timeout") ||
+          message.includes("name not resolved"));
 
-      const shouldRetrySupabase =
-        isSupabase &&
-        (isAbortError || isFetchFailed);
-
-      if (shouldRetrySupabase) {
-        try {
-          // Retry once to smooth over transient browser/network transport failures.
-          return await runFetch();
-        } catch {
-          // Fall through to suppressed response below.
-        }
+      if (isTransient) {
+        return runFetch();
       }
-
-      if (isSupabase && isAbortError) {
-        return new Response(null, { status: 499, statusText: "Client Abort Suppressed" });
-      }
-
-      if (isSupabase && isFetchFailed) {
-        return new Response(JSON.stringify({ error: "network_error", message }), {
-          status: 503,
-          statusText: "Supabase network error suppressed",
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
       throw error;
     });
   };

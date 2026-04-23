@@ -1,30 +1,20 @@
 import { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, Music, Users, Upload, Edit, Trash2, Plus, Save, LogOut } from 'lucide-react';
+import { Music, Users, Upload, Edit, Trash2, Plus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ARTISTS, SONGS, Artist, Song } from '@/data/musicData';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { useSongPopularity } from '@/hooks/usePopularity';
 const logo = '/songchainn-logo.webp';
 
-// Simulated admin authentication
-const ADMIN_PASSWORD = 'songchainn-admin-2024';
-
 export default function Admin() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isLoading } = useAuth();
   const { data: popularityData } = useSongPopularity();
-  const [isAdminMode, setIsAdminMode] = useState(false);
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<'artists' | 'songs'>('artists');
-  const [editingArtist, setEditingArtist] = useState<Artist | null>(null);
   const [artists, setArtists] = useState(ARTISTS);
-  
-  // Merge songs with real database stats
+
   const songsWithRealStats = useMemo(() => {
     return SONGS.map(song => {
       const dbData = popularityData?.find(p => p.song_id === song.id);
@@ -36,68 +26,10 @@ export default function Admin() {
     });
   }, [popularityData]);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      setIsAdminMode(true);
-      setLoginError('');
-    } else {
-      setLoginError('Access Restricted');
-    }
-  };
+  if (isLoading) return null;
 
-  const handleLogout = () => {
-    setIsAdminMode(false);
-    setPassword('');
-  };
-
-  // If not admin, show login gate
-  if (!isAdminMode && !isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-sm w-full"
-        >
-          <div className="text-center mb-8">
-            <img src={logo} alt="$ongChainn" className="w-16 h-16 mx-auto mb-4" />
-            <h1 className="font-heading text-2xl font-bold text-foreground mb-2">
-              Admin Access
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              This area is restricted to authorized administrators only.
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <Input
-                type="password"
-                placeholder="Admin Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-card border-border"
-              />
-            </div>
-            
-            {loginError && (
-              <p className="text-destructive text-sm text-center">{loginError}</p>
-            )}
-
-            <Button type="submit" className="w-full gradient-primary">
-              <Shield className="w-4 h-4 mr-2" />
-              Access Admin Panel
-            </Button>
-          </form>
-
-          <p className="mt-6 text-xs text-center text-muted-foreground">
-            If you're seeing this page by mistake,{' '}
-            <a href="/" className="text-primary hover:underline">return to home</a>.
-          </p>
-        </motion.div>
-      </div>
-    );
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -112,10 +44,9 @@ export default function Admin() {
               <span className="text-xs text-destructive ml-2 font-medium">Admin</span>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
+          <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            &larr; Back to app
+          </a>
         </div>
       </header>
 

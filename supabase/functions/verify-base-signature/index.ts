@@ -1,26 +1,54 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ethers } from "https://esm.sh/ethers@6.13.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const EIP1271_MAGIC_VALUE = "0x1626ba7e";
+
+async function verifySignature(address: string, message: string, signature: string): Promise<boolean> {
+  // Try ECDSA recovery first (EOA wallets)
+  try {
+    const recovered = ethers.verifyMessage(message, signature);
+    if (recovered.toLowerCase() === address.toLowerCase()) {
+      return true;
+    }
+  } catch {
+    // Not a valid ECDSA signature — may be a smart contract wallet
+  }
+
+  // EIP-1271 fallback for smart contract wallets (Base Smart Wallet, Coinbase Wallet, etc.)
+  const baseRpcUrl = Deno.env.get("BASE_RPC_URL") ?? "https://mainnet.base.org";
+  try {
+    const provider = new ethers.JsonRpcProvider(baseRpcUrl);
+    const msgHash = ethers.hashMessage(message);
+    const contract = new ethers.Contract(
+      address,
+      ["function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4)"],
+      provider
+    );
+    const result: string = await contract.isValidSignature(msgHash, signature);
+    return result.toLowerCase() === EIP1271_MAGIC_VALUE;
+  } catch {
+    return false;
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, address, message, signature, nonce } = await req.json();
+    const { action, address, message, signature } = await req.json();
 
-    // Create Supabase client with service role for database access
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Generate nonce endpoint
     if (action === "generate-nonce") {
       const newNonce = crypto.randomUUID().replace(/-/g, "");
       return new Response(
@@ -29,7 +57,6 @@ serve(async (req) => {
       );
     }
 
-    // Verify signature endpoint
     if (action === "verify") {
       if (!address || !message || !signature) {
         return new Response(
@@ -38,7 +65,16 @@ serve(async (req) => {
         );
       }
 
-      // Extract nonce from SIWE message
+      // Validate address format
+      const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+      if (!addressRegex.test(address)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid wallet address format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Extract and validate nonce from SIWE message
       const nonceMatch = message.match(/Nonce: ([a-f0-9]+)/i);
       const messageNonce = nonceMatch?.[1];
 
@@ -49,74 +85,51 @@ serve(async (req) => {
         );
       }
 
-      // Clean up expired nonces (older than 10 minutes)
+      // Clean up expired nonces
       await supabase
-        .from('used_nonces')
+        .from("used_nonces")
         .delete()
-        .lt('expires_at', new Date().toISOString());
+        .lt("expires_at", new Date().toISOString());
 
-      // Try to insert nonce - if it already exists, INSERT will fail (replay attack)
+      // Replay-attack protection: nonce must be single-use
       const { error: nonceError } = await supabase
-        .from('used_nonces')
-        .insert({ 
+        .from("used_nonces")
+        .insert({
           nonce: messageNonce,
           used_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 min expiry
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
         });
 
+      if (nonceError?.code === "23505") {
+        return new Response(
+          JSON.stringify({ error: "Nonce already used" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       if (nonceError) {
-        console.log("Nonce check failed:", nonceError.message);
-        // If insert failed due to duplicate, nonce was already used
-        if (nonceError.code === '23505') { // PostgreSQL unique violation
-          return new Response(
-            JSON.stringify({ error: "Nonce already used" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        // For other errors, log but continue (don't block auth entirely)
         console.error("Nonce storage error:", nonceError);
       }
 
-      // For Base Smart Wallets, we need to verify using ERC-6492/EIP-1271
-      // The signature verification happens on-chain for smart contract wallets
-      // For now, we verify the address format and message structure
-      
-      // Validate address format (case-insensitive for checksummed addresses)
-      const addressRegex = /^0x[a-fA-F0-9]{40}$/;
-      if (!addressRegex.test(address)) {
+      // Cryptographically verify the signature — EOA (ECDSA) or smart contract (EIP-1271)
+      const signatureValid = await verifySignature(address, message, signature);
+      if (!signatureValid) {
         return new Response(
-          JSON.stringify({ error: "Invalid wallet address format" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Signature verification failed" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Validate SIWE message - check for standard SIWE patterns or the address in the message
-      // Base wallet may return different formats depending on the connection method
-      const hasSIWEFormat = message.includes("wants you to sign in with your Ethereum account") ||
-                            message.includes("Sign in to $ongChainn") ||
-                            message.toLowerCase().includes(address.toLowerCase());
-      
-      if (!hasSIWEFormat) {
-        console.log("Message validation failed. Message:", message.substring(0, 200));
-        return new Response(
-          JSON.stringify({ error: "Invalid message format" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Create deterministic email from wallet address for Supabase auth
+      // Derive a stable identity for this wallet address
       const walletEmail = `${address.slice(2, 14).toLowerCase()}@base.wallet`;
       const walletPassword = `base_${address.slice(-16).toLowerCase()}`;
 
-      // Try to sign in existing user
       let authResult = await supabase.auth.signInWithPassword({
         email: walletEmail,
         password: walletPassword,
       });
 
-      // If user doesn't exist, create new account
       if (authResult.error?.message?.includes("Invalid login credentials")) {
-        const { data, error } = await supabase.auth.admin.createUser({
+        const { error: createError } = await supabase.auth.admin.createUser({
           email: walletEmail,
           password: walletPassword,
           email_confirm: true,
@@ -127,15 +140,14 @@ serve(async (req) => {
           },
         });
 
-        if (error) {
-          console.error("User creation error:", error);
+        if (createError) {
+          console.error("User creation error:", createError);
           return new Response(
             JSON.stringify({ error: "Failed to create user account" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        // Sign in the newly created user
         authResult = await supabase.auth.signInWithPassword({
           email: walletEmail,
           password: walletPassword,
