@@ -66,6 +66,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const lastPlayRef = useRef<{ songId: string; at: number } | null>(null);
   const lastPulseAtRef = useRef<number>(0);
   const offlinePlaysRef = useRef<OfflinePlay[]>([]);
+  const playChannelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
     const raw = localStorage.getItem('songchainn_last_play');
@@ -78,6 +79,21 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     } catch {
       void 0;
     }
+  }, []);
+
+  // Cross-tab play deduplication via BroadcastChannel
+  useEffect(() => {
+    if (!('BroadcastChannel' in window)) return;
+    const channel = new BroadcastChannel('songchainn:plays');
+    playChannelRef.current = channel;
+    channel.onmessage = (event: MessageEvent<{ songId: string; at: number }>) => {
+      const { songId, at } = event.data;
+      if (songId && at) lastPlayRef.current = { songId, at };
+    };
+    return () => {
+      channel.close();
+      playChannelRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -173,6 +189,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     if (last && last.songId === songId && now - last.at < PLAY_DEDUPE_WINDOW_MS) return;
     lastPlayRef.current = { songId, at: now };
     localStorage.setItem('songchainn_last_play', JSON.stringify({ songId, at: now }));
+    playChannelRef.current?.postMessage({ songId, at: now });
 
     setTodayPlays(prev => prev + 1);
     setTotalPlays(prev => prev + 1);
