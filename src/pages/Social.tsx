@@ -431,12 +431,12 @@ export default function Social() {
               </motion.div>
             </div>
           ) : (
-            <div className="max-w-lg mx-auto px-2">
+            <>
               {postsToRender.map((post, index) => (
                 <div
                   key={post.id}
-                  className="snap-start snap-always h-[calc(100dvh-12rem)]"
-                  style={{ scrollSnapAlign: 'start' }}
+                  className="snap-start snap-always w-full max-w-lg mx-auto px-2"
+                  style={{ scrollSnapAlign: 'start', height: '100%' }}
                 >
                   <MusicFeedCard
                     post={post}
@@ -448,7 +448,7 @@ export default function Social() {
                   />
                 </div>
               ))}
-            </div>
+            </>
           )}
         </div>
 
@@ -483,10 +483,10 @@ export default function Social() {
                 <div className="flex items-center justify-center mb-4">
                   <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
                 </div>
-                <PostComposer 
+                <PostComposer
                   onPost={async (content, type, songId) => {
-                    await createPost(content, type, songId);
-                    closeComposer();
+                    const ok = await createPost(content, type, songId);
+                    if (ok !== false) closeComposer();
                   }}
                   initialType={shareSongId ? 'song_share' : 'text'}
                   initialSongId={shareSongId ?? undefined}

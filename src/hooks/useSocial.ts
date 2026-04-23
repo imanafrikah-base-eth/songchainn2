@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
 import { AudienceProfile } from '@/types/database';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 export function useSocial() {
@@ -140,7 +140,16 @@ export function useSocial() {
       postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
       songId?: string,
       playlistId?: string
-    ) => {
+    ): Promise<boolean> => {
+      if (!isSupabaseConfigured) {
+        toast({
+          title: 'Posting unavailable',
+          description: 'Connect a Supabase project to enable the social feed.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
       let payloadForLog:
         | {
             user_id: string;
@@ -155,19 +164,20 @@ export function useSocial() {
         const { data: authData, error: authErr } = await supabase.auth.getUser();
         if (authErr) throw authErr;
 
-        const user = authData?.user;
-        if (!user) throw new Error('Not authenticated');
+        const sessionUser = authData?.user;
+        if (!sessionUser) throw new Error('Not authenticated');
 
         const cleanContent = (content ?? '').trim();
         const cleanSongId = (songId ?? '').trim();
         const cleanPlaylistId = (playlistId ?? '').trim();
 
         if (!cleanContent && !cleanSongId && !cleanPlaylistId) {
-          throw new Error('Post cannot be empty');
+          toast({ title: 'Post cannot be empty', variant: 'destructive' });
+          return false;
         }
 
         const payload: Database['public']['Tables']['social_posts']['Insert'] = {
-          user_id: user.id,
+          user_id: sessionUser.id,
           post_type: postType,
         };
 
@@ -191,21 +201,16 @@ export function useSocial() {
 
         toast({ title: 'Post shared!' });
         await fetchPosts();
+        return true;
       } catch (error: any) {
         const msg = String(error?.message || '');
-        if (msg === 'Post cannot be empty') {
-          toast({
-            title: 'Post cannot be empty',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        console.error('social_posts insert failed', { error, payload: payloadForLog });
+        console.error('social_posts insert failed', { error: msg, payload: payloadForLog });
         toast({
-          title: 'Could not post — check console',
+          title: 'Could not share post',
+          description: msg || 'Please check your connection and try again.',
           variant: 'destructive',
         });
+        return false;
       }
     },
     [toast, fetchPosts]

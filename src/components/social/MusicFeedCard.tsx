@@ -164,7 +164,7 @@ export function MusicFeedCard({
 
   return (
     <motion.div 
-      className={`relative w-full h-[calc(100vh-190px)] min-h-[420px] sm:min-h-[500px] max-h-[800px] bg-card rounded-2xl sm:rounded-3xl overflow-hidden ${
+      className={`relative w-full h-full min-h-[420px] sm:min-h-[500px] bg-card rounded-2xl sm:rounded-3xl overflow-hidden ${
         isVisible ? 'ring-2 ring-primary/60 shadow-2xl shadow-primary/30' : ''
       }`}
       initial={{ opacity: 0, scale: 0.95 }}
