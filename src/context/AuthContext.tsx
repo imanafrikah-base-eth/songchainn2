@@ -243,7 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       return { error: new Error(err?.message || 'Sign up failed') };
     }
-  }, [refreshProfile, setNeedsOnboarding]);
+  }, [refreshProfile]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     try {

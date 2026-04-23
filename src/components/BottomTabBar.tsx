@@ -65,7 +65,7 @@ export function BottomTabBar() {
                     {item.path === '/room' && roomOnlineCount > 0 && (
                       <>
                         <span className="absolute -top-2 -right-3 inline-flex items-center justify-center h-5 px-1.5 rounded-full bg-red-500/15 text-red-400 text-[10px] font-semibold">
-                          {`${roomOnlineCount}live`}
+                          {`${roomOnlineCount} live`}
                         </span>
                       </>
                     )}

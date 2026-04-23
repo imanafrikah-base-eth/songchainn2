@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Mic, MicOff, Hand, Users, Volume2, VolumeX } from 'lucide-react';
-import { useBattleRoles, BattleRole } from '@/battlezone/hooks/useBattleRoles';
+import { useBattleRoles } from '@/battlezone/hooks/useBattleRoles';
 import { useToast } from '@/battlezone/hooks/use-toast';
+import { useAuth } from '@/battlezone/contexts/AuthContext';
 import { Room } from 'livekit-client';
 
 interface MicControlsProps {
@@ -16,10 +17,9 @@ export const MicControls: React.FC<MicControlsProps> = ({
   onAudioPermissionChange,
 }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const {
     myRole,
-    permissions,
-    updateParticipantRole,
     requestToSpeak,
     removeSpeaker,
     toggleParticipantMute,
@@ -87,7 +87,7 @@ export const MicControls: React.FC<MicControlsProps> = ({
       }
 
       // Update database
-      await toggleParticipantMute(liveKitRoom?.localParticipant.identity || '', newMutedState);
+      await toggleParticipantMute(user?.id || '', newMutedState);
       
       setIsMuted(newMutedState);
       setIsSpeaking(!newMutedState);
@@ -123,7 +123,7 @@ export const MicControls: React.FC<MicControlsProps> = ({
 
   // Leave speaker stage
   const handleLeaveStage = async () => {
-    const success = await removeSpeaker(liveKitRoom?.localParticipant.identity || '');
+    const success = await removeSpeaker(user?.id || '');
     
     if (success) {
       setIsMuted(true);

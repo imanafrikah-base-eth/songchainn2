@@ -394,7 +394,7 @@ export default function Home() {
                   <Headphones className="w-3.5 h-3.5" />
                   <span>Jump into Room</span>
                   <span className="inline-flex items-center rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
-                    {`${roomOnlineCount}live`}
+                    {`${roomOnlineCount} live`}
                   </span>
                   <ArrowRight className="w-3 h-3" />
                 </Button>

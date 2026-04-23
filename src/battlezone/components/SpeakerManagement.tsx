@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Hand, Mic, MicOff, Crown, Shield, UserCheck, UserX, Volume2, VolumeX } from 'lucide-react';
-import { useBattleRoles, BattleRole } from '@/battlezone/hooks/useBattleRoles';
+import { useBattleRoles } from '@/battlezone/hooks/useBattleRoles';
 import { useToast } from '@/battlezone/hooks/use-toast';
 
 interface SpeakerManagementProps {
@@ -16,7 +16,6 @@ export const SpeakerManagement: React.FC<SpeakerManagementProps> = ({
   const {
     participants,
     myRole,
-    permissions,
     approveSpeakerRequest,
     removeSpeaker,
     toggleParticipantMute,

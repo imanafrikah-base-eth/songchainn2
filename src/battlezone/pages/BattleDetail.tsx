@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Users, Share2, Play, Trophy } from "lucide-react";
 import Navbar from "@/battlezone/components/Navbar";
 import Footer from "@/battlezone/components/Footer";
@@ -10,9 +10,31 @@ import AppLink from "@/battlezone/components/AppLink";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
 
 const BattleDetail = () => {
-  const { isEmbedded } = useEmbedMode();
+  const { isEmbedded, embedTo } = useEmbedMode();
   const { battleId } = useParams();
+  const navigate = useNavigate();
   const { data: battle, isLoading } = useBattle(battleId);
+
+  const handleVote = () => {
+    if (!battle) return;
+    if (battle.status === "live") {
+      navigate(embedTo(`/entry/${battle.id}`));
+    }
+  };
+
+  const handleShare = async () => {
+    if (!battle) return;
+    const url = `${window.location.origin}/wavewarz-africa/battle/${battle.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: battle.title, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      void 0;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -129,10 +151,20 @@ const BattleDetail = () => {
               <Play className="h-4 w-4" /> Enter Room
             </AppLink>
           )}
-          <button className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-bold text-foreground hover:bg-muted transition-colors">
-            <Trophy className="h-4 w-4" /> Vote Now
-          </button>
-          <button className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-medium text-muted-foreground hover:bg-muted transition-colors">
+          {battle.status === "live" && (
+            <button
+              type="button"
+              onClick={handleVote}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-bold text-foreground hover:bg-muted transition-colors"
+            >
+              <Trophy className="h-4 w-4" /> Vote Now
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleShare()}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-medium text-muted-foreground hover:bg-muted transition-colors"
+          >
             <Share2 className="h-4 w-4" /> Share
           </button>
         </div>

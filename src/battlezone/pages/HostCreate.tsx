@@ -35,15 +35,6 @@ const HostCreate = () => {
   const navigate = useNavigate();
   const { user, profile, loading } = useAuth();
 
-  // Debug authentication state
-  useEffect(() => {
-    console.log("=== HostCreate Auth Debug ===");
-    console.log("User:", user);
-    console.log("Profile:", profile);
-    console.log("Loading:", loading);
-    console.log("==========================");
-  }, [user, profile, loading]);
-  
   const [form, setForm] = useState({
     title: "",
     region: "Zambia",
@@ -105,10 +96,7 @@ const HostCreate = () => {
         .order("created_at", { ascending: false })
         .limit(500);
       
-      console.log("Users data fetch:", { data, error });
-      
       if (!data || error) {
-        console.log("No data or error:", error);
         // Create mock users for testing if no real users
         const mockUsers: SongchainUser[] = [
           {
@@ -133,7 +121,6 @@ const HostCreate = () => {
             avatar_url: null,
           }
         ];
-        console.log("Using mock users:", mockUsers);
         setUsers(mockUsers);
         return;
       }
@@ -156,9 +143,6 @@ const HostCreate = () => {
       (data as any[]).forEach((row) => {
         const userId = String(row?.user_id || "").trim();
         if (!userId) return;
-        
-        console.log("Processing user:", { userId, username: row?.username, displayName: row?.display_name });
-        
         if (!uniqueByUserId.has(userId)) {
           uniqueByUserId.set(userId, {
             id: String(row?.id || userId),
@@ -170,9 +154,7 @@ const HostCreate = () => {
         }
       });
 
-      const finalUsers = Array.from(uniqueByUserId.values());
-      console.log("Final users list:", finalUsers);
-      setUsers(finalUsers);
+      setUsers(Array.from(uniqueByUserId.values()));
     };
 
     fetchUsers();
@@ -462,7 +444,6 @@ const HostCreate = () => {
       return;
     }
 
-    console.log("Starting battle creation...");
     setIsSubmitting(true);
     try {
       const status = isLaunchNow ? "live" : "upcoming";

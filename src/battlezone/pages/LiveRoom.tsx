@@ -11,7 +11,6 @@ import { useBattleRoles, type BattleParticipant } from "@/battlezone/hooks/useBa
 import { supabase } from "@/battlezone/integrations/supabase/client";
 import type { Tables } from "@/battlezone/integrations/supabase/types";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
-import { fetchSongchainUserIdSet } from "@/battlezone/lib/songchain";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import { useToast } from "@/battlezone/hooks/use-toast";
@@ -644,7 +643,7 @@ const LiveRoom = () => {
             <MicControls 
               battleId={roomId || ''} 
               liveKitRoom={liveKitRoomRef.current}
-              onAudioPermissionChange={(granted) => console.log('Audio permission:', granted)}
+              onAudioPermissionChange={(granted) => setMicPermission(granted ? 'granted' : 'denied')}
             />
           </div>
 
