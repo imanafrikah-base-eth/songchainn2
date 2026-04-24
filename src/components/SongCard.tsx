@@ -181,7 +181,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
         >
           <div className="relative w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl bg-secondary flex items-center justify-center flex-shrink-0 overflow-hidden shadow-soft shine-overlay">
             {isCurrentSong ? (
-              <SpinningSongArt isPlaying={isPlaying} size="lg" />
+              <SpinningSongArt isPlaying={isPlaying} size="lg" coverImage={song.coverImage} />
             ) : (
               <>
                 {song.coverImage && !coverImageFailed ? (
@@ -349,7 +349,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           <div className="relative aspect-[4/3] overflow-hidden">
             {isCurrentSong ? (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-cyan-400/10">
-                <SpinningSongArt isPlaying={isPlaying} size="xl" />
+                <SpinningSongArt isPlaying={isPlaying} size="xl" coverImage={song.coverImage} />
               </div>
             ) : (
               <AIArtwork
@@ -452,7 +452,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     >
       <div className="aspect-square bg-secondary relative overflow-hidden">
         {isCurrentSong ? (
-          <SpinningSongArt isPlaying={isPlaying} size="xl" className="rounded-none" />
+          <SpinningSongArt isPlaying={isPlaying} size="xl" className="rounded-none" coverImage={song.coverImage} />
         ) : (
           <>
             {song.coverImage && !coverImageFailed ? (

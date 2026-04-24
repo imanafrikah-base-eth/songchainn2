@@ -103,15 +103,18 @@ export function useNotifications() {
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!user) return;
 
-    await supabase
+    const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
-      .eq('id', notificationId);
+      .eq('id', notificationId)
+      .eq('user_id', user.id);
 
-    setNotifications(prev =>
-      prev.map(n => (n.id === notificationId ? { ...n, is_read: true } : n))
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    if (!error) {
+      setNotifications(prev =>
+        prev.map(n => (n.id === notificationId ? { ...n, is_read: true } : n))
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
   }, [user]);
 
   const markAllAsRead = useCallback(async () => {
@@ -133,9 +136,9 @@ export function useNotifications() {
     postId?: string,
     message?: string
   ) => {
-    if (!user || toUserId === user.id) return; // Don't notify yourself
+    if (!user || toUserId === user.id) return;
 
-    await supabase
+    const { error } = await supabase
       .from('notifications')
       .insert({
         user_id: toUserId,
@@ -144,6 +147,10 @@ export function useNotifications() {
         post_id: postId || null,
         message: message || null,
       });
+
+    if (error && import.meta.env.DEV) {
+      console.error('Failed to create notification', error);
+    }
   }, [user]);
 
   const deleteNotification = useCallback(async (notificationId: string) => {

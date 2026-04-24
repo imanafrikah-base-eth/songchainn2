@@ -132,14 +132,19 @@ export function useAudienceInteractions() {
     const isLiked = likedSongs.includes(songId);
     const next = isLiked ? likedSongs.filter((id) => id !== songId) : [...likedSongs, songId];
 
-    if (isLiked) {
-      await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
-    } else {
-      await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
+    try {
+      if (isLiked) {
+        const { error } = await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
+        if (error) throw error;
+      }
+      setLikedSongs(next);
+      toast({ title: isLiked ? 'Song removed from likes' : 'Song liked!' });
+    } catch {
+      toast({ title: 'Could not update likes', variant: 'destructive' });
     }
-
-    setLikedSongs(next);
-    toast({ title: isLiked ? 'Song removed from likes' : 'Song liked!' });
   }, [user, likedSongs, toast]);
 
   // Like/Unlike Artist
@@ -149,14 +154,19 @@ export function useAudienceInteractions() {
     const isLiked = likedArtists.includes(artistId);
     const next = isLiked ? likedArtists.filter((id) => id !== artistId) : [...likedArtists, artistId];
 
-    if (isLiked) {
-      await supabase.from('liked_artists').delete().eq('user_id', user.id).eq('artist_id', artistId);
-    } else {
-      await supabase.from('liked_artists').insert({ user_id: user.id, artist_id: artistId } as any);
+    try {
+      if (isLiked) {
+        const { error } = await supabase.from('liked_artists').delete().eq('user_id', user.id).eq('artist_id', artistId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('liked_artists').insert({ user_id: user.id, artist_id: artistId } as any);
+        if (error) throw error;
+      }
+      setLikedArtists(next);
+      toast({ title: isLiked ? 'Artist unfollowed' : 'Artist followed!' });
+    } catch {
+      toast({ title: 'Could not update artist follow', variant: 'destructive' });
     }
-
-    setLikedArtists(next);
-    toast({ title: isLiked ? 'Artist unfollowed' : 'Artist followed!' });
   }, [user, likedArtists, toast]);
 
   const toggleSaveCatalog = useCallback(async (catalogId: string) => {
@@ -362,9 +372,13 @@ export function useAudienceInteractions() {
     }
 
     const position = songIds.length;
-    await supabase
+    const { error } = await supabase
       .from('playlist_songs')
       .insert({ playlist_id: playlistId, song_id: songId, position } as any);
+    if (error) {
+      toast({ title: 'Could not add song to playlist', variant: 'destructive' });
+      return;
+    }
     toast({ title: 'Song added to playlist!' });
   }, [user, toast]);
 

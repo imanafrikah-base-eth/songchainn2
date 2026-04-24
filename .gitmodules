@@ -1,0 +1,3 @@
+[submodule "BattleZone/africa-battle-live-ui"]
+	path = BattleZone/africa-battle-live-ui
+	url = https://github.com/songchaindao-dot/africa-battle-live-ui

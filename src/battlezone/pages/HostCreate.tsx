@@ -35,15 +35,6 @@ const HostCreate = () => {
   const navigate = useNavigate();
   const { user, profile, loading } = useAuth();
 
-  // Debug authentication state
-  useEffect(() => {
-    console.log("=== HostCreate Auth Debug ===");
-    console.log("User:", user);
-    console.log("Profile:", profile);
-    console.log("Loading:", loading);
-    console.log("==========================");
-  }, [user, profile, loading]);
-  
   const [form, setForm] = useState({
     title: "",
     region: "Zambia",
@@ -105,10 +96,7 @@ const HostCreate = () => {
         .order("created_at", { ascending: false })
         .limit(500);
       
-      console.log("Users data fetch:", { data, error });
-      
       if (!data || error) {
-        console.log("No data or error:", error);
         // Create mock users for testing if no real users
         const mockUsers: SongchainUser[] = [
           {
@@ -133,7 +121,6 @@ const HostCreate = () => {
             avatar_url: null,
           }
         ];
-        console.log("Using mock users:", mockUsers);
         setUsers(mockUsers);
         return;
       }
@@ -156,9 +143,6 @@ const HostCreate = () => {
       (data as any[]).forEach((row) => {
         const userId = String(row?.user_id || "").trim();
         if (!userId) return;
-        
-        console.log("Processing user:", { userId, username: row?.username, displayName: row?.display_name });
-        
         if (!uniqueByUserId.has(userId)) {
           uniqueByUserId.set(userId, {
             id: String(row?.id || userId),
@@ -170,16 +154,14 @@ const HostCreate = () => {
         }
       });
 
-      const finalUsers = Array.from(uniqueByUserId.values());
-      console.log("Final users list:", finalUsers);
-      setUsers(finalUsers);
+      setUsers(Array.from(uniqueByUserId.values()));
     };
 
     fetchUsers();
 
     // Set up real-time subscription for new users
     const subscription = supabase
-      .channel('audience_profiles_changes')
+      .channel(`audience_profiles_changes-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audience_profiles' },
@@ -208,7 +190,7 @@ const HostCreate = () => {
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      void supabase.removeChannel(subscription);
     };
   }, []);
 
@@ -287,36 +269,33 @@ const HostCreate = () => {
     }));
   };
 
-  const upsertHostInRoom = async (battleId: string) => {
-    if (!user || !profile) return;
-    const { error } = await supabase.from("battle_rooms").upsert(
-      {
-        battle_id: battleId,
-        user_id: user.id,
-        role: "host",
-        display_name: profile.display_name || profile.username || "Host",
-        is_muted: false,
-        is_speaking: true,
-        requested_to_speak: false,
-      },
-      { onConflict: "battle_id,user_id" },
-    );
+  const upsertHostInRoom = async (battleId: string, displayName: string) => {
+    if (!user) return;
+    await supabase.from("battle_rooms").delete().eq("battle_id", battleId).eq("user_id", user.id);
+    const { error } = await supabase.from("battle_rooms").insert({
+      battle_id: battleId,
+      user_id: user.id,
+      role: "host",
+      display_name: displayName,
+      is_muted: false,
+      is_speaking: true,
+    });
     if (error) throw error;
   };
 
   const upsertCoHostsInRoom = async (battleId: string) => {
     if (!selectedCoHosts.length) return;
-    const rows = selectedCoHosts.map((coHost) => ({
-      battle_id: battleId,
-      user_id: coHost.user_id,
-      role: "co-host",
-      display_name: coHost.display_name || coHost.username || "Co-Host",
-      is_muted: true,
-      is_speaking: false,
-      requested_to_speak: false,
-    }));
-    const { error } = await supabase.from("battle_rooms").upsert(rows, { onConflict: "battle_id,user_id" });
-    if (error) throw error;
+    for (const coHost of selectedCoHosts) {
+      await supabase.from("battle_rooms").delete().eq("battle_id", battleId).eq("user_id", coHost.user_id);
+      await supabase.from("battle_rooms").insert({
+        battle_id: battleId,
+        user_id: coHost.user_id,
+        role: "co-host",
+        display_name: coHost.display_name || coHost.username || "Co-Host",
+        is_muted: true,
+        is_speaking: false,
+      });
+    }
   };
 
   const broadcastBattleLaunch = async (battleId: string, title: string) => {
@@ -365,7 +344,7 @@ const HostCreate = () => {
       text: `You have been selected as a co-host for "${title}".\nCTA::Open Battle Room::${roomRoute}\nCTA::Open Host Controls::${hostRoute}\nCTA::BattleZone Home::/wavewarz-africa`,
       created_at: new Date().toISOString(),
     }));
-    await (supabase as any).from("direct_messages").insert(directMessages);
+    try { await (supabase as any).from("direct_messages").insert(directMessages); } catch { void 0; }
 
     const notificationsPayload = selectedCoHosts.map((coHost) => ({
       user_id: coHost.user_id,
@@ -398,18 +377,20 @@ const HostCreate = () => {
         song_a: form.songA || "TBD",
         song_b: form.songB || "TBD",
         host_user_id: user.id,
-        host_name: profile.display_name || profile.username || "Host",
+        host_name: profile?.display_name || profile?.username || (user as any).user_metadata?.display_name || (user as any).user_metadata?.username || (user.email || "").split("@")[0] || "Host",
         co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
         scheduled_time: form.schedule || null,
-        status: "draft",
+        status: "upcoming",
         round: 1,
         total_rounds: 3,
       });
       if (error) throw error;
       toast({ title: "Draft saved", description: "Battle draft saved. Find it in Upcoming to launch later." });
       navigate(embedTo("/battles/upcoming"));
-    } catch {
-      toast({ title: "Failed to save draft", description: "Please try again." });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? "Unknown error");
+      console.error("[HostCreate] saveDraft failed:", msg);
+      toast({ title: "Failed to save draft", description: msg || "Please try again." });
     } finally {
       setIsSubmitting(false);
     }
@@ -423,14 +404,13 @@ const HostCreate = () => {
       });
       return;
     }
-    if (!profile) {
-      toast({
-        title: "Finish your profile",
-        description:
-          "Complete your $ongChainn profile (onboarding) before hosting a battle.",
-      });
-      return;
-    }
+    const hostName =
+      profile?.display_name ||
+      profile?.username ||
+      (user as any).user_metadata?.display_name ||
+      (user as any).user_metadata?.username ||
+      (user.email || "").split("@")[0] ||
+      "Host";
 
     const missing: string[] = [];
     if (!form.title.trim()) missing.push("Battle title");
@@ -464,7 +444,6 @@ const HostCreate = () => {
       return;
     }
 
-    console.log("Starting battle creation...");
     setIsSubmitting(true);
     try {
       const status = isLaunchNow ? "live" : "upcoming";
@@ -486,7 +465,7 @@ const HostCreate = () => {
           song_a: form.songA || "TBD",
           song_b: form.songB || "TBD",
           host_user_id: user.id,
-          host_name: profile.display_name || profile.username || "Host",
+          host_name: hostName,
           co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
           scheduled_time: scheduledTime,
           status,
@@ -507,7 +486,7 @@ const HostCreate = () => {
       await sendCoHostInvites(data.id, form.title);
 
       if (isLaunchNow) {
-        await upsertHostInRoom(data.id);
+        await upsertHostInRoom(data.id, hostName);
         await upsertCoHostsInRoom(data.id);
         await broadcastBattleLaunch(data.id, form.title);
         toast({ title: "Battle launched", description: "You are now live as host. Audience can join in real time." });
@@ -517,8 +496,7 @@ const HostCreate = () => {
         navigate(embedTo("/battles/upcoming"));
       }
     } catch (err) {
-      const message =
-        err instanceof Error && err.message ? err.message : "Unexpected error. Please try again.";
+      const message = (err as any)?.message || "Unexpected error. Please try again.";
       toast({ title: "Failed to create battle", description: message });
     } finally {
       setIsSubmitting(false);

@@ -136,7 +136,7 @@ export function Navigation() {
       await signOut();
       setMobileMenuOpen(false);
       toast.success('Signed out successfully');
-      navigate('/auth');
+      // No explicit navigate needed — auth state change re-renders to Auth page
     } catch (error) {
       toast.error('Failed to sign out');
     }
@@ -191,7 +191,7 @@ export function Navigation() {
                       {item.path === '/room' && roomOnlineCount > 0 && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                          <span>{`${roomOnlineCount}live`}</span>
+                          <span>{`${roomOnlineCount} live`}</span>
                         </span>
                       )}
                     </span>
@@ -222,7 +222,7 @@ export function Navigation() {
                   <Headphones className="w-4 h-4" />
                   <span>Return to Room</span>
                   <span className="inline-flex items-center rounded-full bg-primary text-primary-foreground px-1.5 py-0.5 text-[10px] sm:text-xs leading-none">
-                    {`${roomOnlineCount}live`}
+                    {`${roomOnlineCount} live`}
                   </span>
                 </motion.button>
               )}
@@ -529,7 +529,7 @@ export function Navigation() {
                           <>
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                              <span>{`${roomOnlineCount}live`}</span>
+                              <span>{`${roomOnlineCount} live`}</span>
                             </span>
                           </>
                         )}

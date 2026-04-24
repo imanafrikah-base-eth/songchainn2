@@ -190,7 +190,7 @@ export default function Profile() {
       if (!authedUser) throw new Error('Not authenticated');
 
       const publicUrl = await uploadPublicImage({
-        bucket: field === 'avatar_url' ? 'avaters' : 'covers',
+        bucket: field === 'avatar_url' ? 'avatars' : 'covers',
         userId: authedUser.id,
         file,
       });

@@ -93,8 +93,8 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const livekitApiKey = getEnv("LIVEKIT_API_KEY");
-    const livekitApiSecret = getEnv("LIVEKIT_API_SECRET");
-    const livekitWsUrl = getEnv("LIVEKIT_WS_URL");
+    const livekitApiSecret = getEnv("LIVEKIT_API_SECRET") || getEnv("LIVEKIT_SECRET");
+    const livekitWsUrl = getEnv("LIVEKIT_WS_URL") || getEnv("LIVEKIT_URL");
     if (!livekitApiKey || !livekitApiSecret || !livekitWsUrl) {
       return json({ error: "Missing LIVEKIT_API_KEY / LIVEKIT_API_SECRET / LIVEKIT_WS_URL" }, { status: 500 });
     }

@@ -70,16 +70,13 @@ export default function Onboarding() {
 
   const handleBackToSignIn = useCallback(async () => {
     try {
-      await signOut();
-      try {
-        localStorage.removeItem('songchainn_needs_onboarding');
-      } catch {
-        void 0;
-      }
-    } finally {
-      navigate('/auth', { replace: true });
+      localStorage.removeItem('songchainn_needs_onboarding');
+    } catch {
+      void 0;
     }
-  }, [navigate, signOut]);
+    await signOut();
+    // auth state change re-renders to Auth page — no explicit navigate needed
+  }, [signOut]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = Array.from(e.target.files ?? [])[0];
@@ -121,10 +118,10 @@ export default function Onboarding() {
     setCoverFile(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
-    
+
     const validationResult = profileSchema.safeParse({
       profileName,
       bio: bio || undefined,
@@ -144,131 +141,113 @@ export default function Onboarding() {
       toast({ title: 'Please fix the errors below', variant: 'destructive' });
       return;
     }
-    
+
     if (!user) return;
-    
+
     setIsLoading(true);
-    navigate('/', { replace: true });
+    try {
+      const authedUserId = user.id;
 
-    (async () => {
-      try {
-        const authedUserId = user.id;
+      let avatarUrl: string | null = null;
+      let coverUrl: string | null = null;
 
-        let avatarUrl: string | null = null;
-        let coverUrl: string | null = null;
-
-        if (avatarFile) {
-          try {
-            avatarUrl = await uploadPublicImage({
-              bucket: 'avaters',
-              userId: authedUserId,
-              file: avatarFile,
-            });
-          } catch (err) {
-            console.error('Onboarding avatar upload failed', err);
-          }
-        }
-
-        if (coverFile) {
-          try {
-            coverUrl = await uploadPublicImage({
-              bucket: 'covers',
-              userId: authedUserId,
-              file: coverFile,
-            });
-          } catch (err) {
-            console.error('Onboarding cover upload failed', err);
-          }
-        }
-
-        const existingRes = await supabase
-          .from('audience_profiles')
-          .select('id')
-          .or(`user_id.eq.${authedUserId},id.eq.${authedUserId}`)
-          .maybeSingle();
-
-        const existingId =
-          existingRes.data && typeof existingRes.data === 'object'
-            ? (existingRes.data as { id?: string | null }).id
-            : undefined;
-
-        const profileId = existingId || authedUserId;
-
-        const payload: {
-          id: string;
-          user_id: string;
-          profile_name: string;
-          bio: string | null;
-          location: string;
-          x_profile_link: string | null;
-          base_profile_link: string | null;
-          onboarding_completed: boolean;
-          updated_at: string;
-          avatar_url?: string;
-          cover_photo_url?: string;
-        } = {
-          id: profileId,
-          user_id: authedUserId,
-          profile_name: profileName.trim(),
-          bio: bio.trim() || null,
-          location: location.trim(),
-          x_profile_link: xProfileLink.trim() || null,
-          base_profile_link: baseProfileLink.trim() || null,
-          onboarding_completed: true,
-          updated_at: new Date().toISOString(),
-        };
-
-        if (avatarUrl) {
-          payload.avatar_url = avatarUrl;
-        }
-
-        if (coverUrl) {
-          payload.cover_photo_url = coverUrl;
-        }
-
-        const { error } = await supabase
-          .from('audience_profiles')
-          .upsert(payload, { onConflict: 'user_id' });
-
-        if (error) {
-          console.error('Onboarding profile save failed (raw)', error);
-          console.error('Onboarding profile save failed', {
-            message: error.message,
-            details: (error as any)?.details,
-            hint: (error as any)?.hint,
-            code: (error as any)?.code,
-          });
-          toast({
-            title: 'Profile not saved yet',
-            description: 'You can continue. Please try again later.',
-            variant: 'destructive',
-          });
-          return;
-        }
-        
-        toast({ title: 'Welcome to the Audience!' });
+      if (avatarFile) {
         try {
-          localStorage.setItem('songchainn_needs_onboarding', '0');
-          localStorage.setItem('songchainn_show_profile_photo_hint', '1');
-        } catch {
-          void 0;
+          avatarUrl = await uploadPublicImage({
+            bucket: 'avaters',
+            userId: authedUserId,
+            file: avatarFile,
+          });
+        } catch (err) {
+          console.error('Onboarding avatar upload failed', err);
         }
-        await refreshProfile();
-      } catch (err: any) {
-        console.error('Onboarding profile save failed (raw)', err);
-        console.error('Onboarding profile save failed', {
-          message: String(err?.message || ''),
-          details: (err as any)?.details,
-          hint: (err as any)?.hint,
-          code: (err as any)?.code,
-        });
+      }
+
+      if (coverFile) {
+        try {
+          coverUrl = await uploadPublicImage({
+            bucket: 'covers',
+            userId: authedUserId,
+            file: coverFile,
+          });
+        } catch (err) {
+          console.error('Onboarding cover upload failed', err);
+        }
+      }
+
+      const existingRes = await supabase
+        .from('audience_profiles')
+        .select('id')
+        .or(`user_id.eq.${authedUserId},id.eq.${authedUserId}`)
+        .maybeSingle();
+
+      const existingId =
+        existingRes.data && typeof existingRes.data === 'object'
+          ? (existingRes.data as { id?: string | null }).id
+          : undefined;
+
+      const profileId = existingId || authedUserId;
+
+      const payload: {
+        id: string;
+        user_id: string;
+        profile_name: string;
+        bio: string | null;
+        location: string;
+        x_profile_link: string | null;
+        base_profile_link: string | null;
+        onboarding_completed: boolean;
+        updated_at: string;
+        profile_picture_url?: string;
+        cover_photo_url?: string;
+      } = {
+        id: profileId,
+        user_id: authedUserId,
+        profile_name: profileName.trim(),
+        bio: bio.trim() || null,
+        location: location.trim(),
+        x_profile_link: xProfileLink.trim() || null,
+        base_profile_link: baseProfileLink.trim() || null,
+        onboarding_completed: true,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (avatarUrl) payload.profile_picture_url = avatarUrl;
+      if (coverUrl) payload.cover_photo_url = coverUrl;
+
+      const { error } = await supabase
+        .from('audience_profiles')
+        .upsert(payload as any, { onConflict: 'user_id' });
+
+      if (error) {
+        console.error('Onboarding profile save failed', error);
         toast({
-          title: 'Profile not saved yet',
-          description: 'You can continue. Please try again later.',
+          title: 'Could not save profile',
+          description: error.message,
           variant: 'destructive',
         });
+        return;
       }
-    })();
+
+      try {
+        localStorage.setItem('songchainn_needs_onboarding', '0');
+        localStorage.setItem('songchainn_show_profile_photo_hint', '1');
+      } catch {
+        void 0;
+      }
+      await refreshProfile();
+      toast({ title: 'Welcome to the Audience!' });
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      console.error('Onboarding submit error', err);
+      toast({
+        title: 'Could not save profile',
+        description: String(err?.message || 'Please try again.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

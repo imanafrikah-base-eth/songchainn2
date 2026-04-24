@@ -11,7 +11,6 @@ import { useBattleRoles, type BattleParticipant } from "@/battlezone/hooks/useBa
 import { supabase } from "@/battlezone/integrations/supabase/client";
 import type { Tables } from "@/battlezone/integrations/supabase/types";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
-import { fetchSongchainUserIdSet } from "@/battlezone/lib/songchain";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import { useToast } from "@/battlezone/hooks/use-toast";
@@ -114,6 +113,13 @@ const LiveRoom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  const participantsRef = useRef(participants);
+  participantsRef.current = participants;
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
+  const userRef = useRef(user);
+  userRef.current = user;
+
   useEffect(() => {
     if (!roomId) return;
     let mounted = true;
@@ -127,12 +133,15 @@ const LiveRoom = () => {
         .limit(200);
 
       if (!mounted || !data) return;
-      const names = new Map(participants.map((p) => [p.user_id, p.display_name || "Listener"]));
+      const currentParticipants = participantsRef.current;
+      const currentProfile = profileRef.current;
+      const currentUser = userRef.current;
+      const names = new Map(currentParticipants.map((p) => [p.user_id, p.display_name || "Listener"]));
       const nextMessages: ChatMessage[] = data.map((msg: RoomMessageRow) => ({
         id: msg.id,
         userName:
           names.get(msg.user_id) ||
-          (msg.user_id === user?.id ? profile?.display_name || profile?.username || "You" : "Listener"),
+          (msg.user_id === currentUser?.id ? currentProfile?.display_name || currentProfile?.username || "You" : "Listener"),
         text: msg.message,
         timestamp: new Date(msg.created_at),
         type: "message",
@@ -142,7 +151,7 @@ const LiveRoom = () => {
 
     void fetchMessages();
     const chatChannel = supabase
-      .channel(`battle-room-chat-${roomId}`)
+      .channel(`battle-room-chat-${roomId}-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "room_messages", filter: `room_name=eq.${roomId}` },
@@ -154,7 +163,7 @@ const LiveRoom = () => {
       mounted = false;
       void supabase.removeChannel(chatChannel);
     };
-  }, [roomId, participants, profile?.display_name, profile?.username, user?.id]);
+  }, [roomId]);
 
   const sendMessage = async () => {
     if (!chatInput.trim() || !roomId || !user) return;
@@ -266,7 +275,6 @@ const LiveRoom = () => {
         display_name: displayName,
         is_muted: true,
         is_speaking: false,
-        requested_to_speak: false,
       });
     };
 
@@ -635,7 +643,7 @@ const LiveRoom = () => {
             <MicControls 
               battleId={roomId || ''} 
               liveKitRoom={liveKitRoomRef.current}
-              onAudioPermissionChange={(granted) => console.log('Audio permission:', granted)}
+              onAudioPermissionChange={(granted) => setMicPermission(granted ? 'granted' : 'denied')}
             />
           </div>
 

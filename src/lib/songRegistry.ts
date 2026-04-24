@@ -143,12 +143,12 @@ export function getPreviewThreshold(): number {
 const FUNCTION_SELECTORS: Record<string, string> = {
   // keccak256("balanceOf(address,uint256)") = 0x00fdd58e
   "balanceOf": "00fdd58e",
-  // keccak256("buySong(uint256,uint256)") = 0x74a56eb6
-  "buySong": "74a56eb6",
-  // keccak256("getSongPrice(uint256)") = 0x8c8d98a0 
-  "getSongPrice": "8c8d98a0",
-  // keccak256("getSongArtist(uint256)") = 0x6c0360eb
-  "getSongArtist": "6c0360eb"
+  // keccak256("buySong(uint256,uint256)") = 0xa9914258
+  "buySong": "a9914258",
+  // keccak256("getSongPrice(uint256)") = 0xab4e2b2f
+  "getSongPrice": "ab4e2b2f",
+  // keccak256("getSongArtist(uint256)") = 0x706886c2
+  "getSongArtist": "706886c2"
 };
 
 /**

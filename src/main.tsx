@@ -1,9 +1,11 @@
+import "./ses-compat";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.tsx";
 import "./index.css";
 import { Web3Provider } from "./components/Web3Provider";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { checkSupabaseReachability } from "./lib/networkCheck";
 
 declare global {
@@ -29,21 +31,27 @@ if (import.meta.env.DEV) {
 }
 
 if (typeof window !== "undefined" && import.meta.env.PROD) {
-  const AUTO_RELOAD_KEY = "__songchainn_auto_reload_at";
-  const AUTO_RELOAD_WINDOW_MS = 30_000;
+  const AUTO_RELOAD_COUNT_KEY = "__songchainn_reload_count";
+  const AUTO_RELOAD_TS_KEY = "__songchainn_reload_at";
+  const AUTO_RELOAD_WINDOW_MS = 60_000;
+  const MAX_AUTO_RELOADS = 2;
 
   const canAutoReload = () => {
     try {
-      const last = Number(sessionStorage.getItem(AUTO_RELOAD_KEY) || "0");
+      const count = Number(sessionStorage.getItem(AUTO_RELOAD_COUNT_KEY) || "0");
+      if (count >= MAX_AUTO_RELOADS) return false;
+      const last = Number(sessionStorage.getItem(AUTO_RELOAD_TS_KEY) || "0");
       return !last || Date.now() - last > AUTO_RELOAD_WINDOW_MS;
     } catch {
-      return true;
+      return false;
     }
   };
 
   const markAutoReload = () => {
     try {
-      sessionStorage.setItem(AUTO_RELOAD_KEY, String(Date.now()));
+      const count = Number(sessionStorage.getItem(AUTO_RELOAD_COUNT_KEY) || "0");
+      sessionStorage.setItem(AUTO_RELOAD_COUNT_KEY, String(count + 1));
+      sessionStorage.setItem(AUTO_RELOAD_TS_KEY, String(Date.now()));
     } catch {
       void 0;
     }
@@ -99,8 +107,6 @@ if (typeof window !== "undefined" && import.meta.env.PROD) {
 if (typeof window !== "undefined" && typeof window.fetch === "function") {
   const originalFetch = window.fetch.bind(window);
 
-  const neverAbortedSignal = () => new AbortController().signal;
-
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
       typeof input === "string"
@@ -111,70 +117,34 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
             ? input.href
             : String(input);
 
+    // Silence noisy WalletConnect telemetry pings
     if (url.includes("pulse.walletconnect.org/batch")) {
       return Promise.resolve(new Response(null, { status: 204 }));
     }
 
-    const isSupabaseRestOrFn =
-      url.includes(".supabase.co/rest/v1/") || url.includes(".supabase.co/functions/v1/");
-    const isSupabaseAuth = url.includes(".supabase.co/auth/v1/");
+    const isSupabase =
+      url.includes(".supabase.co/rest/v1/") ||
+      url.includes(".supabase.co/functions/v1/") ||
+      url.includes(".supabase.co/auth/v1/");
 
-    const isSupabaseRequest = isSupabaseRestOrFn || isSupabaseAuth;
-    const shouldIgnoreAbortSignal =
-      isSupabaseRequest &&
-      (typeof init?.signal !== "undefined" ||
-        (input instanceof Request && typeof input.signal !== "undefined"));
+    const runFetch = () => originalFetch(input, init);
 
-    const nextInput =
-      shouldIgnoreAbortSignal && input instanceof Request
-        ? new Request(input, { signal: neverAbortedSignal() })
-        : input;
-    const nextInit = shouldIgnoreAbortSignal && init?.signal ? { ...init, signal: neverAbortedSignal() } : init;
+    if (!isSupabase) return runFetch();
 
-    const runFetch = () => originalFetch(nextInput, nextInit);
-
+    // Single retry for transient network failures; real errors propagate to callers
     return runFetch().catch(async (error: any) => {
-      const isSupabase = isSupabaseRestOrFn || isSupabaseAuth;
-      const message = String(error?.message ?? error ?? "");
-      const normalized = message.toLowerCase();
-      const isAbortError =
-        error?.name === "AbortError" ||
-        normalized.includes("abort") ||
-        normalized.includes("aborted");
-      const isFetchFailed =
-        normalized.includes("failed to fetch") ||
-        normalized.includes("network changed") ||
-        normalized.includes("http2") ||
-        normalized.includes("timed out") ||
-        normalized.includes("timeout") ||
-        normalized.includes("name not resolved") ||
-        normalized.includes("dns");
+      const message = String(error?.message ?? error ?? "").toLowerCase();
+      const isTransient =
+        error?.name !== "AbortError" &&
+        (message.includes("failed to fetch") ||
+          message.includes("network changed") ||
+          message.includes("http2") ||
+          message.includes("timeout") ||
+          message.includes("name not resolved"));
 
-      const shouldRetrySupabase =
-        isSupabase &&
-        (isAbortError || isFetchFailed);
-
-      if (shouldRetrySupabase) {
-        try {
-          // Retry once to smooth over transient browser/network transport failures.
-          return await runFetch();
-        } catch {
-          // Fall through to suppressed response below.
-        }
+      if (isTransient) {
+        return runFetch();
       }
-
-      if (isSupabase && isAbortError) {
-        return new Response(null, { status: 499, statusText: "Client Abort Suppressed" });
-      }
-
-      if (isSupabase && isFetchFailed) {
-        return new Response(JSON.stringify({ error: "network_error", message }), {
-          status: 503,
-          statusText: "Supabase network error suppressed",
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
       throw error;
     });
   };
@@ -199,10 +169,12 @@ if ("serviceWorker" in navigator && import.meta.env.PROD && import.meta.env.VITE
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <Web3Provider>
-        <App />
-      </Web3Provider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Web3Provider>
+          <App />
+        </Web3Provider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

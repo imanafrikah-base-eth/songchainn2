@@ -113,7 +113,8 @@ export function useHostAudio(): UseHostAudioReturn {
       const gain = ctx.createGain();
       gain.gain.value = songVolume;
       source.connect(gain);
-      gain.connect(dest);
+      gain.connect(dest);         // → LiveKit broadcast stream
+      gain.connect(ctx.destination); // → host's local speakers (monitoring)
 
       source.onended = () => {
         setIsSongPlaying(false);

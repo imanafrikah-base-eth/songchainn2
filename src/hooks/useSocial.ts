@@ -1,18 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
 import { AudienceProfile } from '@/types/database';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 export function useSocial() {
-  const { user, isArtist } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [posts, setPosts] = useState<SocialPostWithProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [following, setFollowing] = useState<string[]>([]);
   const [followers, setFollowers] = useState<string[]>([]);
+  const followingRef = useRef<string[]>([]);
 
   const fetchFollowData = useCallback(async () => {
     if (!user) {
@@ -26,7 +27,9 @@ export function useSocial() {
       supabase.from('user_follows').select('follower_id').eq('following_id', user.id),
     ]);
 
-    setFollowing((followingRes.data || []).map((r: any) => r.following_id).filter(Boolean));
+    const newFollowing = (followingRes.data || []).map((r: any) => r.following_id).filter(Boolean);
+    followingRef.current = newFollowing;
+    setFollowing(newFollowing);
     setFollowers((followersRes.data || []).map((r: any) => r.follower_id).filter(Boolean));
   }, [user]);
 
@@ -38,83 +41,92 @@ export function useSocial() {
     }
     setIsLoading(true);
 
-    if (feedType === 'following' && following.length === 0) {
+    const currentFollowing = followingRef.current;
+
+    if (feedType === 'following' && currentFollowing.length === 0) {
       setPosts([]);
       setIsLoading(false);
       return;
     }
 
-    const baseQuery = supabase
-      .from('social_posts')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
+    try {
+      const baseQuery = supabase
+        .from('social_posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-    const { data: postsData } =
-      feedType === 'following'
-        ? await baseQuery.in('user_id', Array.from(new Set([user.id, ...following])))
-        : await baseQuery;
+      const { data: postsData, error: postsError } =
+        feedType === 'following'
+          ? await baseQuery.in('user_id', Array.from(new Set([user.id, ...currentFollowing])))
+          : await baseQuery;
 
-    const rows = (postsData as any[]) || [];
-    if (rows.length === 0) {
+      if (postsError) throw postsError;
+
+      const rows = (postsData as any[]) || [];
+      if (rows.length === 0) {
+        setPosts([]);
+        return;
+      }
+
+      const postIds = rows.map((p) => p.id);
+      const userIds = Array.from(new Set(rows.map((p) => p.user_id).filter(Boolean)));
+
+      const [profilesByIdRes, profilesByUserIdRes, likesRes, commentsRes, userLikesRes] = await Promise.all([
+        supabase.from('audience_profiles').select('*').in('id', userIds),
+        supabase.from('audience_profiles').select('*').in('user_id', userIds),
+        supabase.from('post_likes').select('post_id,user_id').in('post_id', postIds),
+        supabase.from('post_comments').select('post_id').in('post_id', postIds),
+        supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
+      ]);
+
+      const profilesMap = new Map<string, AudienceProfile>();
+      ([...(profilesByIdRes.data || []), ...(profilesByUserIdRes.data || [])] as any[]).forEach((p: any) => {
+        profilesMap.set(String(p.id), p as any);
+        if (p?.user_id) profilesMap.set(String(p.user_id), p as any);
+      });
+
+      const likesCount = new Map<string, number>();
+      (likesRes.data || []).forEach((l: any) => {
+        const pid = String(l.post_id);
+        likesCount.set(pid, (likesCount.get(pid) || 0) + 1);
+      });
+
+      const commentsCount = new Map<string, number>();
+      (commentsRes.data || []).forEach((c: any) => {
+        const pid = String(c.post_id);
+        commentsCount.set(pid, (commentsCount.get(pid) || 0) + 1);
+      });
+
+      const userLikedPosts = new Set<string>((userLikesRes.data || []).map((l: any) => String(l.post_id)));
+
+      const enriched: SocialPostWithProfile[] = rows.map((post) => ({
+        id: post.id,
+        user_id: post.user_id,
+        content: post.content,
+        song_id: post.song_id,
+        playlist_id: post.playlist_id,
+        image_url: (post as any).image_url ?? null,
+        image_path: (post as any).image_path ?? null,
+        post_type: post.post_type,
+        created_at: post.created_at,
+        updated_at: post.updated_at,
+        profile: profilesMap.get(String(post.user_id)),
+        likes_count: likesCount.get(String(post.id)) || 0,
+        comments_count: commentsCount.get(String(post.id)) || 0,
+        is_liked: userLikedPosts.has(String(post.id)),
+        artist_id: null,
+        artist_is_verified: null,
+      }));
+
+      setPosts(enriched);
+    } catch (err) {
+      if (import.meta.env.DEV) console.error('fetchPosts failed', err);
       setPosts([]);
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    const postIds = rows.map((p) => p.id);
-    const userIds = Array.from(new Set(rows.map((p) => p.user_id).filter(Boolean)));
-
-    const [profilesByIdRes, profilesByUserIdRes, likesRes, commentsRes, userLikesRes] = await Promise.all([
-      supabase.from('audience_profiles').select('*').in('id', userIds),
-      supabase.from('audience_profiles').select('*').in('user_id', userIds),
-      supabase.from('post_likes').select('post_id,user_id').in('post_id', postIds),
-      supabase.from('post_comments').select('post_id').in('post_id', postIds),
-      supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
-    ]);
-
-    const profilesMap = new Map<string, AudienceProfile>();
-    ([...(profilesByIdRes.data || []), ...(profilesByUserIdRes.data || [])] as any[]).forEach((p: any) => {
-      profilesMap.set(String(p.id), p as any);
-      if (p?.user_id) profilesMap.set(String(p.user_id), p as any);
-    });
-
-    const likesCount = new Map<string, number>();
-    (likesRes.data || []).forEach((l: any) => {
-      const pid = String(l.post_id);
-      likesCount.set(pid, (likesCount.get(pid) || 0) + 1);
-    });
-
-    const commentsCount = new Map<string, number>();
-    (commentsRes.data || []).forEach((c: any) => {
-      const pid = String(c.post_id);
-      commentsCount.set(pid, (commentsCount.get(pid) || 0) + 1);
-    });
-
-    const userLikedPosts = new Set<string>((userLikesRes.data || []).map((l: any) => String(l.post_id)));
-
-    const enriched: SocialPostWithProfile[] = rows.map((post) => ({
-      id: post.id,
-      user_id: post.user_id,
-      content: post.content,
-      song_id: post.song_id,
-      playlist_id: post.playlist_id,
-      image_url: (post as any).image_url ?? null,
-      image_path: (post as any).image_path ?? null,
-      post_type: post.post_type,
-      created_at: post.created_at,
-      updated_at: post.updated_at,
-      profile: profilesMap.get(String(post.user_id)),
-      likes_count: likesCount.get(String(post.id)) || 0,
-      comments_count: commentsCount.get(String(post.id)) || 0,
-      is_liked: userLikedPosts.has(String(post.id)),
-      artist_id: null,
-      artist_is_verified: null,
-    }));
-
-    setPosts(enriched);
-    setIsLoading(false);
-  }, [user, following]);
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -140,7 +152,16 @@ export function useSocial() {
       postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
       songId?: string,
       playlistId?: string
-    ) => {
+    ): Promise<boolean> => {
+      if (!isSupabaseConfigured) {
+        toast({
+          title: 'Posting unavailable',
+          description: 'Connect a Supabase project to enable the social feed.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
       let payloadForLog:
         | {
             user_id: string;
@@ -155,19 +176,20 @@ export function useSocial() {
         const { data: authData, error: authErr } = await supabase.auth.getUser();
         if (authErr) throw authErr;
 
-        const user = authData?.user;
-        if (!user) throw new Error('Not authenticated');
+        const sessionUser = authData?.user;
+        if (!sessionUser) throw new Error('Not authenticated');
 
         const cleanContent = (content ?? '').trim();
         const cleanSongId = (songId ?? '').trim();
         const cleanPlaylistId = (playlistId ?? '').trim();
 
         if (!cleanContent && !cleanSongId && !cleanPlaylistId) {
-          throw new Error('Post cannot be empty');
+          toast({ title: 'Post cannot be empty', variant: 'destructive' });
+          return false;
         }
 
         const payload: Database['public']['Tables']['social_posts']['Insert'] = {
-          user_id: user.id,
+          user_id: sessionUser.id,
           post_type: postType,
         };
 
@@ -191,21 +213,16 @@ export function useSocial() {
 
         toast({ title: 'Post shared!' });
         await fetchPosts();
+        return true;
       } catch (error: any) {
         const msg = String(error?.message || '');
-        if (msg === 'Post cannot be empty') {
-          toast({
-            title: 'Post cannot be empty',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        console.error('social_posts insert failed', { error, payload: payloadForLog });
+        console.error('social_posts insert failed', { error: msg, payload: payloadForLog });
         toast({
-          title: 'Could not post — check console',
+          title: 'Could not share post',
+          description: msg || 'Please check your connection and try again.',
           variant: 'destructive',
         });
+        return false;
       }
     },
     [toast, fetchPosts]
@@ -270,7 +287,11 @@ export function useSocial() {
           return;
         }
 
-        setFollowing((prev) => prev.filter((id) => id !== userId));
+        setFollowing((prev) => {
+          const next = prev.filter((id) => id !== userId);
+          followingRef.current = next;
+          return next;
+        });
         toast({ title: 'Unfollowed' });
       } else {
         const { error } = await supabase
@@ -286,7 +307,11 @@ export function useSocial() {
           return;
         }
 
-        setFollowing((prev) => Array.from(new Set([...prev, userId])));
+        setFollowing((prev) => {
+          const next = Array.from(new Set([...prev, userId]));
+          followingRef.current = next;
+          return next;
+        });
         toast({ title: 'Following!' });
       }
     },
@@ -353,28 +378,46 @@ export function useSocial() {
     ));
   }, [user, toast]);
 
+  // Stable refs so the channel effect below never needs fetchPosts/fetchFollowData
+  // as dependencies — those functions change whenever `following` state changes,
+  // which would tear down and recreate the channel and hit Supabase's rule that
+  // `.on()` cannot be called after `.subscribe()`.
+  const feedTypeRef = useRef<'all' | 'following'>('all');
+  const fetchPostsRef = useRef(fetchPosts);
+  fetchPostsRef.current = fetchPosts;
+  const fetchFollowDataRef = useRef(fetchFollowData);
+  fetchFollowDataRef.current = fetchFollowData;
+
   useEffect(() => {
     if (!user) return;
+    // Append timestamp so a rapid unmount/remount cycle never reuses a
+    // channel name that Supabase still considers subscribed.
+    const channelName = `social-feed-${user.id}-${Date.now()}`;
     const channel = supabase
-      .channel(`social-feed-${user.id}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => {
-        void fetchPosts();
+        void fetchPostsRef.current(feedTypeRef.current);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
-        void fetchPosts();
+        void fetchPostsRef.current(feedTypeRef.current);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => {
-        void fetchPosts();
+        void fetchPostsRef.current(feedTypeRef.current);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_follows' }, () => {
-        void fetchFollowData();
+        void fetchFollowDataRef.current();
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [user, fetchPosts, fetchFollowData]);
+  }, [user]); // only recreate when the logged-in user changes
+
+  const fetchPostsTracked = useCallback((feedType: 'all' | 'following' = 'all') => {
+    feedTypeRef.current = feedType;
+    return fetchPosts(feedType);
+  }, [fetchPosts]);
 
   return {
     posts,
@@ -388,6 +431,6 @@ export function useSocial() {
     isFollowing,
     getPostComments,
     addComment,
-    refetchPosts: fetchPosts
+    refetchPosts: fetchPostsTracked
   };
 }

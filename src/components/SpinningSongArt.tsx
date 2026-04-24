@@ -1,11 +1,10 @@
-import { useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import songArtVideo from '@/assets/song-art.mp4';
 
 interface SongArtProps {
   isPlaying?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  coverImage?: string;
 }
 
 const sizeClasses = {
@@ -15,35 +14,32 @@ const sizeClasses = {
   xl: 'w-full h-full',
 };
 
-export function SpinningSongArt({ isPlaying = false, size = 'md', className }: SongArtProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.play();
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  }, [isPlaying]);
-
+export function SpinningSongArt({ isPlaying = false, size = 'md', className, coverImage }: SongArtProps) {
   return (
     <div
       className={cn(
         'rounded-xl overflow-hidden flex-shrink-0',
         sizeClasses[size],
-        className
+        className,
       )}
     >
-      <video
-        ref={videoRef}
-        src={songArtVideo}
-        loop
-        muted
-        playsInline
-        className="w-full h-full object-cover"
-      />
+      {coverImage ? (
+        <img
+          src={coverImage}
+          alt=""
+          className={cn(
+            'w-full h-full object-cover',
+            isPlaying && 'animate-spin [animation-duration:3s]',
+          )}
+        />
+      ) : (
+        <div
+          className={cn(
+            'w-full h-full bg-gradient-to-br from-primary to-primary/50',
+            isPlaying && 'animate-spin [animation-duration:3s]',
+          )}
+        />
+      )}
     </div>
   );
 }

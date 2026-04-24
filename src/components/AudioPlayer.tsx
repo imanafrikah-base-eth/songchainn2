@@ -257,7 +257,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                 className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 text-left group"
               >
                 <div className="relative flex-shrink-0">
-                  <SpinningSongArt isPlaying={isPlaying} size="md" className="shadow-soft" />
+                  <SpinningSongArt isPlaying={isPlaying} size="md" className="shadow-soft" coverImage={currentSong.coverImage} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1 mb-0.5">

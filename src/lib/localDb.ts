@@ -3,7 +3,7 @@ import type { AudienceProfile, Playlist } from '@/types/database';
 type LocalAccount = {
   id: string;
   email: string;
-  password: string;
+  passwordHash: string;
   created_at: string;
 };
 
@@ -83,7 +83,13 @@ export function listAccounts(): LocalAccount[] {
   return readJson<LocalAccount[]>(KEYS.accounts, []);
 }
 
-export function createAccount(email: string, password: string): LocalAccount {
+async function hashPassword(email: string, password: string): Promise<string> {
+  const data = new TextEncoder().encode(`${email}:${password}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function createAccount(email: string, password: string): Promise<LocalAccount> {
   const normalized = email.trim().toLowerCase();
   const accounts = listAccounts();
   if (accounts.some((a) => a.email === normalized)) {
@@ -92,7 +98,7 @@ export function createAccount(email: string, password: string): LocalAccount {
   const account: LocalAccount = {
     id: crypto.randomUUID(),
     email: normalized,
-    password,
+    passwordHash: await hashPassword(normalized, password),
     created_at: new Date().toISOString(),
   };
   accounts.push(account);
@@ -100,11 +106,12 @@ export function createAccount(email: string, password: string): LocalAccount {
   return account;
 }
 
-export function verifyAccount(email: string, password: string): LocalAccount | null {
+export async function verifyAccount(email: string, password: string): Promise<LocalAccount | null> {
   const normalized = email.trim().toLowerCase();
   const account = listAccounts().find((a) => a.email === normalized);
   if (!account) return null;
-  if (account.password !== password) return null;
+  const hash = await hashPassword(normalized, password);
+  if (account.passwordHash !== hash) return null;
   return account;
 }
 

@@ -61,10 +61,9 @@ export function useSongOwnership(songId: string): SongOwnership {
   
   const status = getStatus();
   
-  const isLocked = false;
-  
-  const canPlay = true;
-  const isPreviewOnly = false;
+  const isLocked = status === 'preview_used';
+  const canPlay = status !== 'preview_used';
+  const isPreviewOnly = status === 'preview';
   
   // Check on-chain ownership
   const checkOwnership = useCallback(async () => {

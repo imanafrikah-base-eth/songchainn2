@@ -62,16 +62,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    console.log("Fetching profile for userId:", userId);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("audience_profiles")
       .select("*")
       .eq("user_id", userId)
       .maybeSingle();
-    
-    console.log("Profile fetch result:", { data, error });
-    
-    // Set profile even if onboarding not completed, for testing purposes
     setProfile(data as AudienceProfile | null);
   };
 

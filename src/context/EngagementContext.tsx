@@ -66,6 +66,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const lastPlayRef = useRef<{ songId: string; at: number } | null>(null);
   const lastPulseAtRef = useRef<number>(0);
   const offlinePlaysRef = useRef<OfflinePlay[]>([]);
+  const playChannelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
     const raw = localStorage.getItem('songchainn_last_play');
@@ -78,6 +79,21 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     } catch {
       void 0;
     }
+  }, []);
+
+  // Cross-tab play deduplication via BroadcastChannel
+  useEffect(() => {
+    if (!('BroadcastChannel' in window)) return;
+    const channel = new BroadcastChannel('songchainn:plays');
+    playChannelRef.current = channel;
+    channel.onmessage = (event: MessageEvent<{ songId: string; at: number }>) => {
+      const { songId, at } = event.data;
+      if (songId && at) lastPlayRef.current = { songId, at };
+    };
+    return () => {
+      channel.close();
+      playChannelRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -173,18 +189,19 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     if (last && last.songId === songId && now - last.at < PLAY_DEDUPE_WINDOW_MS) return;
     lastPlayRef.current = { songId, at: now };
     localStorage.setItem('songchainn_last_play', JSON.stringify({ songId, at: now }));
+    playChannelRef.current?.postMessage({ songId, at: now });
 
     setTodayPlays(prev => prev + 1);
     setTotalPlays(prev => prev + 1);
     setEngagementPoints(prev => prev + POINTS_PER_PLAY);
 
-    (async () => {
-      await supabase.from('song_analytics').insert({
-        event_type: 'play',
-        song_id: songId,
-        user_id: user?.id ?? null,
-      } as any);
-    })();
+    supabase.from('song_analytics').insert({
+      event_type: 'play',
+      song_id: songId,
+      user_id: user?.id ?? null,
+    } as any).then(({ error }) => {
+      if (error && import.meta.env.DEV) console.error('Failed to record play', error);
+    });
   }, [user]);
 
   const addOfflinePlay = useCallback((songId: string, durationSeconds: number) => {
@@ -314,9 +331,11 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     if (user) {
       try {
         if (isCurrentlyLiked) {
-          await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
+          const { error } = await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
+          if (error) throw error;
         } else {
-          await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
+          const { error: insertError } = await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
+          if (insertError) throw insertError;
 
           const { data: existingLikes, error: selectError } = await supabase
             .from('social_posts')
@@ -337,8 +356,20 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error) {
+        // Revert optimistic update
+        setLikedSongsState(prev => {
+          const reverted = new Set(prev);
+          if (isCurrentlyLiked) {
+            reverted.add(songId);
+            setEngagementPoints(p => p + POINTS_PER_LIKE);
+          } else {
+            reverted.delete(songId);
+            setEngagementPoints(p => Math.max(0, p - POINTS_PER_LIKE));
+          }
+          return reverted;
+        });
         if (import.meta.env.DEV) {
-          console.error('Failed to toggle like or create social post', error);
+          console.error('Failed to toggle like', error);
         }
       }
     }
