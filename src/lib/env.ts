@@ -23,6 +23,15 @@ export function getEnv(): EnvConfig {
   if (supabaseUrl && !supabaseUrl.includes('supabase.co')) {
     problems.push(`VITE_SUPABASE_URL looks wrong: "${supabaseUrl}"`);
   }
+  if (supabaseAnonKey && !supabaseAnonKey.startsWith('eyJ')) {
+    // Publishable keys (sb_publishable_...) require @supabase/supabase-js ≥ 2.49 and
+    // may make an extra network round-trip on first load. If the project is paused or
+    // the key is wrong this causes a blank-page hang. Use the JWT anon key instead.
+    console.warn(
+      '[$ongChainn] VITE_SUPABASE_ANON_KEY looks like a publishable key (not a JWT). ' +
+      'Copy the "anon" JWT key from Supabase → Project Settings → API to avoid load hangs.'
+    );
+  }
 
   if (problems.length > 0) {
     const message =

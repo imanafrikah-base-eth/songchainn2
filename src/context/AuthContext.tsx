@@ -152,20 +152,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
-      const u = data.session?.user ?? null;
-      if (u) {
-        setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-      } else {
-        setUser(null);
-        setIsAdmin(false);
+      try {
+        // 8-second guard: if getSession() hangs (e.g. Supabase project paused or key
+        // needs initial network validation), we still unblock the render.
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('auth:timeout')), 8000)
+          ),
+        ]);
+        if (!mounted) return;
+        const u = sessionResult.data?.session?.user ?? null;
+        if (u) {
+          setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+        } else {
+          setUser(null);
+          setIsAdmin(false);
+        }
+        setIsArtist(false);
+        setArtistId(null);
+        if (u) void refreshRoles(u.id);
+      } catch {
+        // Supabase unreachable or timed-out — proceed as unauthenticated
+        if (mounted) {
+          setUser(null);
+          setIsAdmin(false);
+          setIsArtist(false);
+          setArtistId(null);
+        }
+      } finally {
+        if (mounted) setIsLoading(false);
       }
-      setIsArtist(false);
-      setArtistId(null);
-      // Unblock render immediately — roles load in background
-      setIsLoading(false);
-      if (u) void refreshRoles(u.id);
     };
 
     bootstrap();
