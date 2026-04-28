@@ -24,8 +24,14 @@ export default defineConfig(() => ({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          // Core React — always needed, cached aggressively
-          if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) {
+          // Core React + react-query — always needed, must share the same chunk
+          // so React.createContext is defined when @tanstack/react-query initialises
+          if (
+            id.includes('react-dom') ||
+            id.includes('react-router') ||
+            id.includes('/react/') ||
+            id.includes('@tanstack')
+          ) {
             return 'vendor-react';
           }
           // Animation — needed on most pages
@@ -35,10 +41,6 @@ export default defineConfig(() => ({
           // Supabase — needed on most pages
           if (id.includes('@supabase')) {
             return 'vendor-supabase';
-          }
-          // Server-state — small, needed at app root (QueryClientProvider in main.tsx)
-          if (id.includes('@tanstack')) {
-            return 'vendor-query';
           }
           // Wagmi core — needed at root (WagmiProvider in main.tsx)
           if (
