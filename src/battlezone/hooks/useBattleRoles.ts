@@ -169,28 +169,16 @@ export const useBattleRoles = (battleId: string) => {
     if (!battleId || !user || myRole !== 'audience') return false;
 
     try {
-      // Add speaker request
-      const { error: requestError } = await supabase
-        .from('battle_speaker_requests')
-        .insert({
-          battle_id: battleId,
-          user_id: user.id,
-          display_name: user.user_metadata?.display_name || user.user_metadata?.username || 'Listener',
-        });
-
-      if (requestError) throw requestError;
-
-      // Update participant to indicate request
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('battle_rooms')
-        .update({ 
+        .update({
           requested_to_speak: true,
           last_seen_at: new Date().toISOString()
         })
         .eq('battle_id', battleId)
         .eq('user_id', user.id);
 
-      if (updateError) throw updateError;
+      if (error) throw error;
       return true;
     } catch (err) {
       console.error('Error requesting to speak:', err);
@@ -202,49 +190,13 @@ export const useBattleRoles = (battleId: string) => {
   // Approve speaker request
   const approveSpeakerRequest = async (requesterUserId: string) => {
     if (!battleId || !user) return false;
-
-    try {
-      // Update speaker request status
-      const { error: requestError } = await supabase
-        .from('battle_speaker_requests')
-        .update({ 
-          status: 'approved',
-          approved_by: user.id,
-          approved_at: new Date().toISOString()
-        })
-        .eq('battle_id', battleId)
-        .eq('user_id', requesterUserId);
-
-      if (requestError) throw requestError;
-
-      // Update participant role to speaker
-      return await updateParticipantRole(requesterUserId, 'speaker');
-    } catch (err) {
-      console.error('Error approving speaker request:', err);
-      setError(err instanceof Error ? err.message : 'Failed to approve speaker');
-      return false;
-    }
+    return await updateParticipantRole(requesterUserId, 'speaker');
   };
 
   // Remove speaker
   const removeSpeaker = async (speakerUserId: string) => {
     if (!battleId) return false;
-
-    try {
-      // Remove any pending speaker requests
-      await supabase
-        .from('battle_speaker_requests')
-        .update({ status: 'rejected' })
-        .eq('battle_id', battleId)
-        .eq('user_id', speakerUserId);
-
-      // Update participant role back to audience
-      return await updateParticipantRole(speakerUserId, 'audience');
-    } catch (err) {
-      console.error('Error removing speaker:', err);
-      setError(err instanceof Error ? err.message : 'Failed to remove speaker');
-      return false;
-    }
+    return await updateParticipantRole(speakerUserId, 'audience');
   };
 
   // Mute/unmute participant
@@ -276,17 +228,18 @@ export const useBattleRoles = (battleId: string) => {
     return participants.filter(p => p.role === role);
   };
 
-  // Get speaker requests
+  // Get speaker requests from battle_rooms (participants who raised their hand)
   const getSpeakerRequests = async () => {
     if (!battleId) return [];
 
     try {
       const { data, error } = await supabase
-        .from('battle_speaker_requests')
+        .from('battle_rooms')
         .select('*')
         .eq('battle_id', battleId)
-        .eq('status', 'pending')
-        .order('requested_at', { ascending: true });
+        .eq('requested_to_speak', true)
+        .eq('role', 'audience')
+        .order('last_seen_at', { ascending: true });
 
       if (error) throw error;
       return data || [];
@@ -327,23 +280,8 @@ export const useBattleRoles = (battleId: string) => {
       )
       .subscribe();
 
-    const speakerRequestChannel = supabase
-      .channel(`speaker-requests-${battleId}-${ts}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'battle_speaker_requests',
-          filter: `battle_id=eq.${battleId}`,
-        },
-        () => fetchParticipants()
-      )
-      .subscribe();
-
     return () => {
       void supabase.removeChannel(participantChannel);
-      void supabase.removeChannel(speakerRequestChannel);
     };
   }, [battleId, user?.id]);
 

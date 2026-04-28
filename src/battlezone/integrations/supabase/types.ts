@@ -90,6 +90,7 @@ export type Database = {
           is_speaking: boolean
           joined_at: string
           last_seen_at: string
+          requested_to_speak: boolean
           role: string
           user_id: string
         }
@@ -102,6 +103,7 @@ export type Database = {
           is_speaking?: boolean
           joined_at?: string
           last_seen_at?: string
+          requested_to_speak?: boolean
           role?: string
           user_id: string
         }
@@ -114,12 +116,54 @@ export type Database = {
           is_speaking?: boolean
           joined_at?: string
           last_seen_at?: string
+          requested_to_speak?: boolean
           role?: string
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "battle_rooms_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_speaker_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          battle_id: string
+          display_name: string
+          id: string
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          battle_id: string
+          display_name: string
+          id?: string
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          battle_id?: string
+          display_name?: string
+          id?: string
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_speaker_requests_battle_id_fkey"
             columns: ["battle_id"]
             isOneToOne: false
             referencedRelation: "battles"

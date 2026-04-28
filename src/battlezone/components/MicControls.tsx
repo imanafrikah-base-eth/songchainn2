@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Hand, Users, Volume2, VolumeX } from 'lucide-react';
 import { useBattleRoles } from '@/battlezone/hooks/useBattleRoles';
 import { useToast } from '@/battlezone/hooks/use-toast';
@@ -30,6 +30,7 @@ export const MicControls: React.FC<MicControlsProps> = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [micPermission, setMicPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [isRequestingToSpeak, setIsRequestingToSpeak] = useState(false);
+  const prevRoleRef = useRef<string>(myRole);
 
   // Check microphone permissions
   const checkMicPermission = async () => {
@@ -142,18 +143,29 @@ export const MicControls: React.FC<MicControlsProps> = ({
     }
   };
 
-  // Update UI state based on role changes
+  // Update UI state and LiveKit mic on role changes
   useEffect(() => {
+    const prevRole = prevRoleRef.current;
+    prevRoleRef.current = myRole;
+
     if (myRole === 'speaker' || myRole === 'host' || myRole === 'co-host') {
       setIsMuted(false);
       setIsSpeaking(true);
       setIsRequestingToSpeak(false);
+      // Enable mic when promoted from audience
+      if (prevRole === 'audience' && liveKitRoom) {
+        liveKitRoom.localParticipant.setMicrophoneEnabled(true).catch(console.error);
+      }
     } else {
       setIsMuted(true);
       setIsSpeaking(false);
       setIsRequestingToSpeak(false);
+      // Disable mic when moved back to audience
+      if (prevRole !== 'audience' && liveKitRoom) {
+        liveKitRoom.localParticipant.setMicrophoneEnabled(false).catch(console.error);
+      }
     }
-  }, [myRole]);
+  }, [myRole, liveKitRoom]);
 
   // Check initial mic permission
   useEffect(() => {
