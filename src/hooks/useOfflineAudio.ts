@@ -190,38 +190,12 @@ export function useOfflineAudio() {
     return cachedSongs.some(s => s.songId === songId);
   }, [cachedSongs]);
 
+  // Returns the original audio URL for a cached song so the SW fetch interceptor
+  // can serve it from cache — no blob URL needed, no memory leak.
   const getCachedAudioUrl = useCallback(async (songId: string): Promise<string | null> => {
-    if (!import.meta.env.PROD || import.meta.env.VITE_ENABLE_SERVICE_WORKER !== 'true' || !('serviceWorker' in navigator)) return null;
-    
-    return new Promise((resolve) => {
-      const registration = navigator.serviceWorker.ready.then(reg => {
-        if (!reg.active) {
-          resolve(null);
-          return;
-        }
-
-        const handler = (event: MessageEvent) => {
-          if (event.data.type === 'CACHED_AUDIO_URL' && event.data.songId === songId) {
-            navigator.serviceWorker.removeEventListener('message', handler);
-            resolve(event.data.url);
-          }
-        };
-
-        navigator.serviceWorker.addEventListener('message', handler);
-        
-        reg.active.postMessage({
-          type: 'GET_CACHED_AUDIO',
-          songId
-        });
-
-        // Timeout after 2 seconds
-        setTimeout(() => {
-          navigator.serviceWorker.removeEventListener('message', handler);
-          resolve(null);
-        }, 2000);
-      });
-    });
-  }, []);
+    const cached = cachedSongs.find(s => s.songId === songId);
+    return cached?.audioUrl ?? null;
+  }, [cachedSongs]);
 
   return {
     cachedSongs,

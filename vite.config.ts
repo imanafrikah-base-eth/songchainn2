@@ -42,20 +42,20 @@ export default defineConfig(() => ({
           if (id.includes('@supabase')) {
             return 'vendor-supabase';
           }
-          // Wagmi core — needed at root (WagmiProvider in main.tsx)
+          // Wagmi + all Coinbase libs in one chunk.
+          // onchainkit imports wallet-sdk internally; splitting them across
+          // chunks causes a TDZ crash ("Cannot access 'nt' before initialization").
           if (
             id.includes('wagmi') ||
             id.includes('/viem/') ||
             id.includes('@wagmi') ||
             id.includes('web3modal') ||
             id.includes('walletconnect') ||
-            id.includes('@walletconnect')
+            id.includes('@walletconnect') ||
+            id.includes('@coinbase')  ||
+            id.includes('onchainkit')
           ) {
             return 'vendor-web3';
-          }
-          // Coinbase OnchainKit — only used on Auth/Marketplace pages (lazy)
-          if (id.includes('@coinbase') || id.includes('onchainkit')) {
-            return 'vendor-coinbase';
           }
           // LiveKit — only used in Room page (lazy)
           if (id.includes('livekit') || id.includes('@livekit')) {

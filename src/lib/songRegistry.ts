@@ -6,6 +6,7 @@
  */
 
 import { getWalletProvider, BASE_CHAIN_ID_HEX } from './baseWallet';
+import { parseEther } from 'viem';
 
 // Contract address on Base mainnet
 export const SONG_REGISTRY_ADDRESS = "0x39e8317fEEBE3129f3d876c1F6D35271849797F9";
@@ -557,7 +558,5 @@ export function formatEthPrice(weiString: string): string {
  * Parse ETH string to Wei
  */
 export function parseEthToWei(ethAmount: string): string {
-  const eth = parseFloat(ethAmount);
-  const wei = BigInt(Math.floor(eth * 1e18));
-  return wei.toString();
+  return parseEther(ethAmount).toString();
 }

@@ -1,6 +1,21 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+
+// Subscribed broadcast channels keyed by channel name — reused across sendPulse calls.
+// A channel must be subscribed before .send() works; creating a new one every call
+// means nothing is ever actually broadcast.
+const pulseChannels = new Map<string, RealtimeChannel>();
+
+function getPulseChannel(channelName: string): RealtimeChannel {
+  const existing = pulseChannels.get(channelName);
+  if (existing) return existing;
+  const ch = supabase.channel(channelName, { config: { broadcast: { self: false } } });
+  ch.subscribe();
+  pulseChannels.set(channelName, ch);
+  return ch;
+}
 
 interface EngagementContextType {
   engagementPoints: number;
@@ -39,7 +54,7 @@ interface OfflinePlay {
 }
 
 export function EngagementProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   
   const [engagementPoints, setEngagementPoints] = useState(() => {
     const saved = localStorage.getItem('songchainn_points');
@@ -67,6 +82,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const lastPulseAtRef = useRef<number>(0);
   const offlinePlaysRef = useRef<OfflinePlay[]>([]);
   const playChannelRef = useRef<BroadcastChannel | null>(null);
+  const likeInFlightRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const raw = localStorage.getItem('songchainn_last_play');
@@ -226,6 +242,10 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Don't sync while auth is still bootstrapping — user may appear null until
+    // the session is restored, which would permanently attribute plays to no one.
+    if (isAuthLoading) return;
+
     const syncOfflinePlays = async () => {
       if (offlinePlaysRef.current.length === 0) return;
       if (!navigator.onLine) return;
@@ -264,7 +284,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener('online', handleOnline);
     };
-  }, [user]);
+  }, [user, isAuthLoading]);
 
   const sendPulse = useCallback((songId: string, options?: { roomName?: string | null }) => {
     if (!songId) return;
@@ -289,9 +309,10 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       },
     }));
 
-    // Broadcast to other online users via Supabase Realtime
+    // Broadcast to other online users via Supabase Realtime.
+    // Channel must be subscribed before .send() — getPulseChannel handles that.
     const channelName = `pulse-${payload.roomId || 'global'}`;
-    void supabase.channel(channelName).send({
+    void getPulseChannel(channelName).send({
       type: 'broadcast',
       event: 'pulse',
       payload: { songId, userId: user?.id ?? null, timestamp: payload.timestamp },
@@ -313,8 +334,11 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const toggleLike = useCallback(async (songId: string) => {
+    if (likeInFlightRef.current.has(songId)) return;
+    likeInFlightRef.current.add(songId);
+
     const isCurrentlyLiked = likedSongs.has(songId);
-    
+
     // Optimistically update UI
     setLikedSongsState(prev => {
       const newLikes = new Set(prev);
@@ -328,8 +352,8 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       return newLikes;
     });
 
-    if (user) {
-      try {
+    try {
+      if (user) {
         if (isCurrentlyLiked) {
           const { error } = await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
           if (error) throw error;
@@ -355,23 +379,25 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
             } as any);
           }
         }
-      } catch (error) {
-        // Revert optimistic update
-        setLikedSongsState(prev => {
-          const reverted = new Set(prev);
-          if (isCurrentlyLiked) {
-            reverted.add(songId);
-            setEngagementPoints(p => p + POINTS_PER_LIKE);
-          } else {
-            reverted.delete(songId);
-            setEngagementPoints(p => Math.max(0, p - POINTS_PER_LIKE));
-          }
-          return reverted;
-        });
-        if (import.meta.env.DEV) {
-          console.error('Failed to toggle like', error);
-        }
       }
+    } catch (error) {
+      // Revert optimistic update
+      setLikedSongsState(prev => {
+        const reverted = new Set(prev);
+        if (isCurrentlyLiked) {
+          reverted.add(songId);
+          setEngagementPoints(p => p + POINTS_PER_LIKE);
+        } else {
+          reverted.delete(songId);
+          setEngagementPoints(p => Math.max(0, p - POINTS_PER_LIKE));
+        }
+        return reverted;
+      });
+      if (import.meta.env.DEV) {
+        console.error('Failed to toggle like', error);
+      }
+    } finally {
+      likeInFlightRef.current.delete(songId);
     }
   }, [user, likedSongs]);
 

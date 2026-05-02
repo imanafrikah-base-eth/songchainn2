@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface QueuedAction {
   id: string;
@@ -41,7 +42,46 @@ export function useOfflineQueue() {
   // Process a single action
   const processAction = async (action: QueuedAction): Promise<boolean> => {
     try {
-      return true;
+      const { payload } = action;
+      switch (action.type) {
+        case 'like_song': {
+          const { error } = await supabase
+            .from('liked_songs')
+            .insert({ user_id: payload.user_id, song_id: payload.song_id } as any);
+          return !error;
+        }
+        case 'unlike_song': {
+          const { error } = await supabase
+            .from('liked_songs')
+            .delete()
+            .eq('user_id', payload.user_id)
+            .eq('song_id', payload.song_id);
+          return !error;
+        }
+        case 'like_post': {
+          const { error } = await supabase
+            .from('post_likes')
+            .insert({ post_id: payload.post_id, user_id: payload.user_id } as any);
+          return !error;
+        }
+        case 'unlike_post': {
+          const { error } = await supabase
+            .from('post_likes')
+            .delete()
+            .eq('post_id', payload.post_id)
+            .eq('user_id', payload.user_id);
+          return !error;
+        }
+        case 'comment':
+        case 'song_comment': {
+          const { error } = await supabase
+            .from('post_comments')
+            .insert({ post_id: payload.post_id, user_id: payload.user_id, content: payload.content } as any);
+          return !error;
+        }
+        default:
+          return false;
+      }
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('Failed to process action:', action.type, error);

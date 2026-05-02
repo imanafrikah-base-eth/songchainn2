@@ -115,8 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAudienceProfile(profileData as any);
       upsertProfile(profileData as any);
       const completed = (profileData as any).onboarding_completed === true;
-      const storageFlag = shouldRequireOnboardingFromStorage();
-      const needsOnboardingFlag = !completed && storageFlag;
+      const needsOnboardingFlag = !completed;
       setNeedsOnboarding(needsOnboardingFlag);
       try {
         localStorage.setItem('songchainn_needs_onboarding', needsOnboardingFlag ? '1' : '0');
