@@ -33,7 +33,6 @@ interface ChatMessage {
 // RoomParticipant interface is now imported from useBattleRoles hook
 type SidebarTab = "audience" | "requests" | "chat";
 type RoomMessageRow = Tables<"room_messages">;
-type MicPermissionState = "unknown" | "granted" | "denied";
 
 const LiveRoom = () => {
   const { isEmbedded, embedTo } = useEmbedMode();
@@ -50,11 +49,9 @@ const LiveRoom = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [round, setRound] = useState(1);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("chat");
-  const [requestedToSpeak, setRequestedToSpeak] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isVerySmallMobile, setIsVerySmallMobile] = useState(false);
   const [audioConnected, setAudioConnected] = useState(false);
-  const [micPermission, setMicPermission] = useState<MicPermissionState>('unknown');
   const [showSongPicker, setShowSongPicker] = useState(false);
   const liveKitRoomRef = useRef<Room | null>(null);
 
@@ -64,9 +61,9 @@ const LiveRoom = () => {
   const {
     participants,
     myRole,
-    permissions,
     hasPermission,
     getParticipantsByRole,
+    approveSpeakerRequest,
   } = useBattleRoles(roomId || '');
 
   useEffect(() => {
@@ -198,6 +195,13 @@ const LiveRoom = () => {
     }
   };
 
+  const advanceRound = async () => {
+    if (!roomId || !battle) return;
+    const newRound = Math.min(round + 1, battle.totalRounds);
+    setRound(newRound);
+    await supabase.from("battles").update({ round: newRound }).eq("id", roomId);
+  };
+
   const endBattle = async () => {
     if (!roomId) return;
     await supabase
@@ -242,7 +246,6 @@ const LiveRoom = () => {
   const speakers = getParticipantsByRole('speaker');
   const audience = getParticipantsByRole('audience');
   const iAmHostOrCoHost = hasPermission('canApproveSpeakers');
-  const iCanSpeak = hasPermission('canPublishAudio');
 
   useEffect(() => {
     if (!roomId || !user) return;
@@ -337,56 +340,6 @@ const LiveRoom = () => {
     };
   }, [roomId, user, profile?.display_name, profile?.username]);
 
-  const requestMicAccess = async () => {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setMicPermission("denied");
-      toast({
-        title: "Microphone unavailable",
-        description: "Your device/browser does not expose microphone access in this session.",
-      });
-      return false;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
-      setMicPermission("granted");
-      return true;
-    } catch {
-      setMicPermission("denied");
-      toast({
-        title: "Microphone permission denied",
-        description: "Allow microphone access in your browser to speak live in this room.",
-      });
-      return false;
-    }
-  };
-
-  const setStageMuted = async (muted: boolean) => {
-    if (!roomId || !user || !iCanSpeak) return;
-    if (!muted && micPermission !== "granted") {
-      const allowed = await requestMicAccess();
-      if (!allowed) return;
-    }
-    await supabase
-      .from("battle_rooms")
-      .update({ is_muted: muted, is_speaking: !muted, last_seen_at: new Date().toISOString() })
-      .eq("battle_id", roomId)
-      .eq("user_id", user.id);
-
-    const room = liveKitRoomRef.current;
-    if (room) {
-      try {
-        await room.localParticipant.setMicrophoneEnabled(!muted);
-      } catch {
-        // Keep UI/state consistent even if LiveKit device permissions fail.
-      }
-    }
-  };
-
-  // Leaving speaker stage is now handled by MicControls component
-
-  // Speaker removal functionality is now handled by SpeakerManagement component
 
   useEffect(() => {
     if (!roomId) return;
@@ -421,13 +374,6 @@ const LiveRoom = () => {
     };
   }, [roomId]);
 
-  useEffect(() => {
-    if (!user) return;
-    const me = participants.find((p) => p.user_id === user.id);
-    if (!me) return;
-    setRequestedToSpeak(me.requested_to_speak);
-    if (!me.is_muted) setMicPermission("granted");
-  }, [participants, user]);
 
   const getSidebarTabs = () => {
     if (!hasPermission('canApproveSpeakers')) return ["audience", "chat"] as const;
@@ -640,10 +586,9 @@ const LiveRoom = () => {
           {/* Microphone Controls */}
           <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
             <h3 className="text-sm font-bold text-muted-foreground mb-3">Audio Controls</h3>
-            <MicControls 
-              battleId={roomId || ''} 
+            <MicControls
+              battleId={roomId || ''}
               liveKitRoom={liveKitRoomRef.current}
-              onAudioPermissionChange={(granted) => setMicPermission(granted ? 'granted' : 'denied')}
             />
           </div>
 
@@ -662,7 +607,7 @@ const LiveRoom = () => {
                 <button onClick={() => setIsPaused(!isPaused)} className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2">
                   {isPaused ? <><Play className="h-4 w-4" /> Resume</> : <><Pause className="h-4 w-4" /> Pause Round</>}
                 </button>
-                <button onClick={() => setRound((r) => Math.min(r + 1, battle.totalRounds))} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
+                <button onClick={advanceRound} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
                   <SkipForward className="h-4 w-4" /> Next Round
                 </button>
                 <button onClick={endBattle} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
@@ -686,6 +631,23 @@ const LiveRoom = () => {
                 )}
 
                 <div className="flex flex-wrap gap-2">
+                  {/* Mic toggle for host broadcast */}
+                  {!hostAudio.isMicEnabled ? (
+                    <button
+                      onClick={() => hostAudio.startMic()}
+                      className="rounded-xl bg-card border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted transition-all flex items-center gap-2"
+                    >
+                      <MicOff className="h-4 w-4" /> Enable Mic
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => hostAudio.stopMic()}
+                      className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2"
+                    >
+                      <Mic className="h-4 w-4" /> Mic On
+                    </button>
+                  )}
+                  {/* Song toggle */}
                   {!hostAudio.isSongPlaying ? (
                     <button
                       onClick={() => setShowSongPicker(true)}
@@ -774,14 +736,71 @@ const LiveRoom = () => {
 
           <div className="flex-1 overflow-y-auto p-4">
             {sidebarTab === "audience" && (
-              <div className="space-y-2">
-                <SpeakerManagement battleId={roomId || ''} maxSpeakers={10} />
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  In Room ({participants.length})
+                </p>
+                {participants.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No participants yet</p>
+                )}
+                {participants.map((p) => (
+                  <div key={p.user_id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/30">
+                    <div className={`relative h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0 ${p.is_speaking && !p.is_muted ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""}`}>
+                      {(p.display_name || "?").charAt(0).toUpperCase()}
+                      {p.role === "host" && <Crown className="absolute -top-1 -right-1 h-3 w-3 text-neon-gold" />}
+                      {p.role === "co-host" && <Shield className="absolute -top-1 -right-1 h-3 w-3 text-neon-cyan" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{p.display_name || "Anonymous"}</p>
+                      <p className="text-[10px] text-muted-foreground capitalize">{p.role}</p>
+                    </div>
+                    {p.is_speaking && !p.is_muted
+                      ? <Volume2 className="h-3 w-3 text-primary shrink-0" />
+                      : p.is_muted && p.role !== "audience"
+                      ? <MicOff className="h-3 w-3 text-muted-foreground shrink-0" />
+                      : null
+                    }
+                  </div>
+                ))}
               </div>
             )}
 
             {sidebarTab === "requests" && (
               <div className="space-y-2">
-                <SpeakerManagement battleId={roomId || ''} maxSpeakers={10} />
+                {hasPermission('canApproveSpeakers') ? (
+                  <>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                      Speaker Requests
+                    </p>
+                    {participants.filter((p) => p.requested_to_speak && p.role === "audience").length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No pending requests</p>
+                    )}
+                    {participants
+                      .filter((p) => p.requested_to_speak && p.role === "audience")
+                      .map((p) => (
+                        <div key={p.user_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
+                              {(p.display_name || "?").charAt(0).toUpperCase()}
+                            </div>
+                            <p className="text-sm font-medium text-foreground truncate">{p.display_name || "Anonymous"}</p>
+                          </div>
+                          <button
+                            onClick={() => approveSpeakerRequest(p.user_id)}
+                            className="text-xs font-semibold text-primary hover:text-primary/80 shrink-0 ml-2"
+                          >
+                            Approve
+                          </button>
+                        </div>
+                      ))
+                    }
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    <Hand className="h-4 w-4 mx-auto mb-1" />
+                    Tap "Request to Speak" below to join the stage
+                  </p>
+                )}
               </div>
             )}
 
@@ -823,7 +842,7 @@ const LiveRoom = () => {
                     </button>
                     {showEmojiPicker && (
                       <div className="absolute bottom-full right-0 mb-2 flex gap-1 rounded-lg border border-border bg-card p-2">
-                        {["FIRE", "100", "CLAP", "LOVE", "WOW", "LOL", "STRONG", "MUSIC"].map((e) => (
+                        {["🔥", "💯", "👏", "❤️", "😮", "😂", "💪", "🎵"].map((e) => (
                           <button key={e} onClick={() => addEmoji(e)} className="text-lg hover:scale-125 transition-transform">
                             {e}
                           </button>

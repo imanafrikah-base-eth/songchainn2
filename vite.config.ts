@@ -24,8 +24,14 @@ export default defineConfig(() => ({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          // Core React — always needed, cached aggressively
-          if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) {
+          // Core React + react-query — always needed, must share the same chunk
+          // so React.createContext is defined when @tanstack/react-query initialises
+          if (
+            id.includes('react-dom') ||
+            id.includes('react-router') ||
+            id.includes('/react/') ||
+            id.includes('@tanstack')
+          ) {
             return 'vendor-react';
           }
           // Animation — needed on most pages
@@ -36,24 +42,20 @@ export default defineConfig(() => ({
           if (id.includes('@supabase')) {
             return 'vendor-supabase';
           }
-          // Server-state — small, needed at app root (QueryClientProvider in main.tsx)
-          if (id.includes('@tanstack')) {
-            return 'vendor-query';
-          }
-          // Wagmi core — needed at root (WagmiProvider in main.tsx)
+          // Wagmi + all Coinbase libs in one chunk.
+          // onchainkit imports wallet-sdk internally; splitting them across
+          // chunks causes a TDZ crash ("Cannot access 'nt' before initialization").
           if (
             id.includes('wagmi') ||
             id.includes('/viem/') ||
             id.includes('@wagmi') ||
             id.includes('web3modal') ||
             id.includes('walletconnect') ||
-            id.includes('@walletconnect')
+            id.includes('@walletconnect') ||
+            id.includes('@coinbase')  ||
+            id.includes('onchainkit')
           ) {
             return 'vendor-web3';
-          }
-          // Coinbase OnchainKit — only used on Auth/Marketplace pages (lazy)
-          if (id.includes('@coinbase') || id.includes('onchainkit')) {
-            return 'vendor-coinbase';
           }
           // LiveKit — only used in Room page (lazy)
           if (id.includes('livekit') || id.includes('@livekit')) {

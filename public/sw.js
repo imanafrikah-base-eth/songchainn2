@@ -124,23 +124,9 @@ self.addEventListener('message', (event) => {
   }
   
   if (event.data && event.data.type === 'GET_CACHED_AUDIO') {
-    const { songId } = event.data;
-    caches.open(AUDIO_CACHE).then((cache) => {
-      cache.match(`audio-${songId}`).then((response) => {
-        if (response) {
-          response.blob().then((blob) => {
-            const url = URL.createObjectURL(blob);
-            self.clients.matchAll().then((clients) => {
-              clients.forEach((client) => {
-                client.postMessage({ type: 'CACHED_AUDIO_URL', songId, url });
-              });
-            });
-          });
-        } else {
-          enforceAudioCacheLimitAndBroadcast(cache).catch(() => {});
-        }
-      });
-    });
+    // Client now resolves cached URLs from its own state; the SW fetch interceptor
+    // serves the audio from cache when the audio element requests it.
+    // No-op — kept for protocol compatibility with older SW activations.
   }
 
   if (event.data && event.data.type === 'REMOVE_CACHED_AUDIO') {
@@ -224,26 +210,31 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
-  const data = event.data.json();
-  
-  const options = {
-    body: data.body || 'You have a new notification',
-    icon: '/favicon.png',
-    badge: '/favicon.png',
-    vibrate: [100, 50, 100],
-    data: {
-      url: data.url || '/',
-      ...data
-    },
-    actions: [
-      { action: 'open', title: 'Open' },
-      { action: 'dismiss', title: 'Dismiss' }
-    ]
-  };
+  event.waitUntil((async () => {
+    let data;
+    try {
+      data = event.data.json();
+    } catch {
+      data = { body: await event.data.text() };
+    }
 
-  event.waitUntil(
-    self.registration.showNotification(data.title || '$ongChainn', options)
-  );
+    const options = {
+      body: data.body || 'You have a new notification',
+      icon: '/favicon.png',
+      badge: '/favicon.png',
+      vibrate: [100, 50, 100],
+      data: {
+        url: data.url || '/',
+        ...data
+      },
+      actions: [
+        { action: 'open', title: 'Open' },
+        { action: 'dismiss', title: 'Dismiss' }
+      ]
+    };
+
+    await self.registration.showNotification(data.title || '$ongChainn', options);
+  })());
 });
 
 self.addEventListener('notificationclick', (event) => {

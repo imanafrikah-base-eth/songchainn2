@@ -231,11 +231,17 @@ export function useSocial() {
   const deletePost = useCallback(async (postId: string) => {
     if (!user) return;
 
-    await Promise.all([
+    const [, , { error }] = await Promise.all([
       supabase.from('post_likes').delete().eq('post_id', postId),
       supabase.from('post_comments').delete().eq('post_id', postId),
       supabase.from('social_posts').delete().eq('id', postId).eq('user_id', user.id),
     ]);
+
+    if (error) {
+      toast({ title: 'Could not delete post', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     toast({ title: 'Post deleted' });
   }, [user, toast]);
@@ -246,22 +252,29 @@ export function useSocial() {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
 
-    if (post.is_liked) {
-      await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
-    } else {
-      await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id } as any);
-    }
+    const wasLiked = post.is_liked;
 
-    setPosts(prev => prev.map(p => 
-      p.id === postId 
-        ? { 
-            ...p, 
-            is_liked: !p.is_liked,
-            likes_count: p.is_liked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1 
-          } 
+    // Optimistic update
+    setPosts(prev => prev.map(p =>
+      p.id === postId
+        ? { ...p, is_liked: !wasLiked, likes_count: wasLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1 }
         : p
     ));
-  }, [user, posts]);
+
+    const { error } = wasLiked
+      ? await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id)
+      : await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id } as any);
+
+    if (error) {
+      // Revert on failure
+      setPosts(prev => prev.map(p =>
+        p.id === postId
+          ? { ...p, is_liked: wasLiked, likes_count: wasLiked ? p.likes_count + 1 : Math.max(0, p.likes_count - 1) }
+          : p
+      ));
+      toast({ title: 'Could not update like', description: error.message, variant: 'destructive' });
+    }
+  }, [user, posts, toast]);
 
   const followUser = useCallback(
     async (userId: string) => {

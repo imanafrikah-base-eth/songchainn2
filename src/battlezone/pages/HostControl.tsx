@@ -255,7 +255,13 @@ const HostControl = () => {
             </button>
             <button
               type="button"
-              onClick={() => setRound((r) => Math.min(r + 1, battle.totalRounds))}
+              onClick={async () => {
+                const newRound = Math.min(round + 1, battle.totalRounds);
+                setRound(newRound);
+                if (roomId) {
+                  await supabase.from("battles").update({ round: newRound }).eq("id", roomId);
+                }
+              }}
               className="rounded-lg bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/80"
             >
               Next Round
