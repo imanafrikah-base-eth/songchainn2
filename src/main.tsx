@@ -1,3 +1,4 @@
+"use client";
 import "./ses-compat";
 import React from "react";
 import { createRoot } from "react-dom/client";
