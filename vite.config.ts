@@ -24,46 +24,7 @@ export default defineConfig(() => ({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          // Core React + Web3 + react-query — must share the same chunk
-          // to avoid "createContext of undefined" errors and TDZ crashes.
-          if (
-            id.includes('/node_modules/react/') ||
-            id.includes('/node_modules/react-dom/') ||
-            id.includes('/node_modules/react-router/') ||
-            id.includes('/node_modules/react-router-dom/') ||
-            id.includes('/node_modules/@tanstack/') ||
-            id.includes('wagmi') ||
-            id.includes('/viem/') ||
-            id.includes('@wagmi') ||
-            id.includes('web3modal') ||
-            id.includes('walletconnect') ||
-            id.includes('@walletconnect') ||
-            id.includes('@coinbase')  ||
-            id.includes('onchainkit')
-          ) {
-            return 'vendor-core';
-          }
-          // Animation — needed on most pages
-          if (id.includes('framer-motion')) {
-            return 'vendor-motion';
-          }
-          // Supabase — needed on most pages
-          if (id.includes('@supabase')) {
-            return 'vendor-supabase';
-          }
-          // LiveKit — only used in Room page (lazy)
-          if (id.includes('livekit') || id.includes('@livekit')) {
-            return 'vendor-livekit';
-          }
-          // UI primitives — needed on most pages
-          if (id.includes('@radix-ui') || id.includes('lucide-react')) {
-            return 'vendor-ui';
-          }
-          // Date utils — small, lazy (only pages that format dates)
-          if (id.includes('date-fns')) {
-            return 'vendor-date';
-          }
-          return 'vendor-misc';
+          return 'vendor';
         },
       },
     },
@@ -172,6 +133,7 @@ export default defineConfig(() => ({
     react(),
   ],
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
