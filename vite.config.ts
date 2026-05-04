@@ -27,10 +27,11 @@ export default defineConfig(() => ({
           // Core React + react-query — always needed, must share the same chunk
           // so React.createContext is defined when @tanstack/react-query initialises
           if (
-            id.includes('react-dom') ||
-            id.includes('react-router') ||
-            id.includes('/react/') ||
-            id.includes('@tanstack')
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/react-router/') ||
+            id.includes('/node_modules/react-router-dom/') ||
+            id.includes('/node_modules/@tanstack/')
           ) {
             return 'vendor-react';
           }
@@ -79,7 +80,7 @@ export default defineConfig(() => ({
       name: "dev-upload-image-mock",
       apply: "serve",
       configureServer(server) {
-        server.middlewares.use("/api/upload/image", (req: any, res: any, next: any) => {
+        server.middlewares.use("/api/upload/image", (req: any, res: any) => {
           if (req.method !== "POST") {
             res.statusCode = 405;
             res.setHeader("Content-Type", "application/json");
@@ -103,7 +104,7 @@ export default defineConfig(() => ({
       name: "dev-livekit-token",
       apply: "serve",
       configureServer(server) {
-        server.middlewares.use("/api/livekit-token", async (req: any, res: any, next: any) => {
+        server.middlewares.use("/api/livekit-token", async (req: any, res: any) => {
           if (req.method !== "POST") {
             res.statusCode = 405;
             res.setHeader("Content-Type", "application/json");
@@ -115,7 +116,9 @@ export default defineConfig(() => ({
             // Parse request body
             const body = await new Promise((resolve, reject) => {
               let data = "";
-              req.on("data", chunk => data += chunk);
+              req.on("data", (chunk: Buffer | string) => {
+                data += chunk.toString();
+              });
               req.on("end", () => {
                 try {
                   resolve(JSON.parse(data));
@@ -152,7 +155,7 @@ export default defineConfig(() => ({
               throw new Error(`LiveKit server error: ${response.status}`);
             }
 
-            const tokenData = await response.json();
+            const tokenData = await response.json() as Record<string, unknown>;
             
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");

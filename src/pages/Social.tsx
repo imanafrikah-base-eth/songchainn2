@@ -1,4 +1,4 @@
-import { type UIEvent, useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -49,7 +49,6 @@ export default function Social() {
   const [suggestedUsers, setSuggestedUsers] = useState<AudienceProfile[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [showComposer, setShowComposer] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [sharedPost, setSharedPost] = useState<SocialPostWithProfile | null>(null);
   const [isLoadingSharedPost, setIsLoadingSharedPost] = useState(false);
   const [commentSheet, setCommentSheet] = useState<{ isOpen: boolean; postId: string | null }>({
@@ -105,7 +104,6 @@ export default function Social() {
     const idx = posts.findIndex((p) => p.id === sharedPostId);
     if (idx >= 0) {
       setSharedPost(null);
-      setCurrentIndex(idx);
       const container = feedRef.current;
       if (container) {
         container.scrollTo({ top: idx * container.clientHeight, behavior: 'auto' });
@@ -129,14 +127,6 @@ export default function Social() {
 
   const postsToRender = sharedPost ? [sharedPost] : filteredPosts;
   const effectiveIsLoading = isLoading || isLoadingSharedPost;
-
-  const handleScroll = useCallback((e: UIEvent<HTMLDivElement>) => {
-    const container = e.currentTarget;
-    const newIndex = Math.round(container.scrollTop / container.clientHeight);
-    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < postsToRender.length) {
-      setCurrentIndex(newIndex);
-    }
-  }, [currentIndex, postsToRender.length]);
 
   const handleOpenComments = async (postId: string) => {
     setCommentSheet({ isOpen: true, postId });
@@ -165,25 +155,20 @@ export default function Social() {
   return (
     <div className="h-dvh bg-black relative overflow-hidden">
 
-      {/* ── Full-screen snap feed ── */}
+      {/* ── Scrollable feed ── */}
       <div
         ref={feedRef}
         className="absolute inset-0 overflow-y-scroll overscroll-none"
-        style={{ scrollSnapType: 'y mandatory', WebkitOverflowScrolling: 'touch' }}
-        onScroll={handleScroll}
       >
         {effectiveIsLoading ? (
-          <div className="h-full flex items-center justify-center" style={{ scrollSnapAlign: 'start' }}>
+          <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <div className="w-12 h-12 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-white/60">Loading your feed…</p>
             </div>
           </div>
         ) : postsToRender.length === 0 ? (
-          <div
-            className="h-full flex items-center justify-center px-6"
-            style={{ scrollSnapAlign: 'start' }}
-          >
+          <div className="h-full flex items-center justify-center px-6">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -218,19 +203,14 @@ export default function Social() {
             </motion.div>
           </div>
         ) : (
-          postsToRender.map((post, index) => (
-            <div
-              key={post.id}
-              className="h-full w-full"
-              style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
-            >
+          postsToRender.map((post) => (
+            <div key={post.id} className="h-full w-full">
               <MusicFeedCard
                 post={post}
                 onLike={toggleLikePost}
                 onFollow={followUser}
                 isFollowing={isFollowing(post.user_id)}
                 onComment={() => handleOpenComments(post.id)}
-                isVisible={index === currentIndex}
               />
             </div>
           ))
@@ -376,22 +356,6 @@ export default function Social() {
           </div>
         </div>
       </div>
-
-      {/* ── Scroll position dots ── */}
-      {postsToRender.length > 1 && !effectiveIsLoading && (
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1.5 pointer-events-none">
-          {postsToRender.slice(0, 12).map((_, i) => (
-            <div
-              key={i}
-              className={`rounded-full transition-all duration-200 ${
-                i === currentIndex
-                  ? 'w-1.5 h-4 bg-white'
-                  : 'w-1 h-1 bg-white/30'
-              }`}
-            />
-          ))}
-        </div>
-      )}
 
       {/* ── Floating create button ── */}
       <motion.button

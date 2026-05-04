@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type SyntheticEvent } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart,
@@ -37,7 +37,6 @@ interface MusicFeedCardProps {
   onFollow: (userId: string) => void;
   isFollowing: boolean;
   onComment: () => void;
-  isVisible?: boolean;
 }
 
 export function MusicFeedCard({
@@ -46,24 +45,12 @@ export function MusicFeedCard({
   onFollow,
   isFollowing,
   onComment,
-  isVisible = false,
 }: MusicFeedCardProps) {
   const { user } = useAuth();
   const { currentSong, isPlaying, playSong, pause, play } = usePlayer();
   const navigate = useNavigate();
   const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard } = useShare();
-  const [showHeart, setShowHeart] = useState(false);
   const { data: pulseCounts } = usePulseCounts();
-
-  // Stable refs so autoplay effect doesn't need player state as deps
-  const currentSongRef = useRef(currentSong);
-  const isPlayingRef = useRef(isPlaying);
-  const playRef = useRef(play);
-  const playSongRef = useRef(playSong);
-  currentSongRef.current = currentSong;
-  isPlayingRef.current = isPlaying;
-  playRef.current = play;
-  playSongRef.current = playSong;
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
   const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
@@ -79,21 +66,6 @@ export function MusicFeedCard({
   const totalPulses = pulseCounts && song
     ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count || 0)
     : 0;
-
-  // Autoplay when this card scrolls into view
-  useEffect(() => {
-    if (!isVisible || !song) return;
-    const songId = song.id;
-    const timer = setTimeout(() => {
-      const cs = currentSongRef.current;
-      if (cs?.id === songId) {
-        if (!isPlayingRef.current) playRef.current();
-      } else {
-        playSongRef.current(song);
-      }
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [isVisible, song]);
 
   const handleSongImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
@@ -115,12 +87,6 @@ export function MusicFeedCard({
       ? getSongShareUrl({ id: song.id, title: song.title, artist: artist?.name || song.artist, coverImage: song.coverImage })
       : getShareUrl('post', post.id);
     copyToClipboard(url);
-  };
-
-  const handleDoubleTap = () => {
-    if (!post.is_liked) onLike(post.id);
-    setShowHeart(true);
-    setTimeout(() => setShowHeart(false), 900);
   };
 
   const handlePlayPause = () => {
@@ -172,7 +138,6 @@ export function MusicFeedCard({
       <div
         className="absolute inset-0 cursor-pointer"
         onClick={song ? handlePlayPause : undefined}
-        onDoubleClick={handleDoubleTap}
       >
         {/* Center artwork */}
         <div className="absolute inset-0 flex items-center justify-center">
@@ -227,7 +192,7 @@ export function MusicFeedCard({
           {/* Play / Pause indicator */}
           {song && (
             <AnimatePresence>
-              {!isThisSongPlaying && isVisible && (
+              {!isThisSongPlaying && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.6 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -239,7 +204,7 @@ export function MusicFeedCard({
                   </div>
                 </motion.div>
               )}
-              {isThisSongPlaying && isVisible && (
+              {isThisSongPlaying && (
                 <motion.div
                   key="pause-hint"
                   initial={{ opacity: 0 }}
@@ -255,20 +220,6 @@ export function MusicFeedCard({
             </AnimatePresence>
           )}
         </div>
-
-        {/* Double-tap heart burst */}
-        <AnimatePresence>
-          {showHeart && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1.3 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            >
-              <Heart className="w-28 h-28 text-red-500 fill-red-500 drop-shadow-2xl" />
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* ── Right-side action bar ── */}
