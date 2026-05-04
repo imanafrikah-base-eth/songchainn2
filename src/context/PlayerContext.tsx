@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode, useMemo } from 'react';
-import { Song, SONGS } from '@/data/musicData';
+import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode, useMemo } from 'react';
+import { Song, SONGS, ARTISTS, CATALOGS } from '@/data/musicData';
+import { supabase } from '@/integrations/supabase/client';
+import { syncPublicSongsInBackground } from '@/lib/publicSongsSync';
 
 // Split context for better performance - components only re-render for what they need
 interface PlayerStateContext {
@@ -137,10 +139,67 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     isRoomModeRef.current = isRoomMode;
   }, [isRoomMode]);
 
+  const bootstrapSongSources = useMemo(() => {
+    const byId = new Map<string, Song>();
+    for (const song of SONGS) {
+      byId.set(song.id, song);
+    }
+    for (const catalog of CATALOGS) {
+      for (const songId of catalog.songIds) {
+        const song = byId.get(songId);
+        if (song) byId.set(song.id, song);
+      }
+    }
+    return Array.from(byId.values());
+  }, []);
+
+  // Background sync of all current app song sources (SONGS + catalog-referenced songs).
+  useEffect(() => {
+    void syncPublicSongsInBackground(bootstrapSongSources, ARTISTS);
+  }, [bootstrapSongSources]);
+
   useEffect(() => {
     recoverAttemptsRef.current = 0;
     lastRecoverAtRef.current = 0;
   }, [currentSong?.id]);
+
+  useEffect(() => {
+    if (!currentSong) return;
+
+    console.log("🔥 Sync triggered", currentSong);
+
+    const syncSong = async () => {
+      try {
+        const artistRecord = ARTISTS.find(a => a.id === currentSong.artistId);
+        const songWithArtistImage = currentSong as Song & { artistImage?: string };
+        const payload = {
+          id: String(currentSong.id),
+          title: currentSong.title,
+          artist_name: currentSong.artist,
+          audio_url: currentSong.audioUrl,
+          cover_art_url: currentSong.coverImage,
+          artist_image_url: songWithArtistImage.artistImage || artistRecord?.profileImage || null,
+          is_published: true
+        };
+
+        console.log("📦 Payload:", payload);
+
+        const { data, error } = await (supabase as any)
+          .from("songs")
+          .upsert(payload as any, { onConflict: "id" });
+
+        if (error) {
+          console.error("❌ Supabase error:", error);
+        } else {
+          console.log("✅ Insert success:", data);
+        }
+      } catch (err) {
+        console.error("🔥 Crash:", err);
+      }
+    };
+
+    syncSong();
+  }, [currentSong]);
 
   useEffect(() => {
     const audio = audioRef.current;

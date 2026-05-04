@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Flame, Music2, PlayCircle, Trophy, Users } from 'lucide-react';
+import { ArrowRight, Flame, PlayCircle, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { WaveWarzBattleCard } from '@/components/wavewarz/WaveWarzBattleCard';
 import { WaveWarzCountryJoinDialog } from '@/components/wavewarz/WaveWarzCountryJoinDialog';
-import { WAVEWARZ_AFRICA_ASSETS, WAVEWARZ_AFRICA_LINKS, WAVEWARZ_BATTLE_CARDS, WAVEWARZ_HERO_STATS } from '@/data/wavewarzAfrica';
+import { WAVEWARZ_AFRICA_ASSETS, WAVEWARZ_AFRICA_LINKS, WAVEWARZ_HERO_STATS } from '@/data/wavewarzAfrica';
 
 export function WaveWarzHomeHero() {
   return (
@@ -62,50 +61,7 @@ export function WaveWarzHomeHero() {
                 </Link>
               ))}
             </div>
-            <div className="grid gap-2 rounded-2xl border border-cyan-400/25 bg-black/45 p-3 text-sm text-zinc-100 sm:grid-cols-2">
-              <div className="space-y-1">
-                <p className="font-semibold text-cyan-100">Past Battle Result</p>
-                <p>NDA won on votes.</p>
-                <p>IMan Afrikah won on trades.</p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Link
-                  to={WAVEWARZ_AFRICA_LINKS.quickBattles}
-                  className="inline-flex items-center justify-center rounded-xl border border-emerald-300/30 bg-emerald-500/15 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/25"
-                >
-                  Join $ongChain Artists To Battle
-                </Link>
-                <WaveWarzCountryJoinDialog
-                  triggerClassName="h-auto justify-center rounded-xl border border-cyan-300/30 bg-cyan-500/15 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/25"
-                />
-              </div>
-            </div>
           </div>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-cyan-300/25 bg-black/55 p-3 sm:p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
-            <Music2 className="h-5 w-5 text-emerald-300" />
-            Passed BattleZ
-          </h2>
-          <Link
-            to={WAVEWARZ_AFRICA_LINKS.quickBattles}
-            className="inline-flex items-center gap-1 rounded-lg border border-cyan-300/30 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-500/10"
-          >
-            See All
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="grid gap-3 lg:grid-cols-3">
-          {WAVEWARZ_BATTLE_CARDS.map((battle) => (
-            <WaveWarzBattleCard key={battle.id} battle={battle} />
-          ))}
-        </div>
-        <div className="mt-3 flex items-center gap-2 text-xs text-zinc-300">
-          <Users className="h-3.5 w-3.5 text-cyan-200" />
-          BattleZone runs in $ongChainn app first, with embedded fallback only on hard errors.
         </div>
       </div>
     </section>

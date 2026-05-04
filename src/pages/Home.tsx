@@ -407,29 +407,31 @@ export default function Home() {
             <h2 className="text-sm sm:text-base font-semibold text-foreground">$ongChainn Quick Actions</h2>
             <span className="text-[11px] sm:text-xs text-muted-foreground">Smart shortcuts</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
             {quickActions.map((item) => {
               const Icon = item.icon;
               const content = (
-                <div className="w-full rounded-xl border border-border bg-card/60 px-3 py-2.5 text-left hover:border-primary/35 hover:bg-primary/5 transition-colors">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Icon className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-medium text-foreground">{item.label}</span>
+                <div className="h-full min-h-[98px] rounded-xl border border-border bg-card/60 px-3 py-2.5 text-left hover:border-primary/35 hover:bg-primary/5 transition-colors">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/12">
+                      <Icon className="h-3.5 w-3.5 text-primary" />
+                    </span>
+                    <span className="text-[13px] sm:text-sm font-semibold leading-tight text-foreground">{item.label}</span>
                   </div>
-                  <p className="text-[11px] sm:text-xs text-muted-foreground">{item.description}</p>
+                  <p className="text-[10px] sm:text-xs leading-relaxed text-muted-foreground">{item.description}</p>
                 </div>
               );
 
               if (item.to) {
                 return (
-                  <Link key={item.label} to={item.to}>
+                  <Link key={item.label} to={item.to} className="block h-full">
                     {content}
                   </Link>
                 );
               }
 
               return (
-                <button key={item.label} type="button" onClick={item.action}>
+                <button key={item.label} type="button" onClick={item.action} className="h-full w-full text-left">
                   {content}
                 </button>
               );
