@@ -3,6 +3,26 @@ export type EnvConfig = {
   supabaseAnonKey: string;
 };
 
+function stripWrappingQuotes(raw: string): string {
+  let value = raw.trim();
+  const pairs: Array<[string, string]> = [
+    ['"', '"'],
+    ["'", "'"],
+    ['`', '`'],
+  ];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [start, end] of pairs) {
+      if (value.startsWith(start) && value.endsWith(end) && value.length >= 2) {
+        value = value.slice(1, -1).trim();
+        changed = true;
+      }
+    }
+  }
+  return value;
+}
+
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return trimmed;
@@ -13,13 +33,21 @@ function normalizeUrl(raw: string): string {
 export function getEnv(): EnvConfig {
   const rawUrl = (import.meta.env.VITE_SUPABASE_URL ?? '').toString();
   const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').toString();
+  const cleanedUrl = stripWrappingQuotes(rawUrl);
+  const cleanedKey = stripWrappingQuotes(rawKey);
 
-  const supabaseUrl = normalizeUrl(rawUrl);
-  const supabaseAnonKey = rawKey.trim();
+  const supabaseUrl = normalizeUrl(cleanedUrl);
+  const supabaseAnonKey = cleanedKey.trim();
 
   const problems: string[] = [];
   if (!supabaseUrl) problems.push('VITE_SUPABASE_URL is missing');
   if (!supabaseAnonKey) problems.push('VITE_SUPABASE_ANON_KEY is missing');
+  if (rawUrl.trim() && cleanedUrl !== rawUrl.trim()) {
+    problems.push('VITE_SUPABASE_URL has wrapping quotes — remove quotes in Vercel env');
+  }
+  if (rawKey.trim() && cleanedKey !== rawKey.trim()) {
+    problems.push('VITE_SUPABASE_ANON_KEY has wrapping quotes — remove quotes in Vercel env');
+  }
   if (supabaseUrl && !supabaseUrl.includes('supabase.co')) {
     problems.push(`VITE_SUPABASE_URL looks wrong: "${supabaseUrl}"`);
   }
