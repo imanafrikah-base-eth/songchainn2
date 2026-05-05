@@ -23,6 +23,32 @@ function stripWrappingQuotes(raw: string): string {
   return value;
 }
 
+function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
+  const parts = jwt.split('.');
+  if (parts.length < 2) return null;
+  const payload = parts[1];
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    const parsed = JSON.parse(json) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function getSupabaseRefFromUrl(supabaseUrl: string): string | null {
+  try {
+    const host = new URL(supabaseUrl).hostname;
+    const ref = host.split('.')[0];
+    return ref && ref.length > 0 ? ref : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return trimmed;
@@ -59,6 +85,16 @@ export function getEnv(): EnvConfig {
       '[$ongChainn] VITE_SUPABASE_ANON_KEY looks like a publishable key (not a JWT). ' +
       'Copy the "anon" JWT key from Supabase → Project Settings → API to avoid load hangs.'
     );
+  }
+  if (supabaseUrl && supabaseAnonKey.startsWith('eyJ')) {
+    const urlRef = getSupabaseRefFromUrl(supabaseUrl);
+    const payload = decodeJwtPayload(supabaseAnonKey);
+    const keyRef = payload && typeof payload.ref === 'string' ? (payload.ref as string) : null;
+    if (urlRef && keyRef && urlRef !== keyRef) {
+      problems.push(
+        `VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY do not match (url ref: "${urlRef}", key ref: "${keyRef}")`
+      );
+    }
   }
 
   if (problems.length > 0) {
