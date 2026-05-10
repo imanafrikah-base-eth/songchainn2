@@ -13,6 +13,8 @@ import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
 import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
 import { BaseWalletButton } from '@/components/wallet/BaseWalletButton';
+import { useFarcasterContext } from '@/context/FarcasterContext';
+import { requestFarcasterSignIn } from '@/hooks/useFarcaster';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { CATALOGS, SONGS, type Song } from '@/data/musicData';
@@ -62,7 +64,9 @@ const ABOUT_STEPS = [
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail } = useAuth();
+  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail, signInWithFarcaster } = useAuth();
+  const { isInFarcaster } = useFarcasterContext();
+  const [isFarcasterLoading, setIsFarcasterLoading] = useState(false);
   const { openConnectModal, isConnected } = useWeb3Wallet();
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -183,6 +187,30 @@ export default function Auth() {
       setConnectionState('idle');
     }
   }, [hasWallet, isWalletDetected, isConnected, signInWithWallet, openConnectModal]);
+
+  const handleFarcasterSignIn = useCallback(async () => {
+    setError(null);
+    setIsFarcasterLoading(true);
+    try {
+      const { message, signature } = await requestFarcasterSignIn();
+      const result = await signInWithFarcaster(message, signature);
+      if (result.error) setError(result.error.message);
+    } catch (err: any) {
+      const msg = String(err?.message ?? '');
+      if (!msg.includes('cancel') && !msg.includes('reject')) {
+        setError('Farcaster sign-in failed. Please try again.');
+      }
+    } finally {
+      setIsFarcasterLoading(false);
+    }
+  }, [signInWithFarcaster]);
+
+  // Auto-open the auth modal when running inside Farcaster so users see the Farcaster button first.
+  useEffect(() => {
+    if (isInFarcaster && authView === 'landing') {
+      setAuthView('main');
+    }
+  }, [isInFarcaster, authView]);
 
   useEffect(() => {
     if (user) navigate('/', { replace: true });
@@ -447,7 +475,7 @@ export default function Auth() {
 
   const tellAboutWaveWarz = useCallback(() => {
     showMoshaTransient(
-      'WaveWarz Africa is $ongChainn BattleZone energy. You can enter live battles, support artists, view results, and join battle rooms directly inside $ongChainn.',
+      'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and submit your country for rollout.',
       11000,
     );
   }, [showMoshaTransient]);
@@ -468,7 +496,7 @@ export default function Auth() {
 
     const steps: Array<{ id?: string; text: string }> = [
       { text: 'This is Hot Today. It surfaces songs listeners are actively pushing right now.' },
-      { id: 'wavewarz-preview', text: 'WaveWarz is where fans vote and support artists live in BattleZone energy.' },
+      { id: 'wavewarz-preview', text: 'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you register your music and country.' },
       { id: 'about-songchainn', text: 'This section explains $ongChainn vision and what early listeners unlock first.' },
       { id: 'featured-catalogs', text: 'Featured Catalogs group the strongest drops so you can discover faster.' },
       { id: 'trending-artists', text: 'Trending Artists helps you catch talent early and stay ahead of the crowd.' },
@@ -543,7 +571,7 @@ export default function Auth() {
   useEffect(() => {
     if (isMoshaOpen) return;
     const cues: Array<{ id: string; text: string }> = [
-      { id: 'wavewarz-preview', text: 'WaveWarz is where fans vote and push artists live. Big energy there.' },
+      { id: 'wavewarz-preview', text: 'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and submit your country.' },
       { id: 'about-songchainn', text: '$ongChainn turns listening into signal. Want the full story? Tap Learn More.' },
       { id: 'featured-catalogs', text: 'These catalogs are trending now. You can preview first, then sign in when ready.' },
       { id: 'trending-artists', text: 'Early ears catch artists before the crowd. Your taste matters here.' },
@@ -743,16 +771,25 @@ export default function Auth() {
                     <Flame className="h-3.5 w-3.5" />
                     WaveWarz Africa
                   </p>
-                  <h2 className="text-2xl md:text-3xl font-bold text-white">Enter The African BattleZone</h2>
+                  <h2 className="text-2xl md:text-3xl font-bold text-white">WaveWarz Africa</h2>
                   <p className="max-w-2xl text-sm md:text-base text-zinc-200">
-                    Make some money while voting for and supporting your favorite artist or song. Feel the live battle energy before you sign in.
+                    Register your music and country on $ongChainn. All WaveWarz Africa battle activity happens on WaveWarz.com.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <Button type="button" className="bg-emerald-400 text-black hover:bg-emerald-300" onClick={handleBrowseWithoutAuthModal}>
-                      Enter BattleZ
+                    <Button
+                      type="button"
+                      className="bg-emerald-400 text-black hover:bg-emerald-300"
+                      onClick={() => window.open('/wavewarz-africa', '_self')}
+                    >
+                      Register on $ongChainn
                     </Button>
-                    <Button type="button" variant="outline" className="border-cyan-300/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20" onClick={handleBrowseWithoutAuthModal}>
-                      Watch Live Battles
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-cyan-300/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
+                      onClick={() => window.open('https://www.wavewarz.com', '_blank', 'noopener,noreferrer')}
+                    >
+                      Open WaveWarz.com
                     </Button>
                     <Button
                       type="button"
@@ -760,7 +797,7 @@ export default function Auth() {
                       className="border-emerald-300/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
                       onClick={() => window.open('https://subscribepage.io/XFM0pk', '_blank', 'noopener,noreferrer')}
                     >
-                      Learn How It Works
+                      Learn More
                     </Button>
                   </div>
                 </div>
@@ -1146,6 +1183,27 @@ export default function Auth() {
                     Continue your music journey or create a new account.
                   </p>
                 </div>
+
+                {/* Farcaster sign-in — only shown inside Farcaster clients */}
+                {isInFarcaster && (
+                  <button
+                    onClick={handleFarcasterSignIn}
+                    disabled={isFarcasterLoading}
+                    className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl bg-[#7c3aed] text-white hover:opacity-95 transition-colors press-effect mb-3 disabled:opacity-60"
+                  >
+                    <span className="flex items-center gap-3">
+                      {isFarcasterLoading
+                        ? <Loader2 className="w-5 h-5 animate-spin" />
+                        : <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M18.24 0H5.76A5.76 5.76 0 0 0 0 5.76v12.48A5.76 5.76 0 0 0 5.76 24h12.48A5.76 5.76 0 0 0 24 18.24V5.76A5.76 5.76 0 0 0 18.24 0ZM7.92 18l-3.12-9h2.4l1.8 5.64L10.8 9h2.4l1.8 5.64L16.8 9h2.4L16.08 18h-2.4l-1.68-5.28L10.32 18H7.92Z"/></svg>
+                      }
+                      <span className="font-semibold">
+                        {isFarcasterLoading ? 'Signing in…' : 'Continue with Farcaster'}
+                      </span>
+                    </span>
+                    {!isFarcasterLoading && <span className="text-xs opacity-80">1-tap sign in</span>}
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
                     setAuthMode('signin');

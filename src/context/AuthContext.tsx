@@ -16,6 +16,7 @@ interface AuthContextType {
   walletAddress: string | null;
   isWalletDetected: boolean;
   signInWithWallet: () => Promise<{ error: Error | null }>;
+  signInWithFarcaster: (message: string, signature: string) => Promise<{ error: Error | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -296,6 +297,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshProfile, refreshRoles]);
 
+  const signInWithFarcaster = useCallback(async (message: string, signature: string) => {
+    try {
+      if (!isSupabaseConfigured) return { error: new Error('Supabase is not configured') };
+
+      const { data, error: fnError } = await supabase.functions.invoke('farcaster-auth', {
+        body: { message, signature },
+      });
+      if (fnError) return { error: new Error(fnError.message || 'Farcaster auth failed') };
+
+      const { email, otp } = data as { email: string; otp: string };
+
+      const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email',
+      });
+      if (otpError) return { error: otpError };
+
+      const u = otpData.user;
+      if (!u) return { error: new Error('Sign-in failed') };
+
+      setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+      await refreshRoles(u.id);
+      setIsArtist(false);
+      setArtistId(null);
+      setNeedsOnboarding(true);
+      try {
+        localStorage.setItem('songchainn_needs_onboarding', '1');
+        localStorage.setItem('songchainn_show_profile_photo_hint', '1');
+      } catch { void 0; }
+      await refreshProfile();
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(err?.message || 'Farcaster sign-in failed') };
+    }
+  }, [refreshProfile, refreshRoles]);
+
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
@@ -322,6 +360,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       walletAddress,
       isWalletDetected,
       signInWithWallet,
+      signInWithFarcaster,
       signUpWithEmail,
       signInWithEmail,
       signOut,

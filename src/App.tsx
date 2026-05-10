@@ -15,7 +15,7 @@ import { NotificationBanner } from "@/components/NotificationBanner";
 const VibeAgent = lazy(() => import("@/components/VibeAgent").then(m => ({ default: m.VibeAgent })));
 const BehaviorCtaPopups = lazy(() => import("@/components/BehaviorCtaPopups").then(m => ({ default: m.BehaviorCtaPopups })));
 import { useUserPresence } from "@/hooks/useUserPresence";
-import { useFarcaster } from "@/hooks/useFarcaster";
+import { FarcasterProvider } from "@/context/FarcasterContext";
 import { supabase } from "@/integrations/supabase/client";
 // Lazy load pages for better initial load performance
 const Home = lazy(() => import("./pages/Home"));
@@ -186,7 +186,6 @@ function AppShell() {
 function AppContent() {
   const { isAuthenticated, isLoading, needsOnboarding, user } = useAuth();
   useUserPresence(user?.id ?? null, { includeLastSeen: true });
-  useFarcaster();
 
   if (isLoading) {
     return <PageLoader />;
@@ -236,11 +235,13 @@ function AppContent() {
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AppContent />
-      </TooltipProvider>
+      <FarcasterProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AppContent />
+        </TooltipProvider>
+      </FarcasterProvider>
     </AuthProvider>
   </BrowserRouter>
 );
