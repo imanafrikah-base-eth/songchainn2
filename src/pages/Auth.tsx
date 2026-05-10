@@ -13,6 +13,7 @@ import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
 import { useFarcasterContext } from '@/context/FarcasterContext';
 import { requestFarcasterSignIn } from '@/hooks/useFarcaster';
+import sdk from '@farcaster/miniapp-sdk';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { CATALOGS, SONGS, type Song } from '@/data/musicData';
@@ -62,9 +63,10 @@ const ABOUT_STEPS = [
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail, signInWithFarcaster } = useAuth();
+  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail, signInWithFarcaster, signInWithFarcasterToken } = useAuth();
   const { isInFarcaster } = useFarcasterContext();
   const [isFarcasterLoading, setIsFarcasterLoading] = useState(false);
+  const [quickAuthAttempted, setQuickAuthAttempted] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
@@ -197,7 +199,26 @@ export default function Auth() {
     }
   }, [signInWithFarcaster]);
 
-  // Auto-open the auth modal when running inside Farcaster so users see the Farcaster button first.
+  // quickAuth: silently sign in as soon as we know we're in Farcaster.
+  // sdk.quickAuth.getToken() requires no user interaction in most clients.
+  useEffect(() => {
+    if (!isInFarcaster || user || quickAuthAttempted) return;
+    setQuickAuthAttempted(true);
+    setIsFarcasterLoading(true);
+
+    sdk.quickAuth.getToken()
+      .then(({ token }) => signInWithFarcasterToken(token))
+      .catch(() => ({ error: new Error('quickAuth unavailable') }))
+      .then((result) => {
+        if (result?.error) {
+          // Silent failure — fall back to the manual Farcaster button
+          setAuthView('main');
+        }
+      })
+      .finally(() => setIsFarcasterLoading(false));
+  }, [isInFarcaster, user, quickAuthAttempted, signInWithFarcasterToken]);
+
+  // Auto-open the auth modal when in Farcaster so users see the button if quickAuth fails.
   useEffect(() => {
     if (isInFarcaster && authView === 'landing') {
       setAuthView('main');
@@ -1162,7 +1183,7 @@ export default function Auth() {
                   </p>
                 </div>
 
-                {/* Farcaster sign-in — only shown inside Farcaster clients */}
+                {/* Farcaster sign-in — auto-fires via quickAuth; button is fallback */}
                 {isInFarcaster && (
                   <button
                     onClick={handleFarcasterSignIn}
@@ -1175,10 +1196,10 @@ export default function Auth() {
                         : <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M18.24 0H5.76A5.76 5.76 0 0 0 0 5.76v12.48A5.76 5.76 0 0 0 5.76 24h12.48A5.76 5.76 0 0 0 24 18.24V5.76A5.76 5.76 0 0 0 18.24 0ZM7.92 18l-3.12-9h2.4l1.8 5.64L10.8 9h2.4l1.8 5.64L16.8 9h2.4L16.08 18h-2.4l-1.68-5.28L10.32 18H7.92Z"/></svg>
                       }
                       <span className="font-semibold">
-                        {isFarcasterLoading ? 'Signing in…' : 'Continue with Farcaster'}
+                        {isFarcasterLoading ? 'Signing you in…' : 'Continue with Farcaster'}
                       </span>
                     </span>
-                    {!isFarcasterLoading && <span className="text-xs opacity-80">1-tap sign in</span>}
+                    {!isFarcasterLoading && <span className="text-xs opacity-80">Tap if not auto-signed</span>}
                   </button>
                 )}
 

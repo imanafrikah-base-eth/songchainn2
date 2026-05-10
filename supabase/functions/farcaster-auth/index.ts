@@ -1,9 +1,9 @@
-// Farcaster Sign-In With Farcaster (SIWF) verification edge function.
-// Flow: client gets SIWE message+signature from sdk.actions.signIn() →
-// sends here → we verify cryptographically → issue a Supabase magic-link OTP →
-// client calls supabase.auth.verifyOtp() to establish a real session.
+// Farcaster auth edge function — handles two paths:
+//   1. quickAuth JWT  { token }              — zero-tap, auto sign-in
+//   2. SIWF           { message, signature } — manual button fallback
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verifyMessage } from 'npm:viem';
+import { jwtVerify, createRemoteJWKSet } from 'npm:jose';
 
 const ALLOWED_DOMAINS = new Set([
   'songchainn.xyz',
@@ -12,7 +12,6 @@ const ALLOWED_DOMAINS = new Set([
   'localhost:8080',
 ]);
 
-// Messages older than 5 minutes are rejected as stale / replayed.
 const MAX_AGE_MS = 5 * 60 * 1000;
 
 const CORS = {
@@ -26,6 +25,24 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
+}
+
+// Farcaster's public JWKS endpoint for quickAuth tokens
+const FARCASTER_JWKS = createRemoteJWKSet(
+  new URL('https://auth.farcaster.xyz/.well-known/jwks.json'),
+);
+
+async function handleQuickAuth(token: string): Promise<{ fid: number; error?: string }> {
+  try {
+    const { payload } = await jwtVerify(token, FARCASTER_JWKS, {
+      issuer: 'https://auth.farcaster.xyz',
+    });
+    const fid = Number(payload.sub);
+    if (!fid || isNaN(fid)) return { fid: 0, error: 'Invalid FID in token' };
+    return { fid };
+  } catch (err: unknown) {
+    return { fid: 0, error: `Token verification failed: ${err instanceof Error ? err.message : err}` };
+  }
 }
 
 function parseSiwe(message: string) {
@@ -52,75 +69,80 @@ function checkTimestamps(issuedAt: string, expirationTime: string): string | nul
   return null;
 }
 
+async function issueSupabaseSession(fid: number, metadata: Record<string, unknown>) {
+  const admin = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    { auth: { persistSession: false } },
+  );
+
+  const email = `fid-${fid}@farcaster.songchainn.xyz`;
+
+  const { error: createErr } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: { farcaster_fid: fid, provider: 'farcaster', ...metadata },
+  });
+
+  if (createErr && !/already registered|already exists/i.test(createErr.message)) {
+    throw createErr;
+  }
+
+  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+  });
+
+  if (linkErr || !link?.properties?.email_otp) {
+    throw linkErr ?? new Error('OTP generation failed');
+  }
+
+  return { email, otp: link.properties.email_otp };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: CORS });
 
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
-    const { message, signature } = body;
 
+    // ── PATH 1: quickAuth JWT ──────────────────────────────────────────────
+    if (typeof body.token === 'string') {
+      const { fid, error } = await handleQuickAuth(body.token);
+      if (error || !fid) return json({ error: error ?? 'Invalid token' }, 401);
+
+      const result = await issueSupabaseSession(fid, {});
+      return json(result);
+    }
+
+    // ── PATH 2: SIWF message + signature ──────────────────────────────────
+    const { message, signature } = body;
     if (typeof message !== 'string' || typeof signature !== 'string') {
-      return json({ error: 'message and signature are required strings' }, 400);
+      return json({ error: 'Provide either { token } or { message, signature }' }, 400);
     }
 
     const { address, domain, issuedAt, expirationTime, fid } = parseSiwe(message);
 
-    // 1. Domain allowlist
-    if (!ALLOWED_DOMAINS.has(domain)) {
-      return json({ error: 'Untrusted sign-in domain' }, 400);
-    }
+    if (!ALLOWED_DOMAINS.has(domain)) return json({ error: 'Untrusted sign-in domain' }, 400);
 
-    // 2. Timestamp freshness
     const timeErr = checkTimestamps(issuedAt, expirationTime);
     if (timeErr) return json({ error: timeErr }, 400);
 
-    // 3. Address present
     if (!address || !address.startsWith('0x')) {
       return json({ error: 'Ethereum address missing from message' }, 400);
     }
 
-    // 4. Cryptographic signature verification (never skipped)
     const valid = await verifyMessage({ address, message, signature: signature as `0x${string}` });
     if (!valid) return json({ error: 'Signature verification failed' }, 401);
 
-    // 5. FID required
     if (!fid || isNaN(fid)) return json({ error: 'Farcaster FID missing from message' }, 400);
 
-    // 6. Find-or-create Supabase user keyed by FID
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      { auth: { persistSession: false } },
-    );
+    const result = await issueSupabaseSession(fid, { farcaster_address: address });
+    return json(result);
 
-    const email = `fid-${fid}@farcaster.songchainn.xyz`;
-
-    const { error: createErr } = await admin.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: { farcaster_fid: fid, farcaster_address: address, provider: 'farcaster' },
-    });
-
-    // Ignore "already registered" — existing user is fine, we'll still issue an OTP below.
-    if (createErr && !/already registered|already exists/i.test(createErr.message)) {
-      throw createErr;
-    }
-
-    // 7. Generate a one-time sign-in token (never emailed — returned directly to client)
-    const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
-      type: 'magiclink',
-      email,
-    });
-
-    if (linkErr || !link?.properties?.email_otp) {
-      throw linkErr ?? new Error('OTP generation failed');
-    }
-
-    return json({ email, otp: link.properties.email_otp });
   } catch (err: unknown) {
     console.error('[farcaster-auth]', err instanceof Error ? err.message : err);
-    // Never leak internal details to the client
     return json({ error: 'Authentication failed' }, 500);
   }
 });
