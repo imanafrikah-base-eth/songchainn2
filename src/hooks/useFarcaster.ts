@@ -24,19 +24,23 @@ export function useFarcaster(): FarcasterState {
         const inFarcaster = await sdk.isInMiniApp();
         if (cancelled) return;
 
-        // Signal ready immediately — dismisses the Farcaster splash screen
-        // as soon as possible without waiting for context to load.
-        if (!sdkReadyCalled) {
-          sdkReadyCalled = true;
-          sdk.actions.ready();
-        }
-
         if (inFarcaster) {
-          const context = await sdk.context;
-          if (!cancelled) setState({ isInFarcaster: true, context });
+          // Set isInFarcaster immediately — don't wait for context.
+          // This ensures the Farcaster button and quickAuth fire right away.
+          setState({ isInFarcaster: true, context: null });
+
+          // Fetch context in the background; failure doesn't affect detection.
+          try {
+            const context = await sdk.context;
+            if (!cancelled) setState({ isInFarcaster: true, context });
+          } catch {
+            // context unavailable in this client — isInFarcaster stays true
+          }
         }
       } catch {
-        // not in Farcaster or SDK unavailable
+        // SDK unavailable or not in a Farcaster client
+      } finally {
+        // always dismiss the splash screen
         if (!cancelled && !sdkReadyCalled) {
           sdkReadyCalled = true;
           sdk.actions.ready();
