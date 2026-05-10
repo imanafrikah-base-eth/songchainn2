@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
-import { hasWalletProvider } from '@/lib/baseWallet';
+import { hasWalletProvider, connectWallet, getConnectedAccounts, signMessage, generateNonce } from '@/lib/baseWallet';
 
 interface AuthContextType {
   user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null;
@@ -225,17 +225,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: new Error('No wallet detected. Please install a Base compatible wallet.') };
       }
 
-      const { data, error } = await supabase.auth.signInWithWeb3({
-        chain: 'base',
-        statement: 'Sign in to $ongChainn on Base',
-      } as any);
-
-      if (error) {
-        return { error };
+      // Connect and get address, switching to Base chain automatically
+      let address: string | undefined;
+      const existing = await getConnectedAccounts();
+      if (existing.length > 0) {
+        address = existing[0];
+      } else {
+        const result = await connectWallet();
+        if (!result.success || !result.address) {
+          return { error: new Error(result.error ?? 'Failed to connect wallet') };
+        }
+        address = result.address;
       }
 
+      // Build an EIP-4361 SIWE message
+      const domain = window.location.host || 'songchainn.xyz';
+      const nonce = generateNonce();
+      const issuedAt = new Date().toISOString();
+      const message = [
+        `${domain} wants you to sign in with your Ethereum account:`,
+        address,
+        '',
+        'Sign in to $ongChainn on Base',
+        '',
+        `URI: ${window.location.origin}`,
+        'Version: 1',
+        'Chain ID: 8453',
+        `Nonce: ${nonce}`,
+        `Issued At: ${issuedAt}`,
+      ].join('\n');
+
+      const { signature, error: sigErr } = await signMessage(message, address);
+      if (sigErr || !signature) {
+        return { error: new Error(sigErr ?? 'Signature rejected') };
+      }
+
+      // Verify server-side and get a Supabase OTP
+      const { data, error: fnError } = await supabase.functions.invoke('wallet-auth', {
+        body: { message, signature },
+      });
+
+      if (fnError) return { error: new Error(fnError.message || 'Wallet auth failed') };
+
+      const { email, otp } = data as { email: string; otp: string };
+
+      const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email',
+      });
+      if (otpError) return { error: otpError };
+
+      const u = otpData.user;
+      if (!u) return { error: new Error('Sign-in failed') };
+
+      setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+      await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
+      setWalletAddress(address);
       setNeedsOnboarding(true);
       try {
         localStorage.setItem('songchainn_needs_onboarding', '1');

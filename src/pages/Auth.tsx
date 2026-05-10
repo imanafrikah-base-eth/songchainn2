@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, QrCode, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight } from 'lucide-react';
+import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -11,8 +11,6 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { CountryCodeSelector } from '@/components/CountryCodeSelector';
 import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
-import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
-import { BaseWalletButton } from '@/components/wallet/BaseWalletButton';
 import { useFarcasterContext } from '@/context/FarcasterContext';
 import { requestFarcasterSignIn } from '@/hooks/useFarcaster';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -67,7 +65,6 @@ export default function Auth() {
   const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail, signInWithFarcaster } = useAuth();
   const { isInFarcaster } = useFarcasterContext();
   const [isFarcasterLoading, setIsFarcasterLoading] = useState(false);
-  const { openConnectModal, isConnected } = useWeb3Wallet();
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
@@ -160,15 +157,10 @@ export default function Auth() {
 
   const handleWalletSignIn = useCallback(async () => {
     setError(null);
-    if (!hasWallet && !isWalletDetected && !isConnected) {
-      await openConnectModal();
-      return;
-    }
-
     setConnectionState('connecting');
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       setConnectionState('signing');
 
       const result = await signInWithWallet();
@@ -178,7 +170,7 @@ export default function Auth() {
         setConnectionState('idle');
       } else {
         setConnectionState('verifying');
-        await new Promise((resolve) => setTimeout(resolve, 400));
+        await new Promise((resolve) => setTimeout(resolve, 350));
         setConnectionState('success');
         setPendingWalletConnection(false);
       }
@@ -186,7 +178,7 @@ export default function Auth() {
       setError('Connection failed. Please try again.');
       setConnectionState('idle');
     }
-  }, [hasWallet, isWalletDetected, isConnected, signInWithWallet, openConnectModal]);
+  }, [signInWithWallet]);
 
   const handleFarcasterSignIn = useCallback(async () => {
     setError(null);
@@ -229,11 +221,6 @@ export default function Auth() {
       setGuestLockedSongIds(new Set());
     }
   }, []);
-
-  const handleWalletConnect = async () => {
-    setError(null);
-    await openConnectModal();
-  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1122,26 +1109,17 @@ export default function Auth() {
                   </div>
                 )}
 
-                <div className="w-full mb-3">
-                  <BaseWalletButton fullWidth />
-                </div>
-
-                {/* WalletConnect QR Option */}
-                <Button
-                  onClick={handleWalletConnect}
+                <button
+                  onClick={handleWalletSignIn}
                   disabled={isWalletLoading}
-                  variant="outline"
-                  className="w-full h-12 rounded-2xl mt-3 border-border/50 hover:bg-secondary/30 text-foreground font-medium"
+                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-[#0052FF] text-white font-semibold text-sm hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-60 mb-3"
                 >
-                  <QrCode className="w-5 h-5 mr-2" />
-                  Scan QR with Mobile Wallet
-                </Button>
+                  {getButtonContent()}
+                </button>
 
-                {!hasWallet && (
+                {!hasWallet && !isWalletDetected && connectionState === 'idle' && (
                   <div className="text-center pt-4 mt-4 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Or install a browser wallet:
-                    </p>
+                    <p className="text-xs text-muted-foreground mb-3">No wallet? Install one:</p>
                     <div className="flex gap-2">
                       <a
                         href="https://metamask.io/download/"
@@ -1262,26 +1240,17 @@ export default function Auth() {
                   </div>
                 )}
 
-                <div className="w-full mb-3">
-                  <BaseWalletButton fullWidth />
-                </div>
-
-                {/* WalletConnect QR Option - always show for mobile wallet users */}
-                <Button
-                  onClick={handleWalletConnect}
+                <button
+                  onClick={handleWalletSignIn}
                   disabled={isWalletLoading}
-                  variant="outline"
-                  className="w-full h-12 rounded-2xl mt-3 border-border/50 hover:bg-secondary/30 text-foreground font-medium"
+                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-[#0052FF] text-white font-semibold text-sm hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-60 mb-3"
                 >
-                  <QrCode className="w-5 h-5 mr-2" />
-                  Scan QR with Mobile Wallet
-                </Button>
+                  {getButtonContent()}
+                </button>
 
-                {!hasWallet && (
+                {!hasWallet && !isWalletDetected && connectionState === 'idle' && (
                   <div className="text-center pt-4 mt-4 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Or install a browser wallet:
-                    </p>
+                    <p className="text-xs text-muted-foreground mb-3">No wallet? Install one:</p>
                     <div className="flex gap-2">
                       <a
                         href="https://metamask.io/download/"
