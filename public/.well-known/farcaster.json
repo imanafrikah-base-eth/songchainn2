@@ -7,7 +7,7 @@
   "miniapp": {
     "version": "1",
     "name": "$ongChainn",
-    "subtitle": "Audience-first music on Base",
+    "subtitle": "Music rewards",
     "description": "Discover, stream, and collect music while supporting artists on Base and Farcaster.",
     "homeUrl": "https://songchainn.xyz",
     "iconUrl": "https://songchainn.xyz/assets/icon.png",
@@ -18,12 +18,10 @@
     "primaryCategory": "music",
     "tags": [
       "music",
-      "onchain music",
-      "audio",
-      "artists",
-      "base",
-      "farcaster",
-      "collect music"
+      "web3",
+      "creator",
+      "social",
+      "rewards"
     ]
   }
 }
