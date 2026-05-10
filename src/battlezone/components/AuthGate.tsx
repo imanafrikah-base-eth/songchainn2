@@ -59,8 +59,8 @@ const AuthGate = ({ children }: { children: React.ReactNode }) => {
               WaveWarz Africa BattleZone
             </h1>
             <p className="text-muted-foreground">
-              Access WaveWarz through your <span className="text-primary font-semibold">$ongChainn</span> account. 
-              Only registered $ongChainn users can enter BattleZone.
+              Register your music and country inside <span className="text-primary font-semibold">$ongChainn</span>. WaveWarz Africa battles run on{" "}
+              <span className="text-primary font-semibold">WaveWarz.com</span>.
             </p>
           </div>
 
@@ -84,9 +84,9 @@ const AuthGate = ({ children }: { children: React.ReactNode }) => {
           <div className="rounded-xl border border-border bg-card/60 p-4 text-left space-y-2">
             <p className="text-xs font-semibold text-foreground">Why $ongChainn?</p>
             <ul className="text-xs text-muted-foreground space-y-1">
-              <li>- Your $ongChainn profile is your battle identity</li>
-              <li>- Only $ongChainn artists and songs are featured</li>
-              <li>- Votes and activity sync to your $ongChainn account</li>
+              <li>- Register your artist profile and music catalog</li>
+              <li>- Submit your country rollout interest</li>
+              <li>- Battle activity takes place on WaveWarz.com</li>
             </ul>
           </div>
         </div>

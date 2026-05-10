@@ -54,12 +54,14 @@ const Navbar = () => {
               <ArrowLeft className="h-4 w-4" />
               Back to $ongChainn
             </Link>
-            <AppLink
-              to="/host/create"
+            <a
+              href="https://www.wavewarz.com"
+              target="_blank"
+              rel="noreferrer"
               className="hidden md:flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              <Zap className="h-4 w-4" /> Host a Battle
-            </AppLink>
+              <Zap className="h-4 w-4" /> Open WaveWarz.com
+            </a>
             
             {/* Profile chip */}
             {profile && (

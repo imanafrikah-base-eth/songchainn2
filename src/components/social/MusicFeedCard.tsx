@@ -353,11 +353,11 @@ export function MusicFeedCard({
         {battleLiveId && (
           <button
             type="button"
-            onClick={() => navigate(`/wavewarz-africa/room/${battleLiveId}`)}
+            onClick={() => window.open('https://www.wavewarz.com', '_blank', 'noopener,noreferrer')}
             className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-rose-300/40 bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-100"
           >
             <Flame className="h-3.5 w-3.5" />
-            Join Live Battle{battleLiveTitle ? `: ${battleLiveTitle}` : ''}
+            Live battle on WaveWarz.com{battleLiveTitle ? `: ${battleLiveTitle}` : ''}
           </button>
         )}
 

@@ -220,10 +220,10 @@ export default function Home() {
       to: '/room',
     },
     {
-      label: 'Open BattleZone',
-      description: 'See live battles and enter your battle room.',
+      label: 'WaveWarz Africa',
+      description: 'Battles happen on WaveWarz.com. Register music/country on $ongChainn.',
       icon: Sword,
-      to: '/wavewarz-africa/battles/live',
+      href: 'https://www.wavewarz.com',
     },
     {
       label: 'Open DJ Shuffle',
@@ -255,8 +255,8 @@ export default function Home() {
 
       window.setTimeout(() => {
         const promptText = hasSeenNewUserPrompt
-          ? 'Yo welcome back fam. New app experience is live: cleaner UI, faster feed autoplay flow, and upgraded WaveWarz BattleZone access. Click here to explore your navigation sections, quick actions, and live zones.'
-          : 'Welcome to $ongChainn Phase One: Audience First. Want a quick guided tour of sections and features? Music trading and rewards are coming soon.';
+          ? 'Yo welcome back fam. Quick heads up: WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and submit your country for rollout.'
+          : 'Welcome to $ongChainn Phase One: Audience First. WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and submit your country for rollout.';
         window.dispatchEvent(
           new CustomEvent('songchainn:mosha-prompt', {
             detail: {
@@ -421,6 +421,20 @@ export default function Home() {
                   <p className="text-[10px] sm:text-xs leading-relaxed text-muted-foreground">{item.description}</p>
                 </div>
               );
+
+              if ((item as any).href) {
+                return (
+                  <a
+                    key={item.label}
+                    href={(item as any).href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block h-full"
+                  >
+                    {content}
+                  </a>
+                );
+              }
 
               if (item.to) {
                 return (

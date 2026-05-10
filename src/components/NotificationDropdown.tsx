@@ -34,9 +34,9 @@ const notificationMessages = {
 function extractBattleRoute(message?: string | null) {
   if (!message) return null;
   const markerMatch = message.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)/);
-  if (markerMatch?.[1]) return `/wavewarz-africa/room/${markerMatch[1]}`;
+  if (markerMatch?.[1]) return 'https://www.wavewarz.com';
   const pathMatch = message.match(/\/wavewarz-africa\/room\/([a-zA-Z0-9-]+)/);
-  if (pathMatch?.[1]) return `/wavewarz-africa/room/${pathMatch[1]}`;
+  if (pathMatch?.[1]) return 'https://www.wavewarz.com';
   return null;
 }
 
@@ -141,7 +141,11 @@ export function NotificationDropdown() {
     setOpen(false);
     const battleRoute = extractBattleRoute(notification.message);
     if (battleRoute) {
-      navigate(battleRoute);
+      if (/^https?:\/\//i.test(battleRoute)) {
+        window.open(battleRoute, '_blank', 'noopener,noreferrer');
+      } else {
+        navigate(battleRoute);
+      }
       return;
     }
     

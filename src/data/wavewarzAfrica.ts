@@ -9,12 +9,12 @@ import santanaImage from '@/assets/Santana/Santana (1).png';
 
 export const WAVEWARZ_AFRICA_LINKS = {
   enterBattlez: '/wavewarz-africa',
-  watchLiveBattles: '/wavewarz-africa/live',
-  quickBattles: '/wavewarz-africa/live',
+  watchLiveBattles: 'https://www.wavewarz.com',
+  quickBattles: 'https://www.wavewarz.com',
   learnMore: 'https://subscribepage.io/XFM0pk',
-  createBattlez: '/wavewarz-africa/create',
-  supportCommunityBattle: '/wavewarz-africa/live',
-  launchNextQuickBattle: '/wavewarz-africa/live',
+  createBattlez: 'https://www.wavewarz.com',
+  supportCommunityBattle: 'https://www.wavewarz.com',
+  launchNextQuickBattle: 'https://www.wavewarz.com',
   connectWallet: 'https://phantom.com/',
   solflare: 'https://solflare.com/',
   phantom: 'https://phantom.com/',

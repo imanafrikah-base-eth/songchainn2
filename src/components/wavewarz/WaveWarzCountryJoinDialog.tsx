@@ -76,7 +76,7 @@ export function WaveWarzCountryJoinDialog({
               id="wavewarz-message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Tell us about your community, artists, and expected battle activity."
+              placeholder="Tell us about your community, artists, and rollout plans."
               rows={3}
             />
           </div>

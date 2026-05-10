@@ -78,7 +78,7 @@ function modeLabel(mode: AgentMode) {
 }
 
 function getWaveWarzPrimer() {
-  return 'WaveWarz Africa is $ongChainn BattleZone mode: live battles, fan voting, artist support, room play, and results tracking.';
+  return 'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and/or country.';
 }
 
 function getTopCatalogBySong(song: Song) {
@@ -303,7 +303,7 @@ export function VibeAgent() {
       setExternalPrompt({
         text:
           `You are on fire, ${displayName}. Song #${distinctSongStarts} just started and your momentum is building. ` +
-          `Your points and streaks keep rising as you play music, chat in The Room, join or host battles, invite new users, and share songs to Feed. ` +
+          `Your points and streaks keep rising as you play music, chat in The Room, invite new users, and share songs to Feed. ` +
           `Right now you are on ${currentStreak} streak with ${engagementPoints.toLocaleString()} points. ` +
           `Rewards redemption opens soon, so every action now stacks your future unlocks.`,
         ctaLabel: 'Show My Progress',
@@ -458,9 +458,9 @@ export function VibeAgent() {
 
   const openWaveWarzPrimer = useCallback(() => {
     setExternalPrompt({
-      text: `${getWaveWarzPrimer()} Start from WaveWarz, open Live battles, or join a BattleZone room when active.`,
-      ctaLabel: 'Open WaveWarz',
-      ctaPath: '/wavewarz-africa',
+      text: `${getWaveWarzPrimer()} Want to watch or host battles? Open WaveWarz.com.`,
+      ctaLabel: 'Open WaveWarz.com',
+      ctaPath: 'https://www.wavewarz.com',
     });
     setStep('external-prompt');
   }, []);
@@ -819,7 +819,12 @@ export function VibeAgent() {
                     type="button"
                     className="h-8 text-xs"
                     onClick={() => {
-                      navigate(externalPrompt.ctaPath!);
+                      const path = externalPrompt.ctaPath!;
+                      if (/^https?:\/\//i.test(path)) {
+                        window.open(path, '_blank', 'noopener,noreferrer');
+                      } else {
+                        navigate(path);
+                      }
                       setStep(null);
                     }}
                   >

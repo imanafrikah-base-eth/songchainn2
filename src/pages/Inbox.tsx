@@ -68,7 +68,7 @@ function buildMoshaReply(text: string, history: DirectMessage[]) {
     return 'To share a song to feed: open a song card, tap share to feed, then post. If it fails, refresh feed once and try again while signed in.';
   }
   if (query.includes('wavewarz') || query.includes('battle')) {
-    return 'WaveWarz Africa is $ongChainn BattleZone mode: live battles, fan voting, room energy, and results. Open /wavewarz-africa to start.';
+    return 'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and/or country. Open /wavewarz-africa in SongChainn for the registration side.';
   }
   if (contextualQuery.includes('dj') || contextualQuery.includes('shuffle')) {
     return 'DJ Shuffle can run Artist, All Songs, or Catalog shuffle. I can guide you to the best mode for your vibe.';
@@ -86,7 +86,7 @@ function buildMoshaReply(text: string, history: DirectMessage[]) {
 }
 
 const SEED_TEXT =
-  'Hey fam, Mo$ha here. Welcome to your $ongChainn message center. Ask me about WaveWarz, DJ Shuffle, rooms, catalogs, and what to do next.';
+  'Hey fam, Mo$ha here. Welcome to your $ongChainn message center. WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and/or country.';
 
 export default function Inbox() {
   const { user } = useAuth();
