@@ -206,12 +206,20 @@ export default function Auth() {
     setQuickAuthAttempted(true);
     setIsFarcasterLoading(true);
 
-    sdk.quickAuth.getToken()
-      .then(({ token }) => signInWithFarcasterToken(token))
+    // sdk.quickAuth is available in miniapp-sdk ≥ 0.4 — guard for older versions
+    const getToken = (sdk as any).quickAuth?.getToken?.bind((sdk as any).quickAuth);
+
+    if (!getToken) {
+      setIsFarcasterLoading(false);
+      setAuthView('main');
+      return;
+    }
+
+    getToken()
+      .then(({ token }: { token: string }) => signInWithFarcasterToken(token))
       .catch(() => ({ error: new Error('quickAuth unavailable') }))
-      .then((result) => {
+      .then((result: { error: Error | null } | void) => {
         if (result?.error) {
-          // Silent failure — fall back to the manual Farcaster button
           setAuthView('main');
         }
       })

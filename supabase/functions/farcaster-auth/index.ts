@@ -3,7 +3,7 @@
 //   2. SIWF           { message, signature } — manual button fallback
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verifyMessage } from 'npm:viem';
-import { jwtVerify, createRemoteJWKSet } from 'npm:jose';
+import { jwtVerify, createRemoteJWKSet } from 'https://esm.sh/jose@5.9.6';
 
 const ALLOWED_DOMAINS = new Set([
   'songchainn.xyz',
@@ -27,7 +27,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// Farcaster's public JWKS endpoint for quickAuth tokens
+// Farcaster's public JWKS — used to verify quickAuth JWTs
 const FARCASTER_JWKS = createRemoteJWKSet(
   new URL('https://auth.farcaster.xyz/.well-known/jwks.json'),
 );
