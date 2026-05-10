@@ -13,7 +13,6 @@ import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
 import { useFarcasterContext } from '@/context/FarcasterContext';
 import { requestFarcasterSignIn } from '@/hooks/useFarcaster';
-import sdk from '@farcaster/miniapp-sdk';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { CATALOGS, SONGS, type Song } from '@/data/musicData';
@@ -63,10 +62,9 @@ const ABOUT_STEPS = [
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail, signInWithFarcaster, signInWithFarcasterToken } = useAuth();
+  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail, signInWithFarcaster } = useAuth();
   const { isInFarcaster } = useFarcasterContext();
   const [isFarcasterLoading, setIsFarcasterLoading] = useState(false);
-  const [quickAuthAttempted, setQuickAuthAttempted] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
@@ -198,33 +196,6 @@ export default function Auth() {
       setIsFarcasterLoading(false);
     }
   }, [signInWithFarcaster]);
-
-  // quickAuth: silently sign in as soon as we know we're in Farcaster.
-  // sdk.quickAuth.getToken() requires no user interaction in most clients.
-  useEffect(() => {
-    if (!isInFarcaster || user || quickAuthAttempted) return;
-    setQuickAuthAttempted(true);
-    setIsFarcasterLoading(true);
-
-    // sdk.quickAuth is available in miniapp-sdk ≥ 0.4 — guard for older versions
-    const getToken = (sdk as any).quickAuth?.getToken?.bind((sdk as any).quickAuth);
-
-    if (!getToken) {
-      setIsFarcasterLoading(false);
-      setAuthView('main');
-      return;
-    }
-
-    getToken()
-      .then(({ token }: { token: string }) => signInWithFarcasterToken(token))
-      .catch(() => ({ error: new Error('quickAuth unavailable') }))
-      .then((result: { error: Error | null } | void) => {
-        if (result?.error) {
-          setAuthView('main');
-        }
-      })
-      .finally(() => setIsFarcasterLoading(false));
-  }, [isInFarcaster, user, quickAuthAttempted, signInWithFarcasterToken]);
 
   // Auto-open the auth modal when in Farcaster so users see the button if quickAuth fails.
   useEffect(() => {

@@ -23,13 +23,20 @@ export function useFarcaster(): FarcasterState {
       try {
         const inFarcaster = await sdk.isInMiniApp();
         if (cancelled) return;
+
+        // Signal ready immediately — dismisses the Farcaster splash screen
+        // as soon as possible without waiting for context to load.
+        if (!sdkReadyCalled) {
+          sdkReadyCalled = true;
+          sdk.actions.ready();
+        }
+
         if (inFarcaster) {
           const context = await sdk.context;
           if (!cancelled) setState({ isInFarcaster: true, context });
         }
       } catch {
         // not in Farcaster or SDK unavailable
-      } finally {
         if (!cancelled && !sdkReadyCalled) {
           sdkReadyCalled = true;
           sdk.actions.ready();
