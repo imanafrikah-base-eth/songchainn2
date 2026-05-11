@@ -89,14 +89,16 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
 
   const email = `fid-${fid}@farcaster.songchainn.xyz`;
 
-  // Create user if they don't exist yet
+  // Create user if they don't exist yet; track whether this is a brand-new account
   const { error: createErr } = await admin.auth.admin.createUser({
     email,
     email_confirm: true,
     user_metadata: { farcaster_fid: fid, provider: 'farcaster', ...metadata },
   });
 
-  if (createErr && !/already registered|already exists/i.test(createErr.message)) {
+  const isExistingUser = !!createErr && /already registered|already exists/i.test(createErr.message);
+
+  if (createErr && !isExistingUser) {
     console.error('[farcaster-auth] createUser error:', createErr.message);
     throw createErr;
   }
@@ -112,7 +114,7 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
     throw linkErr ?? new Error('OTP generation failed');
   }
 
-  return { email, otp: link.properties.email_otp };
+  return { email, otp: link.properties.email_otp, isNewUser: !isExistingUser };
 }
 
 Deno.serve(async (req) => {

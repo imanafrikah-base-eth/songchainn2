@@ -355,7 +355,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (fnError) return { error: new Error(fnError.message || 'Farcaster auth failed') };
 
-      const { email, otp } = data as { email: string; otp: string };
+      const { email, otp, isNewUser } = data as { email: string; otp: string; isNewUser?: boolean };
 
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
         email,
@@ -371,8 +371,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
-      // Don't force needsOnboarding here — onAuthStateChange will fire and
-      // refreshProfile (via useEffect) will set it correctly from the DB.
+      if (isNewUser) {
+        setNeedsOnboarding(true);
+        try { localStorage.setItem('songchainn_needs_onboarding', '1'); } catch { void 0; }
+      }
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Farcaster sign-in failed') };
@@ -388,7 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (fnError) return { error: new Error(fnError.message || 'Farcaster auth failed') };
 
-      const { email, otp } = data as { email: string; otp: string };
+      const { email, otp, isNewUser } = data as { email: string; otp: string; isNewUser?: boolean };
 
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
         email,
@@ -404,6 +406,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
+      if (isNewUser) {
+        setNeedsOnboarding(true);
+        try { localStorage.setItem('songchainn_needs_onboarding', '1'); } catch { void 0; }
+      }
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Farcaster sign-in failed') };
