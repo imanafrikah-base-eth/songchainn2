@@ -162,6 +162,9 @@ const artistSantana =
   import.meta.env.VITE_ARTWORK_SANTANA ||
   'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/file_00000000106871fd889daaa509fd5a14.png';
 
+const artistSantanaVol3 =
+  'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20VOL%203%20ARTWORK.png';
+
 const artistCover1 =
   import.meta.env.VITE_ARTWORK_FAITH ||
   'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/FAITH%20ART%20WORK.png';
@@ -2814,6 +2817,111 @@ const SONGS_RAW: Song[] = [
     volume: 'Vol2',
   },
   {
+    id: '205',
+    title: 'BABY MAMA',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20-%20BABY%20MAMA.mp3',
+    coverImage: artistSantanaVol3,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-10T00:00:00.000Z',
+    volume: 'Vol3',
+  },
+  {
+    id: '206',
+    title: 'ENTANGLEMENT',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20-%20ENTANGLEMENT.mp3',
+    coverImage: artistSantanaVol3,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-10T00:00:00.000Z',
+    volume: 'Vol3',
+  },
+  {
+    id: '207',
+    title: 'GOOD BAD ENERGY',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20-%20GOOD%20BAD%20ENERGY.mp3',
+    coverImage: artistSantanaVol3,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-10T00:00:00.000Z',
+    volume: 'Vol3',
+  },
+  {
+    id: '208',
+    title: 'GRAVITY',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20-%20GRAVITY.mp3',
+    coverImage: artistSantanaVol3,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-10T00:00:00.000Z',
+    volume: 'Vol3',
+  },
+  {
+    id: '209',
+    title: 'MARY GO ROUND',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20-%20MARY%20GO%20ROUND.mp3',
+    coverImage: artistSantanaVol3,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-10T00:00:00.000Z',
+    volume: 'Vol3',
+  },
+  {
+    id: '210',
+    title: 'NONCOMMITTAL',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20-%20NONCOMMITTAL.mp3',
+    coverImage: artistSantanaVol3,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-10T00:00:00.000Z',
+    volume: 'Vol3',
+  },
+  {
+    id: '211',
+    title: 'STEAK & LOBSTER',
+    artist: 'Santana',
+    artistId: '7',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20-%20STEAK%20%26%20LOBSTER.mp3',
+    coverImage: artistSantanaVol3,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-10T00:00:00.000Z',
+    volume: 'Vol3',
+  },
+  {
     id: '190',
     title: 'KEEP IT TO MYSELF',
     artist: 'IMAN AFRIKAH',
@@ -3207,7 +3315,7 @@ export const ARTISTS: Artist[] = [
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
     profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Santana/Santana%20(1).png',
-    songs: ['7', '43', '44', '45', '46', '47', '48', '183', '184', '185', '186', '187', '188', '189'],
+    songs: ['7', '43', '44', '45', '46', '47', '48', '183', '184', '185', '186', '187', '188', '189', '205', '206', '207', '208', '209', '210', '211'],
   },
   {
     id: '8',
