@@ -87,6 +87,7 @@ export default function Discover() {
       'Afro-Dancehall': 0,
       Alternative: 0,
       'Pop-Dancehall': 0,
+      'Hiphop/Soul': 0,
     };
 
     likedSongIds.forEach(songId => {
@@ -201,6 +202,7 @@ export default function Discover() {
       'Afro-Dancehall': 'bg-lime-500/20 text-lime-400 border-lime-500/30',
       Alternative: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
       'Pop-Dancehall': 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
+      'Hiphop/Soul': 'bg-violet-500/20 text-violet-300 border-violet-500/30',
     };
     return colors[genre] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';
   };
