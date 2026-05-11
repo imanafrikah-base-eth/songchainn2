@@ -273,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
         email,
         token: otp,
-        type: 'email',
+        type: 'magiclink',
       });
       if (otpError) return { error: otpError };
 
@@ -360,7 +360,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
         email,
         token: otp,
-        type: 'email',
+        type: 'magiclink',
       });
       if (otpError) return { error: otpError };
 
@@ -371,17 +371,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
-      setNeedsOnboarding(true);
-      try {
-        localStorage.setItem('songchainn_needs_onboarding', '1');
-        localStorage.setItem('songchainn_show_profile_photo_hint', '1');
-      } catch { void 0; }
-      await refreshProfile();
+      // Don't force needsOnboarding here — onAuthStateChange will fire and
+      // refreshProfile (via useEffect) will set it correctly from the DB.
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Farcaster sign-in failed') };
     }
-  }, [refreshProfile, refreshRoles]);
+  }, [refreshRoles]);
 
   const signInWithFarcaster = useCallback(async (message: string, signature: string) => {
     try {
@@ -397,7 +393,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
         email,
         token: otp,
-        type: 'email',
+        type: 'magiclink',
       });
       if (otpError) return { error: otpError };
 
@@ -408,17 +404,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
-      setNeedsOnboarding(true);
-      try {
-        localStorage.setItem('songchainn_needs_onboarding', '1');
-        localStorage.setItem('songchainn_show_profile_photo_hint', '1');
-      } catch { void 0; }
-      await refreshProfile();
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Farcaster sign-in failed') };
     }
-  }, [refreshProfile, refreshRoles]);
+  }, [refreshRoles]);
 
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured) {
@@ -477,6 +467,7 @@ export function useAuth() {
       isWalletDetected: false,
       signInWithWallet: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcasterToken: async () => ({ error: new Error('AuthProvider missing') }),
+      signInWithFarcaster: async () => ({ error: new Error('AuthProvider missing') }),
       signUpWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signOut: async () => {},
