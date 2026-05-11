@@ -118,6 +118,8 @@ let popularityChannelTeardownTimer: ReturnType<typeof setTimeout> | null = null;
 let canUseGetSongPopularityRpc: boolean | null = null;
 let canUseSongPopularityView: boolean | null = null;
 let canUseGetArtistFollowCountsRpc: boolean | null = null;
+let canUseGetTodayHotSongsRpc: boolean | null = null;
+let canUseGetPulseCountsRpc: boolean | null = null;
 
 function invalidatePopularityQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
@@ -241,40 +243,47 @@ export function useTodayHotSongs(limit = 5) {
   return useQuery({
     queryKey: ['today-hot-songs', limit],
     queryFn: async () => {
-      const now = new Date();
-      const windowMs = 1000 * 60 * 60 * 24;
-      const windowStart = new Date(now.getTime() - windowMs);
+      const windowStart = new Date(Date.now() - 1000 * 60 * 60 * 24);
 
+      if (canUseGetTodayHotSongsRpc !== false) {
+        const { data, error } = await (supabase as any).rpc('get_today_hot_songs', {
+          p_since: windowStart.toISOString(),
+          p_limit: limit,
+        });
+        if (!error && Array.isArray(data)) {
+          canUseGetTodayHotSongsRpc = true;
+          return data
+            .map((row: any) => {
+              const song = SONGS.find(s => s.id === String(row.song_id));
+              return song ? { song, playsToday: Number(row.plays_today) } : null;
+            })
+            .filter(Boolean) as TodayHotSong[];
+        }
+        canUseGetTodayHotSongsRpc = false;
+      }
+
+      // Fallback: direct query (limited by per-user RLS, but better than nothing)
       const { data, error } = await supabase
         .from('song_analytics')
-        .select('song_id, created_at, event_type')
+        .select('song_id')
         .eq('event_type', 'play')
         .gte('created_at', windowStart.toISOString());
 
-      if (error || !data) {
-        return [] as TodayHotSong[];
-      }
+      if (error || !data) return [] as TodayHotSong[];
 
       const counts = new Map<string, number>();
-
-      data.forEach((row: any) => {
+      (data as any[]).forEach((row) => {
         const songId = row.song_id as string | null;
         if (!songId) return;
-        const current = counts.get(songId) || 0;
-        counts.set(songId, current + 1);
+        counts.set(songId, (counts.get(songId) || 0) + 1);
       });
 
       const result: TodayHotSong[] = [];
-
       counts.forEach((playsToday, songId) => {
         const song = SONGS.find(s => s.id === songId);
-        if (song) {
-          result.push({ song, playsToday });
-        }
+        if (song) result.push({ song, playsToday });
       });
-
       result.sort((a, b) => b.playsToday - a.playsToday);
-
       return result.slice(0, limit);
     },
     staleTime: 1000 * 60,
@@ -286,24 +295,32 @@ export function usePulseCounts() {
   return useQuery({
     queryKey: ['pulse-counts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('song_analytics')
-        .select('song_id, event_type');
-
-      if (error || !data) {
-        return [] as SongPulseCount[];
+      if (canUseGetPulseCountsRpc !== false) {
+        const { data, error } = await (supabase as any).rpc('get_pulse_counts');
+        if (!error && Array.isArray(data)) {
+          canUseGetPulseCountsRpc = true;
+          return data.map((row: any) => ({
+            song_id: String(row.song_id),
+            pulse_count: Number(row.pulse_count),
+          })) as SongPulseCount[];
+        }
+        canUseGetPulseCountsRpc = false;
       }
 
-      const counts = new Map<string, number>();
+      // Fallback: pulse events are visible to all authenticated users via RLS
+      const { data, error } = await supabase
+        .from('song_analytics')
+        .select('song_id')
+        .eq('event_type', 'pulse');
 
-      (data as any[]).forEach(row => {
+      if (error || !data) return [] as SongPulseCount[];
+
+      const counts = new Map<string, number>();
+      (data as any[]).forEach((row) => {
         const songId = row.song_id as string | null;
         if (!songId) return;
-        if (row.event_type !== 'pulse') return;
-        const current = counts.get(songId) || 0;
-        counts.set(songId, current + 1);
+        counts.set(songId, (counts.get(songId) || 0) + 1);
       });
-
       return Array.from(counts.entries()).map(([song_id, pulse_count]) => ({
         song_id,
         pulse_count,

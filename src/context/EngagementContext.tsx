@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -55,6 +56,7 @@ interface OfflinePlay {
 
 export function EngagementProvider({ children }: { children: ReactNode }) {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const queryClient = useQueryClient();
   
   const [engagementPoints, setEngagementPoints] = useState(() => {
     const saved = localStorage.getItem('songchainn_points');
@@ -379,6 +381,8 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
             } as any);
           }
         }
+        // Immediately refresh global like counts without waiting for realtime
+        queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
       }
     } catch (error) {
       // Revert optimistic update
