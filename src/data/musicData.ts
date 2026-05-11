@@ -20,7 +20,8 @@ export type Genre =
   | 'ZamRock-Fusion'
   | 'Afro-Dancehall'
   | 'Alternative'
-  | 'Pop-Dancehall';
+  | 'Pop-Dancehall'
+  | 'Hiphop/Soul';
 
 export const GENRES: Genre[] = [
   'Trap',
@@ -34,6 +35,7 @@ export const GENRES: Genre[] = [
   'Afro-Dancehall',
   'Alternative',
   'Pop-Dancehall',
+  'Hiphop/Soul',
 ];
 
 export interface Song {
@@ -54,7 +56,7 @@ export interface Song {
   artistWallet?: string;
   isTokenGated?: boolean;
   addedAt?: string;
-  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP';
+  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP' | 'LIKE,COMMENT,SUBSCRIBE';
 }
 
 export interface Catalog {
@@ -165,6 +167,12 @@ const artistSantana =
 const artistSantanaVol3 =
   'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/Santana%20Vol3/SANTANA%20VOL%203%20ARTWORK.png';
 
+const artistNemesisVsLadyryn =
+  'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20PFP.jpg';
+
+const artistNemesisVsLadyrynArtwork =
+  'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20LIKE%20COMMENT%20SUBSCRIBE%20ARTWORK.jpg';
+
 const artistCover1 =
   import.meta.env.VITE_ARTWORK_FAITH ||
   'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/FAITH%20ART%20WORK.png';
@@ -193,6 +201,8 @@ const ARTWORK_BY_ARTIST: Record<string, string> = {
   FAITH: artistCover1,
   JMN: artistCover2,
   SAMMIE: artistCover3,
+  'NEMESISvsLADYRYN': artistNemesisVsLadyryn,
+  'NEMESIS VS LADYRYN': artistNemesisVsLadyryn,
 };
 
 function buildCatalogs(songs: Song[]): Catalog[] {
@@ -2922,6 +2932,51 @@ const SONGS_RAW: Song[] = [
     volume: 'Vol3',
   },
   {
+    id: '212',
+    title: 'Block is Hot',
+    artist: 'NEMESISvsLADYRYN',
+    artistId: '11',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20Block%20is%20Hot.mp3',
+    coverImage: artistNemesisVsLadyrynArtwork,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Lusaka Townsquare',
+    genre: 'Hiphop/Soul',
+    addedAt: '2026-05-11T00:00:00.000Z',
+    volume: 'LIKE,COMMENT,SUBSCRIBE',
+  },
+  {
+    id: '213',
+    title: 'Vib3',
+    artist: 'NEMESISvsLADYRYN',
+    artistId: '11',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20Vib3.mp3',
+    coverImage: artistNemesisVsLadyrynArtwork,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Lusaka Townsquare',
+    genre: 'Hiphop/Soul',
+    addedAt: '2026-05-11T00:00:00.000Z',
+    volume: 'LIKE,COMMENT,SUBSCRIBE',
+  },
+  {
+    id: '214',
+    title: 'Gr3Y',
+    artist: 'NEMESISvsLADYRYN',
+    artistId: '11',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20Gr3Y.mp3',
+    coverImage: artistNemesisVsLadyrynArtwork,
+    plays: 0,
+    likes: 0,
+    townSquare: 'Lusaka Townsquare',
+    genre: 'Hiphop/Soul',
+    addedAt: '2026-05-11T00:00:00.000Z',
+    volume: 'LIKE,COMMENT,SUBSCRIBE',
+  },
+  {
     id: '190',
     title: 'KEEP IT TO MYSELF',
     artist: 'IMAN AFRIKAH',
@@ -3347,6 +3402,16 @@ export const ARTISTS: Artist[] = [
     songs: ['95', '96', '97', '98', '99'],
     addedAt: '2026-01-14T00:00:00.000Z',
   },
+  {
+    id: '11',
+    name: 'NEMESISvsLADYRYN',
+    bio: 'NemesisvsLadyryn is a Zambian singer-rapper weaving lofi haze with ethereal, raw vocals. Between whispered prayers and late-night truths, her sound lives where vulnerability meets defiance. From Lusaka to the world, music for souls who feel too much.making music for the over thinkers and overthinkers...',
+    location: 'Lusaka',
+    townSquare: 'Lusaka Townsquare',
+    profileImage: artistNemesisVsLadyryn,
+    songs: ['212', '213', '214'],
+    addedAt: '2026-05-11T00:00:00.000Z',
+  },
 ];
 
 export const TOWN_SQUARES = [
@@ -3356,5 +3421,12 @@ export const TOWN_SQUARES = [
     location: 'Zambia',
     description: 'Pioneer town square of Create On Base Town Squares',
     artistCount: 10,
+  },
+  {
+    id: 'lusaka',
+    name: 'Lusaka Townsquare',
+    location: 'Zambia',
+    description: 'Lusaka — the capital sound. Where Zambian urban voices meet the world.',
+    artistCount: 1,
   },
 ];
