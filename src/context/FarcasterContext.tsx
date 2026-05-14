@@ -18,7 +18,7 @@ const FarcasterContext = createContext<FarcasterContextType>({
 
 export function FarcasterProvider({ children }: { children: ReactNode }) {
   const state = useFarcaster();
-  const { user, signInWithFarcasterToken } = useAuth();
+  const { user, signInWithFarcasterToken, isLoading } = useAuth();
   const attemptedRef = useRef(false);
   const [quickAuthFailed, setQuickAuthFailed] = useState(false);
 
@@ -26,7 +26,7 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
   // true, before Auth.tsx renders, cutting seconds off sign-in time.
   // On failure, sets quickAuthFailed so Auth.tsx can surface the manual button.
   useEffect(() => {
-    if (!state.isInFarcaster || user || attemptedRef.current) return;
+    if (!state.isInFarcaster || user || isLoading || attemptedRef.current) return;
     attemptedRef.current = true;
 
     const quickAuth = (sdk as any).quickAuth;
@@ -38,7 +38,7 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
     quickAuth.getToken()
       .then(({ token }: { token: string }) => signInWithFarcasterToken(token))
       .catch(() => setQuickAuthFailed(true));
-  }, [state.isInFarcaster, user, signInWithFarcasterToken]);
+  }, [state.isInFarcaster, user, isLoading, signInWithFarcasterToken]);
 
   const value: FarcasterContextType = { ...state, quickAuthFailed };
   return <FarcasterContext.Provider value={value}>{children}</FarcasterContext.Provider>;

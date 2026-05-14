@@ -59,6 +59,8 @@ export function MusicFeedCard({
   const isThisSongPlaying = currentSong?.id === song?.id && isPlaying;
   const isWelcomePost = post.post_type === 'welcome';
   const isSongLikePost = post.post_type === 'song_like';
+  const isSongPulsePost = post.post_type === 'song_pulse';
+  const isSongActivityPost = isSongLikePost || isSongPulsePost;
   const battleLiveMatch = post.content?.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)::(.*)/);
   const battleLiveId = battleLiveMatch?.[1] ?? null;
   const battleLiveTitle = battleLiveMatch?.[2]?.trim() ?? null;
@@ -160,7 +162,7 @@ export function MusicFeedCard({
           ) : hasCover ? (
             <motion.div
               className={`rounded-full overflow-hidden shadow-2xl border-4 ${
-                isSongLikePost ? 'border-red-500/60 w-52 h-52 md:w-64 md:h-64' : 'border-white/20 w-52 h-52 md:w-64 md:h-64'
+                isSongLikePost ? 'border-red-500/60 w-52 h-52 md:w-64 md:h-64' : isSongPulsePost ? 'border-primary/60 w-52 h-52 md:w-64 md:h-64' : 'border-white/20 w-52 h-52 md:w-64 md:h-64'
               }`}
               animate={isThisSongPlaying ? { rotate: 360 } : {}}
               transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
@@ -186,6 +188,16 @@ export function MusicFeedCard({
               transition={{ duration: 1, repeat: Infinity }}
             >
               <Heart className="w-6 h-6 text-white fill-white" />
+            </motion.div>
+          )}
+          {/* Song pulse badge */}
+          {isSongPulsePost && (
+            <motion.div
+              className="absolute -top-2 right-[calc(50%-100px)] bg-primary rounded-full p-2.5 shadow-lg"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 0.8, repeat: Infinity }}
+            >
+              <Sparkles className="w-6 h-6 text-white" />
             </motion.div>
           )}
 
@@ -345,6 +357,13 @@ export function MusicFeedCard({
               liked &quot;{song.title}&quot; by {artist?.name}
             </p>
           </div>
+        ) : isSongPulsePost && song ? (
+          <div className="mb-2">
+            <p className="text-white/90 text-sm flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+              pulsed &quot;{song.title}&quot; by {artist?.name}
+            </p>
+          </div>
         ) : post.content ? (
           <p className="text-white/90 text-sm mb-2 line-clamp-2">{post.content}</p>
         ) : null}
@@ -364,10 +383,12 @@ export function MusicFeedCard({
         {/* Song ticker */}
         {song && !isWelcomePost && (
           <div className={`flex items-center gap-2 rounded-full py-1.5 px-3 w-fit backdrop-blur-md ${
-            isSongLikePost ? 'bg-red-500/20' : 'bg-white/10'
+            isSongLikePost ? 'bg-red-500/20' : isSongPulsePost ? 'bg-primary/20' : 'bg-white/10'
           }`}>
             {isSongLikePost
               ? <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400 shrink-0" />
+              : isSongPulsePost
+              ? <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
               : <Music className="w-3.5 h-3.5 text-white shrink-0" />}
             {totalPulses > 0 && (
               <span className="text-[11px] text-white/80 tabular-nums shrink-0">

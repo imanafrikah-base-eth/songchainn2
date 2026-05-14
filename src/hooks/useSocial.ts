@@ -14,27 +14,32 @@ export function useSocial() {
   const [following, setFollowing] = useState<string[]>([]);
   const [followers, setFollowers] = useState<string[]>([]);
   const followingRef = useRef<string[]>([]);
+  // Ref so callbacks don't need user in their deps array — prevents re-renders on token refresh
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = user?.id ?? null;
 
   const fetchFollowData = useCallback(async () => {
-    if (!user) {
+    const uid = userIdRef.current;
+    if (!uid) {
       setFollowing([]);
       setFollowers([]);
       return;
     }
 
     const [followingRes, followersRes] = await Promise.all([
-      supabase.from('user_follows').select('following_id').eq('follower_id', user.id),
-      supabase.from('user_follows').select('follower_id').eq('following_id', user.id),
+      supabase.from('user_follows').select('following_id').eq('follower_id', uid),
+      supabase.from('user_follows').select('follower_id').eq('following_id', uid),
     ]);
 
     const newFollowing = (followingRes.data || []).map((r: any) => r.following_id).filter(Boolean);
     followingRef.current = newFollowing;
     setFollowing(newFollowing);
     setFollowers((followersRes.data || []).map((r: any) => r.follower_id).filter(Boolean));
-  }, [user]);
+  }, []); // stable — reads uid from ref
 
   const fetchPosts = useCallback(async (feedType: 'all' | 'following' = 'all') => {
-    if (!user) {
+    const uid = userIdRef.current;
+    if (!uid) {
       setPosts([]);
       setIsLoading(false);
       return;
@@ -58,7 +63,7 @@ export function useSocial() {
 
       const { data: postsData, error: postsError } =
         feedType === 'following'
-          ? await baseQuery.in('user_id', Array.from(new Set([user.id, ...currentFollowing])))
+          ? await baseQuery.in('user_id', Array.from(new Set([uid, ...currentFollowing])))
           : await baseQuery;
 
       if (postsError) throw postsError;
@@ -77,7 +82,7 @@ export function useSocial() {
         supabase.from('audience_profiles').select('*').in('user_id', userIds),
         supabase.from('post_likes').select('post_id,user_id').in('post_id', postIds),
         supabase.from('post_comments').select('post_id').in('post_id', postIds),
-        supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
+        supabase.from('post_likes').select('post_id').eq('user_id', uid).in('post_id', postIds),
       ]);
 
       const profilesMap = new Map<string, AudienceProfile>();
@@ -129,22 +134,22 @@ export function useSocial() {
   }, [user]);
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       fetchFollowData();
     } else {
       setFollowing([]);
       setFollowers([]);
     }
-  }, [user, fetchFollowData]);
+  }, [user?.id, fetchFollowData]);
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       fetchPosts();
     } else {
       setPosts([]);
       setIsLoading(false);
     }
-  }, [user, fetchPosts]);
+  }, [user?.id, fetchPosts]);
 
   const createPost = useCallback(
     async (
@@ -402,10 +407,11 @@ export function useSocial() {
   fetchFollowDataRef.current = fetchFollowData;
 
   useEffect(() => {
-    if (!user) return;
+    const uid = user?.id;
+    if (!uid) return;
     // Append timestamp so a rapid unmount/remount cycle never reuses a
     // channel name that Supabase still considers subscribed.
-    const channelName = `social-feed-${user.id}-${Date.now()}`;
+    const channelName = `social-feed-${uid}-${Date.now()}`;
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => {
@@ -425,7 +431,7 @@ export function useSocial() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user]); // only recreate when the logged-in user changes
+  }, [user?.id]); // only recreate when user ID actually changes, not on token refresh
 
   const fetchPostsTracked = useCallback((feedType: 'all' | 'following' = 'all') => {
     feedTypeRef.current = feedType;

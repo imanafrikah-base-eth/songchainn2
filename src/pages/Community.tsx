@@ -141,7 +141,7 @@ export default function Community() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('newest');
+  const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('active');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [presenceRefreshAt, setPresenceRefreshAt] = useState(Date.now());
   const { onlineUserIds, lastSeenByUserId } = useOnlineUsers(users.map((profile) => profile.user_id), { includeLastSeen: true });
@@ -157,11 +157,19 @@ export default function Community() {
     const fetchUsers = async () => {
       setIsLoading(true);
       setLoadError(null);
-      
-      const { data: profiles, error } = await supabase
-        .from('audience_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('fetch:timeout')), 12000)
+      );
+
+      const { data: profiles, error } = await Promise.race([
+        supabase
+          .from('audience_profiles')
+          .select('*')
+          .order('updated_at', { ascending: false, nullsFirst: false })
+          .then((res) => res),
+        timeout,
+      ]).catch((err) => ({ data: null, error: err })) as any;
 
       if (error) {
         if (import.meta.env.DEV) {
@@ -191,55 +199,56 @@ export default function Community() {
       const uniqueProfiles = Array.from(dedupedByUserId.values());
       uniqueProfiles.forEach((profile) => upsertProfile(profile as any));
 
-      // Get follower counts and post counts
-      const userIds = uniqueProfiles.map(p => p.user_id);
-      
-      const playsQuery = userIds.length
-        ? supabase
-            .from('song_analytics')
-            .select('user_id')
-            .eq('event_type', 'play')
-            .in('user_id', userIds)
-        : Promise.resolve({ data: [] as { user_id: string | null }[] });
-
-      const [followersRes, postsRes, playsRes] = await Promise.all([
-        supabase
-          .from('user_follows')
-          .select('following_id')
-          .in('following_id', userIds),
-        supabase
-          .from('social_posts')
-          .select('user_id')
-          .in('user_id', userIds),
-        playsQuery,
-      ]);
-
-      const followerCounts = new Map<string, number>();
-      followersRes.data?.forEach(f => {
-        followerCounts.set(f.following_id, (followerCounts.get(f.following_id) || 0) + 1);
-      });
-
-      const postCounts = new Map<string, number>();
-      postsRes.data?.forEach(p => {
-        postCounts.set(p.user_id, (postCounts.get(p.user_id) || 0) + 1);
-      });
-
-      const playCounts = new Map<string, number>();
-      playsRes.data?.forEach(p => {
-        if (!p.user_id) return;
-        playCounts.set(p.user_id, (playCounts.get(p.user_id) || 0) + 1);
-      });
-
-      const enrichedUsers: UserProfile[] = uniqueProfiles.map(profile => ({
-        ...profile,
-        follower_count: followerCounts.get(profile.user_id) || 0,
-        post_count: postCounts.get(profile.user_id) || 0,
-        play_count: playCounts.get(profile.user_id) || 0,
-      }));
-
-      setUsers(enrichedUsers);
-      setFilteredUsers(enrichedUsers);
+      // Show profiles immediately so UI is not empty while counts load
+      setUsers(uniqueProfiles);
+      setFilteredUsers(uniqueProfiles);
       setIsLoading(false);
+
+      // Enrich with counts in the background — non-blocking
+      const userIds = uniqueProfiles.map(p => p.user_id);
+      if (!userIds.length) return;
+
+      try {
+        const playsQuery = supabase
+          .from('song_analytics')
+          .select('user_id')
+          .eq('event_type', 'play')
+          .in('user_id', userIds);
+
+        const [followersRes, postsRes, playsRes] = await Promise.all([
+          supabase.from('user_follows').select('following_id').in('following_id', userIds),
+          supabase.from('social_posts').select('user_id').in('user_id', userIds),
+          playsQuery,
+        ]);
+
+        const followerCounts = new Map<string, number>();
+        followersRes.data?.forEach(f => {
+          followerCounts.set(f.following_id, (followerCounts.get(f.following_id) || 0) + 1);
+        });
+
+        const postCounts = new Map<string, number>();
+        postsRes.data?.forEach(p => {
+          postCounts.set(p.user_id, (postCounts.get(p.user_id) || 0) + 1);
+        });
+
+        const playCounts = new Map<string, number>();
+        playsRes.data?.forEach(p => {
+          if (!p.user_id) return;
+          playCounts.set(p.user_id, (playCounts.get(p.user_id) || 0) + 1);
+        });
+
+        const enrichedUsers: UserProfile[] = uniqueProfiles.map(profile => ({
+          ...profile,
+          follower_count: followerCounts.get(profile.user_id) || 0,
+          post_count: postCounts.get(profile.user_id) || 0,
+          play_count: playCounts.get(profile.user_id) || 0,
+        }));
+
+        setUsers(enrichedUsers);
+        setFilteredUsers(enrichedUsers);
+      } catch {
+        // Counts failed — profiles already shown without them, which is fine
+      }
     };
 
     fetchUsers();
@@ -295,9 +304,11 @@ export default function Community() {
         );
         break;
       case 'active':
-        filtered = filtered.sort((a, b) =>
-          (b.play_count || 0) - (a.play_count || 0)
-        );
+        filtered = filtered.sort((a, b) => {
+          const aTime = new Date(a.updated_at || a.created_at).getTime();
+          const bTime = new Date(b.updated_at || b.created_at).getTime();
+          return bTime - aTime;
+        });
         break;
     }
 
@@ -484,7 +495,7 @@ export default function Community() {
               </TabsTrigger>
               <TabsTrigger value="active" className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4" />
-                Most Active
+                Recent
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -678,7 +689,7 @@ export default function Community() {
         )}
 
         {/* Stats Footer */}
-        {!isLoading && filteredUsers.length > 0 && (
+        {!isLoading && derivedUsers.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -686,7 +697,7 @@ export default function Community() {
             className="mt-8 text-center text-sm text-muted-foreground"
           >
             <p>
-              Showing {filteredUsers.length} of {users.length} community members
+              Showing {derivedUsers.length} of {users.length} community members
             </p>
           </motion.div>
         )}

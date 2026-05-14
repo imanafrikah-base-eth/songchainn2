@@ -85,6 +85,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const offlinePlaysRef = useRef<OfflinePlay[]>([]);
   const playChannelRef = useRef<BroadcastChannel | null>(null);
   const likeInFlightRef = useRef<Set<string>>(new Set());
+  const pulsedSongPostsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const raw = localStorage.getItem('songchainn_last_play');
@@ -327,6 +328,26 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           song_id: songId,
           user_id: user?.id ?? null,
         } as any);
+
+        if (user?.id && !pulsedSongPostsRef.current.has(songId)) {
+          pulsedSongPostsRef.current.add(songId);
+          const cutoff = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+          const { data: existing } = await supabase
+            .from('social_posts')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('song_id', songId)
+            .eq('post_type', 'song_pulse')
+            .gte('created_at', cutoff)
+            .limit(1);
+          if (!existing || existing.length === 0) {
+            await supabase.from('social_posts').insert({
+              user_id: user.id,
+              song_id: songId,
+              post_type: 'song_pulse',
+            } as any);
+          }
+        }
       } catch {
         if (import.meta.env.DEV) {
           console.error('Failed to record pulse event');

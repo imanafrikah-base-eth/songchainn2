@@ -23,7 +23,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { supabase } from '@/integrations/supabase/client';
-import { useSafePlayerState } from '@/context/PlayerContext';
+import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
+import { SONGS } from '@/data/musicData';
 
 export default function Social() {
   const { user } = useAuth();
@@ -44,6 +45,10 @@ export default function Social() {
     refetchPosts,
   } = useSocial();
   const playerState = useSafePlayerState();
+  const { playSong } = usePlayerActions();
+  const playSongRef = useRef(playSong);
+  playSongRef.current = playSong;
+  const postsToRenderRef = useRef<SocialPostWithProfile[]>([]);
 
   const [feedType, setFeedType] = useState<'foryou' | 'following'>('foryou');
   const [suggestedUsers, setSuggestedUsers] = useState<AudienceProfile[]>([]);
@@ -121,11 +126,36 @@ export default function Social() {
     void load();
   }, [posts, sharedPostId]);
 
+  // Auto-play song when a post scrolls fully into view
+  useEffect(() => {
+    const container = feedRef.current;
+    if (!container) return;
+    let scrollTimer: ReturnType<typeof setTimeout>;
+
+    const handleScroll = () => {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        const idx = Math.round(container.scrollTop / container.clientHeight);
+        const post = postsToRenderRef.current[idx];
+        if (!post?.song_id) return;
+        const song = SONGS.find(s => s.id === post.song_id);
+        if (song) playSongRef.current(song);
+      }, 150);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimer);
+    };
+  }, []);
+
   const filteredPosts = feedType === 'following'
     ? posts.filter((p) => following.includes(p.user_id) || p.user_id === user?.id)
     : posts;
 
   const postsToRender = sharedPost ? [sharedPost] : filteredPosts;
+  postsToRenderRef.current = postsToRender;
   const effectiveIsLoading = isLoading || isLoadingSharedPost;
 
   const handleOpenComments = async (postId: string) => {
@@ -158,7 +188,7 @@ export default function Social() {
       {/* ── Scrollable feed ── */}
       <div
         ref={feedRef}
-        className="absolute inset-0 overflow-y-scroll overscroll-none"
+        className="absolute inset-0 overflow-y-scroll overscroll-none snap-y snap-mandatory"
       >
         {effectiveIsLoading ? (
           <div className="h-full flex items-center justify-center">
@@ -204,7 +234,7 @@ export default function Social() {
           </div>
         ) : (
           postsToRender.map((post) => (
-            <div key={post.id} className="h-full w-full">
+            <div key={post.id} className="h-full w-full snap-start">
               <MusicFeedCard
                 post={post}
                 onLike={toggleLikePost}
