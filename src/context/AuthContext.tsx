@@ -144,40 +144,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    if (!isSupabaseConfigured) {
-      setUser(null);
-      setAudienceProfile(null);
-      setNeedsOnboarding(false);
-      setWalletAddress(null);
-      setIsAdmin(false);
-      setIsArtist(false);
-      setArtistId(null);
-      setIsLoading(false);
-      return;
-    }
-
-    // INITIAL_SESSION fires immediately from the localStorage cache — no network round-trip.
-    // This means returning users see the app instantly instead of waiting for a token refresh.
-    // Subsequent events (TOKEN_REFRESHED, SIGNED_OUT, etc.) keep state in sync silently.
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      const u = session?.user ?? null;
-
-      if (event === 'INITIAL_SESSION') {
-        if (u) {
-          setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-          void refreshRoles(u.id);
-        } else {
-          setUser(null);
-          setIsAdmin(false);
-        }
+    const bootstrap = async () => {
+      if (!isSupabaseConfigured) {
+        if (!mounted) return;
+        setUser(null);
+        setAudienceProfile(null);
+        setNeedsOnboarding(false);
+        setWalletAddress(null);
+        setIsAdmin(false);
         setIsArtist(false);
         setArtistId(null);
         setIsLoading(false);
         return;
       }
 
-      // TOKEN_REFRESHED, SIGNED_IN, SIGNED_OUT, USER_UPDATED …
+      try {
+        // 8-second guard: if getSession() hangs (e.g. Supabase project paused),
+        // we still unblock the render.
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('auth:timeout')), 8000)
+          ),
+        ]);
+        if (!mounted) return;
+        const u = sessionResult.data?.session?.user ?? null;
+        if (u) {
+          setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+        } else {
+          setUser(null);
+          setIsAdmin(false);
+        }
+        setIsArtist(false);
+        setArtistId(null);
+        if (u) void refreshRoles(u.id);
+      } catch {
+        if (mounted) {
+          setUser(null);
+          setIsAdmin(false);
+          setIsArtist(false);
+          setArtistId(null);
+        }
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    bootstrap();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const u = session?.user ?? null;
       setUser(u ? { id: u.id, email: u.email, user_metadata: u.user_metadata as any } : null);
       if (u) {
         await refreshRoles(u.id);
