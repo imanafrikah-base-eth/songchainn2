@@ -96,7 +96,10 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
     user_metadata: { farcaster_fid: fid, provider: 'farcaster', ...metadata },
   });
 
-  const isExistingUser = !!createErr && /already registered|already exists/i.test(createErr.message);
+  const isExistingUser = !!createErr && (
+    (createErr as any).status === 422 ||
+    /already registered|already exists|User already/i.test(createErr.message)
+  );
 
   if (createErr && !isExistingUser) {
     console.error('[farcaster-auth] createUser error:', createErr.message);
@@ -109,11 +112,17 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
     email,
   });
 
-  if (linkErr || !link?.properties?.email_otp) {
-    console.error('[farcaster-auth] generateLink error:', linkErr?.message ?? 'no email_otp');
-    throw linkErr ?? new Error('OTP generation failed');
+  if (linkErr) {
+    console.error('[farcaster-auth] generateLink error:', linkErr.message, JSON.stringify(linkErr));
+    throw linkErr;
   }
 
+  if (!link?.properties?.email_otp) {
+    console.error('[farcaster-auth] generateLink returned no email_otp. properties:', JSON.stringify(link?.properties));
+    throw new Error('OTP generation failed — email_otp missing');
+  }
+
+  console.log('[farcaster-auth] issuing session for fid:', fid, 'isExistingUser:', isExistingUser);
   return { email, otp: link.properties.email_otp, isNewUser: !isExistingUser };
 }
 

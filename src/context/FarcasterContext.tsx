@@ -36,8 +36,17 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
     }
 
     quickAuth.getToken()
-      .then(({ token }: { token: string }) => signInWithFarcasterToken(token))
-      .catch(() => setQuickAuthFailed(true));
+      .then(async ({ token }: { token: string }) => {
+        const result = await signInWithFarcasterToken(token);
+        if (result?.error) {
+          if (import.meta.env.DEV) console.error('[FarcasterContext] quickAuth sign-in failed:', result.error.message);
+          setQuickAuthFailed(true);
+        }
+      })
+      .catch((err: any) => {
+        if (import.meta.env.DEV) console.error('[FarcasterContext] quickAuth.getToken failed:', err?.message);
+        setQuickAuthFailed(true);
+      });
   }, [state.isInFarcaster, user, isLoading, signInWithFarcasterToken]);
 
   const value: FarcasterContextType = { ...state, quickAuthFailed };
