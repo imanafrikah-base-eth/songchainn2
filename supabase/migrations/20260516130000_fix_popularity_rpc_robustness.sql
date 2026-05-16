@@ -67,9 +67,6 @@ REVOKE ALL ON FUNCTION public.get_song_popularity() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_song_popularity() TO anon;
 GRANT EXECUTE ON FUNCTION public.get_song_popularity() TO authenticated;
 
--- Also ensure the view has security_invoker off so the fallback path works.
-ALTER VIEW public.song_popularity SET (security_invoker = off);
-
 -- Re-apply get_pulse_counts with SECURITY DEFINER (idempotent).
 CREATE OR REPLACE FUNCTION public.get_pulse_counts()
 RETURNS TABLE (song_id text, pulse_count bigint)

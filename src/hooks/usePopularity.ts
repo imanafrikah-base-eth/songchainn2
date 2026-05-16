@@ -129,7 +129,6 @@ let popularityChannelTeardownTimer: ReturnType<typeof setTimeout> | null = null;
 // Track RPC capability per-session only — reset to null means "retry on next mount".
 // Using a simple in-session flag avoids permanently disabling after a transient failure.
 let canUseGetSongPopularityRpc: boolean | null = null;
-let canUseSongPopularityView: boolean | null = null;
 let canUseGetArtistFollowCountsRpc: boolean | null = null;
 let canUseGetTodayHotSongsRpc: boolean | null = null;
 let canUseGetPulseCountsRpc: boolean | null = null;
@@ -139,7 +138,6 @@ function maybeResetRpcFlags() {
   const now = Date.now();
   if (now - lastRpcCapabilityReset > 5 * 60 * 1000) {
     canUseGetSongPopularityRpc = null;
-    canUseSongPopularityView = null;
     canUseGetArtistFollowCountsRpc = null;
     canUseGetTodayHotSongsRpc = null;
     canUseGetPulseCountsRpc = null;
@@ -230,15 +228,6 @@ export function useSongPopularity() {
           return mergeSongPopularityWithSeed((data as SongPopularity[]) || []);
         }
         canUseGetSongPopularityRpc = false;
-      }
-
-      if (canUseSongPopularityView !== false) {
-        const { data: fallbackData, error: fallbackError } = await supabase.from('song_popularity').select('*');
-        if (!fallbackError) {
-          canUseSongPopularityView = true;
-          return mergeSongPopularityWithSeed((fallbackData as SongPopularity[]) || []);
-        }
-        canUseSongPopularityView = false;
       }
 
       return mergeSongPopularityWithSeed([] as SongPopularity[]);
@@ -442,16 +431,6 @@ export function useArtistStreamTotals() {
           popularityData = mergeSongPopularityWithSeed(data as SongPopularity[]);
         } else {
           canUseGetSongPopularityRpc = false;
-        }
-      }
-
-      if (!popularityData.length && canUseSongPopularityView !== false) {
-        const { data: fallbackData, error: fallbackError } = await supabase.from('song_popularity').select('*');
-        if (!fallbackError) {
-          canUseSongPopularityView = true;
-          popularityData = mergeSongPopularityWithSeed((fallbackData as SongPopularity[]) || []);
-        } else {
-          canUseSongPopularityView = false;
         }
       }
 
