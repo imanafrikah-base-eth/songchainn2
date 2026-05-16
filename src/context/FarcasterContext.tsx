@@ -18,8 +18,9 @@ const FarcasterContext = createContext<FarcasterContextType>({
 
 export function FarcasterProvider({ children }: { children: ReactNode }) {
   const state = useFarcaster();
-  const { user, signInWithFarcasterToken, isLoading } = useAuth();
+  const { user, signInWithFarcasterToken, isLoading, createFarcasterProfile } = useAuth();
   const attemptedRef = useRef(false);
+  const profileCreatedRef = useRef(false);
   const [quickAuthFailed, setQuickAuthFailed] = useState(false);
 
   // Start quickAuth as early as possible — fires the moment isInFarcaster becomes
@@ -48,6 +49,21 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
         setQuickAuthFailed(true);
       });
   }, [state.isInFarcaster, user, isLoading, signInWithFarcasterToken]);
+
+  // Once signed in AND context is available, auto-populate the Supabase profile
+  // from the user's public Farcaster account — skips onboarding entirely.
+  useEffect(() => {
+    if (!state.isInFarcaster || !user || !state.context?.user || profileCreatedRef.current) return;
+    profileCreatedRef.current = true;
+    const fc = state.context.user;
+    void createFarcasterProfile({
+      fid: fc.fid,
+      username: fc.username,
+      displayName: fc.displayName,
+      pfpUrl: fc.pfpUrl,
+      location: state.context.user.location?.description,
+    });
+  }, [state.isInFarcaster, user, state.context, createFarcasterProfile]);
 
   const value: FarcasterContextType = { ...state, quickAuthFailed };
   return <FarcasterContext.Provider value={value}>{children}</FarcasterContext.Provider>;

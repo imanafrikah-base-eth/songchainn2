@@ -22,6 +22,7 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  createFarcasterProfile: (farcasterUser: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -421,6 +422,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshRoles]);
 
+  const createFarcasterProfile = useCallback(async (farcasterUser: {
+    fid: number;
+    username?: string;
+    displayName?: string;
+    pfpUrl?: string;
+    location?: string;
+  }) => {
+    const uid = user?.id;
+    if (!uid || !isSupabaseConfigured) return;
+
+    const { data: existing } = await supabase
+      .from('audience_profiles')
+      .select('id, onboarding_completed')
+      .eq('user_id', uid)
+      .maybeSingle();
+
+    if (existing?.onboarding_completed) return;
+
+    const profileName = farcasterUser.displayName || farcasterUser.username || `User ${farcasterUser.fid}`;
+
+    const profileData = {
+      user_id: uid,
+      profile_name: profileName,
+      profile_picture_url: farcasterUser.pfpUrl || null,
+      location: farcasterUser.location || null,
+      is_public: true,
+      onboarding_completed: true,
+    };
+
+    if (existing) {
+      await supabase.from('audience_profiles').update(profileData).eq('user_id', uid);
+    } else {
+      await supabase.from('audience_profiles').insert(profileData as any);
+    }
+
+    await refreshProfile();
+    setNeedsOnboarding(false);
+    try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
+  }, [user?.id, refreshProfile]);
+
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
@@ -453,6 +494,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signOut,
       refreshProfile,
+      createFarcasterProfile,
     }}>
       {children}
     </AuthContext.Provider>
@@ -483,6 +525,7 @@ export function useAuth() {
       signInWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signOut: async () => {},
       refreshProfile: async () => {},
+      createFarcasterProfile: async () => {},
     };
   }
   return context;
