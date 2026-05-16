@@ -179,9 +179,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setArtistId(null);
         if (u) void refreshRoles(u.id);
       } catch {
+        // On timeout or network error, don't touch user/isAdmin — onAuthStateChange
+        // already fired INITIAL_SESSION with any stored session from localStorage and
+        // called refreshRoles. Overriding state here would log out a valid session.
         if (mounted) {
-          setUser(null);
-          setIsAdmin(false);
           setIsArtist(false);
           setArtistId(null);
         }
