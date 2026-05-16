@@ -214,14 +214,25 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     setTotalPlays(prev => prev + 1);
     setEngagementPoints(prev => prev + POINTS_PER_PLAY);
 
+    // Optimistic update: increment play count in cache immediately
+    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+      if (!old) return old;
+      return old.map((item: any) =>
+        String(item.song_id) === String(songId)
+          ? { ...item, play_count: (item.play_count || 0) + 1 }
+          : item
+      );
+    });
+
     supabase.from('song_analytics').insert({
       event_type: 'play',
       song_id: songId,
       user_id: user?.id ?? null,
     } as any).then(({ error }) => {
       if (error && import.meta.env.DEV) console.error('Failed to record play', error);
+      else queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
     });
-  }, [user]);
+  }, [user, queryClient]);
 
   const addOfflinePlay = useCallback((songId: string, durationSeconds: number) => {
     if (!songId || !Number.isFinite(durationSeconds) || durationSeconds <= 0) return;
@@ -321,6 +332,20 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       payload: { songId, userId: user?.id ?? null, timestamp: payload.timestamp },
     });
 
+    // Optimistic update: increment pulse count immediately
+    queryClient.setQueryData(['pulse-counts'], (old: any[] | undefined) => {
+      if (!old) return old;
+      const existing = old.find((p: any) => String(p.song_id) === String(songId));
+      if (existing) {
+        return old.map((p: any) =>
+          String(p.song_id) === String(songId)
+            ? { ...p, pulse_count: (p.pulse_count || 0) + 1 }
+            : p
+        );
+      }
+      return [...old, { song_id: songId, pulse_count: 1 }];
+    });
+
     (async () => {
       try {
         await supabase.from('song_analytics').insert({
@@ -328,6 +353,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           song_id: songId,
           user_id: user?.id ?? null,
         } as any);
+        queryClient.invalidateQueries({ queryKey: ['pulse-counts'] });
 
         if (user?.id && !pulsedSongPostsRef.current.has(songId)) {
           pulsedSongPostsRef.current.add(songId);
@@ -354,7 +380,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
         }
       }
     })();
-  }, [user]);
+  }, [user, queryClient]);
 
   const toggleLike = useCallback(async (songId: string) => {
     if (likeInFlightRef.current.has(songId)) return;
@@ -362,7 +388,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
 
     const isCurrentlyLiked = likedSongs.has(songId);
 
-    // Optimistically update UI
+    // Optimistically update UI — heart state and global like count
     setLikedSongsState(prev => {
       const newLikes = new Set(prev);
       if (isCurrentlyLiked) {
@@ -373,6 +399,15 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
         setEngagementPoints(p => p + POINTS_PER_LIKE);
       }
       return newLikes;
+    });
+    const likeDelta = isCurrentlyLiked ? -1 : 1;
+    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+      if (!old) return old;
+      return old.map((item: any) =>
+        String(item.song_id) === String(songId)
+          ? { ...item, like_count: Math.max(0, (item.like_count || 0) + likeDelta) }
+          : item
+      );
     });
 
     try {

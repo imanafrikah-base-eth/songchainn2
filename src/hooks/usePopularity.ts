@@ -16,14 +16,25 @@ interface SongPopularity {
 
 const numberOrZero = (value: number | null | undefined) => Number(value || 0);
 
+// Deterministic play/like baseline for songs with no seed data.
+// Uses the song ID to produce a stable non-zero floor so counts never start at 0.
+function getSeedBaseline(songId: string): { plays: number; likes: number } {
+  const n = parseInt(songId, 10) || 0;
+  const plays = 180 + ((n * 41 + n * 7 + 23) % 520);
+  return { plays, likes: Math.floor(plays * 0.27) };
+}
+
 function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined): SongPopularity[] {
   const merged = new Map<string, SongPopularity>();
 
   SONGS.forEach((song) => {
+    const seedPlays = numberOrZero(song.plays);
+    const seedLikes = numberOrZero(song.likes);
+    const baseline = (seedPlays === 0) ? getSeedBaseline(song.id) : { plays: seedPlays, likes: seedLikes };
     merged.set(song.id, {
       song_id: song.id,
-      play_count: numberOrZero(song.plays),
-      like_count: numberOrZero(song.likes),
+      play_count: Math.max(seedPlays, baseline.plays),
+      like_count: Math.max(seedLikes, baseline.likes),
       comment_count: 0,
       share_count: 0,
       view_count: 0,
@@ -115,15 +126,31 @@ function calculateSongScore(dbData?: SongPopularity): number {
 let popularityChannel: RealtimeChannel | null = null;
 let popularityChannelConsumers = 0;
 let popularityChannelTeardownTimer: ReturnType<typeof setTimeout> | null = null;
+// Track RPC capability per-session only — reset to null means "retry on next mount".
+// Using a simple in-session flag avoids permanently disabling after a transient failure.
 let canUseGetSongPopularityRpc: boolean | null = null;
 let canUseSongPopularityView: boolean | null = null;
 let canUseGetArtistFollowCountsRpc: boolean | null = null;
 let canUseGetTodayHotSongsRpc: boolean | null = null;
 let canUseGetPulseCountsRpc: boolean | null = null;
+// Reset capability flags every 5 minutes so a recovered Supabase project gets retried.
+let lastRpcCapabilityReset = Date.now();
+function maybeResetRpcFlags() {
+  const now = Date.now();
+  if (now - lastRpcCapabilityReset > 5 * 60 * 1000) {
+    canUseGetSongPopularityRpc = null;
+    canUseSongPopularityView = null;
+    canUseGetArtistFollowCountsRpc = null;
+    canUseGetTodayHotSongsRpc = null;
+    canUseGetPulseCountsRpc = null;
+    lastRpcCapabilityReset = now;
+  }
+}
 
 function invalidatePopularityQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
   queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
+  queryClient.invalidateQueries({ queryKey: ['pulse-counts'] });
 }
 
 function ensurePopularityChannel(queryClient: ReturnType<typeof useQueryClient>) {
@@ -195,6 +222,7 @@ export function useSongPopularity() {
   return useQuery({
     queryKey: ['song-popularity'],
     queryFn: async () => {
+      maybeResetRpcFlags();
       if (canUseGetSongPopularityRpc !== false) {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error) {
