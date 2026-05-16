@@ -162,18 +162,35 @@ export default function Community() {
         setTimeout(() => reject(new Error('fetch:timeout')), 12000)
       );
 
-      const { data: profiles, error } = await Promise.race([
-        supabase
-          .from('audience_profiles')
-          .select('*')
-          .order('updated_at', { ascending: false, nullsFirst: false })
-          .then((res) => res),
-        timeout,
-      ]).catch((err) => ({ data: null, error: err })) as any;
+      // Try SECURITY DEFINER RPC first — bypasses any restrictive RLS on audience_profiles.
+      // Falls back to direct table query if the RPC doesn't exist yet.
+      let profiles: any[] | null = null;
+      let fetchError: any = null;
 
-      if (error) {
+      const rpcResult = await Promise.race([
+        (supabase as any).rpc('get_community_profiles', { p_limit: 300, p_offset: 0 }).then((r: any) => r),
+        timeout,
+      ]).catch((err: any) => ({ data: null, error: err })) as any;
+
+      if (!rpcResult.error && Array.isArray(rpcResult.data)) {
+        profiles = rpcResult.data;
+      } else {
+        // RPC not available yet — fall back to direct query
+        const directResult = await Promise.race([
+          supabase
+            .from('audience_profiles')
+            .select('*')
+            .order('updated_at', { ascending: false })
+            .then((r) => r),
+          timeout,
+        ]).catch((err: any) => ({ data: null, error: err })) as any;
+        profiles = directResult.data;
+        fetchError = directResult.error;
+      }
+
+      if (fetchError || !profiles) {
         if (import.meta.env.DEV) {
-          console.error('Error fetching users:', error);
+          console.error('Error fetching users:', fetchError);
         }
         setLoadError('Unable to load community right now. Showing cached profiles if available.');
         const cached = Object.values(getAllProfiles() || {}).filter((p) => p?.user_id);
@@ -639,10 +656,16 @@ export default function Community() {
                     </div>
 
                     {/* Joined Date */}
-                    <p className="text-xs text-muted-foreground/60 mt-2 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      Joined {formatDistanceToNow(new Date(profile.created_at), { addSuffix: true })}
-                    </p>
+                    {(() => {
+                      const d = new Date(profile.created_at);
+                      const valid = !isNaN(d.getTime());
+                      return valid ? (
+                        <p className="text-xs text-muted-foreground/60 mt-2 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Joined {formatDistanceToNow(d, { addSuffix: true })}
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
 
                   {/* Follow Button */}
