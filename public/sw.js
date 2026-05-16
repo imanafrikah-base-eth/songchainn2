@@ -1,6 +1,6 @@
 // $ongChainn Push Notification Service Worker
-const CACHE_NAME = 'songchainn-v2';
-const AUDIO_CACHE = 'songchainn-audio-v2';
+const CACHE_NAME = 'songchainn-v3';
+const AUDIO_CACHE = 'songchainn-audio-v3';
 const AUDIO_CACHE_SIZE_LIMIT = 500 * 1024 * 1024;
 
 // Files to cache for offline use

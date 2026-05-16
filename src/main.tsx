@@ -164,8 +164,27 @@ if (typeof window !== "undefined") {
   });
 }
 
-if ("serviceWorker" in navigator && import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === "true") {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  // Capture the controller that was active before registration so we can tell
+  // the difference between a fresh install (no prior controller) and an upgrade.
+  const existingController = navigator.serviceWorker.controller;
+
+  navigator.serviceWorker.register("/sw.js").then((registration) => {
+    // Whenever the tab becomes visible, ask the browser to check for a new SW.
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) registration.update().catch(() => {});
+    });
+  }).catch(() => {});
+
+  // When a new SW finishes activating and claims this client, reload once so
+  // the page runs the latest bundles. Guard against looping on fresh install
+  // (existingController is null when there was no previous SW).
+  let swRefreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (swRefreshing || !existingController) return;
+    swRefreshing = true;
+    window.location.reload();
+  });
 }
 
 createRoot(document.getElementById("root")!).render(
