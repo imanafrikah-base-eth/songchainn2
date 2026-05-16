@@ -178,11 +178,8 @@ export function useSocial() {
         | undefined;
 
       try {
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
-        if (authErr) throw authErr;
-
-        const sessionUser = authData?.user;
-        if (!sessionUser) throw new Error('Not authenticated');
+        const uid = userIdRef.current;
+        if (!uid) throw new Error('Not authenticated');
 
         const cleanContent = (content ?? '').trim();
         const cleanSongId = (songId ?? '').trim();
@@ -194,7 +191,7 @@ export function useSocial() {
         }
 
         const payload: Database['public']['Tables']['social_posts']['Insert'] = {
-          user_id: sessionUser.id,
+          user_id: uid,
           post_type: postType,
         };
 
