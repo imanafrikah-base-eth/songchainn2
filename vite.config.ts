@@ -22,8 +22,22 @@ export default defineConfig(() => ({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
+        // Split the giant vendor blob (~2.6 MB / 740 KB gz) into smaller
+        // route-shaped chunks so the auth landing page no longer has to
+        // download wagmi / livekit / onchainkit just to render.
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
+          if (id.includes('@farcaster/')) return 'vendor-farcaster';
+          if (id.includes('@web3modal/') || id.includes('@walletconnect/')) return 'vendor-walletconnect';
+          if (id.includes('@wagmi/') || id.includes('/wagmi/') || id.includes('viem')) return 'vendor-wagmi';
+          if (id.includes('@coinbase/onchainkit')) return 'vendor-onchainkit';
+          if (id.includes('livekit-client') || id.includes('@livekit/')) return 'vendor-livekit';
+          if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
+          if (id.includes('framer-motion')) return 'vendor-framer';
+          if (id.includes('@supabase/')) return 'vendor-supabase';
+          if (id.includes('@tanstack/')) return 'vendor-query';
+          if (id.includes('@radix-ui/')) return 'vendor-radix';
+          if (id.includes('react-dom') || /\/react\//.test(id)) return 'vendor-react';
           return 'vendor';
         },
       },

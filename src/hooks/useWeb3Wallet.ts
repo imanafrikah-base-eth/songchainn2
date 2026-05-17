@@ -22,7 +22,7 @@ export function useWeb3Wallet() {
   };
 
   const disconnectWallet = () => {
-    void disconnectAsync().catch(() => {});
+    void disconnectAsync().catch((err) => { if (import.meta.env.DEV) console.warn('[wallet-disconnect]', err); });
   };
 
   const getWalletName = (): string => {

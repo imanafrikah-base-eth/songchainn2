@@ -85,7 +85,7 @@ if (typeof window !== "undefined" && import.meta.env.PROD) {
         navigator.serviceWorker.getRegistrations().then((regs) => Promise.all(regs.map((r) => r.unregister()))),
         typeof caches !== "undefined" && caches.keys ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))) : Promise.resolve([]),
       ])
-        .catch(() => {})
+        .catch((err) => { if (import.meta.env.DEV) console.warn('[sw-reset]', err); })
         .finally(reload);
       return;
     }
@@ -172,9 +172,9 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   navigator.serviceWorker.register("/sw.js").then((registration) => {
     // Whenever the tab becomes visible, ask the browser to check for a new SW.
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) registration.update().catch(() => {});
+      if (!document.hidden) registration.update().catch((err) => { if (import.meta.env.DEV) console.warn('[sw-update]', err); });
     });
-  }).catch(() => {});
+  }).catch((err) => { if (import.meta.env.DEV) console.warn('[sw-register]', err); });
 
   // When a new SW finishes activating and claims this client, reload once so
   // the page runs the latest bundles. Guard against looping on fresh install

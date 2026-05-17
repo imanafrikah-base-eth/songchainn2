@@ -181,6 +181,7 @@ export default function Community() {
             .from('audience_profiles')
             .select('*')
             .order('updated_at', { ascending: false })
+            .limit(300)
             .then((r) => r),
           timeout,
         ]).catch((err: any) => ({ data: null, error: err })) as any;
@@ -226,15 +227,19 @@ export default function Community() {
       if (!userIds.length) return;
 
       try {
+        // Hard caps below match the per-page community size (300 profiles).
+        // Without them, each tab open could pull every analytics/follow row
+        // for the entire community → tens-of-MB payloads at scale.
         const playsQuery = supabase
           .from('song_analytics')
           .select('user_id')
           .eq('event_type', 'play')
-          .in('user_id', userIds);
+          .in('user_id', userIds)
+          .limit(5000);
 
         const [followersRes, postsRes, playsRes] = await Promise.all([
-          supabase.from('user_follows').select('following_id').in('following_id', userIds),
-          supabase.from('social_posts').select('user_id').in('user_id', userIds),
+          supabase.from('user_follows').select('following_id').in('following_id', userIds).limit(5000),
+          supabase.from('social_posts').select('user_id').in('user_id', userIds).limit(5000),
           playsQuery,
         ]);
 
