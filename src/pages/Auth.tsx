@@ -12,7 +12,7 @@ import { CountryCodeSelector } from '@/components/CountryCodeSelector';
 import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
 import { useFarcasterContext } from '@/context/FarcasterContext';
-import { requestFarcasterSignIn } from '@/hooks/useFarcaster';
+import sdk from '@farcaster/miniapp-sdk';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { CATALOGS, SONGS, type Song } from '@/data/musicData';
@@ -62,8 +62,8 @@ const ABOUT_STEPS = [
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail, signInWithFarcaster } = useAuth();
-  const { isInFarcaster } = useFarcasterContext();
+  const { signInWithWallet, isWalletDetected, walletAddress, user, signUpWithEmail, signInWithEmail, signInWithFarcasterContext } = useAuth();
+  const { isInFarcaster, context: farcasterContext } = useFarcasterContext();
   const [isFarcasterLoading, setIsFarcasterLoading] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -184,8 +184,26 @@ export default function Auth() {
     setError(null);
     setIsFarcasterLoading(true);
     try {
-      const { message, signature } = await requestFarcasterSignIn();
-      const result = await signInWithFarcaster(message, signature);
+      // Prefer the already-resolved miniapp context; fall back to a fresh fetch
+      // in case this fires before FarcasterProvider has populated it.
+      let fc = farcasterContext?.user;
+      if (!fc?.fid) {
+        try {
+          const ctx = await sdk.context;
+          fc = ctx?.user;
+        } catch { /* outside miniapp */ }
+      }
+      if (!fc?.fid) {
+        setError('Could not read your Farcaster account. Open this app inside Warpcast or the Base App.');
+        return;
+      }
+      const result = await signInWithFarcasterContext({
+        fid: fc.fid,
+        username: fc.username,
+        displayName: fc.displayName,
+        pfpUrl: fc.pfpUrl,
+        location: fc.location?.description,
+      });
       if (result.error) setError(result.error.message);
     } catch (err: any) {
       const msg = String(err?.message ?? '');
@@ -195,7 +213,7 @@ export default function Auth() {
     } finally {
       setIsFarcasterLoading(false);
     }
-  }, [signInWithFarcaster]);
+  }, [farcasterContext, signInWithFarcasterContext]);
 
   // Auto-open the auth modal when in Farcaster so users see the button if quickAuth fails.
   useEffect(() => {

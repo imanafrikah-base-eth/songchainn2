@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import sdk from '@farcaster/miniapp-sdk';
-import type { MiniAppContext } from '@farcaster/miniapp-core';
+import type { Context as FarcasterCoreContext } from '@farcaster/miniapp-core';
+
+type MiniAppContext = FarcasterCoreContext.MiniAppContext;
 
 interface FarcasterState {
   isInFarcaster: boolean;

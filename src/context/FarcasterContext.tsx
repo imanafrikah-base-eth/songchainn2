@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { useFarcaster } from '@/hooks/useFarcaster';
 import { useAuth } from '@/context/AuthContext';
-import type { MiniAppContext } from '@farcaster/miniapp-core';
-import sdk from '@farcaster/miniapp-sdk';
+import type { Context as FarcasterCoreContext } from '@farcaster/miniapp-core';
+
+type MiniAppContext = FarcasterCoreContext.MiniAppContext;
 
 interface FarcasterContextType {
   isInFarcaster: boolean;
@@ -18,52 +19,41 @@ const FarcasterContext = createContext<FarcasterContextType>({
 
 export function FarcasterProvider({ children }: { children: ReactNode }) {
   const state = useFarcaster();
-  const { user, signInWithFarcasterToken, isLoading, createFarcasterProfile } = useAuth();
-  const attemptedRef = useRef(false);
-  const profileCreatedRef = useRef(false);
+  const { user, signInWithFarcasterContext } = useAuth();
+  const signedInRef = useRef(false);
   const [quickAuthFailed, setQuickAuthFailed] = useState(false);
 
-  // Start quickAuth as early as possible — fires the moment isInFarcaster becomes
-  // true, before Auth.tsx renders, cutting seconds off sign-in time.
-  // On failure, sets quickAuthFailed so Auth.tsx can surface the manual button.
+  // Trust sdk.context.user for client-side sign-in. Per Farcaster Mini Apps docs,
+  // context.user is untrusted (no signature) but fine for UI gating. No backend
+  // round-trip, no Supabase OTP — we just unlock the app.
   useEffect(() => {
-    if (!state.isInFarcaster || user || isLoading || attemptedRef.current) return;
-    attemptedRef.current = true;
-
-    const quickAuth = (sdk as any).quickAuth;
-    if (!quickAuth?.getToken) {
-      setQuickAuthFailed(true);
-      return;
-    }
-
-    quickAuth.getToken()
-      .then(async ({ token }: { token: string }) => {
-        const result = await signInWithFarcasterToken(token);
-        if (result?.error) {
-          if (import.meta.env.DEV) console.error('[FarcasterContext] quickAuth sign-in failed:', result.error.message);
-          setQuickAuthFailed(true);
-        }
-      })
-      .catch((err: any) => {
-        if (import.meta.env.DEV) console.error('[FarcasterContext] quickAuth.getToken failed:', err?.message);
-        setQuickAuthFailed(true);
-      });
-  }, [state.isInFarcaster, user, isLoading, signInWithFarcasterToken]);
-
-  // Once signed in AND context is available, auto-populate the Supabase profile
-  // from the user's public Farcaster account — skips onboarding entirely.
-  useEffect(() => {
-    if (!state.isInFarcaster || !user || !state.context?.user || profileCreatedRef.current) return;
-    profileCreatedRef.current = true;
-    const fc = state.context.user;
-    void createFarcasterProfile({
+    if (!state.isInFarcaster || user || signedInRef.current) return;
+    const fc = state.context?.user;
+    if (!fc?.fid) return;
+    signedInRef.current = true;
+    void signInWithFarcasterContext({
       fid: fc.fid,
       username: fc.username,
       displayName: fc.displayName,
       pfpUrl: fc.pfpUrl,
-      location: state.context.user.location?.description,
+      location: fc.location?.description,
+    }).then((r) => {
+      if (r?.error) {
+        setQuickAuthFailed(true);
+        signedInRef.current = false;
+      }
     });
-  }, [state.isInFarcaster, user, state.context, createFarcasterProfile]);
+  }, [state.isInFarcaster, state.context, user, signInWithFarcasterContext]);
+
+  // If we're in Farcaster but context never resolved within ~3s, surface the
+  // manual button so the user isn't stranded.
+  useEffect(() => {
+    if (!state.isInFarcaster || user || state.context?.user) return;
+    const t = setTimeout(() => {
+      if (!signedInRef.current) setQuickAuthFailed(true);
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [state.isInFarcaster, state.context, user]);
 
   const value: FarcasterContextType = { ...state, quickAuthFailed };
   return <FarcasterContext.Provider value={value}>{children}</FarcasterContext.Provider>;

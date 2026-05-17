@@ -18,11 +18,57 @@ interface AuthContextType {
   signInWithWallet: () => Promise<{ error: Error | null }>;
   signInWithFarcasterToken: (token: string) => Promise<{ error: Error | null }>;
   signInWithFarcaster: (message: string, signature: string) => Promise<{ error: Error | null }>;
+  signInWithFarcasterContext: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => Promise<{ error: Error | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   createFarcasterProfile: (farcasterUser: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => Promise<void>;
+}
+
+const FC_USER_KEY = 'songchainn_fc_user';
+
+function isFcUserId(id?: string | null) {
+  return !!id && id.startsWith('fc-');
+}
+
+function loadFcUserFromStorage(): { user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null; profile: AudienceProfile | null } {
+  try {
+    const raw = localStorage.getItem(FC_USER_KEY);
+    if (!raw) return { user: null, profile: null };
+    const parsed = JSON.parse(raw);
+    if (!parsed?.user?.id || !isFcUserId(parsed.user.id)) return { user: null, profile: null };
+    return { user: parsed.user, profile: parsed.profile ?? null };
+  } catch {
+    return { user: null, profile: null };
+  }
+}
+
+function buildFcUserAndProfile(fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) {
+  const id = `fc-${fc.fid}`;
+  const profileName = fc.displayName || fc.username || `User ${fc.fid}`;
+  const user = {
+    id,
+    email: null,
+    user_metadata: {
+      farcaster_fid: fc.fid,
+      provider: 'farcaster_context',
+      username: fc.username,
+      displayName: fc.displayName,
+      pfpUrl: fc.pfpUrl,
+      location: fc.location,
+    },
+  };
+  const profile = {
+    id,
+    user_id: id,
+    profile_name: profileName,
+    profile_picture_url: fc.pfpUrl ?? null,
+    location: fc.location ?? null,
+    is_public: true,
+    onboarding_completed: true,
+  } as unknown as AudienceProfile;
+  return { user, profile };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,15 +82,18 @@ function shouldRequireOnboardingFromStorage() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<{ id: string; email?: string | null; user_metadata?: Record<string, any> } | null>(null);
+  const fcBoot = loadFcUserFromStorage();
+  const [user, setUser] = useState<{ id: string; email?: string | null; user_metadata?: Record<string, any> } | null>(fcBoot.user);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isArtist, setIsArtist] = useState(false);
   const [artistId, setArtistId] = useState<string | null>(null);
-  const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(null);
-  const [needsOnboarding, setNeedsOnboarding] = useState(shouldRequireOnboardingFromStorage());
+  const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(fcBoot.profile);
+  const [needsOnboarding, setNeedsOnboarding] = useState(fcBoot.user ? false : shouldRequireOnboardingFromStorage());
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isWalletDetected, setIsWalletDetected] = useState(false);
+  const userRef = React.useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   // Check for any wallet provider (keep it fresh when the app regains focus)
   useEffect(() => {
@@ -75,6 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
+    if (isFcUserId(user.id)) {
+      // FC users are purely local — no Supabase profile lookup.
+      setNeedsOnboarding(false);
+      try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
+      return;
+    }
     if (!isSupabaseConfigured) {
       setAudienceProfile(null);
       setNeedsOnboarding(false);
@@ -148,9 +203,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const bootstrap = async () => {
       if (!isSupabaseConfigured) {
         if (!mounted) return;
-        setUser(null);
-        setAudienceProfile(null);
-        setNeedsOnboarding(false);
+        // Keep any rehydrated FC user in place.
+        if (!isFcUserId(userRef.current?.id)) {
+          setUser(null);
+          setAudienceProfile(null);
+          setNeedsOnboarding(false);
+        }
         setWalletAddress(null);
         setIsAdmin(false);
         setIsArtist(false);
@@ -172,7 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = sessionResult.data?.session?.user ?? null;
         if (u) {
           setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-        } else {
+        } else if (!isFcUserId(userRef.current?.id)) {
           setUser(null);
           setIsAdmin(false);
         }
@@ -196,10 +254,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const u = session?.user ?? null;
-      setUser(u ? { id: u.id, email: u.email, user_metadata: u.user_metadata as any } : null);
       if (u) {
+        setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
         await refreshRoles(u.id);
-      } else {
+      } else if (!isFcUserId(userRef.current?.id)) {
+        // Don't wipe a synthetic FC session when no Supabase session exists.
+        setUser(null);
         setIsAdmin(false);
       }
       setIsArtist(false);
@@ -462,10 +522,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
   }, [user?.id, refreshProfile]);
 
+  const signInWithFarcasterContext = useCallback(async (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => {
+    try {
+      if (!fc?.fid) return { error: new Error('Missing Farcaster fid') };
+      const { user: fcUser, profile } = buildFcUserAndProfile(fc);
+      setUser(fcUser);
+      setAudienceProfile(profile);
+      setIsAdmin(false);
+      setIsArtist(false);
+      setArtistId(null);
+      setNeedsOnboarding(false);
+      try {
+        localStorage.setItem(FC_USER_KEY, JSON.stringify({ user: fcUser, profile }));
+        localStorage.setItem('songchainn_needs_onboarding', '0');
+      } catch { void 0; }
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(err?.message || 'Farcaster sign-in failed') };
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
+    try { localStorage.removeItem(FC_USER_KEY); } catch { void 0; }
     setUser(null);
     setIsAdmin(false);
     setIsArtist(false);
@@ -490,6 +571,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithWallet,
       signInWithFarcasterToken,
       signInWithFarcaster,
+      signInWithFarcasterContext,
       signUpWithEmail,
       signInWithEmail,
       signOut,
@@ -521,6 +603,7 @@ export function useAuth() {
       signInWithWallet: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcasterToken: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcaster: async () => ({ error: new Error('AuthProvider missing') }),
+      signInWithFarcasterContext: async () => ({ error: new Error('AuthProvider missing') }),
       signUpWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signOut: async () => {},
