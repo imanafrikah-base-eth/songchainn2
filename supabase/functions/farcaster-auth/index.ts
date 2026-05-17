@@ -5,28 +5,38 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verifyMessage } from 'npm:viem';
 import { jwtVerify, createRemoteJWKSet } from 'https://esm.sh/jose@5.9.6';
 
-const ALLOWED_DOMAINS = new Set([
-  'songchainn.xyz',
-  'app.songchainn.xyz',
-  'www.songchainn.xyz',
-  'localhost:5173',
-  'localhost:8080',
-  'localhost:3000',
-]);
+// SIWE domain allowlist — limited to prod hosts by default. To enable local
+// development, set ALLOWED_SIWE_DOMAINS in the edge fn env (CSV, e.g.
+// "songchainn.xyz,localhost:5173"). NEVER ship localhost in production env.
+const ALLOWED_DOMAINS = new Set<string>(
+  (Deno.env.get('ALLOWED_SIWE_DOMAINS') ?? 'songchainn.xyz,app.songchainn.xyz,www.songchainn.xyz')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+);
+
+const ALLOWED_ORIGINS = new Set<string>(
+  (Deno.env.get('ALLOWED_ORIGINS') ?? 'https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+);
 
 // Extend sign-in window to 10 min — Farcaster clients can be slow
 const MAX_AGE_MS = 10 * 60 * 1000;
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const EXPECTED_AUDIENCE = Deno.env.get('FC_QUICKAUTH_AUDIENCE') ?? 'songchainn.xyz';
 
-function json(body: unknown, status = 200) {
+function corsFor(origin: string | null) {
+  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
+
+function json(origin: string | null, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...corsFor(origin), 'Content-Type': 'application/json' },
   });
 }
 
@@ -39,10 +49,12 @@ async function handleQuickAuth(token: string): Promise<{ fid: number; error?: st
   try {
     const { payload } = await jwtVerify(token, FARCASTER_JWKS, {
       issuer: 'https://auth.farcaster.xyz',
+      audience: EXPECTED_AUDIENCE,
     });
     // sub is the FID (numeric string)
     const fid = Number(payload['sub']);
     if (!fid || isNaN(fid)) return { fid: 0, error: 'Invalid FID in token' };
+    if (fid <= 0 || fid > 2_147_483_647) return { fid: 0, error: 'FID out of range' };
     return { fid };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -127,8 +139,9 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
-  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: CORS });
+  const origin = req.headers.get('origin');
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsFor(origin) });
+  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: corsFor(origin) });
 
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
@@ -136,43 +149,43 @@ Deno.serve(async (req) => {
     // ── PATH 1: quickAuth JWT ──────────────────────────────────────────────
     if (typeof body.token === 'string') {
       const { fid, error } = await handleQuickAuth(body.token);
-      if (error || !fid) return json({ error: error ?? 'Invalid token' }, 401);
+      if (error || !fid) return json(origin, { error: error ?? 'Invalid token' }, 401);
 
       const result = await issueSupabaseSession(fid, {});
-      return json(result);
+      return json(origin, result);
     }
 
     // ── PATH 2: SIWF message + signature ──────────────────────────────────
     const { message, signature } = body;
     if (typeof message !== 'string' || typeof signature !== 'string') {
-      return json({ error: 'Provide either { token } or { message, signature }' }, 400);
+      return json(origin, { error: 'Provide either { token } or { message, signature }' }, 400);
     }
 
     const { address, domain, issuedAt, expirationTime, fid } = parseSiwe(message);
 
     if (!ALLOWED_DOMAINS.has(domain)) {
       console.error('[farcaster-auth] Untrusted domain:', domain);
-      return json({ error: `Untrusted sign-in domain: ${domain}` }, 400);
+      return json(origin, { error: `Untrusted sign-in domain: ${domain}` }, 400);
     }
 
     const timeErr = checkTimestamps(issuedAt, expirationTime);
-    if (timeErr) return json({ error: timeErr }, 400);
+    if (timeErr) return json(origin, { error: timeErr }, 400);
 
     if (!address || !address.startsWith('0x')) {
-      return json({ error: 'Ethereum address missing from SIWF message' }, 400);
+      return json(origin, { error: 'Ethereum address missing from SIWF message' }, 400);
     }
 
     const valid = await verifyMessage({ address, message, signature: signature as `0x${string}` });
-    if (!valid) return json({ error: 'Signature verification failed' }, 401);
+    if (!valid) return json(origin, { error: 'Signature verification failed' }, 401);
 
-    if (!fid || isNaN(fid)) return json({ error: 'Farcaster FID missing from SIWF message' }, 400);
+    if (!fid || isNaN(fid)) return json(origin, { error: 'Farcaster FID missing from SIWF message' }, 400);
 
     const result = await issueSupabaseSession(fid, { farcaster_address: address });
-    return json(result);
+    return json(origin, result);
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[farcaster-auth] unhandled error:', msg);
-    return json({ error: 'Authentication failed' }, 500);
+    return json(origin, { error: 'Authentication failed' }, 500);
   }
 });

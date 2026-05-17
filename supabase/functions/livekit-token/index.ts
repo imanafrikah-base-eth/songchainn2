@@ -1,8 +1,3 @@
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 const getEnv = (key: string): string | undefined => {
   const denoEnv = (globalThis as any)?.Deno?.env;
   if (denoEnv?.get) return denoEnv.get(key);
@@ -11,10 +6,25 @@ const getEnv = (key: string): string | undefined => {
   return undefined;
 };
 
-const json = (body: unknown, init?: ResponseInit) =>
+const ALLOWED_ORIGINS = new Set<string>(
+  (getEnv("ALLOWED_ORIGINS") ?? "https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz")
+    .split(",").map((s) => s.trim()).filter(Boolean),
+);
+
+function corsFor(origin: string | null) {
+  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "";
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
+
+const json = (origin: string | null, body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), {
     ...init,
-    headers: { ...corsHeaders, "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: { ...corsFor(origin), "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
 
 const base64UrlEncode = (input: Uint8Array | string): string => {
@@ -63,10 +73,17 @@ const getAuthenticatedUser = async (req: Request) => {
   return (await res.json().catch(() => null)) as { id?: string; email?: string } | null;
 };
 
-const getBattleRole = async (battleId: string, userId: string): Promise<string> => {
+// Returns the explicit role for this user in this battle room, or null if no
+// membership row exists. Throws on infrastructure errors so the caller can
+// fail closed rather than silently downgrading to "audience" on a network
+// blip — that previously let a transient outage hand out tokens to anyone.
+const getBattleRole = async (
+  battleId: string,
+  userId: string,
+): Promise<{ role: string | null; error?: "config" | "lookup" }> => {
   const supabaseUrl = getEnv("SUPABASE_URL");
   const serviceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) return "audience";
+  if (!supabaseUrl || !serviceRoleKey) return { role: null, error: "config" };
 
   const restUrl = new URL(`${supabaseUrl}/rest/v1/battle_rooms`);
   restUrl.searchParams.set("select", "role");
@@ -75,39 +92,55 @@ const getBattleRole = async (battleId: string, userId: string): Promise<string> 
   restUrl.searchParams.set("order", "last_seen_at.desc");
   restUrl.searchParams.set("limit", "1");
 
-  const res = await fetch(restUrl.toString(), {
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-    },
-  });
-  if (!res.ok) return "audience";
+  let res: Response;
+  try {
+    res = await fetch(restUrl.toString(), {
+      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
+    });
+  } catch {
+    return { role: null, error: "lookup" };
+  }
+  if (!res.ok) return { role: null, error: "lookup" };
 
   const rows = (await res.json().catch(() => [])) as Array<{ role?: string }>;
-  return rows[0]?.role || "audience";
+  return { role: rows[0]?.role ?? null };
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 });
+  const origin = req.headers.get("origin");
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsFor(origin) });
+  if (req.method !== "POST") return json(origin, { error: "Method not allowed" }, { status: 405 });
 
   try {
     const livekitApiKey = getEnv("LIVEKIT_API_KEY");
     const livekitApiSecret = getEnv("LIVEKIT_API_SECRET") || getEnv("LIVEKIT_SECRET");
     const livekitWsUrl = getEnv("LIVEKIT_WS_URL") || getEnv("LIVEKIT_URL");
     if (!livekitApiKey || !livekitApiSecret || !livekitWsUrl) {
-      return json({ error: "Missing LIVEKIT_API_KEY / LIVEKIT_API_SECRET / LIVEKIT_WS_URL" }, { status: 500 });
+      return json(origin, { error: "Missing LIVEKIT_API_KEY / LIVEKIT_API_SECRET / LIVEKIT_WS_URL" }, { status: 500 });
     }
 
     const user = await getAuthenticatedUser(req);
-    if (!user?.id) return json({ error: "Unauthorized" }, { status: 401 });
+    if (!user?.id) return json(origin, { error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
     const roomName = String((body as any)?.roomName || "").trim();
     const participantName = String((body as any)?.participantName || "").trim() || "WaveWarz Listener";
-    if (!roomName) return json({ error: "roomName is required" }, { status: 400 });
+    if (!roomName) return json(origin, { error: "roomName is required" }, { status: 400 });
 
-    const role = await getBattleRole(roomName, user.id);
+    const lookup = await getBattleRole(roomName, user.id);
+    if (lookup.error === "config") {
+      return json(origin, { error: "Server misconfigured" }, { status: 500 });
+    }
+    if (lookup.error === "lookup") {
+      // Fail closed — never hand out a room token if we couldn't verify membership.
+      return json(origin, { error: "Could not verify room membership" }, { status: 503 });
+    }
+    if (lookup.role === null) {
+      // No battle_rooms row → not a member. The client must insert one
+      // (which it already does on room join) before requesting a token.
+      return json(origin, { error: "Not a member of this room" }, { status: 403 });
+    }
+    const role = lookup.role;
     const canPublish = role === "host" || role === "co-host" || role === "speaker";
     const now = Math.floor(Date.now() / 1000);
     const exp = now + 60 * 60;
@@ -131,7 +164,7 @@ const handler = async (req: Request): Promise<Response> => {
     };
 
     const token = await buildJwt(payload, livekitApiSecret);
-    return json({
+    return json(origin, {
       token,
       wsUrl: livekitWsUrl,
       roomName,
@@ -139,7 +172,7 @@ const handler = async (req: Request): Promise<Response> => {
       role,
     });
   } catch (error) {
-    return json({ error: String((error as any)?.message ?? error) }, { status: 500 });
+    return json(origin, { error: String((error as any)?.message ?? error) }, { status: 500 });
   }
 };
 

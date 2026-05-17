@@ -5,26 +5,35 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verifyMessage } from 'npm:viem';
 
-const ALLOWED_DOMAINS = new Set([
-  'songchainn.xyz',
-  'app.songchainn.xyz',
-  'localhost:5173',
-  'localhost:8080',
-]);
+// SIWE domain allowlist — prod only by default. Override locally via
+// ALLOWED_SIWE_DOMAINS env (CSV). NEVER ship localhost in prod env.
+const ALLOWED_DOMAINS = new Set<string>(
+  (Deno.env.get('ALLOWED_SIWE_DOMAINS') ?? 'songchainn.xyz,app.songchainn.xyz,www.songchainn.xyz')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+);
+
+const ALLOWED_ORIGINS = new Set<string>(
+  (Deno.env.get('ALLOWED_ORIGINS') ?? 'https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+);
 
 // Messages older than 5 minutes are rejected as stale / replayed.
 const MAX_AGE_MS = 5 * 60 * 1000;
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+function corsFor(origin: string | null) {
+  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
 
-function json(body: unknown, status = 200) {
+function json(origin: string | null, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...corsFor(origin), 'Content-Type': 'application/json' },
   });
 }
 
@@ -49,36 +58,37 @@ function checkTimestamps(issuedAt: string, expirationTime: string): string | nul
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
-  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: CORS });
+  const origin = req.headers.get('origin');
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsFor(origin) });
+  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: corsFor(origin) });
 
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const { message, signature } = body;
 
     if (typeof message !== 'string' || typeof signature !== 'string') {
-      return json({ error: 'message and signature are required strings' }, 400);
+      return json(origin, { error: 'message and signature are required strings' }, 400);
     }
 
     const { address, domain, issuedAt, expirationTime } = parseSiwe(message);
 
     // 1. Domain allowlist
     if (!ALLOWED_DOMAINS.has(domain)) {
-      return json({ error: 'Untrusted sign-in domain' }, 400);
+      return json(origin, { error: 'Untrusted sign-in domain' }, 400);
     }
 
     // 2. Timestamp freshness
     const timeErr = checkTimestamps(issuedAt, expirationTime);
-    if (timeErr) return json({ error: timeErr }, 400);
+    if (timeErr) return json(origin, { error: timeErr }, 400);
 
     // 3. Address present
     if (!address || !address.startsWith('0x')) {
-      return json({ error: 'Ethereum address missing from message' }, 400);
+      return json(origin, { error: 'Ethereum address missing from message' }, 400);
     }
 
     // 4. Cryptographic signature verification (never skipped)
     const valid = await verifyMessage({ address, message, signature: signature as `0x${string}` });
-    if (!valid) return json({ error: 'Signature verification failed' }, 401);
+    if (!valid) return json(origin, { error: 'Signature verification failed' }, 401);
 
     // 5. Find-or-create Supabase user keyed by wallet address
     const admin = createClient(
@@ -110,9 +120,9 @@ Deno.serve(async (req) => {
       throw linkErr ?? new Error('OTP generation failed');
     }
 
-    return json({ email, otp: link.properties.email_otp });
+    return json(origin, { email, otp: link.properties.email_otp });
   } catch (err: unknown) {
     console.error('[wallet-auth]', err instanceof Error ? err.message : err);
-    return json({ error: 'Authentication failed' }, 500);
+    return json(origin, { error: 'Authentication failed' }, 500);
   }
 });
