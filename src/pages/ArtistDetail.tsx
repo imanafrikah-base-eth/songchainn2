@@ -491,17 +491,13 @@ export default function ArtistDetail() {
   }, [queryClient, timelineUserId]);
 
   const artistStats = useMemo(() => {
-    if (!artistSongs.length || !popularityData) {
-      return { totalPlays: 0, totalLikes: 0 };
-    }
-
     let totalPlays = 0;
     let totalLikes = 0;
 
     artistSongs.forEach(song => {
-      const songData = popularityData.find(p => p.song_id === song.id);
-      totalPlays += songData?.play_count || 0;
-      totalLikes += songData?.like_count || 0;
+      const songData = popularityData?.find(p => p.song_id === song.id);
+      totalPlays += songData?.play_count ?? song.plays ?? 0;
+      totalLikes += songData?.like_count ?? song.likes ?? 0;
     });
 
     return { totalPlays, totalLikes };

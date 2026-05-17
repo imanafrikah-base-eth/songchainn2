@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { Playlist } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { broadcastCountDelta } from '@/hooks/usePopularity';
 import { getLikedArtists, getLikedSongs, getPlaylistSongs as getLocalPlaylistSongs, listPlaylists, savePlaylists, setPlaylistSongs } from '@/lib/localDb';
 
 export function useAudienceInteractions() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [likedSongs, setLikedSongs] = useState<string[]>([]);
   const [likedArtists, setLikedArtists] = useState<string[]>([]);
   const [savedCatalogs, setSavedCatalogs] = useState<string[]>([]);
@@ -152,7 +155,24 @@ export function useAudienceInteractions() {
     if (!user) return;
 
     const isLiked = likedArtists.includes(artistId);
+    const delta = isLiked ? -1 : 1;
     const next = isLiked ? likedArtists.filter((id) => id !== artistId) : [...likedArtists, artistId];
+
+    // Optimistic local state update
+    setLikedArtists(next);
+
+    // Optimistic cache update — follower count changes instantly for this user
+    queryClient.setQueryData(['artist-follower-counts'], (old: any[] | undefined) => {
+      if (!old) return old;
+      return old.map((item: any) =>
+        String(item.artist_id) === String(artistId)
+          ? { ...item, follower_count: Math.max(0, (item.follower_count || 0) + delta) }
+          : item,
+      );
+    });
+
+    // Broadcast to all other connected clients for instant cross-app update
+    broadcastCountDelta('follow', { artistId, delta });
 
     try {
       if (isLiked) {
@@ -162,12 +182,23 @@ export function useAudienceInteractions() {
         const { error } = await supabase.from('liked_artists').insert({ user_id: user.id, artist_id: artistId } as any);
         if (error) throw error;
       }
-      setLikedArtists(next);
+      // Trigger a fresh DB count for everyone via postgres_changes (already handled by usePopularity listener)
+      queryClient.invalidateQueries({ queryKey: ['artist-follower-counts'] });
       toast({ title: isLiked ? 'Artist unfollowed' : 'Artist followed!' });
     } catch {
+      // Revert optimistic updates on failure
+      setLikedArtists(likedArtists);
+      queryClient.setQueryData(['artist-follower-counts'], (old: any[] | undefined) => {
+        if (!old) return old;
+        return old.map((item: any) =>
+          String(item.artist_id) === String(artistId)
+            ? { ...item, follower_count: Math.max(0, (item.follower_count || 0) - delta) }
+            : item,
+        );
+      });
       toast({ title: 'Could not update artist follow', variant: 'destructive' });
     }
-  }, [user, likedArtists, toast]);
+  }, [user, likedArtists, queryClient, toast]);
 
   const toggleSaveCatalog = useCallback(async (catalogId: string) => {
     if (!catalogId) return;

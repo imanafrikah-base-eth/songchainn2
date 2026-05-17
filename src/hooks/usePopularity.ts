@@ -145,6 +145,71 @@ function maybeResetRpcFlags() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Real-time count broadcast — instant cross-client play / like / follow deltas
+// ---------------------------------------------------------------------------
+let countsLiveChannel: RealtimeChannel | null = null;
+
+interface CountDeltaPayload {
+  type: 'play' | 'like' | 'follow';
+  songId?: string;
+  artistId?: string;
+  delta?: number;
+}
+
+function handleCountDelta(queryClient: ReturnType<typeof useQueryClient>, p: CountDeltaPayload) {
+  if (p.type === 'play' && p.songId) {
+    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+      if (!old) return old;
+      return old.map((item: any) =>
+        String(item.song_id) === String(p.songId)
+          ? { ...item, play_count: (item.play_count || 0) + 1 }
+          : item,
+      );
+    });
+  } else if (p.type === 'like' && p.songId) {
+    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+      if (!old) return old;
+      return old.map((item: any) =>
+        String(item.song_id) === String(p.songId)
+          ? { ...item, like_count: Math.max(0, (item.like_count || 0) + (p.delta ?? 0)) }
+          : item,
+      );
+    });
+  } else if (p.type === 'follow' && p.artistId) {
+    queryClient.setQueryData(['artist-follower-counts'], (old: any[] | undefined) => {
+      if (!old) return old;
+      return old.map((item: any) =>
+        String(item.artist_id) === String(p.artistId)
+          ? { ...item, follower_count: Math.max(0, (item.follower_count || 0) + (p.delta ?? 0)) }
+          : item,
+      );
+    });
+  }
+}
+
+function ensureCountsLiveChannel(queryClient: ReturnType<typeof useQueryClient>): RealtimeChannel {
+  if (countsLiveChannel) return countsLiveChannel;
+  countsLiveChannel = supabase
+    .channel('counts-live', { config: { broadcast: { self: false } } })
+    .on('broadcast', { event: 'count-delta' }, ({ payload }) => {
+      if (payload) handleCountDelta(queryClient, payload as CountDeltaPayload);
+    })
+    .subscribe();
+  return countsLiveChannel;
+}
+
+export function broadcastCountDelta(type: 'play' | 'like' | 'follow', data: Omit<CountDeltaPayload, 'type'>): void {
+  if (!countsLiveChannel) return;
+  try {
+    void countsLiveChannel.send({
+      type: 'broadcast',
+      event: 'count-delta',
+      payload: { type, ...data } as CountDeltaPayload,
+    });
+  } catch { /* non-critical */ }
+}
+
 function invalidatePopularityQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
   queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
@@ -196,7 +261,8 @@ function usePopularityRealtime() {
       popularityChannelTeardownTimer = null;
     }
     popularityChannelConsumers += 1;
-    const channel = ensurePopularityChannel(queryClient);
+    ensurePopularityChannel(queryClient);
+    ensureCountsLiveChannel(queryClient);
 
     return () => {
       popularityChannelConsumers = Math.max(0, popularityChannelConsumers - 1);
@@ -206,6 +272,10 @@ function usePopularityRealtime() {
           if (popularityChannelConsumers === 0 && popularityChannel) {
             supabase.removeChannel(popularityChannel);
             popularityChannel = null;
+          }
+          if (popularityChannelConsumers === 0 && countsLiveChannel) {
+            supabase.removeChannel(countsLiveChannel);
+            countsLiveChannel = null;
           }
           popularityChannelTeardownTimer = null;
         }, 1500);
@@ -234,6 +304,7 @@ export function useSongPopularity() {
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,
+    placeholderData: () => mergeSongPopularityWithSeed([]),
   });
 }
 
@@ -414,6 +485,7 @@ export function useArtistFollowerCounts() {
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,
+    placeholderData: () => ARTISTS.map(a => ({ artist_id: a.id, follower_count: ARTIST_FOLLOWER_BASELINE })),
   });
 }
 
@@ -453,6 +525,16 @@ export function useArtistStreamTotals() {
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,
+    placeholderData: () => {
+      const seed = mergeSongPopularityWithSeed([]);
+      const songToArtist = new Map<string, string>(SONGS.map(s => [s.id, s.artistId]));
+      const totals = new Map<string, number>();
+      seed.forEach(row => {
+        const artistId = songToArtist.get(String(row.song_id || ''));
+        if (artistId) totals.set(artistId, (totals.get(artistId) || 0) + (row.play_count || 0));
+      });
+      return Array.from(totals.entries()).map(([artist_id, stream_count]) => ({ artist_id, stream_count }));
+    },
   });
 }
 

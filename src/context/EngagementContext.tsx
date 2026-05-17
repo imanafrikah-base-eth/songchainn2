@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode, use
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { broadcastCountDelta } from '@/hooks/usePopularity';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // Subscribed broadcast channels keyed by channel name — reused across sendPulse calls.
@@ -223,6 +224,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           : item
       );
     });
+    broadcastCountDelta('play', { songId });
 
     supabase.from('song_analytics').insert({
       event_type: 'play',
@@ -409,6 +411,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           : item
       );
     });
+    broadcastCountDelta('like', { songId, delta: likeDelta });
 
     try {
       if (user) {
