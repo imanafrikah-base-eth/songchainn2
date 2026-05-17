@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { fcOpenUrl } from '@/lib/farcasterActions';
 
 interface ShareOptions {
   title: string;
@@ -100,7 +101,7 @@ export function useShare() {
 
   const shareToX = useCallback((text: string, url: string) => {
     const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-    window.open(tweetUrl, '_blank', 'width=600,height=400');
+    void fcOpenUrl(tweetUrl);
   }, []);
 
   const sharePost = useCallback(async (postId: string, content?: string) => {

@@ -13,6 +13,7 @@ import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
 import { useFarcasterContext } from '@/context/FarcasterContext';
 import sdk from '@farcaster/miniapp-sdk';
+import { fcOpenUrl } from '@/lib/farcasterActions';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { CATALOGS, SONGS, type Song } from '@/data/musicData';
@@ -792,7 +793,7 @@ export default function Auth() {
                       type="button"
                       variant="outline"
                       className="border-cyan-300/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
-                      onClick={() => window.open('https://www.wavewarz.com', '_blank', 'noopener,noreferrer')}
+                      onClick={() => { void fcOpenUrl('https://www.wavewarz.com'); }}
                     >
                       Open WaveWarz.com
                     </Button>
@@ -800,7 +801,7 @@ export default function Auth() {
                       type="button"
                       variant="outline"
                       className="border-emerald-300/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
-                      onClick={() => window.open('https://subscribepage.io/XFM0pk', '_blank', 'noopener,noreferrer')}
+                      onClick={() => { void fcOpenUrl('https://subscribepage.io/XFM0pk'); }}
                     >
                       Learn More
                     </Button>

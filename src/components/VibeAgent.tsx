@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useEngagement } from '@/context/EngagementContext';
 import moshaAvatar from '@/assets/Mo$ha chat pop up.png';
+import { fcOpenUrl } from '@/lib/farcasterActions';
 
 type AgentMode = 'unset' | 'music' | 'chill' | 'turnup' | 'focus' | 'feelings' | 'explore';
 type MoodChoice = 'loving' | 'cool' | 'not_my_vibe';
@@ -821,7 +822,7 @@ export function VibeAgent() {
                     onClick={() => {
                       const path = externalPrompt.ctaPath!;
                       if (/^https?:\/\//i.test(path)) {
-                        window.open(path, '_blank', 'noopener,noreferrer');
+                        void fcOpenUrl(path);
                       } else {
                         navigate(path);
                       }

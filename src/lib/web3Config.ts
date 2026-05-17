@@ -1,6 +1,7 @@
 import { createWeb3Modal } from '@web3modal/wagmi/react';
 import { defaultWagmiConfig } from '@web3modal/wagmi/react/config';
 import { base } from 'wagmi/chains';
+import farcasterMiniApp from '@farcaster/miniapp-wagmi-connector';
 
 // WalletConnect internals call socket.disconnect() which doesn't exist on native WebSocket.
 // Add it as an alias for close() on the prototype only — no constructor replacement.
@@ -32,6 +33,10 @@ const metadata = {
 const chains = [base] as const;
 
 // Create wagmi config
+// The Farcaster connector is appended so that, inside Warpcast / Base App,
+// wagmi can resolve `sdk.wallet.getEthereumProvider()` automatically and
+// transactions skip the wallet-picker dialog. Outside a miniapp the
+// connector simply isn't selectable.
 export const wagmiConfig = defaultWagmiConfig({
   chains,
   projectId,
@@ -40,6 +45,7 @@ export const wagmiConfig = defaultWagmiConfig({
   enableInjected: true,
   enableEIP6963: true,
   enableCoinbase: false,
+  connectors: [farcasterMiniApp()],
 });
 
 let isWeb3ModalInitialized = false;

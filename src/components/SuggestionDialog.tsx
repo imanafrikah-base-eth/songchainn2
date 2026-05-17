@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { fcOpenUrl } from '@/lib/farcasterActions';
 import { toast } from 'sonner';
 
 interface SuggestionDialogProps {
@@ -49,7 +50,7 @@ export function SuggestionDialog({ open, onOpenChange }: SuggestionDialogProps) 
         // Fallback if table is not ready yet.
         const subject = encodeURIComponent(`$ongChainn Suggestion: ${payload.title}`);
         const body = encodeURIComponent(`User: ${payload.user_label}\n\n${payload.details}`);
-        window.open(`mailto:wavewarzafrica@songchainn.xyz?subject=${subject}&body=${body}`, '_blank');
+        void fcOpenUrl(`mailto:wavewarzafrica@songchainn.xyz?subject=${subject}&body=${body}`);
         toast.success('Suggestion captured and email draft opened.');
       } else {
         toast.success('Suggestion sent. Thank you for helping improve $ongChainn.');

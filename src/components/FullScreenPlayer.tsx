@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { useShare } from '@/hooks/useShare';
 import { toast } from '@/hooks/use-toast';
+import { fcOpenUrl } from '@/lib/farcasterActions';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -128,14 +129,14 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
     if (!currentSong) return;
     const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
     const text = `Check out "${currentSong.title}" by ${currentSong.artist} on $ongChainn!`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, '_blank');
+    void fcOpenUrl(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`);
   };
 
   const handleShareToTelegram = () => {
     if (!currentSong) return;
     const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
     const text = `Check out "${currentSong.title}" by ${currentSong.artist} on $ongChainn!`;
-    window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+    void fcOpenUrl(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
   };
 
   const toggleRepeat = () => {

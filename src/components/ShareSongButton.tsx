@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Share2, 
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useShare } from '@/hooks/useShare';
 import { useSocial } from '@/hooks/useSocial';
 import { toast } from 'sonner';
+import { fcOpenUrl, fcComposeCast, isInMiniApp } from '@/lib/farcasterActions';
 
 interface ShareSongButtonProps {
   songId: string;
@@ -35,11 +36,18 @@ export function ShareSongButton({
 }: ShareSongButtonProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [inMiniApp, setInMiniApp] = useState(false);
   const { getSongShareUrl, shareToX } = useShare();
   const { createPost } = useSocial();
 
   const shareUrl = getSongShareUrl({ id: songId, title: songTitle, artist: artistName, coverImage });
   const shareText = `Check out "${songTitle}" by ${artistName} on $ongChainn!`;
+
+  useEffect(() => {
+    let cancelled = false;
+    void isInMiniApp().then((v) => { if (!cancelled) setInMiniApp(v); });
+    return () => { cancelled = true; };
+  }, []);
 
   const copyText = useCallback(async (text: string) => {
     const tryClipboardApi = async () => {
@@ -126,13 +134,13 @@ export function ShareSongButton({
 
   const handleShareToWhatsApp = useCallback(async () => {
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`;
-    window.open(whatsappUrl, '_blank');
+    await fcOpenUrl(whatsappUrl);
     setShowDropdown(false);
   }, [shareText, shareUrl]);
 
   const handleShareToTelegram = useCallback(async () => {
     const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
-    window.open(telegramUrl, '_blank');
+    await fcOpenUrl(telegramUrl);
     setShowDropdown(false);
   }, [shareUrl, shareText]);
 
@@ -142,23 +150,39 @@ export function ShareSongButton({
     setShowDropdown(false);
   }, [createPost, songId]);
 
-  const shareOptions = [
-    { icon: <Share2 className="w-4 h-4" />, label: 'Share to Feed', action: handleShareToFeed },
-    { icon: <Link2 className="w-4 h-4" />, label: 'Copy Link', action: handleCopyLink, highlight: copied },
-    { icon: <Twitter className="w-4 h-4" />, label: 'Share on X', action: handleShareToX },
-    { icon: <MessageCircle className="w-4 h-4" />, label: 'WhatsApp', action: handleShareToWhatsApp },
-    { icon: <Share2 className="w-4 h-4" />, label: 'Telegram', action: handleShareToTelegram },
-  ];
+  const handleShareToFarcaster = useCallback(async () => {
+    const ok = await fcComposeCast({ text: shareText, embeds: [shareUrl] });
+    if (ok) toast.success('Cast composer opened');
+    else toast.error('Open inside Warpcast / Base App to cast');
+    setShowDropdown(false);
+  }, [shareText, shareUrl]);
 
-  // Add native share option on mobile
-  if (typeof navigator !== 'undefined' && 'share' in navigator) {
-    shareOptions.unshift({
-      icon: <Share2 className="w-4 h-4" />,
-      label: 'Share',
-      action: handleNativeShare,
-      highlight: false
-    });
-  }
+  const shareOptions = useMemo(() => {
+    const opts: { icon: JSX.Element; label: string; action: () => void | Promise<void>; highlight?: boolean }[] = [];
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      opts.push({
+        icon: <Share2 className="w-4 h-4" />,
+        label: 'Share',
+        action: handleNativeShare,
+        highlight: false,
+      });
+    }
+    if (inMiniApp) {
+      opts.push({
+        icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M18.24 0H5.76A5.76 5.76 0 0 0 0 5.76v12.48A5.76 5.76 0 0 0 5.76 24h12.48A5.76 5.76 0 0 0 24 18.24V5.76A5.76 5.76 0 0 0 18.24 0ZM7.92 18l-3.12-9h2.4l1.8 5.64L10.8 9h2.4l1.8 5.64L16.8 9h2.4L16.08 18h-2.4l-1.68-5.28L10.32 18H7.92Z"/></svg>,
+        label: 'Cast on Farcaster',
+        action: handleShareToFarcaster,
+      });
+    }
+    opts.push(
+      { icon: <Share2 className="w-4 h-4" />, label: 'Share to Feed', action: handleShareToFeed },
+      { icon: <Link2 className="w-4 h-4" />, label: 'Copy Link', action: handleCopyLink, highlight: copied },
+      { icon: <Twitter className="w-4 h-4" />, label: 'Share on X', action: handleShareToX },
+      { icon: <MessageCircle className="w-4 h-4" />, label: 'WhatsApp', action: handleShareToWhatsApp },
+      { icon: <Share2 className="w-4 h-4" />, label: 'Telegram', action: handleShareToTelegram },
+    );
+    return opts;
+  }, [inMiniApp, copied, handleNativeShare, handleShareToFarcaster, handleShareToFeed, handleCopyLink, handleShareToX, handleShareToWhatsApp, handleShareToTelegram]);
 
   if (variant === 'button') {
     return (

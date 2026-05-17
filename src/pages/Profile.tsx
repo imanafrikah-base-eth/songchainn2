@@ -25,6 +25,7 @@ import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 const logo = '/songchainn-logo.webp';
 import { uploadPublicImage } from '../lib/storage';
+import { fcViewProfile } from '@/lib/farcasterActions';
 
 const first = <T,>(arr: T[] | null | undefined): T | undefined =>
   Array.isArray(arr) && arr.length > 0 ? arr[0] : undefined;
@@ -1167,6 +1168,21 @@ export default function Profile() {
 
         {!isEditing && (
           <div className="flex flex-wrap gap-3 mb-6">
+            {(() => {
+              const farcasterFid = Number((user?.user_metadata as any)?.farcaster_fid);
+              if (!Number.isFinite(farcasterFid) || farcasterFid <= 0) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() => { void fcViewProfile(farcasterFid); }}
+                  className="flex items-center gap-2 px-3 py-2 bg-[#7c3aed]/15 hover:bg-[#7c3aed]/25 text-[#c4b5fd] rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M18.24 0H5.76A5.76 5.76 0 0 0 0 5.76v12.48A5.76 5.76 0 0 0 5.76 24h12.48A5.76 5.76 0 0 0 24 18.24V5.76A5.76 5.76 0 0 0 18.24 0ZM7.92 18l-3.12-9h2.4l1.8 5.64L10.8 9h2.4l1.8 5.64L16.8 9h2.4L16.08 18h-2.4l-1.68-5.28L10.32 18H7.92Z"/></svg>
+                  <span className="text-sm">Farcaster</span>
+                  <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                </button>
+              );
+            })()}
             {profileXLink && (
               <a
                 href={profileXLink}

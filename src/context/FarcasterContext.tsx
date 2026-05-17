@@ -1,9 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { useFarcaster } from '@/hooks/useFarcaster';
 import { useAuth } from '@/context/AuthContext';
+import { fcAddMiniApp } from '@/lib/farcasterActions';
 import type { Context as FarcasterCoreContext } from '@farcaster/miniapp-core';
 
 type MiniAppContext = FarcasterCoreContext.MiniAppContext;
+
+const ADD_MINIAPP_KEY = 'songchainn_fc_add_prompted';
 
 interface FarcasterContextType {
   isInFarcaster: boolean;
@@ -54,6 +57,23 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
     }, 3000);
     return () => clearTimeout(t);
   }, [state.isInFarcaster, state.context, user]);
+
+  // Once signed in inside Warpcast / Base App, ask the host to add this
+  // miniapp to the user's home. The host shows its own native prompt; we
+  // only fire it once per FC user (tracked in localStorage).
+  useEffect(() => {
+    if (!state.isInFarcaster || !user?.id) return;
+    let prompted: string | null = null;
+    try { prompted = localStorage.getItem(ADD_MINIAPP_KEY); } catch { /* noop */ }
+    if (prompted === user.id) return;
+    // Defer so we don't compete with the splash-to-app transition.
+    const t = setTimeout(() => {
+      void fcAddMiniApp().finally(() => {
+        try { localStorage.setItem(ADD_MINIAPP_KEY, user.id); } catch { /* noop */ }
+      });
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [state.isInFarcaster, user?.id]);
 
   const value: FarcasterContextType = { ...state, quickAuthFailed };
   return <FarcasterContext.Provider value={value}>{children}</FarcasterContext.Provider>;
