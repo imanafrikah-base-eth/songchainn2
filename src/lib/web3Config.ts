@@ -32,11 +32,24 @@ const metadata = {
 // Configure chains - Base mainnet only
 const chains = [base] as const;
 
-// Create wagmi config
-// The Farcaster connector is appended so that, inside Warpcast / Base App,
-// wagmi can resolve `sdk.wallet.getEthereumProvider()` automatically and
-// transactions skip the wallet-picker dialog. Outside a miniapp the
-// connector simply isn't selectable.
+// Defensively instantiate the Farcaster mini-app wagmi connector. If the
+// factory throws (it has bitten us in prod when the package's module
+// initialisation races with React load order) we still want the app to
+// render — the connector is only useful inside Warpcast / Base App, so a
+// regular web user loses nothing if it's absent.
+const fcConnector = (() => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return farcasterMiniApp();
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn('[web3Config] Farcaster connector init failed:', err);
+    return null;
+  }
+})();
+
+// Create wagmi config. Inside Warpcast / Base App the FC connector lets
+// transactions skip the wallet-picker dialog; on regular web it simply
+// isn't selectable.
 export const wagmiConfig = defaultWagmiConfig({
   chains,
   projectId,
@@ -45,7 +58,7 @@ export const wagmiConfig = defaultWagmiConfig({
   enableInjected: true,
   enableEIP6963: true,
   enableCoinbase: false,
-  connectors: [farcasterMiniApp()],
+  connectors: fcConnector ? [fcConnector] : undefined,
 });
 
 let isWeb3ModalInitialized = false;
