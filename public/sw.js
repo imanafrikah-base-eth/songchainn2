@@ -1,5 +1,6 @@
 // $ongChainn Push Notification Service Worker
-const CACHE_NAME = 'songchainn-v3';
+const CACHE_NAME = 'songchainn-v4';
+const ASSET_CACHE = 'songchainn-assets-v4';
 const AUDIO_CACHE = 'songchainn-audio-v3';
 const AUDIO_CACHE_SIZE_LIMIT = 500 * 1024 * 1024;
 
@@ -9,6 +10,13 @@ const STATIC_ASSETS = [
   '/favicon.png',
   '/manifest.json'
 ];
+
+// Hashed Vite assets (vendor-XXXX.js, index-XXXX.css, etc.) are content-
+// addressed and never mutate. Serve them cache-first so repeat visits skip
+// the network round-trip entirely — the HTTP `immutable` header set in
+// vercel.json gives the browser the same hint, but having SW back it up
+// covers the case where the browser cache has been evicted.
+const isImmutableAsset = (url) => /\/assets\/.+\.[A-Za-z0-9_-]+\.(js|css|woff2?|ttf|otf|png|jpg|jpeg|webp|avif|svg|ico)$/.test(url.pathname);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -23,7 +31,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME && key !== AUDIO_CACHE)
+        keys.filter((key) => key !== CACHE_NAME && key !== AUDIO_CACHE && key !== ASSET_CACHE)
           .map((key) => caches.delete(key))
       );
     })
@@ -174,6 +182,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // Cache-first for hashed Vite assets — content-addressed so always safe.
+  // Cuts the repeat-visit network round-trip even when HTTP cache is cold.
+  if (isImmutableAsset(url)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          cachePutIfOk(ASSET_CACHE, request, response);
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
   if (destination === 'script' || destination === 'style') {
     event.respondWith(networkFirst(request, CACHE_NAME));
     return;
