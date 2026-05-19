@@ -175,12 +175,11 @@ export default function Community() {
       if (!rpcResult.error && Array.isArray(rpcResult.data)) {
         profiles = rpcResult.data;
       } else {
-        // RPC not available yet — fall back to direct query
+        // RPC not available — fall back to direct table query (no ORDER BY to avoid column issues)
         const directResult = await Promise.race([
           supabase
             .from('audience_profiles')
             .select('*')
-            .order('updated_at', { ascending: false })
             .limit(300)
             .then((r) => r),
           timeout,
@@ -191,16 +190,17 @@ export default function Community() {
 
       if (fetchError || !profiles) {
         if (import.meta.env.DEV) {
-          console.error('Error fetching users:', fetchError);
+          console.error('Error fetching community profiles:', fetchError);
         }
-        setLoadError('Unable to load community right now. Showing cached profiles if available.');
         const cached = Object.values(getAllProfiles() || {}).filter((p) => p?.user_id);
-        if (cached.length) {
-          const normalizedCached: UserProfile[] = cached
-            .map((p: any) => normalizeProfile(p))
-            .filter((p): p is UserProfile => Boolean(p));
+        const normalizedCached: UserProfile[] = cached
+          .map((p: any) => normalizeProfile(p))
+          .filter((p): p is UserProfile => Boolean(p));
+        if (normalizedCached.length) {
           setUsers(normalizedCached);
           setFilteredUsers(normalizedCached);
+        } else {
+          setLoadError('Unable to load community right now. Please try again later.');
         }
         setIsLoading(false);
         return;

@@ -147,33 +147,35 @@ function AppShell() {
     <>
       <div className={`${hideFloatingChrome ? '' : 'pb-20 lg:pb-0'} ${rootPulseClass}`.trim()}>
         <RedirectHandler />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/discover" element={<Discover />} />
-          <Route path="/artists" element={<Artists />} />
-          <Route path="/artist/:id" element={<ArtistDetail />} />
-          <Route path="/catalog/:id" element={<CatalogDetail />} />
-          <Route path="/song/:id" element={<SongDetail />} />
-          <Route path="/playlist/:id" element={<PlaylistDetail />} />
-          <Route path="/playlists" element={<Playlists />} />
-          <Route path="/post/:id" element={<Social />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/social" element={<Social />} />
-          <Route path="/inbox" element={<Inbox />} />
-          <Route path="/community" element={<Community />} />
-          <Route path="/audience/:userId" element={<AudienceProfile />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
-          <Route path="/dj-shuffle" element={<DjShuffle />} />
-          <Route path="/install" element={<Install />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/room" element={<Room />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/bettercallzaal" element={<BetterCallZaal />} />
-          <Route path="/auth" element={<Navigate to="/" replace />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/discover" element={<Discover />} />
+            <Route path="/artists" element={<Artists />} />
+            <Route path="/artist/:id" element={<ArtistDetail />} />
+            <Route path="/catalog/:id" element={<CatalogDetail />} />
+            <Route path="/song/:id" element={<SongDetail />} />
+            <Route path="/playlist/:id" element={<PlaylistDetail />} />
+            <Route path="/playlists" element={<Playlists />} />
+            <Route path="/post/:id" element={<Social />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/social" element={<Social />} />
+            <Route path="/inbox" element={<Inbox />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/audience/:userId" element={<AudienceProfile />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
+            <Route path="/dj-shuffle" element={<DjShuffle />} />
+            <Route path="/install" element={<Install />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/room" element={<Room />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/bettercallzaal" element={<BetterCallZaal />} />
+            <Route path="/auth" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </div>
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><VibeAgent /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><BehaviorCtaPopups /></Suspense></ErrorBoundary>}
