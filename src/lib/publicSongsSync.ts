@@ -115,9 +115,3 @@ export async function syncPublicSongsInBackground(
   }
 }
 
-export async function syncOnePublicSongInBackground(
-  song: Song,
-  artists: Artist[] = ARTISTS,
-): Promise<void> {
-  await syncPublicSongsInBackground([song], artists);
-}

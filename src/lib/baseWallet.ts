@@ -1,11 +1,3 @@
-/**
- * Base Wallet Connection Utilities
- * 
- * Supports any EIP-1193 compatible wallet (MetaMask, Coinbase, Rainbow, etc.)
- * for connecting to Base blockchain and signing transactions.
- */
-
-// Base Mainnet chain ID
 export const BASE_CHAIN_ID = 8453;
 export const BASE_CHAIN_ID_HEX = "0x2105";
 
@@ -22,41 +14,12 @@ interface ConnectResult {
   error?: string;
 }
 
-/**
- * Check if any wallet provider is available
- */
 export function hasWalletProvider(): boolean {
   if (typeof window === "undefined") return false;
   const ethereum = (window as any).ethereum;
   return !!ethereum?.request;
 }
 
-/**
- * Detect the name of the connected wallet provider
- */
-export function getWalletName(): string {
-  if (typeof window === "undefined") return "Unknown Wallet";
-  const ethereum = (window as any).ethereum;
-  if (!ethereum) return "Unknown Wallet";
-
-  // Check for specific wallets via their injected properties
-  if (ethereum.isMetaMask && !ethereum.isCoinbaseWallet) return "MetaMask";
-  if (ethereum.isCoinbaseWallet) return "Coinbase Wallet";
-  if (ethereum.isRainbow) return "Rainbow";
-  if (ethereum.isTrust) return "Trust Wallet";
-  if (ethereum.isBraveWallet) return "Brave Wallet";
-  if (ethereum.isPhantom) return "Phantom";
-  if (ethereum.isRabby) return "Rabby";
-  if (ethereum.isFrame) return "Frame";
-  if (ethereum.isTokenPocket) return "TokenPocket";
-  if (ethereum.isOKExWallet) return "OKX Wallet";
-
-  return "Wallet";
-}
-
-/**
- * Get the injected Ethereum provider (any wallet)
- */
 export function getWalletProvider(): EIP1193Provider | null {
   if (typeof window === "undefined") return null;
   const ethereum = (window as any).ethereum;
@@ -64,17 +27,11 @@ export function getWalletProvider(): EIP1193Provider | null {
   return ethereum as EIP1193Provider;
 }
 
-/**
- * Generate a cryptographically secure nonce
- */
 export function generateNonce(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
 
-/**
- * Switch to Base chain, adding it if necessary
- */
-export async function switchToBaseChain(provider: EIP1193Provider): Promise<boolean> {
+async function switchToBaseChain(provider: EIP1193Provider): Promise<boolean> {
   try {
     await provider.request({
       method: "wallet_switchEthereumChain",
@@ -113,10 +70,6 @@ export async function switchToBaseChain(provider: EIP1193Provider): Promise<bool
   }
 }
 
-/**
- * Connect to any Base-compatible wallet
- * Works with MetaMask, Coinbase Wallet, Rainbow, and any EIP-1193 wallet
- */
 export async function connectWallet(): Promise<ConnectResult> {
   const provider = getWalletProvider();
   
@@ -171,9 +124,6 @@ export async function connectWallet(): Promise<ConnectResult> {
   }
 }
 
-/**
- * Get connected accounts without prompting
- */
 export async function getConnectedAccounts(): Promise<string[]> {
   const provider = getWalletProvider();
   if (!provider) return [];
@@ -189,17 +139,6 @@ export async function getConnectedAccounts(): Promise<string[]> {
   }
 }
 
-/**
- * Check if wallet is connected
- */
-export async function isWalletConnected(): Promise<boolean> {
-  const accounts = await getConnectedAccounts();
-  return accounts.length > 0;
-}
-
-/**
- * Sign a message with the connected wallet
- */
 export async function signMessage(message: string, address: string): Promise<{ signature?: string; error?: string }> {
   const provider = getWalletProvider();
   if (!provider) {
@@ -220,9 +159,6 @@ export async function signMessage(message: string, address: string): Promise<{ s
   }
 }
 
-/**
- * Send a transaction
- */
 export async function sendTransaction(params: {
   from: string;
   to: string;

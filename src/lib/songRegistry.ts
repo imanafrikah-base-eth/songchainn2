@@ -1,20 +1,9 @@
-/**
- * SongRegistry Smart Contract Integration
- * 
- * ERC-1155 contract for song ownership on Base blockchain.
- * Contract address: 0x39e8317fEEBE3129f3d876c1F6D35271849797F9
- */
-
 import { getWalletProvider, BASE_CHAIN_ID_HEX } from './baseWallet';
 import { parseEther } from 'viem';
 
-// Contract address on Base mainnet
 export const SONG_REGISTRY_ADDRESS = "0x39e8317fEEBE3129f3d876c1F6D35271849797F9";
-
-// Re-export for convenience
 export { BASE_CHAIN_ID_HEX as BASE_CHAIN_ID };
 
-// Interface for on-chain song data
 export interface OnChainSong {
   songId: number;
   tokenAddress: string;

@@ -56,11 +56,3 @@ export interface CommentLike {
   created_at: string;
 }
 
-export interface PlaylistCollaborator {
-  id: string;
-  playlist_id: string;
-  user_id: string;
-  can_edit: boolean;
-  created_at: string;
-  profile?: AudienceProfile;
-}

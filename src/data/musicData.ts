@@ -98,13 +98,6 @@ export interface AudienceProfile {
   joinedAt: Date;
 }
 
-export interface AdminUser {
-  id: string;
-  email: string;
-  baseAddress?: string;
-  isAdmin: boolean;
-}
-
 const UNSTABLE_COVER_FALLBACKS: Array<{ match: string; fallback: string }> = [
   { match: 'NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg', fallback: artistNdaLocal },
   { match: 'IMan%20Arikah%20-3.0%20art.png', fallback: artistImanAfrikahLocal },

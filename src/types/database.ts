@@ -39,13 +39,6 @@ export interface LikedSong {
   created_at: string;
 }
 
-export interface LikedArtist {
-  id: string;
-  user_id: string;
-  artist_id: string;
-  created_at: string;
-}
-
 export interface SongComment {
   id: string;
   user_id: string;
