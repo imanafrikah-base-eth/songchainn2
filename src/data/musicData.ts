@@ -56,7 +56,7 @@ export interface Song {
   artistWallet?: string;
   isTokenGated?: boolean;
   addedAt?: string;
-  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP' | 'LIKE,COMMENT,SUBSCRIBE';
+  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP' | 'LIKE,COMMENT,SUBSCRIBE' | '7USHIMI';
 }
 
 export interface Catalog {
@@ -3200,12 +3200,124 @@ const SONGS_RAW: Song[] = [
     addedAt: '2026-03-21T00:00:00.000Z',
     volume: "ER'TING FLEX",
   },
+  {
+    id: '215',
+    title: 'WORLD CHAMPION GYAL',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20WORLD%20CHAMPION%20GYAL.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/7ushimi%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-20T00:00:00.000Z',
+    volume: '7USHIMI',
+  },
+  {
+    id: '216',
+    title: 'LETI NALANTI',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20LETI%20NALANTI.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/7ushimi%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-20T00:00:00.000Z',
+    volume: '7USHIMI',
+  },
+  {
+    id: '217',
+    title: 'NO B.S',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20NO%20B.S.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/7ushimi%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-20T00:00:00.000Z',
+    volume: '7USHIMI',
+  },
+  {
+    id: '218',
+    title: 'EUPHORIA',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20EUPHORIA.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/7ushimi%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-20T00:00:00.000Z',
+    volume: '7USHIMI',
+  },
+  {
+    id: '219',
+    title: 'HURTACHE',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20HURTACHE.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/7ushimi%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-20T00:00:00.000Z',
+    volume: '7USHIMI',
+  },
+  {
+    id: '220',
+    title: 'SHE WILL ALWAYS BE PERFECT',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20SHE%20WILL%20ALWAYS%20BE%20PERFECT.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/7ushimi%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-20T00:00:00.000Z',
+    volume: '7USHIMI',
+  },
+  {
+    id: '221',
+    title: 'HIGHLY POSITIVE',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20HIGHLY%20POSITIVE.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/7ushimi%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro',
+    addedAt: '2026-05-20T00:00:00.000Z',
+    volume: '7USHIMI',
+  },
 ];
 
 const ARTIST_STREAM_TARGETS: Record<string, number> = {
   '1': 14850, // 7ROO7H BASED
   '2': 7420,  // DenaJah
-  '3': 26540, // IMan Afrikah (leader)
+  '3': 29200, // IMan Afrikah (leader)
   '4': 13210, // NDA
   '5': 9800,  // PRP
   '6': 8160,  // Sanchy
@@ -3334,7 +3446,7 @@ export const ARTISTS: Artist[] = [
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
     profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/file_0000000077c8722f8f65c9d1abd8bca1-2.png',
-    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182', '190', '191', '192', '193', '194', '195', '196', '197', '198', '199', '200', '201', '202', '203'],
+    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182', '190', '191', '192', '193', '194', '195', '196', '197', '198', '199', '200', '201', '202', '203', '215', '216', '217', '218', '219', '220', '221'],
   },
   {
     id: '4',

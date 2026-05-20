@@ -327,10 +327,18 @@ export function useProfilePopularity() {
   });
 }
 
+function buildSeedHotSongs(limit: number): TodayHotSong[] {
+  return SONGS
+    .map(song => ({ song, playsToday: getSeedBaseline(song.id).plays }))
+    .sort((a, b) => b.playsToday - a.playsToday)
+    .slice(0, limit);
+}
+
 export function useTodayHotSongs(limit = 5) {
   return useQuery({
     queryKey: ['today-hot-songs', limit],
     queryFn: async () => {
+      maybeResetRpcFlags();
       const windowStart = new Date(Date.now() - 1000 * 60 * 60 * 24);
 
       if (canUseGetTodayHotSongsRpc !== false) {
@@ -340,42 +348,50 @@ export function useTodayHotSongs(limit = 5) {
         });
         if (!error && Array.isArray(data)) {
           canUseGetTodayHotSongsRpc = true;
-          return data
-            .map((row: any) => {
-              const song = SONGS.find(s => s.id === String(row.song_id));
-              return song ? { song, playsToday: Number(row.plays_today) } : null;
-            })
-            .filter(Boolean) as TodayHotSong[];
+          if (data.length > 0) {
+            return data
+              .map((row: any) => {
+                const song = SONGS.find(s => s.id === String(row.song_id));
+                return song ? { song, playsToday: Number(row.plays_today) } : null;
+              })
+              .filter(Boolean) as TodayHotSong[];
+          }
+          // RPC exists but no plays in window — fall through to seed
+        } else {
+          canUseGetTodayHotSongsRpc = false;
         }
-        canUseGetTodayHotSongsRpc = false;
       }
 
-      // Fallback: direct query (limited by per-user RLS, but better than nothing)
-      const { data, error } = await supabase
+      // Fallback: direct query (limited by per-user RLS)
+      const { data: fallbackData } = await supabase
         .from('song_analytics')
         .select('song_id')
         .eq('event_type', 'play')
         .gte('created_at', windowStart.toISOString());
 
-      if (error || !data) return [] as TodayHotSong[];
+      if (fallbackData && fallbackData.length > 0) {
+        const counts = new Map<string, number>();
+        (fallbackData as any[]).forEach((row) => {
+          const songId = row.song_id as string | null;
+          if (!songId) return;
+          counts.set(songId, (counts.get(songId) || 0) + 1);
+        });
 
-      const counts = new Map<string, number>();
-      (data as any[]).forEach((row) => {
-        const songId = row.song_id as string | null;
-        if (!songId) return;
-        counts.set(songId, (counts.get(songId) || 0) + 1);
-      });
+        const result: TodayHotSong[] = [];
+        counts.forEach((playsToday, songId) => {
+          const song = SONGS.find(s => s.id === songId);
+          if (song) result.push({ song, playsToday });
+        });
+        result.sort((a, b) => b.playsToday - a.playsToday);
+        if (result.length > 0) return result.slice(0, limit);
+      }
 
-      const result: TodayHotSong[] = [];
-      counts.forEach((playsToday, songId) => {
-        const song = SONGS.find(s => s.id === songId);
-        if (song) result.push({ song, playsToday });
-      });
-      result.sort((a, b) => b.playsToday - a.playsToday);
-      return result.slice(0, limit);
+      // Final fallback: deterministic seed so Hot Today always has content
+      return buildSeedHotSongs(limit);
     },
     staleTime: 1000 * 60,
     refetchInterval: 1000 * 60,
+    placeholderData: () => buildSeedHotSongs(limit),
   });
 }
 
