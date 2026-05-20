@@ -225,8 +225,8 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   onClick={(e) => e.stopPropagation()}
                   className="inline-flex"
                 >
-                  <OwnershipBadge 
-                    status={ownershipStatus} 
+                  <OwnershipBadge
+                    status={ownershipStatus}
                     offlinePlays={offlinePlaysRemaining}
                     previewSecondsRemaining={previewSecondsRemaining}
                     className="hover:brightness-110"
@@ -234,7 +234,13 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 </Link>
               )}
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">{song.artist}</p>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
+              className="text-xs sm:text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
+            >
+              {song.artist}
+            </button>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
@@ -391,11 +397,17 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   </span>
                 )}
               </h3>
-              <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
+                className="text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
+              >
+                {song.artist}
+              </button>
             </div>
-            <ShareSongButton 
-              songId={song.id} 
-              songTitle={song.title} 
+            <ShareSongButton
+              songId={song.id}
+              songTitle={song.title}
               artistName={song.artist}
               coverImage={song.coverImage}
             />
@@ -513,7 +525,13 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             </Link>
           )}
         </div>
-        <p className="text-sm text-muted-foreground truncate mb-3">{song.artist}</p>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
+          className="text-sm text-muted-foreground truncate mb-3 hover:text-primary transition-colors text-left block w-full"
+        >
+          {song.artist}
+        </button>
 
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground tabular-nums flex items-center gap-1">

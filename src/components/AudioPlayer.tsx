@@ -229,7 +229,13 @@ export const AudioPlayer = memo(function AudioPlayer() {
               </button>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-foreground truncate">{currentSong.title}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{currentSong.artist}</p>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/artist/${currentSong.artistId}`); }}
+                  className="text-[11px] text-muted-foreground truncate hover:text-primary transition-colors text-left"
+                >
+                  {currentSong.artist}
+                </button>
               </div>
             </div>
           </div>
@@ -274,7 +280,13 @@ export const AudioPlayer = memo(function AudioPlayer() {
                   <p className="font-medium text-foreground truncate text-sm sm:text-base group-hover:text-primary transition-colors">
                     {currentSong.title}
                   </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">{currentSong.artist}</p>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/artist/${currentSong.artistId}`); }}
+                    className="text-xs sm:text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
+                  >
+                    {currentSong.artist}
+                  </button>
                   {nextSong && (
                     <p className="text-[10px] text-muted-foreground truncate">
                       Up Next: {nextSong.title} • {nextSong.artist}

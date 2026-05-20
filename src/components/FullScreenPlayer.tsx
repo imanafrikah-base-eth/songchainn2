@@ -1,4 +1,5 @@
 import { memo, useEffect, useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, Share2, ListMusic, Shuffle, Repeat, Repeat1, Copy, Check, MessageCircle } from 'lucide-react';
@@ -38,6 +39,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
   const { toggleLike, isLiked, sendPulse } = useEngagement();
   const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
   const { copied, shareSong, copyToClipboard, shareToX, getSongShareUrl } = useShare();
+  const navigate = useNavigate();
   const [showQueue, setShowQueue] = useState(false);
   const [pulseRipples, setPulseRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const [showPulseHint, setShowPulseHint] = useState(false);
@@ -432,7 +434,13 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                 <h2 className="font-heading text-2xl font-bold text-foreground mb-1 truncate">
                   {currentSong.title}
                 </h2>
-                <p className="text-lg text-muted-foreground truncate">{currentSong.artist}</p>
+                <button
+                  type="button"
+                  onClick={() => { onClose(); navigate(`/artist/${currentSong.artistId}`); }}
+                  className="text-lg text-muted-foreground truncate hover:text-primary transition-colors text-left"
+                >
+                  {currentSong.artist}
+                </button>
                 <div className="mt-3 flex items-center justify-center gap-2">
                   <button
                     onClick={handleKeepThis}

@@ -53,8 +53,8 @@ function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined):
 
     merged.set(songId, {
       song_id: songId,
-      play_count: Math.max(seedPlays, dbPlays),
-      like_count: Math.max(seedLikes, dbLikes),
+      play_count: seedPlays + dbPlays,
+      like_count: seedLikes + dbLikes,
       comment_count: numberOrZero(row.comment_count),
       share_count: numberOrZero(row.share_count),
       view_count: numberOrZero(row.view_count),
@@ -335,11 +335,14 @@ function buildSeedHotSongs(limit: number): TodayHotSong[] {
 }
 
 export function useTodayHotSongs(limit = 5) {
+  const now = new Date();
+  const todayUTC = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
   return useQuery({
-    queryKey: ['today-hot-songs', limit],
+    queryKey: ['today-hot-songs', limit, todayUTC],
     queryFn: async () => {
       maybeResetRpcFlags();
-      const windowStart = new Date(Date.now() - 1000 * 60 * 60 * 24);
+      const d = new Date();
+      const windowStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
       if (canUseGetTodayHotSongsRpc !== false) {
         const { data, error } = await (supabase as any).rpc('get_today_hot_songs', {
