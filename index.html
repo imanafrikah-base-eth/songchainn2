@@ -64,43 +64,6 @@
         });
       })();
     </script>
-    <script>
-      (function () {
-        try {
-          var params = new URLSearchParams(location.search);
-          var img = params.get("img");
-          var title = params.get("title");
-          var artist = params.get("artist");
-
-          var setProp = function (prop, value) {
-            var el = document.querySelector('meta[property="' + prop + '"]');
-            if (el) el.setAttribute("content", value);
-          };
-
-          var setName = function (name, value) {
-            var el = document.querySelector('meta[name="' + name + '"]');
-            if (el) el.setAttribute("content", value);
-          };
-
-          setProp("og:url", location.origin + location.pathname + location.search);
-
-          if (location.pathname.indexOf("/song/") === 0 && img) {
-            var resolvedImg = img.indexOf("http") === 0 ? img : (location.origin + img);
-            setProp("og:image", resolvedImg);
-            setName("twitter:image", resolvedImg);
-
-            if (title && artist) {
-              var fullTitle = title + " - " + artist;
-              setProp("og:title", fullTitle);
-              setName("twitter:title", fullTitle);
-              var desc = 'Listen to "' + title + '" by ' + artist + " on $ongChainn.";
-              setProp("og:description", desc);
-              setName("twitter:description", desc);
-            }
-          }
-        } catch (e) {}
-      })();
-    </script>
   </head>
 
   <body>

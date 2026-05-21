@@ -27,13 +27,10 @@ export function useShare() {
     }
   }, []);
 
-  const getSongShareUrl = useCallback((song: { id: string; title?: string; artist?: string; coverImage?: string }) => {
-    const url = new URL(getShareUrl('song', song.id));
-    if (song.title) url.searchParams.set('title', song.title);
-    if (song.artist) url.searchParams.set('artist', song.artist);
-    if (song.coverImage) url.searchParams.set('img', song.coverImage);
-    return url.toString();
-  }, [getShareUrl]);
+  const getSongShareUrl = useCallback((song: { id: string }) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/share/${song.id}`;
+  }, []);
 
   const copyToClipboard = useCallback(async (url: string) => {
     const tryClipboardApi = async () => {
@@ -113,11 +110,11 @@ export function useShare() {
     });
   }, [getShareUrl, nativeShare]);
 
-  const shareSong = useCallback(async (songTitle: string, artistName: string, songId: string, coverImage?: string) => {
-    const url = getSongShareUrl({ id: songId, title: songTitle, artist: artistName, coverImage });
+  const shareSong = useCallback(async (songTitle: string, artistName: string, songId: string) => {
+    const url = getSongShareUrl({ id: songId });
     return nativeShare({
       title: `${songTitle} - ${artistName}`,
-      text: `Check out "${songTitle}" by ${artistName} on $ongChainn!`,
+      text: `"${songTitle}" by ${artistName} on $ongChainn`,
       url,
     });
   }, [getSongShareUrl, nativeShare]);
