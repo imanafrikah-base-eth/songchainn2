@@ -149,7 +149,7 @@ export function Navigation() {
   return (
     <>
       <header className="sticky top-0 z-40 glass-surface border-b border-border/50">
-        <div className="container mx-auto px-3 sm:px-4">
+        <div className="px-4 sm:px-5 max-w-[1400px] mx-auto">
           <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
             {/* Logo - always visible */}
             <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">

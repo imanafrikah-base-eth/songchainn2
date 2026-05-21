@@ -547,17 +547,17 @@ export default function ArtistDetail() {
     <div
       className={
         profileTheme === 'gold'
-          ? 'min-h-screen pb-24 bg-gradient-to-b from-yellow-500/10 via-background to-background'
+          ? 'min-h-screen bg-gradient-to-b from-yellow-500/10 via-background to-background'
           : profileTheme === 'neon'
-            ? 'min-h-screen pb-24 bg-gradient-to-b from-fuchsia-500/10 via-background to-background'
+            ? 'min-h-screen bg-gradient-to-b from-fuchsia-500/10 via-background to-background'
             : profileTheme === 'midnight'
-              ? 'min-h-screen pb-24 bg-gradient-to-b from-slate-800/20 via-background to-background'
-              : 'min-h-screen bg-background pb-24'
+              ? 'min-h-screen bg-gradient-to-b from-slate-800/20 via-background to-background'
+              : 'min-h-screen bg-background'
       }
     >
       <Navigation />
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="px-4 pt-4 sm:pt-6">
         {/* Back Button */}
         <Link 
           to="/artists" 

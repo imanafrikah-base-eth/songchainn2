@@ -95,10 +95,10 @@ export default function DjShuffle() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 relative">
+    <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <Navigation />
-      <main className="container mx-auto px-3 py-4 sm:px-4 sm:py-8 relative z-10 space-y-6">
+      <main className="px-4 pt-4 sm:pt-6 relative z-10 space-y-6">
         <section className="rounded-3xl border border-cyan-400/30 bg-black/65 overflow-hidden">
           <div className="grid gap-4 p-4 md:grid-cols-[1.1fr_0.9fr] md:p-6">
             <div className="space-y-3">

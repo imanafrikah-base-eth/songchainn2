@@ -43,7 +43,7 @@ export function BottomTabBar() {
       >
         {/* Glass background with blur */}
         <div className="glass-surface border-t border-border/50 pb-safe">
-          <div className="flex items-center justify-around h-16 px-2">
+          <div className="flex items-center h-[54px]">
             {effectiveTabItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -51,7 +51,7 @@ export function BottomTabBar() {
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    "relative flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-all min-w-[60px]",
+                    "relative flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all flex-1 min-w-0",
                     isActive 
                       ? "text-primary" 
                       : "text-muted-foreground hover:text-foreground"
@@ -59,7 +59,7 @@ export function BottomTabBar() {
                 >
                   <div className="relative">
                     <item.icon className={cn(
-                      "w-5 h-5 transition-transform",
+                      "w-[18px] h-[18px] transition-transform",
                       isActive && "scale-110"
                     )} />
                     {item.path === '/room' && roomOnlineCount > 0 && (
@@ -78,7 +78,7 @@ export function BottomTabBar() {
                     )}
                   </div>
                   <span className={cn(
-                    "text-[10px] font-medium transition-all",
+                    "text-[9px] font-medium transition-all leading-none",
                     isActive ? "text-primary" : "text-muted-foreground"
                   )}>
                     {item.label}

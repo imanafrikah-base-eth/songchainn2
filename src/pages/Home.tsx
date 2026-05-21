@@ -354,14 +354,14 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 relative">
+    <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <OfflineIndicator />
       <Navigation />
       <UpdateAvailableBanner />
       <DownloadAppBanner />
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 relative z-10">
+      <main className="px-4 pt-4 sm:pt-6 relative z-10">
         {playerState?.isRoomMode && playerState.currentSong && (
           <div className="mb-4 sm:mb-6">
             <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
@@ -1066,7 +1066,7 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="container mx-auto px-3 sm:px-4 mt-8 sm:mt-12 mb-4 sm:mb-8"
+          className="px-4 mt-6 sm:mt-10 mb-4 sm:mb-6"
         >
           <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shine-overlay relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 opacity-25">

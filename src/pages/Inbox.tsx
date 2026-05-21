@@ -190,7 +190,7 @@ export default function Inbox() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 relative z-10">
+      <main className="px-4 pt-4 sm:pt-6 relative z-10">
         <section className="rounded-2xl border border-border/50 bg-background/85 backdrop-blur p-3 sm:p-4">
           <div className="flex items-center gap-2 mb-3">
             <Bot className="w-4 h-4 text-primary" />

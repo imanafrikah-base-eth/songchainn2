@@ -1,9 +1,22 @@
 @tailwind base;
 
-/* Safe area padding for bottom navigation on devices with home indicator */
+/* Safe area inset utilities */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+/* Bottom chrome clearance: tab bar (64px) + 8px buffer + home indicator */
+.pb-chrome {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+/* Consistent page gutter — 16px on all screens, matches iOS HIG */
+.page-x {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
 @tailwind components;
 @tailwind utilities;
 

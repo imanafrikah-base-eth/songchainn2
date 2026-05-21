@@ -149,11 +149,11 @@ export default function Install() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background">
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="container mx-auto px-4 py-8 relative z-10">
+      <main className="px-4 pt-4 sm:pt-6 relative z-10">
         <AnimatePresence>
           {showIOSInstructions && (
             <motion.div

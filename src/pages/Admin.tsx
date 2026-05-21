@@ -36,7 +36,7 @@ export default function Admin() {
     <div className="min-h-screen bg-background">
       {/* Admin Header */}
       <header className="bg-card border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="px-4 py-4 flex items-center justify-between max-w-[1400px] mx-auto">
           <div className="flex items-center gap-3">
             <img src={logo} alt="$ongChainn" className="w-8 h-8" />
             <div>
@@ -50,7 +50,7 @@ export default function Admin() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="px-4 pt-4 max-w-[1400px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

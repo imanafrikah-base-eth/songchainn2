@@ -538,7 +538,7 @@ export default function WaveWarzBattleZone() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="relative z-10 container mx-auto px-3 py-4 sm:px-4 sm:py-6">
+      <main className="relative z-10 px-4 pt-4 sm:pt-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-white sm:text-3xl">Battle Zone</h1>

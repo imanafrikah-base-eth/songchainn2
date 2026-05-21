@@ -145,7 +145,7 @@ function AppShell() {
 
   return (
     <>
-      <div className={`${hideFloatingChrome ? '' : 'pb-20 lg:pb-0'} ${rootPulseClass}`.trim()}>
+      <div className={`${hideFloatingChrome ? '' : 'pb-chrome lg:pb-0'} ${rootPulseClass}`.trim()}>
         <RedirectHandler />
         <Suspense fallback={<PageLoader />}>
           <Routes>

@@ -211,7 +211,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
         className="fixed bottom-0 left-0 right-0 z-50"
       >
         <div className="glass-surface border-t border-border/50 pb-safe">
-          <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
+          <div className="px-4 py-2.5 sm:py-3">
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
@@ -255,7 +255,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
         <div className="glass-surface border-t border-border/50 pb-safe">
           <ProgressBar currentTime={currentTime} duration={duration} onSeek={seekTo} disabled={isRoomMode} />
 
-          <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
+          <div className="px-4 py-2.5 sm:py-3">
             <div className="flex items-center justify-between gap-2 sm:gap-4">
               {/* Song info - clickable to expand */}
               <button

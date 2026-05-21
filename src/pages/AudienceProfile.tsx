@@ -244,7 +244,7 @@ export default function AudienceProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pb-24">
+      <div className="min-h-screen bg-background">
         <div className="h-48 bg-gradient-to-b from-primary/20 to-background" />
         <div className="max-w-2xl mx-auto px-4 -mt-16">
           <Skeleton className="w-32 h-32 rounded-full mx-auto" />
@@ -260,7 +260,7 @@ export default function AudienceProfile() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-background pb-24 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-bold mb-2">Profile not found</h2>
@@ -273,7 +273,7 @@ export default function AudienceProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background">
       <div className="relative h-48 md:h-64">
         {profile.cover_photo_url ? (
           <img

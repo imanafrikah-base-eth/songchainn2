@@ -5,11 +5,11 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 
 export default function WaveWarzAfricaOnboarding() {
   return (
-    <div className="min-h-screen bg-background pb-24 relative">
+    <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="container mx-auto px-3 py-10 sm:px-4 relative z-10">
+      <main className="px-4 pt-4 sm:pt-6 relative z-10">
         <section className="mx-auto max-w-3xl overflow-hidden rounded-3xl border border-cyan-400/35 bg-black/70 p-6 text-center sm:p-10">
           <h1 className="text-3xl font-bold leading-tight text-white sm:text-5xl">WaveWarz Africa</h1>
           <p className="mt-3 text-sm text-zinc-200 sm:text-lg">Coming soon.</p>

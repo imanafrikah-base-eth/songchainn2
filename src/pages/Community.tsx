@@ -370,11 +370,11 @@ export default function Community() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 relative">
+    <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="container mx-auto px-4 py-6 max-w-4xl relative z-10">
+      <main className="px-4 pt-4 sm:pt-6 max-w-4xl mx-auto relative z-10">
         <motion.section
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}

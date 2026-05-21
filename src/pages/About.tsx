@@ -46,11 +46,11 @@ export default function About() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background pb-24 relative">
+    <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="container mx-auto px-3 sm:px-4 py-8 sm:py-12 relative z-10">
+      <main className="px-4 pt-4 sm:pt-6 relative z-10">
         <motion.section
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}

@@ -208,11 +208,11 @@ export default function Discover() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 relative">
+    <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="container mx-auto px-4 py-8 relative z-10">
+      <main className="px-4 pt-4 sm:pt-6 relative z-10">
         {playerState?.isRoomMode && playerState.currentSong && (
           <div className="mb-6">
             <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">

@@ -9,7 +9,7 @@ export default function WaveWarzAfricaEmbed() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="relative z-10 container mx-auto px-3 py-10 sm:px-4">
+      <main className="relative z-10 px-4 pt-4 sm:pt-6">
         <section className="mx-auto max-w-3xl rounded-3xl border border-cyan-400/35 bg-black/70 p-6 text-center sm:p-10">
           <h1 className="text-3xl font-bold leading-tight text-white sm:text-5xl">WaveWarz Africa</h1>
           <p className="mt-3 text-sm text-zinc-200 sm:text-lg">Coming soon.</p>

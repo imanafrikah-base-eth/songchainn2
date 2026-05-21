@@ -642,7 +642,7 @@ export default function Profile() {
       '');
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background">
       {/* Cover Photo */}
       <div className="relative h-48 bg-gradient-to-br from-primary/30 to-primary/10">
         <input

@@ -178,10 +178,10 @@ export default function SongDetail() {
 
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background">
       <Navigation />
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="px-4 pt-4 sm:pt-6">
         {/* Back Button */}
         <Link 
           to="/" 

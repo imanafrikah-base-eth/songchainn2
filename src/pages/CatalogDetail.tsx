@@ -58,10 +58,10 @@ export default function CatalogDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background">
       <Navigation />
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="px-4 pt-4 sm:pt-6">
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"

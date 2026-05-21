@@ -253,7 +253,7 @@ export default function Marketplace() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-40 glass-card border-b border-border/50">
-        <div className="container mx-auto px-4 py-4">
+        <div className="px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link to="/">
@@ -290,7 +290,7 @@ export default function Marketplace() {
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 gradient-glow opacity-20" />
-        <div className="container mx-auto px-4 py-8 relative">
+        <div className="px-4 py-6 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -332,7 +332,7 @@ export default function Marketplace() {
       </div>
       
       {/* How It Works */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="px-4 py-6">
         <h3 className="text-lg font-heading font-semibold text-foreground mb-4">
           How It Works
         </h3>
@@ -395,7 +395,7 @@ export default function Marketplace() {
       </div>
       
       {/* Songs Grid */}
-      <div className="container mx-auto px-4 py-4 pb-24">
+      <div className="px-4 py-4">
         {tokenGatedSongs.length === 0 ? (
           <Card className="p-12 text-center glass-card">
             <Coins className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
