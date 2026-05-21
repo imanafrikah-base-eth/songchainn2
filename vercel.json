@@ -4,6 +4,10 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/share/artist/:id",
+      "destination": "/api/artist-og?id=:id"
+    },
+    {
       "source": "/share/:id",
       "destination": "/api/song-og?id=:id"
     },

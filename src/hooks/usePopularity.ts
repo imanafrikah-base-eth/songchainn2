@@ -16,25 +16,23 @@ interface SongPopularity {
 
 const numberOrZero = (value: number | null | undefined) => Number(value || 0);
 
-// Deterministic play/like baseline for songs with no seed data.
-// Uses the song ID to produce a stable non-zero floor so counts never start at 0.
-function getSeedBaseline(songId: string): { plays: number; likes: number } {
+// Deterministic play baseline for songs with no real play data yet.
+function getSeedPlayBaseline(songId: string): number {
   const n = parseInt(songId, 10) || 0;
-  const plays = 180 + ((n * 41 + n * 7 + 23) % 520);
-  return { plays, likes: Math.floor(plays * 0.27) };
+  return 180 + ((n * 41 + n * 7 + 23) % 520);
 }
 
 function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined): SongPopularity[] {
   const merged = new Map<string, SongPopularity>();
 
+  // Seed play counts from static data only — NEVER seed likes (only real user actions count)
   SONGS.forEach((song) => {
     const seedPlays = numberOrZero(song.plays);
-    const seedLikes = numberOrZero(song.likes);
-    const baseline = (seedPlays === 0) ? getSeedBaseline(song.id) : { plays: seedPlays, likes: seedLikes };
+    const baseline = seedPlays === 0 ? getSeedPlayBaseline(song.id) : seedPlays;
     merged.set(song.id, {
       song_id: song.id,
-      play_count: Math.max(seedPlays, baseline.plays),
-      like_count: Math.max(seedLikes, baseline.likes),
+      play_count: baseline,
+      like_count: 0,
       comment_count: 0,
       share_count: 0,
       view_count: 0,
@@ -47,14 +45,13 @@ function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined):
     if (!songId) return;
     const seed = merged.get(songId);
     const seedPlays = numberOrZero(seed?.play_count);
-    const seedLikes = numberOrZero(seed?.like_count);
     const dbPlays = numberOrZero(row.play_count);
     const dbLikes = numberOrZero(row.like_count);
 
     merged.set(songId, {
       song_id: songId,
-      play_count: seedPlays + dbPlays,
-      like_count: seedLikes + dbLikes,
+      play_count: Math.max(seedPlays, dbPlays),
+      like_count: dbLikes,                          // real likes only — no seeding
       comment_count: numberOrZero(row.comment_count),
       share_count: numberOrZero(row.share_count),
       view_count: numberOrZero(row.view_count),

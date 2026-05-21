@@ -19,7 +19,7 @@ export function useShare() {
       case 'post':
         return `${baseUrl}/post/${id}`;
       case 'artist':
-        return `${baseUrl}/artist/${id}`;
+        return `${baseUrl}/share/artist/${id}`;
       case 'profile':
         return `${baseUrl}/audience/${id}`;
       default:
