@@ -326,7 +326,7 @@ export function useProfilePopularity() {
 
 function buildSeedHotSongs(limit: number): TodayHotSong[] {
   return SONGS
-    .map(song => ({ song, playsToday: getSeedBaseline(song.id).plays }))
+    .map(song => ({ song, playsToday: getSeedPlayBaseline(song.id) }))
     .sort((a, b) => b.playsToday - a.playsToday)
     .slice(0, limit);
 }
