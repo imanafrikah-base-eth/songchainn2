@@ -153,6 +153,16 @@ export default function Community() {
     target.src = '/placeholder.svg';
   };
 
+  // Touch our own profile's updated_at so we appear near the top of "Recent" list
+  useEffect(() => {
+    if (!user?.id || user.id.startsWith('fc-')) return;
+    void supabase
+      .from('audience_profiles')
+      .update({ updated_at: new Date().toISOString() } as any)
+      .eq('user_id', user.id)
+      .then(() => {});
+  }, [user?.id]);
+
   useEffect(() => {
     const fetchUsers = async () => {
       setIsLoading(true);
@@ -175,11 +185,12 @@ export default function Community() {
       if (!rpcResult.error && Array.isArray(rpcResult.data)) {
         profiles = rpcResult.data;
       } else {
-        // RPC not available — fall back to direct table query (no ORDER BY to avoid column issues)
+        // RPC not available — fall back with updated_at ordering for recency
         const directResult = await Promise.race([
           supabase
             .from('audience_profiles')
             .select('*')
+            .order('updated_at', { ascending: false })
             .limit(300)
             .then((r) => r),
           timeout,
@@ -284,11 +295,44 @@ export default function Community() {
         { event: 'UPDATE', schema: 'public', table: 'audience_profiles' },
         (payload) => {
           const updated = payload.new as UserProfile;
-          const nextUserId = updated?.user_id ?? updated?.id;
+          const nextUserId = updated?.user_id ?? (updated as any)?.id;
           if (!nextUserId) return;
           setUsers((prev) =>
             prev.map((profile) =>
-              profile.user_id === nextUserId ? { ...profile, ...updated, user_id: nextUserId } : profile
+              profile.user_id === String(nextUserId)
+                ? { ...profile, ...updated, user_id: String(nextUserId) }
+                : profile
+            )
+          );
+        }
+      )
+      // Live follower count: any INSERT/DELETE on user_follows updates the target profile's count
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'user_follows' },
+        (payload) => {
+          const followingId = String((payload.new as any)?.following_id || '');
+          if (!followingId) return;
+          setUsers((prev) =>
+            prev.map((p) =>
+              p.user_id === followingId
+                ? { ...p, follower_count: (p.follower_count || 0) + 1 }
+                : p
+            )
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'user_follows' },
+        (payload) => {
+          const followingId = String((payload.old as any)?.following_id || '');
+          if (!followingId) return;
+          setUsers((prev) =>
+            prev.map((p) =>
+              p.user_id === followingId
+                ? { ...p, follower_count: Math.max(0, (p.follower_count || 0) - 1) }
+                : p
             )
           );
         }
@@ -327,6 +371,9 @@ export default function Community() {
         break;
       case 'active':
         filtered = filtered.sort((a, b) => {
+          // Current user always first
+          if (a.user_id === user?.id) return -1;
+          if (b.user_id === user?.id) return 1;
           const aTime = new Date(a.updated_at || a.created_at).getTime();
           const bTime = new Date(b.updated_at || b.created_at).getTime();
           return bTime - aTime;
@@ -335,7 +382,7 @@ export default function Community() {
     }
 
     return filtered;
-  }, [users, searchQuery, sortBy]);
+  }, [users, searchQuery, sortBy, user?.id]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -348,6 +395,16 @@ export default function Community() {
 
   const handleFollow = async (userId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const wasFollowing = isFollowing(userId);
+    const delta = wasFollowing ? -1 : 1;
+    // Optimistic count update in local state before DB round-trip
+    setUsers((prev) =>
+      prev.map((p) =>
+        p.user_id === userId
+          ? { ...p, follower_count: Math.max(0, (p.follower_count || 0) + delta) }
+          : p
+      )
+    );
     await followUser(userId);
   };
 
@@ -374,7 +431,7 @@ export default function Community() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6 max-w-4xl mx-auto relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
         <motion.section
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -531,7 +588,7 @@ export default function Community() {
 
         {/* Users List */}
         {isLoading ? (
-          <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+          <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="glass-card rounded-2xl p-4">
                 <div className="flex items-center gap-4">

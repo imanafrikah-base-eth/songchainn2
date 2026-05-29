@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Music, TrendingUp, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -71,7 +71,7 @@ export default function Artists() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
         {/* Page Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

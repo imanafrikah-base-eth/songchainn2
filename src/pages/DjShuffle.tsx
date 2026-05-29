@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { Music2, PauseCircle, PlayCircle, Shuffle, User2 } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -98,7 +98,7 @@ export default function DjShuffle() {
     <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <Navigation />
-      <main className="px-4 pt-4 sm:pt-6 relative z-10 space-y-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10 space-y-6">
         <section className="rounded-3xl border border-cyan-400/30 bg-black/65 overflow-hidden">
           <div className="grid gap-4 p-4 md:grid-cols-[1.1fr_0.9fr] md:p-6">
             <div className="space-y-3">
@@ -121,7 +121,7 @@ export default function DjShuffle() {
                 </Button>
               </div>
               <p className="text-xs text-zinc-300">
-                Now Playing: {currentSong ? `${currentSong.title} · ${currentSong.artist}` : 'Nothing yet'} {isPlaying ? '(Live)' : ''}
+                Now Playing: {currentSong ? `${currentSong.title} Â· ${currentSong.artist}` : 'Nothing yet'} {isPlaying ? '(Live)' : ''}
               </p>
             </div>
             <div className="rounded-2xl border border-cyan-300/25 bg-black/45 p-2">
@@ -185,7 +185,7 @@ export default function DjShuffle() {
                     }`}
                   >
                     {catalog.title}
-                    <span className="ml-1 text-xs text-zinc-400">· {catalog.artist}</span>
+                    <span className="ml-1 text-xs text-zinc-400">Â· {catalog.artist}</span>
                   </button>
                 ))}
               </div>

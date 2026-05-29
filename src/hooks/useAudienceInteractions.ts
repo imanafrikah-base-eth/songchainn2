@@ -133,7 +133,24 @@ export function useAudienceInteractions() {
     if (!user) return;
 
     const isLiked = likedSongs.includes(songId);
+    const delta = isLiked ? -1 : 1;
     const next = isLiked ? likedSongs.filter((id) => id !== songId) : [...likedSongs, songId];
+
+    // Optimistic local state update
+    setLikedSongs(next);
+
+    // Optimistic cache update — like count changes instantly for this user
+    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+      if (!old) return old;
+      return old.map((item: any) =>
+        String(item.song_id) === String(songId)
+          ? { ...item, like_count: Math.max(0, (item.like_count || 0) + delta) }
+          : item,
+      );
+    });
+
+    // Broadcast to all other connected clients for instant cross-app update
+    broadcastCountDelta('like', { songId, delta });
 
     try {
       if (isLiked) {
@@ -143,12 +160,22 @@ export function useAudienceInteractions() {
         const { error } = await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
         if (error) throw error;
       }
-      setLikedSongs(next);
+      queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
       toast({ title: isLiked ? 'Song removed from likes' : 'Song liked!' });
     } catch {
+      // Revert optimistic updates on failure
+      setLikedSongs(likedSongs);
+      queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+        if (!old) return old;
+        return old.map((item: any) =>
+          String(item.song_id) === String(songId)
+            ? { ...item, like_count: Math.max(0, (item.like_count || 0) - delta) }
+            : item,
+        );
+      });
       toast({ title: 'Could not update likes', variant: 'destructive' });
     }
-  }, [user, likedSongs, toast]);
+  }, [user, likedSongs, queryClient, toast]);
 
   // Like/Unlike Artist
   const toggleLikeArtist = useCallback(async (artistId: string) => {
@@ -181,6 +208,14 @@ export function useAudienceInteractions() {
       } else {
         const { error } = await supabase.from('liked_artists').insert({ user_id: user.id, artist_id: artistId } as any);
         if (error) throw error;
+        // Create feed post for artist follow (fire-and-forget)
+        void supabase.from('social_posts').insert({
+          user_id: user.id,
+          post_type: 'artist_follow',
+          artist_id: artistId,
+          metadata: { artist_id: artistId, action: 'followed' },
+          visibility: 'public',
+        } as any);
       }
       // Trigger a fresh DB count for everyone via postgres_changes (already handled by usePopularity listener)
       queryClient.invalidateQueries({ queryKey: ['artist-follower-counts'] });

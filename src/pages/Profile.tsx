@@ -110,7 +110,7 @@ export default function Profile() {
   const [pendingCoverUrl, setPendingCoverUrl] = useState<string | null>(null);
   const coverPreviewRef = useRef<HTMLDivElement | null>(null);
   const coverPreviewImageRef = useRef<HTMLImageElement | null>(null);
-  const coverDragStateRef = useRef<{ startY: number; startOffset: number } | null>(null);
+  const coverDragStateRef = useRef<{ startY: number; startOffset: number; liveOffset?: number } | null>(null);
   const [isAvatarCropOpen, setIsAvatarCropOpen] = useState(false);
   const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
   const [avatarDraftUrl, setAvatarDraftUrl] = useState<string | null>(null);
@@ -121,11 +121,14 @@ export default function Profile() {
   const [isSavingCroppedAvatar, setIsSavingCroppedAvatar] = useState(false);
   const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
   const avatarPreviewRef = useRef<HTMLDivElement | null>(null);
+  const avatarPreviewImageRef = useRef<HTMLImageElement | null>(null);
   const avatarDragStateRef = useRef<{
     startX: number;
     startY: number;
     startOffsetX: number;
     startOffsetY: number;
+    liveOffsetX?: number;
+    liveOffsetY?: number;
   } | null>(null);
   
   const navigate = useNavigate();
@@ -191,7 +194,7 @@ export default function Profile() {
       if (!authedUser) throw new Error('Not authenticated');
 
       const publicUrl = await uploadPublicImage({
-        bucket: field === 'avatar_url' ? 'avatars' : 'covers',
+        bucket: field === 'avatar_url' ? 'avaters' : 'covers',
         userId: authedUser.id,
         file,
       });
@@ -694,21 +697,25 @@ export default function Profile() {
                 if (!coverDragStateRef.current) return;
                 const deltaY = e.clientY - coverDragStateRef.current.startY;
                 const nextOffset = coverDragStateRef.current.startOffset + deltaY;
-                const clamped = Math.min(
-                  coverCropMaxOffset,
-                  Math.max(-coverCropMaxOffset, nextOffset)
-                );
-                setCoverCropOffsetY(clamped);
+                const clamped = Math.min(coverCropMaxOffset, Math.max(-coverCropMaxOffset, nextOffset));
+                coverDragStateRef.current.liveOffset = clamped;
+                if (coverPreviewImageRef.current) {
+                  coverPreviewImageRef.current.style.transform = `translate(-50%, ${clamped}px)`;
+                }
               }}
               onPointerUp={(e) => {
                 if (!coverDragStateRef.current) return;
                 (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                const final = coverDragStateRef.current.liveOffset ?? coverDragStateRef.current.startOffset;
                 coverDragStateRef.current = null;
+                setCoverCropOffsetY(final);
               }}
               onPointerLeave={(e) => {
                 if (!coverDragStateRef.current) return;
                 (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                const final = coverDragStateRef.current.liveOffset ?? coverDragStateRef.current.startOffset;
                 coverDragStateRef.current = null;
+                setCoverCropOffsetY(final);
               }}
             >
               {coverDraftUrl && (
@@ -821,31 +828,37 @@ export default function Profile() {
                 const deltaY = e.clientY - avatarDragStateRef.current.startY;
                 const nextX = avatarDragStateRef.current.startOffsetX + deltaX;
                 const nextY = avatarDragStateRef.current.startOffsetY + deltaY;
-                const clampedX = Math.min(
-                  avatarMaxOffsetX,
-                  Math.max(-avatarMaxOffsetX, nextX)
-                );
-                const clampedY = Math.min(
-                  avatarMaxOffsetY,
-                  Math.max(-avatarMaxOffsetY, nextY)
-                );
-                setAvatarOffsetX(clampedX);
-                setAvatarOffsetY(clampedY);
+                const clampedX = Math.min(avatarMaxOffsetX, Math.max(-avatarMaxOffsetX, nextX));
+                const clampedY = Math.min(avatarMaxOffsetY, Math.max(-avatarMaxOffsetY, nextY));
+                avatarDragStateRef.current.liveOffsetX = clampedX;
+                avatarDragStateRef.current.liveOffsetY = clampedY;
+                if (avatarPreviewImageRef.current) {
+                  avatarPreviewImageRef.current.style.transform = `translate(-50%, -50%) translate(${clampedX}px, ${clampedY}px)`;
+                }
               }}
               onPointerUp={(e) => {
                 if (!avatarDragStateRef.current) return;
                 (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                const finalX = avatarDragStateRef.current.liveOffsetX ?? avatarDragStateRef.current.startOffsetX;
+                const finalY = avatarDragStateRef.current.liveOffsetY ?? avatarDragStateRef.current.startOffsetY;
                 avatarDragStateRef.current = null;
+                setAvatarOffsetX(finalX);
+                setAvatarOffsetY(finalY);
               }}
               onPointerLeave={(e) => {
                 if (!avatarDragStateRef.current) return;
                 (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                const finalX = avatarDragStateRef.current.liveOffsetX ?? avatarDragStateRef.current.startOffsetX;
+                const finalY = avatarDragStateRef.current.liveOffsetY ?? avatarDragStateRef.current.startOffsetY;
                 avatarDragStateRef.current = null;
+                setAvatarOffsetX(finalX);
+                setAvatarOffsetY(finalY);
               }}
             >
               {avatarDraftUrl && (
                 <>
                   <img
+                    ref={avatarPreviewImageRef}
                     src={avatarDraftUrl}
                     alt="Profile preview"
                     className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
@@ -930,7 +943,7 @@ export default function Profile() {
         </DialogContent>
       </Dialog>
 
-      <div className="px-4 -mt-16 max-w-2xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 -mt-16 max-w-[1400px] mx-auto">
         {/* Profile Picture & Info */}
         <div className="flex items-end gap-4 mb-6">
           <div className="relative">

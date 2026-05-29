@@ -1,19 +1,8 @@
 import { useState, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Heart,
-  MessageCircle,
-  Share2,
-  Play,
-  Pause,
-  Music,
-  UserPlus,
-  Check,
-  Disc3,
-  Copy,
-  PartyPopper,
-  Sparkles,
-  Flame,
+  Heart, MessageCircle, Share2, Play, Pause, Music,
+  UserPlus, Check, Disc3, Copy, PartyPopper, Sparkles, Flame, UserCheck,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SocialPostWithProfile } from '@/types/social';
@@ -24,13 +13,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useShare } from '@/hooks/useShare';
 import { fcOpenUrl } from '@/lib/farcasterActions';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePulseCounts } from '@/hooks/usePopularity';
+import { getArtistSlugUrl, getSongSlugUrl } from '@/lib/slugRoutes';
 
 interface MusicFeedCardProps {
   post: SocialPostWithProfile;
@@ -40,289 +25,252 @@ interface MusicFeedCardProps {
   onComment: () => void;
 }
 
-export function MusicFeedCard({
-  post,
-  onLike,
-  onFollow,
-  isFollowing,
-  onComment,
-}: MusicFeedCardProps) {
+export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }: MusicFeedCardProps) {
   const { user } = useAuth();
   const { currentSong, isPlaying, playSong, pause, play } = usePlayer();
   const navigate = useNavigate();
-  const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard } = useShare();
+  const { shareSong, sharePost, copied, getSongShareUrl, getShareUrl, copyToClipboard } = useShare();
   const { data: pulseCounts } = usePulseCounts();
+  const [imgErr, setImgErr] = useState(false);
 
-  const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
-  const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
-  const postArtist = post.artist_id ? ARTISTS.find(a => a.id === post.artist_id) : null;
-  const isOwnPost = user?.id === post.user_id;
-  const isThisSongPlaying = currentSong?.id === song?.id && isPlaying;
-  const isWelcomePost = post.post_type === 'welcome';
-  const isSongLikePost = post.post_type === 'song_like';
-  const isSongPulsePost = post.post_type === 'song_pulse';
-  const isSongActivityPost = isSongLikePost || isSongPulsePost;
-  const battleLiveMatch = post.content?.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)::(.*)/);
-  const battleLiveId = battleLiveMatch?.[1] ?? null;
-  const battleLiveTitle = battleLiveMatch?.[2]?.trim() ?? null;
+  const song       = post.song_id    ? SONGS.find(s => s.id === post.song_id)      : null;
+  const artist     = song            ? ARTISTS.find(a => a.id === song.artistId)    : null;
+  const postArtist = post.artist_id  ? ARTISTS.find(a => a.id === post.artist_id)   : null;
+  const artistSong = postArtist      ? (SONGS.filter(s => s.artistId === postArtist.id).sort((a,b)=>b.plays-a.plays)[0] ?? null) : null;
+  const activeSong = song ?? artistSong;
 
-  const totalPulses = pulseCounts && song
-    ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count || 0)
-    : 0;
+  const isOwnPost          = user?.id === post.user_id;
+  const isThisSongPlaying  = activeSong ? currentSong?.id === activeSong.id && isPlaying : false;
+  const isWelcomePost      = post.post_type === 'welcome';
+  const isSongLikePost     = post.post_type === 'song_like';
+  const isSongPulsePost    = post.post_type === 'song_pulse';
+  const isArtistFollowPost = post.post_type === 'artist_follow';
 
-  const handleSongImageError = (event: SyntheticEvent<HTMLImageElement>) => {
-    const target = event.currentTarget;
-    if (target.dataset.fallbackApplied === 'true') return;
-    target.dataset.fallbackApplied = 'true';
-    target.src = '/placeholder.svg';
-  };
+  const battleMatch = post.content?.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)::(.*)/);
+  const totalPulses = pulseCounts && song ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count ?? 0) : 0;
+  const coverUrl    = isArtistFollowPost ? (postArtist?.profileImage ?? artistSong?.coverImage) : activeSong?.coverImage;
 
-  const handleShare = () => {
-    if (song && artist) {
-      shareSong(song.title, artist.name, song.id, song.coverImage);
-    } else {
-      sharePost(post.id, post.content || undefined);
-    }
-  };
-
-  const handleCopyLink = () => {
-    const url = song
-      ? getSongShareUrl({ id: song.id, title: song.title, artist: artist?.name || song.artist, coverImage: song.coverImage })
-      : getShareUrl('post', post.id);
-    copyToClipboard(url);
+  const handleImgError = (e: SyntheticEvent<HTMLImageElement>) => {
+    if ((e.currentTarget as any).dataset.fb === 'true') return;
+    (e.currentTarget as any).dataset.fb = 'true';
+    e.currentTarget.src = '/placeholder.svg';
+    setImgErr(true);
   };
 
   const handlePlayPause = () => {
-    if (!song) return;
-    if (currentSong?.id === song.id) {
-      isPlaying ? pause() : play();
-    } else {
-      playSong(song);
-    }
+    if (!activeSong) return;
+    if (currentSong?.id === activeSong.id) isPlaying ? pause() : play();
+    else playSong(activeSong);
   };
 
   const goToProfile = () => {
     if (post.artist_id) {
-      navigate(`/artist/${post.artist_id}`);
-      return;
+      const a = ARTISTS.find(x => x.id === post.artist_id);
+      if (a) { navigate(getArtistSlugUrl(a)); return; }
     }
     navigate(`/audience/${post.user_id}`);
   };
 
-  // Background derived from post type
-  const hasCover = !!(song?.coverImage);
+  const goToArtist = () => {
+    const a = postArtist ?? artist;
+    if (a) navigate(getArtistSlugUrl(a));
+  };
+
+  const handleShare = () => {
+    if (activeSong) shareSong(activeSong.title, activeSong.artist, activeSong.id, activeSong.coverImage);
+    else sharePost(post.id, post.content ?? undefined);
+  };
+
+  const handleCopyLink = () => {
+    const url = activeSong
+      ? getSongShareUrl({ id: activeSong.id, title: activeSong.title, artist: activeSong.artist })
+      : getShareUrl('post', post.id);
+    copyToClipboard(url);
+  };
 
   return (
-    <div className="relative w-full h-full bg-black overflow-hidden">
+    <div className="relative w-full h-full bg-black overflow-hidden select-none">
 
-      {/* ── Full-bleed background ── */}
+      {/* Full-bleed blurred background */}
       {isWelcomePost ? (
         <div className="absolute inset-0 bg-gradient-to-br from-primary/60 via-purple-600/40 to-pink-600/50" />
-      ) : hasCover ? (
+      ) : coverUrl && !imgErr ? (
         <>
-          {/* Blurred ambient layer */}
-          <img
-            src={song!.coverImage}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover scale-110 blur-lg opacity-40"
-            aria-hidden
-            onError={handleSongImageError}
-          />
-          <div className="absolute inset-0 bg-black/50" />
+          <img src={coverUrl} alt="" aria-hidden onError={handleImgError}
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50" />
+          <div className="absolute inset-0 bg-black/55" />
         </>
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-background/80 to-primary/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-background/60 to-primary/10" />
       )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-black/40 pointer-events-none" />
 
-      {/* ── Gradient overlay for readability ── */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30 pointer-events-none" />
-
-      {/* ── Tap area ── */}
-      <div
-        className="absolute inset-0 cursor-pointer"
-        onClick={song ? handlePlayPause : undefined}
-      >
-        {/* Center artwork */}
+      {/* Tap to play */}
+      <div className="absolute inset-0 cursor-pointer" onClick={activeSong ? handlePlayPause : undefined}>
         <div className="absolute inset-0 flex items-center justify-center">
-          {isWelcomePost ? (
-            <motion.div
-              className="text-center px-8"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-            >
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
-              >
+
+          {/* WELCOME */}
+          {isWelcomePost && (
+            <motion.div className="text-center px-8" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+              <motion.div animate={{ rotate: [0,10,-10,0] }} transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}>
                 <PartyPopper className="w-24 h-24 text-yellow-400 mx-auto mb-4" />
               </motion.div>
               <h2 className="text-3xl font-bold text-white mb-1">Welcome!</h2>
               <p className="text-white/80">{post.profile?.profile_name || 'Someone new'}</p>
               <p className="text-white/50 text-sm mt-1">just joined $ongChainn</p>
             </motion.div>
-          ) : hasCover ? (
-            <motion.div
-              className={`rounded-full overflow-hidden shadow-2xl border-4 ${
-                isSongLikePost ? 'border-red-500/60 w-52 h-52 md:w-64 md:h-64' : isSongPulsePost ? 'border-primary/60 w-52 h-52 md:w-64 md:h-64' : 'border-white/20 w-52 h-52 md:w-64 md:h-64'
-              }`}
-              animate={isThisSongPlaying ? { rotate: 360 } : {}}
-              transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
-            >
-              <img
-                src={song!.coverImage}
-                alt={song!.title}
-                className="w-full h-full object-cover"
-                onError={handleSongImageError}
-              />
-            </motion.div>
-          ) : (
-            <div className="w-52 h-52 rounded-full bg-primary/20 flex items-center justify-center">
-              <Music className="w-20 h-20 text-primary/60" />
+          )}
+
+          {/* ARTIST FOLLOW — large artist pfp */}
+          {isArtistFollowPost && postArtist && (
+            <div className="flex flex-col items-center gap-5">
+              <motion.div
+                className="relative w-52 h-52 md:w-64 md:h-64 rounded-full overflow-hidden border-4 border-primary/60 shadow-2xl"
+                animate={isThisSongPlaying ? { scale: [1, 1.03, 1] } : {}}
+                transition={isThisSongPlaying ? { duration: 2, repeat: Infinity } : {}}
+              >
+                <img src={postArtist.profileImage ?? '/placeholder.svg'} alt={postArtist.name}
+                  className="w-full h-full object-cover" onError={handleImgError} />
+                {/* Pulsing ring */}
+                <motion.div className="absolute inset-0 rounded-full border-4 border-primary/40"
+                  animate={{ scale: [1, 1.1, 1], opacity: [0.6, 0, 0.6] }}
+                  transition={{ duration: 2, repeat: Infinity }} />
+              </motion.div>
+              <AnimatePresence>
+                {artistSong && !isThisSongPlaying && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                    <Play className="w-7 h-7 text-white fill-white ml-1" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
 
-          {/* Song like heart badge */}
-          {isSongLikePost && (
-            <motion.div
-              className="absolute -top-2 right-[calc(50%-100px)] bg-red-500 rounded-full p-2.5 shadow-lg"
-              animate={{ scale: [1, 1.15, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
-              <Heart className="w-6 h-6 text-white fill-white" />
-            </motion.div>
-          )}
-          {/* Song pulse badge */}
-          {isSongPulsePost && (
-            <motion.div
-              className="absolute -top-2 right-[calc(50%-100px)] bg-primary rounded-full p-2.5 shadow-lg"
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 0.8, repeat: Infinity }}
-            >
-              <Sparkles className="w-6 h-6 text-white" />
-            </motion.div>
-          )}
+          {/* SONG — spinning disc artwork */}
+          {!isWelcomePost && !isArtistFollowPost && (
+            <>
+              {coverUrl && !imgErr ? (
+                <motion.div
+                  className={`rounded-full overflow-hidden shadow-2xl border-4 w-52 h-52 md:w-64 md:h-64 ${
+                    isSongLikePost ? 'border-red-500/70' : isSongPulsePost ? 'border-primary/70' : 'border-white/20'
+                  }`}
+                  animate={isThisSongPlaying ? { rotate: 360 } : {}}
+                  transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
+                >
+                  <img src={coverUrl} alt={activeSong?.title ?? ''} className="w-full h-full object-cover" onError={handleImgError} />
+                </motion.div>
+              ) : (
+                <div className="w-52 h-52 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Music className="w-20 h-20 text-primary/60" />
+                </div>
+              )}
 
-          {/* Play / Pause indicator */}
-          {song && (
-            <AnimatePresence>
-              {!isThisSongPlaying && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.6 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.6 }}
-                  className="absolute bottom-[42%] left-1/2 -translate-x-1/2 pointer-events-none"
-                >
-                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
-                    <Play className="w-8 h-8 text-white fill-white ml-1" />
-                  </div>
+              {isSongLikePost && (
+                <motion.div className="absolute top-[24%] right-[calc(50%-110px)] bg-red-500 rounded-full p-2.5 shadow-lg"
+                  animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                  <Heart className="w-6 h-6 text-white fill-white" />
                 </motion.div>
               )}
-              {isThisSongPlaying && (
-                <motion.div
-                  key="pause-hint"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute bottom-[42%] left-1/2 -translate-x-1/2 pointer-events-none"
-                >
-                  <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center">
-                    <Pause className="w-8 h-8 text-white fill-white" />
-                  </div>
+              {isSongPulsePost && (
+                <motion.div className="absolute top-[24%] right-[calc(50%-110px)] bg-primary rounded-full p-2.5 shadow-lg"
+                  animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.8, repeat: Infinity }}>
+                  <Sparkles className="w-6 h-6 text-white" />
                 </motion.div>
               )}
-            </AnimatePresence>
+
+              {activeSong && (
+                <AnimatePresence>
+                  {!isThisSongPlaying ? (
+                    <motion.div key="play" initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }}
+                      className="absolute bottom-[42%] left-1/2 -translate-x-1/2 pointer-events-none">
+                      <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                        <Play className="w-8 h-8 text-white fill-white ml-1" />
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div key="pause" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="absolute bottom-[42%] left-1/2 -translate-x-1/2 pointer-events-none">
+                      <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center">
+                        <Pause className="w-8 h-8 text-white fill-white" />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* ── Right-side action bar ── */}
+      {/* Right action bar */}
       <div className="absolute right-3 bottom-32 flex flex-col items-center gap-5 z-10">
-        {/* Avatar + follow */}
         <div className="relative mb-1">
           <button onClick={goToProfile}>
             <Avatar className="w-11 h-11 border-2 border-white shadow-lg">
-              <AvatarImage src={post.profile?.profile_picture_url || ''} />
+              <AvatarImage src={isArtistFollowPost && postArtist ? postArtist.profileImage ?? '' : post.profile?.profile_picture_url ?? ''} />
               <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                {post.profile?.profile_name?.charAt(0) || '?'}
+                {(isArtistFollowPost ? postArtist?.name : post.profile?.profile_name)?.charAt(0) ?? '?'}
               </AvatarFallback>
             </Avatar>
           </button>
           {!isOwnPost && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onFollow(post.user_id); }}
-              className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-lg transition-colors ${
-                isFollowing ? 'bg-white/30' : 'bg-primary'
-              }`}
-            >
-              {isFollowing
-                ? <Check className="w-3 h-3" />
-                : <UserPlus className="w-3 h-3" />}
+            <button onClick={(e) => { e.stopPropagation(); onFollow(post.user_id); }}
+              className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-lg transition-colors ${isFollowing ? 'bg-white/30' : 'bg-primary'}`}>
+              {isFollowing ? <Check className="w-3 h-3" /> : <UserPlus className="w-3 h-3" />}
             </button>
           )}
         </div>
 
-        {/* Like */}
-        <button
-          className="flex flex-col items-center gap-1"
-          onClick={(e) => { e.stopPropagation(); onLike(post.id); }}
-        >
-          <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${
-            post.is_liked ? 'bg-red-500/30' : 'bg-white/10 backdrop-blur-sm'
-          }`}>
+        <button className="flex flex-col items-center gap-1" onClick={(e) => { e.stopPropagation(); onLike(post.id); }}>
+          <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${post.is_liked ? 'bg-red-500/30' : 'bg-white/10 backdrop-blur-sm'}`}>
             <Heart className={`w-6 h-6 ${post.is_liked ? 'text-red-400 fill-red-400' : 'text-white'}`} />
           </div>
           <span className="text-[11px] text-white/90 font-medium">{post.likes_count || 0}</span>
         </button>
 
-        {/* Comment */}
-        <button
-          className="flex flex-col items-center gap-1"
-          onClick={(e) => { e.stopPropagation(); onComment(); }}
-        >
+        <button className="flex flex-col items-center gap-1" onClick={(e) => { e.stopPropagation(); onComment(); }}>
           <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
             <MessageCircle className="w-6 h-6 text-white" />
           </div>
           <span className="text-[11px] text-white/90 font-medium">{post.comments_count || 0}</span>
         </button>
 
-        {/* Share */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              className="flex flex-col items-center gap-1"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <button className="flex flex-col items-center gap-1" onClick={(e) => e.stopPropagation()}>
               <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
                 <Share2 className="w-6 h-6 text-white" />
               </div>
               <span className="text-[11px] text-white/90 font-medium">Share</span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={handleShare} className="gap-2">
-              <Share2 className="w-4 h-4" />
-              Share
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={handleShare} className="gap-2"><Share2 className="w-4 h-4" />Share</DropdownMenuItem>
             <DropdownMenuItem onClick={handleCopyLink} className="gap-2">
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
               Copy link
             </DropdownMenuItem>
+            {activeSong && (
+              <DropdownMenuItem onClick={() => navigate(`/song/${activeSong.id}`)} className="gap-2">
+                <Music className="w-4 h-4" />View song
+              </DropdownMenuItem>
+            )}
+            {(postArtist ?? artist) && (
+              <DropdownMenuItem onClick={goToArtist} className="gap-2">
+                <UserCheck className="w-4 h-4" />View artist
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Spinning disc */}
         <motion.div
           animate={isThisSongPlaying ? { rotate: 360 } : {}}
           transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
           className="w-11 h-11 rounded-full border-2 border-white/40 overflow-hidden shadow-lg"
         >
-          {song?.coverImage ? (
-            <img
-              src={song.coverImage}
-              alt=""
-              className="w-full h-full object-cover"
-              onError={handleSongImageError}
-            />
+          {coverUrl && !imgErr ? (
+            <img src={coverUrl} alt="" className="w-full h-full object-cover" onError={handleImgError} />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center">
               <Disc3 className="w-5 h-5 text-white" />
@@ -331,78 +279,74 @@ export function MusicFeedCard({
         </motion.div>
       </div>
 
-      {/* ── Bottom info ── */}
+      {/* Bottom info */}
       <div className="absolute bottom-0 left-0 right-16 p-4 z-10">
-        {/* Username */}
         <button onClick={goToProfile} className="flex items-center gap-2 mb-2">
-          <span className="font-bold text-white text-base truncate max-w-[200px]">
-            @{post.profile?.profile_name || (postArtist?.name ?? 'Anonymous')}
+          <span className="font-bold text-white text-base truncate max-w-[220px]">
+            @{post.profile?.profile_name || 'Anonymous'}
           </span>
-          {isFollowing && (
-            <span className="text-[10px] text-white/50 bg-white/10 px-1.5 py-0.5 rounded-full shrink-0">
-              Following
-            </span>
-          )}
+          {isFollowing && <span className="text-[10px] text-white/50 bg-white/10 px-1.5 py-0.5 rounded-full shrink-0">Following</span>}
         </button>
 
-        {/* Post content */}
-        {isWelcomePost ? (
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-yellow-400 shrink-0" />
-            <p className="text-white/90 text-sm">Welcome to the community! Say hello 👋</p>
-          </div>
-        ) : isSongLikePost && song ? (
+        {isWelcomePost && (
+          <p className="text-white/90 text-sm flex items-center gap-1.5 mb-2">
+            <Sparkles className="w-4 h-4 text-yellow-400 shrink-0" />Welcome to the community! Say hello 👋
+          </p>
+        )}
+        {isArtistFollowPost && postArtist && (
           <div className="mb-2">
             <p className="text-white/90 text-sm flex items-center gap-1.5">
-              <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400 shrink-0" />
-              liked &quot;{song.title}&quot; by {artist?.name}
+              <UserCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+              started following <span className="font-semibold ml-1">{postArtist.name}</span>
             </p>
+            {artistSong && (
+              <button onClick={goToArtist}
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors">
+                <img src={postArtist.profileImage ?? ''} className="w-4 h-4 rounded-full object-cover" alt="" onError={(e)=>{e.currentTarget.style.display='none'}} />
+                {postArtist.name} · {postArtist.location}
+              </button>
+            )}
           </div>
-        ) : isSongPulsePost && song ? (
-          <div className="mb-2">
-            <p className="text-white/90 text-sm flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
-              pulsed &quot;{song.title}&quot; by {artist?.name}
-            </p>
-          </div>
-        ) : post.content ? (
+        )}
+        {isSongLikePost && song && (
+          <p className="text-white/90 text-sm flex items-center gap-1.5 mb-2">
+            <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400 shrink-0" />
+            liked &quot;{song.title}&quot; by {artist?.name}
+          </p>
+        )}
+        {isSongPulsePost && song && (
+          <p className="text-white/90 text-sm flex items-center gap-1.5 mb-2">
+            <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+            pulsed &quot;{song.title}&quot; by {artist?.name}
+          </p>
+        )}
+        {!isWelcomePost && !isArtistFollowPost && !isSongLikePost && !isSongPulsePost && post.content && (
           <p className="text-white/90 text-sm mb-2 line-clamp-2">{post.content}</p>
-        ) : null}
+        )}
 
-        {/* Battle live */}
-        {battleLiveId && (
-          <button
-            type="button"
-            onClick={() => { void fcOpenUrl('https://www.wavewarz.com'); }}
-            className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-rose-300/40 bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-100"
-          >
+        {battleMatch && (
+          <button type="button" onClick={() => void fcOpenUrl('https://www.wavewarz.com')}
+            className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-rose-300/40 bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-100">
             <Flame className="h-3.5 w-3.5" />
-            Live battle on WaveWarz.com{battleLiveTitle ? `: ${battleLiveTitle}` : ''}
+            Live on WaveWarz{battleMatch[2]?.trim() ? `: ${battleMatch[2].trim()}` : ''}
           </button>
         )}
 
-        {/* Song ticker */}
-        {song && !isWelcomePost && (
+        {activeSong && !isWelcomePost && (
           <div className={`flex items-center gap-2 rounded-full py-1.5 px-3 w-fit backdrop-blur-md ${
             isSongLikePost ? 'bg-red-500/20' : isSongPulsePost ? 'bg-primary/20' : 'bg-white/10'
           }`}>
-            {isSongLikePost
-              ? <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400 shrink-0" />
-              : isSongPulsePost
-              ? <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+            {isSongLikePost ? <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400 shrink-0" />
+              : isSongPulsePost ? <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
               : <Music className="w-3.5 h-3.5 text-white shrink-0" />}
-            {totalPulses > 0 && (
-              <span className="text-[11px] text-white/80 tabular-nums shrink-0">
-                ❤️‍🔥 {totalPulses.toLocaleString()}
-              </span>
-            )}
+            {totalPulses > 0 && <span className="text-[11px] text-white/80 tabular-nums shrink-0">❤️‍🔥 {totalPulses.toLocaleString()}</span>}
             <div className="overflow-hidden max-w-[180px]">
               <motion.p
                 className="text-xs text-white font-medium whitespace-nowrap"
                 animate={isThisSongPlaying ? { x: [0, -120, 0] } : {}}
                 transition={isThisSongPlaying ? { duration: 6, repeat: Infinity, ease: 'linear' } : {}}
               >
-                {song.title} · {artist?.name ?? song.artist}
+                {activeSong.title} · {(isArtistFollowPost ? postArtist?.name : artist?.name) ?? activeSong.artist}
               </motion.p>
             </div>
           </div>

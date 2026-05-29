@@ -126,27 +126,45 @@ export default function Social() {
     void load();
   }, [posts, sharedPostId]);
 
-  // Auto-play song when a post scrolls fully into view
+  // Auto-play / pause as posts snap into view (TikTok behaviour)
+  const pauseRef = useRef(() => {});
+  const { pause: pauseFn } = usePlayerActions();
+  pauseRef.current = pauseFn;
+
   useEffect(() => {
     const container = feedRef.current;
     if (!container) return;
-    let scrollTimer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout>;
 
     const handleScroll = () => {
-      clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
         const idx = Math.round(container.scrollTop / container.clientHeight);
         const post = postsToRenderRef.current[idx];
-        if (!post?.song_id) return;
-        const song = SONGS.find(s => s.id === post.song_id);
-        if (song) playSongRef.current(song);
-      }, 150);
+        if (!post) return;
+
+        // Determine which song to play for this post
+        let songToPlay = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
+
+        // Artist-follow post → auto-play that artist's top song
+        if (!songToPlay && post.post_type === 'artist_follow' && post.artist_id) {
+          const artistSongs = SONGS.filter(s => s.artistId === post.artist_id).sort((a,b) => b.plays - a.plays);
+          songToPlay = artistSongs[0] ?? null;
+        }
+
+        if (songToPlay) {
+          playSongRef.current(songToPlay);
+        } else {
+          // Non-music post — pause whatever is playing
+          pauseRef.current();
+        }
+      }, 160);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      clearTimeout(scrollTimer);
+      clearTimeout(timer);
     };
   }, []);
 

@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, matchPath } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PlayerProvider } from "@/context/PlayerContext";
@@ -43,6 +43,7 @@ const WaveWarzBattleZoneFeature = lazy(() => import("./pages/WaveWarzBattleZoneF
 const DjShuffle = lazy(() => import("./pages/DjShuffle"));
 const Inbox = lazy(() => import("./pages/Inbox"));
 const BetterCallZaal = lazy(() => import("./pages/BetterCallZaal"));
+const SlugResolver = lazy(() => import("./pages/SlugResolver"));
 
 
 // Loading spinner component
@@ -173,6 +174,9 @@ function AppShell() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/bettercallzaal" element={<BetterCallZaal />} />
             <Route path="/auth" element={<Navigate to="/" replace />} />
+            {/* Vanity slug routes — must be after all specific routes */}
+            <Route path="/:artistSlug/:songSlug" element={<SlugResolver />} />
+            <Route path="/:artistSlug" element={<SlugResolver />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
@@ -184,10 +188,47 @@ function AppShell() {
   );
 }
 
+// Routes that are visible to everyone — no auth gate, no auth spinner
+const PUBLIC_PATTERNS = [
+  '/about', '/artists', '/artist/:id', '/catalog/:id', '/song/:id',
+  '/wavewarz-africa', '/wavewarz-africa/*', '/install', '/reset-password', '/bettercallzaal',
+];
+
+function isPublicRoute(pathname: string) {
+  return PUBLIC_PATTERNS.some((p) => matchPath(p, pathname));
+}
+
 // AppContent must be rendered inside AuthProvider and BrowserRouter
 function AppContent() {
   const { isAuthenticated, isLoading, needsOnboarding, user } = useAuth();
+  const location = useLocation();
   useUserPresence(user?.id ?? null, { includeLastSeen: true });
+
+  // Public routes bypass the auth loading spinner — render immediately
+  if (isLoading && isPublicRoute(location.pathname)) {
+    return (
+      <ErrorBoundary>
+        <PlayerProvider>
+          <EngagementProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/about" element={<About />} />
+                <Route path="/artists" element={<Artists />} />
+                <Route path="/artist/:id" element={<ArtistDetail />} />
+                <Route path="/catalog/:id" element={<CatalogDetail />} />
+                <Route path="/song/:id" element={<SongDetail />} />
+                <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
+                <Route path="/install" element={<Install />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/bettercallzaal" element={<BetterCallZaal />} />
+                <Route path="*" element={<PageLoader />} />
+              </Routes>
+            </Suspense>
+          </EngagementProvider>
+        </PlayerProvider>
+      </ErrorBoundary>
+    );
+  }
 
   if (isLoading) {
     return <PageLoader />;
@@ -202,10 +243,36 @@ function AppContent() {
             <EngagementProvider>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
+                  {/* Public routes — accessible without login */}
+                  <Route path="/about" element={<About />} />
+                  <Route path="/artists" element={<Artists />} />
+                  <Route path="/artist/:id" element={<ArtistDetail />} />
+                  <Route path="/catalog/:id" element={<CatalogDetail />} />
+                  <Route path="/song/:id" element={<SongDetail />} />
+                  <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
                   <Route path="/install" element={<Install />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/bettercallzaal" element={<BetterCallZaal />} />
-                  <Route path="*" element={<Auth />} />
+                  {/* Known auth-required routes → landing */}
+                  <Route path="/" element={<Auth />} />
+                  <Route path="/discover" element={<Auth />} />
+                  <Route path="/social" element={<Auth />} />
+                  <Route path="/room" element={<Auth />} />
+                  <Route path="/community" element={<Auth />} />
+                  <Route path="/profile" element={<Auth />} />
+                  <Route path="/playlists" element={<Auth />} />
+                  <Route path="/playlist/:id" element={<Auth />} />
+                  <Route path="/marketplace" element={<Auth />} />
+                  <Route path="/inbox" element={<Auth />} />
+                  <Route path="/dj-shuffle" element={<Auth />} />
+                  <Route path="/admin" element={<Auth />} />
+                  <Route path="/audience/:userId" element={<Auth />} />
+                  <Route path="/post/:id" element={<Auth />} />
+                  {/* Vanity slug routes — must be after all specific routes */}
+                  <Route path="/:artistSlug/:songSlug" element={<SlugResolver />} />
+                  <Route path="/:artistSlug" element={<SlugResolver />} />
+                  {/* Unknown routes — show 404, not landing */}
+                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
             </EngagementProvider>
@@ -213,9 +280,13 @@ function AppContent() {
         </ErrorBoundary>
       ) : needsOnboarding ? (
         <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <Onboarding />
-          </Suspense>
+          <PlayerProvider>
+            <EngagementProvider>
+              <Suspense fallback={<PageLoader />}>
+                <Onboarding />
+              </Suspense>
+            </EngagementProvider>
+          </PlayerProvider>
         </ErrorBoundary>
       ) : (
         <ErrorBoundary>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones, Sparkles, ListMusic, Disc3, Bot, Lightbulb, Inbox } from 'lucide-react';
+import { Home, Users, User, Flame, MessageCircle, Gift, Compass, Menu, X, Download, LogOut, Wallet, Headphones, Sparkles, ListMusic, Disc3, Bot, Lightbulb, Inbox, Search } from 'lucide-react';
 import { useEngagement } from '@/context/EngagementContext';
 import { useAuth } from '@/context/AuthContext';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
@@ -12,6 +12,7 @@ const logo = '/songchainn-logo.webp';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { InviteFriends } from '@/components/InviteFriends';
+import { SearchModal } from '@/components/SearchModal';
 import { SuggestionDialog } from '@/components/SuggestionDialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,6 +39,7 @@ export function Navigation() {
   const { signOut, walletAddress, user, isArtist, artistId } = useAuth();
   const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const [showInvite, setShowInvite] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showSuggestionDialog, setShowSuggestionDialog] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showOfflineSaveAnnouncement, setShowOfflineSaveAnnouncement] = useState(false);
@@ -209,6 +211,18 @@ export function Navigation() {
 
             {/* Right side actions */}
             <div className="flex items-center gap-1 sm:gap-2">
+              {/* Search button — always visible */}
+              <motion.button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-2.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
+                aria-label="Search"
+              >
+                <Search className="w-4 h-4" />
+                <span className="hidden sm:inline text-xs font-medium">Search</span>
+              </motion.button>
               {showReturnToRoom && (
                 <motion.button
                   onClick={() => {
@@ -363,6 +377,7 @@ export function Navigation() {
       </header>
 
       <SuggestionDialog open={showSuggestionDialog} onOpenChange={setShowSuggestionDialog} />
+      <SearchModal open={isSearchOpen} onOpenChange={setIsSearchOpen} />
 
       {showProfilePhotoAnnouncement && (
         <div className="border-b border-indigo-500/30 bg-indigo-500/10 backdrop-blur-sm">

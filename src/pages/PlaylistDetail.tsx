@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Headphones, ListMusic, Music, Pause, Play, Lock, Globe, Plus } from 'lucide-react';
@@ -185,7 +185,7 @@ export default function PlaylistDetail() {
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="flex items-center gap-3 text-muted-foreground">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span>Loading playlist…</span>
+          <span>Loading playlistâ€¦</span>
         </div>
       </div>
     );
@@ -195,7 +195,7 @@ export default function PlaylistDetail() {
     <div className="min-h-screen bg-background">
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         <Link
           to="/profile"
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
@@ -306,7 +306,7 @@ export default function PlaylistDetail() {
                     ) : isSaving ? (
                       <>
                         <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        Saving…
+                        Savingâ€¦
                       </>
                     ) : (
                       <>
@@ -330,7 +330,7 @@ export default function PlaylistDetail() {
           {isLoading ? (
             <div className="flex items-center gap-3 text-muted-foreground">
               <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span>Loading tracks…</span>
+              <span>Loading tracksâ€¦</span>
             </div>
           ) : songs.length === 0 ? (
             <div className="border border-dashed border-border rounded-xl p-6 text-center">

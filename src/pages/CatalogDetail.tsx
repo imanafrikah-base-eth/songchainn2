@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music } from 'lucide-react';
@@ -61,7 +61,7 @@ export default function CatalogDetail() {
     <div className="min-h-screen bg-background">
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"

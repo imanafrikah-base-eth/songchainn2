@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { fcOpenUrl } from '@/lib/farcasterActions';
+import { SONGS, ARTISTS } from '@/data/musicData';
+import { getSongSlugUrl, getArtistSlugById } from '@/lib/slugRoutes';
 
 interface ShareOptions {
   title: string;
@@ -12,24 +14,29 @@ export function useShare() {
   const [copied, setCopied] = useState(false);
 
   const getShareUrl = useCallback((type: 'song' | 'post' | 'artist' | 'profile', id: string) => {
-    const baseUrl = window.location.origin;
+    const base = window.location.origin;
     switch (type) {
-      case 'song':
-        return `${baseUrl}/song/${id}`;
+      case 'song': {
+        const s = SONGS.find(s => s.id === id);
+        return s ? `${base}${getSongSlugUrl(s)}` : `${base}/song/${id}`;
+      }
       case 'post':
-        return `${baseUrl}/post/${id}`;
-      case 'artist':
-        return `${baseUrl}/share/artist/${id}`;
+        return `${base}/post/${id}`;
+      case 'artist': {
+        const slug = getArtistSlugById(id);
+        return `${base}/${slug}`;
+      }
       case 'profile':
-        return `${baseUrl}/audience/${id}`;
+        return `${base}/audience/${id}`;
       default:
-        return baseUrl;
+        return base;
     }
   }, []);
 
-  const getSongShareUrl = useCallback((song: { id: string }) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/share/${song.id}`;
+  const getSongShareUrl = useCallback((song: { id: string; title?: string; artist?: string; coverImage?: string }) => {
+    const base = window.location.origin;
+    const full = SONGS.find(s => s.id === song.id);
+    return full ? `${base}${getSongSlugUrl(full)}` : `${base}/song/${song.id}`;
   }, []);
 
   const copyToClipboard = useCallback(async (url: string) => {
@@ -110,11 +117,11 @@ export function useShare() {
     });
   }, [getShareUrl, nativeShare]);
 
-  const shareSong = useCallback(async (songTitle: string, artistName: string, songId: string) => {
-    const url = getSongShareUrl({ id: songId });
+  const shareSong = useCallback(async (songTitle: string, artistName: string, songId: string, coverImage?: string) => {
+    const url = getSongShareUrl({ id: songId, title: songTitle, artist: artistName, coverImage });
     return nativeShare({
-      title: `${songTitle} - ${artistName}`,
-      text: `"${songTitle}" by ${artistName} on $ongChainn`,
+      title: `${songTitle} by ${artistName}`,
+      text: `🎵 "${songTitle}" by ${artistName} on $ongChainn`,
       url,
     });
   }, [getSongShareUrl, nativeShare]);

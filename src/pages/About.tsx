@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Sparkles, Headphones, Users, Music, ArrowRight, Radio, Brain, ShieldCheck, LineChart } from 'lucide-react';
@@ -50,7 +50,7 @@ export default function About() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
         <motion.section
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -91,7 +91,7 @@ export default function About() {
                 className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full glass text-xs sm:text-sm font-medium text-primary"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>👀 What to Do Now</span>
+                <span>ðŸ‘€ What to Do Now</span>
               </motion.div>
 
               <motion.h1
@@ -119,7 +119,7 @@ export default function About() {
                 >
                   Listeners
                 </button>
-                <span className="opacity-50">•</span>
+                <span className="opacity-50">â€¢</span>
                 <button
                   type="button"
                   className="px-2 py-0.5 rounded-full hover:bg-muted/80 transition-colors"
@@ -130,7 +130,7 @@ export default function About() {
                 >
                   Culture
                 </button>
-                <span className="opacity-50">•</span>
+                <span className="opacity-50">â€¢</span>
                 <button
                   type="button"
                   className="px-2 py-0.5 rounded-full hover:bg-muted/80 transition-colors"
@@ -173,19 +173,19 @@ export default function About() {
                   </div>
 
                   <div className="space-y-2 text-sm sm:text-base text-muted-foreground leading-relaxed">
-                    <p>You don’t need to ape. You don’t need to rush.</p>
+                    <p>You donâ€™t need to ape. You donâ€™t need to rush.</p>
                     <p>
-                      But if you understand markets, you’ll recognize this moment.
+                      But if you understand markets, youâ€™ll recognize this moment.
                     </p>
                   </div>
 
                   <div className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 sm:px-5 sm:py-4 space-y-2">
                     <p className="text-sm sm:text-base text-primary font-medium">
-                      🎶 Music. Markets. Meet.
+                      ðŸŽ¶ Music. Markets. Meet.
                     </p>
                     <p className="text-xs sm:text-sm text-primary/90">
-                      If you’ve ever wished you could trade meaning instead of noise,
-                      you’re early to the right place.
+                      If youâ€™ve ever wished you could trade meaning instead of noise,
+                      youâ€™re early to the right place.
                     </p>
                   </div>
                 </div>
@@ -389,9 +389,9 @@ export default function About() {
               </p>
               <p>
                 $ongChainn is a music platform built on Base, where songs live onchain and listeners matter. Here, music
-                isn’t just streamed and forgotten. Every play, like, share and conversation leaves a real footprint.
+                isnâ€™t just streamed and forgotten. Every play, like, share and conversation leaves a real footprint.
               </p>
-              <p>You’re not just consuming music, you’re part of its journey.</p>
+              <p>Youâ€™re not just consuming music, youâ€™re part of its journey.</p>
             </div>
           </motion.div>
 
@@ -409,7 +409,7 @@ export default function About() {
               </h2>
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p>Right now, you’re in Listener Mode.</p>
+              <p>Right now, youâ€™re in Listener Mode.</p>
               <p>That means:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>You listen to music</li>
@@ -417,7 +417,7 @@ export default function About() {
                 <li>You earn points just by being active</li>
               </ul>
               <p>
-                These points aren’t random. They unlock future drops, access and experiences as $ongChainn grows. If you
+                These points arenâ€™t random. They unlock future drops, access and experiences as $ongChainn grows. If you
                 have good taste, it will eventually matter.
               </p>
             </div>
@@ -430,7 +430,7 @@ export default function About() {
               <ul className="list-disc list-inside space-y-1">
                 <li>You stream</li>
                 <li>The song blows up</li>
-                <li>You get… nothing</li>
+                <li>You getâ€¦ nothing</li>
               </ul>
               <p>On $ongChainn:</p>
               <ul className="list-disc list-inside space-y-1">
@@ -459,7 +459,7 @@ export default function About() {
               </h2>
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p>Music doesn’t stay in one place. It spreads, from friend to friend, chats to timelines, rooms to cities.</p>
+              <p>Music doesnâ€™t stay in one place. It spreads, from friend to friend, chats to timelines, rooms to cities.</p>
               <p>$ongChainn is designed around that idea.</p>
               <p>As songs move:</p>
               <ul className="list-disc list-inside space-y-1">
@@ -499,7 +499,7 @@ export default function About() {
                 <li>A growing onchain culture</li>
               </ul>
               <p>
-                You don’t need to understand blockchain to enjoy $ongChainn, but it’s there to make sure the system stays
+                You donâ€™t need to understand blockchain to enjoy $ongChainn, but itâ€™s there to make sure the system stays
                 open and fair.
               </p>
             </div>
@@ -518,15 +518,15 @@ export default function About() {
               </h2>
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p>$ongChainn isn’t trying to replace music culture. It’s trying to protect and extend it.</p>
-              <p>That’s why:</p>
+              <p>$ongChainn isnâ€™t trying to replace music culture. Itâ€™s trying to protect and extend it.</p>
+              <p>Thatâ€™s why:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>Music plays first</li>
                 <li>Community comes before numbers</li>
                 <li>Identity matters more than clout</li>
               </ul>
               <p>
-                Whether you’re here to discover new music, hang out in The Room, support artists early or just vibe and
+                Whether youâ€™re here to discover new music, hang out in The Room, support artists early or just vibe and
                 listen, you belong here.
               </p>
             </div>
@@ -549,8 +549,8 @@ export default function About() {
               <p>If you trade markets, pause for a second.</p>
               <p>Now imagine this:</p>
               <p>
-                What if you bought Michael Jackson’s biggest song the week it dropped, not the vinyl, not royalties, but a
-                liquid, tradeable onchain position tied to that song’s cultural momentum?
+                What if you bought Michael Jacksonâ€™s biggest song the week it dropped, not the vinyl, not royalties, but a
+                liquid, tradeable onchain position tied to that songâ€™s cultural momentum?
               </p>
               <p>Not thousands of dollars. Not millions. A few dollars. And then you simply held.</p>
               <p className="font-medium text-foreground flex items-center gap-2 pt-2">
@@ -559,10 +559,10 @@ export default function About() {
               </p>
               <p>Most assets decay. Companies die, products expire, narratives rotate, markets forget.</p>
               <p>
-                Music doesn’t. A great song can trend again 10 years later, go viral across generations, resurface in films,
+                Music doesnâ€™t. A great song can trend again 10 years later, go viral across generations, resurface in films,
                 games, social media, clubs and culture cycles, and even outlive its creator.
               </p>
-              <p>Music is a timeless asset, but until now, it hasn’t been tradeable like one.</p>
+              <p>Music is a timeless asset, but until now, it hasnâ€™t been tradeable like one.</p>
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
               <p className="font-medium text-foreground flex items-center gap-2">
@@ -577,7 +577,7 @@ export default function About() {
                 <li>Attention becomes a measurable signal</li>
                 <li>Cultural momentum becomes market momentum</li>
               </ul>
-              <p>This isn’t streaming. This is price discovery for sound.</p>
+              <p>This isnâ€™t streaming. This is price discovery for sound.</p>
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
               <p className="font-medium text-foreground flex items-center gap-2">
@@ -611,7 +611,7 @@ export default function About() {
                 <span>Why Being Early Matters</span>
               </p>
               <p>
-                Early crypto wasn’t about perfect products. It was about new primitives. $ongChainn is introducing one:
+                Early crypto wasnâ€™t about perfect products. It was about new primitives. $ongChainn is introducing one:
                 music as a liquid, onchain asset.
               </p>
               <p>Not every song will moon. Not every trade will win.</p>
@@ -627,9 +627,9 @@ export default function About() {
               </p>
               <p>
                 A song can be bought for a few dollars today and be listened to by millions tomorrow. That asymmetry
-                doesn’t exist in most markets.
+                doesnâ€™t exist in most markets.
               </p>
-              <p>Music doesn’t dilute. Music doesn’t expire. Music doesn’t sleep. It waits.</p>
+              <p>Music doesnâ€™t dilute. Music doesnâ€™t expire. Music doesnâ€™t sleep. It waits.</p>
             </div>
           </motion.div>
         </motion.section>

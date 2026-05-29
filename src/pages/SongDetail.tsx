@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+﻿import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music, ListMusic, Lock, Globe } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
@@ -120,7 +120,7 @@ export default function SongDetail() {
       updateMetaName('twitter:image', imageUrl);
 
       return () => {
-        document.title = '$ongChainn — Audience-First Music Streaming';
+        document.title = '$ongChainn â€” Audience-First Music Streaming';
       };
     }
   }, [song, artist]);
@@ -181,7 +181,7 @@ export default function SongDetail() {
     <div className="min-h-screen bg-background">
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         {/* Back Button */}
         <Link 
           to="/" 

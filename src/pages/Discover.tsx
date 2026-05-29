@@ -212,7 +212,7 @@ export default function Discover() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
         {playerState?.isRoomMode && playerState.currentSong && (
           <div className="mb-6">
             <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">

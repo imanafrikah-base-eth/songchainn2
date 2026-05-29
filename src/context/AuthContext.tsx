@@ -351,13 +351,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsArtist(false);
       setArtistId(null);
       setWalletAddress(address);
-      setNeedsOnboarding(true);
-      try {
-        localStorage.setItem('songchainn_needs_onboarding', '1');
-        localStorage.setItem('songchainn_show_profile_photo_hint', '1');
-      } catch {
-        void 0;
-      }
+      // refreshProfile via useEffect will determine onboarding status for this user
       await refreshProfile();
 
       return { error: null };
@@ -405,12 +399,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
-      await refreshProfile();
+      // Returning users land on home; the user-change effect triggers refreshProfile
+      // which will set needsOnboarding=true only if their profile is genuinely incomplete.
+      setNeedsOnboarding(false);
+      try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Sign in failed') };
     }
-  }, [refreshProfile, refreshRoles]);
+  }, [refreshRoles]);
 
   const signInWithFarcasterToken = useCallback(async (token: string) => {
     try {
@@ -536,6 +533,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(FC_USER_KEY, JSON.stringify({ user: fcUser, profile }));
         localStorage.setItem('songchainn_needs_onboarding', '0');
       } catch { void 0; }
+
+      // Persist to farcaster_profiles so this user appears in community for all users.
+      // Fire-and-forget — failure is non-critical (user is still signed in locally).
+      if (isSupabaseConfigured) {
+        void supabase
+          .from('farcaster_profiles' as any)
+          .upsert(
+            {
+              fid: fc.fid,
+              username: fc.username ?? null,
+              display_name: fc.displayName ?? fc.username ?? `User ${fc.fid}`,
+              pfp_url: fc.pfpUrl ?? null,
+              location: fc.location ?? null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'fid' }
+          )
+          .then(() => {});
+      }
+
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Farcaster sign-in failed') };

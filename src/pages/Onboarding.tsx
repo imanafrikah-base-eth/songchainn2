@@ -38,16 +38,18 @@ export default function Onboarding() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
-  const [coverCropOffsetY, setCoverCropOffsetY] = useState(0);
   const [coverCropMaxOffset, setCoverCropMaxOffset] = useState(0);
-  const [avatarOffsetX, setAvatarOffsetX] = useState(0);
-  const [avatarOffsetY, setAvatarOffsetY] = useState(0);
   const [avatarMaxOffsetX, setAvatarMaxOffsetX] = useState(0);
   const [avatarMaxOffsetY, setAvatarMaxOffsetY] = useState(0);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const coverPreviewRef = useRef<HTMLDivElement | null>(null);
   const avatarPreviewRef = useRef<HTMLDivElement | null>(null);
+  const coverImgRef = useRef<HTMLImageElement | null>(null);
+  const coverLiveOffsetRef = useRef(0);
+  const avatarImgRef = useRef<HTMLImageElement | null>(null);
+  const avatarLiveOffsetXRef = useRef(0);
+  const avatarLiveOffsetYRef = useRef(0);
   const coverDragStateRef = useRef<{ startY: number; startOffset: number } | null>(null);
   const avatarDragStateRef = useRef<{
     startX: number;
@@ -175,33 +177,7 @@ export default function Onboarding() {
         }
       }
 
-      const existingRes = await supabase
-        .from('audience_profiles')
-        .select('id')
-        .or(`user_id.eq.${authedUserId},id.eq.${authedUserId}`)
-        .maybeSingle();
-
-      const existingId =
-        existingRes.data && typeof existingRes.data === 'object'
-          ? (existingRes.data as { id?: string | null }).id
-          : undefined;
-
-      const profileId = existingId || authedUserId;
-
-      const payload: {
-        id: string;
-        user_id: string;
-        profile_name: string;
-        bio: string | null;
-        location: string;
-        x_profile_link: string | null;
-        base_profile_link: string | null;
-        onboarding_completed: boolean;
-        updated_at: string;
-        profile_picture_url?: string;
-        cover_photo_url?: string;
-      } = {
-        id: profileId,
+      const profileFields = {
         user_id: authedUserId,
         profile_name: profileName.trim(),
         bio: bio.trim() || null,
@@ -210,20 +186,25 @@ export default function Onboarding() {
         base_profile_link: baseProfileLink.trim() || null,
         onboarding_completed: true,
         updated_at: new Date().toISOString(),
+        ...(avatarUrl ? { profile_picture_url: avatarUrl } : {}),
+        ...(coverUrl ? { cover_photo_url: coverUrl } : {}),
       };
 
-      if (avatarUrl) payload.profile_picture_url = avatarUrl;
-      if (coverUrl) payload.cover_photo_url = coverUrl;
-
-      const { error } = await supabase
+      const { data: existing } = await supabase
         .from('audience_profiles')
-        .upsert(payload as any, { onConflict: 'user_id' });
+        .select('id')
+        .eq('user_id', authedUserId)
+        .maybeSingle();
 
-      if (error) {
-        console.error('Onboarding profile save failed', error);
+      const saveResult = existing?.id
+        ? await supabase.from('audience_profiles').update(profileFields).eq('user_id', authedUserId)
+        : await supabase.from('audience_profiles').insert({ id: authedUserId, ...profileFields });
+
+      if (saveResult.error) {
+        console.error('Onboarding profile save failed', saveResult.error);
         toast({
           title: 'Could not save profile',
-          description: error.message,
+          description: saveResult.error.message,
           variant: 'destructive',
         });
         return;
@@ -297,7 +278,7 @@ export default function Onboarding() {
                 if (!coverPreviewUrl) return;
                 coverDragStateRef.current = {
                   startY: e.clientY,
-                  startOffset: coverCropOffsetY,
+                  startOffset: coverLiveOffsetRef.current,
                 };
                 (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
               }}
@@ -309,7 +290,10 @@ export default function Onboarding() {
                   coverCropMaxOffset,
                   Math.max(-coverCropMaxOffset, nextOffset)
                 );
-                setCoverCropOffsetY(clamped);
+                coverLiveOffsetRef.current = clamped;
+                if (coverImgRef.current) {
+                  coverImgRef.current.style.transform = `translate(-50%, ${clamped}px)`;
+                }
               }}
               onPointerUp={(e) => {
                 if (!coverDragStateRef.current) return;
@@ -325,6 +309,7 @@ export default function Onboarding() {
               {coverPreviewUrl && (
                 <>
                   <img
+                    ref={coverImgRef}
                     src={coverPreviewUrl}
                     alt="Cover preview"
                     className="absolute left-1/2 top-1/2 -translate-x-1/2"
@@ -339,13 +324,10 @@ export default function Onboarding() {
                       const displayedHeight = img.naturalHeight * scale;
                       const maxOffset = Math.max(0, (displayedHeight - containerHeight) / 2);
                       setCoverCropMaxOffset(maxOffset);
-                      setCoverCropOffsetY(0);
+                      coverLiveOffsetRef.current = 0;
+                      img.style.transform = 'translate(-50%, 0px)';
                     }}
-                    style={{
-                      transform: `translate(-50%, ${coverCropOffsetY}px)`,
-                      width: '100%',
-                      height: 'auto',
-                    }}
+                    style={{ transform: 'translate(-50%, 0px)', width: '100%', height: 'auto' }}
                   />
                   <div className="pointer-events-none absolute inset-0 flex items-end justify-center pb-2">
                     <div className="px-3 py-1 rounded-full bg-background/70 text-[10px] font-medium tracking-wide text-foreground/80">
@@ -384,8 +366,8 @@ export default function Onboarding() {
                     avatarDragStateRef.current = {
                       startX: e.clientX,
                       startY: e.clientY,
-                      startOffsetX: avatarOffsetX,
-                      startOffsetY: avatarOffsetY,
+                      startOffsetX: avatarLiveOffsetXRef.current,
+                      startOffsetY: avatarLiveOffsetYRef.current,
                     };
                     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
                   }}
@@ -395,16 +377,13 @@ export default function Onboarding() {
                     const deltaY = e.clientY - avatarDragStateRef.current.startY;
                     const nextX = avatarDragStateRef.current.startOffsetX + deltaX;
                     const nextY = avatarDragStateRef.current.startOffsetY + deltaY;
-                    const clampedX = Math.min(
-                      avatarMaxOffsetX,
-                      Math.max(-avatarMaxOffsetX, nextX)
-                    );
-                    const clampedY = Math.min(
-                      avatarMaxOffsetY,
-                      Math.max(-avatarMaxOffsetY, nextY)
-                    );
-                    setAvatarOffsetX(clampedX);
-                    setAvatarOffsetY(clampedY);
+                    const clampedX = Math.min(avatarMaxOffsetX, Math.max(-avatarMaxOffsetX, nextX));
+                    const clampedY = Math.min(avatarMaxOffsetY, Math.max(-avatarMaxOffsetY, nextY));
+                    avatarLiveOffsetXRef.current = clampedX;
+                    avatarLiveOffsetYRef.current = clampedY;
+                    if (avatarImgRef.current) {
+                      avatarImgRef.current.style.transform = `translate(-50%, -50%) translate(${clampedX}px, ${clampedY}px)`;
+                    }
                   }}
                   onPointerUp={(e) => {
                     if (!avatarDragStateRef.current) return;
@@ -419,6 +398,7 @@ export default function Onboarding() {
                 >
                   {avatarPreviewUrl ? (
                     <img
+                      ref={avatarImgRef}
                       src={avatarPreviewUrl}
                       alt="Profile preview"
                       className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
@@ -436,14 +416,11 @@ export default function Onboarding() {
                         const maxOffsetY = Math.max(0, (displayedHeight - containerHeight) / 2);
                         setAvatarMaxOffsetX(maxOffsetX);
                         setAvatarMaxOffsetY(maxOffsetY);
-                        setAvatarOffsetX(0);
-                        setAvatarOffsetY(0);
+                        avatarLiveOffsetXRef.current = 0;
+                        avatarLiveOffsetYRef.current = 0;
+                        img.style.transform = 'translate(-50%, -50%) translate(0px, 0px)';
                       }}
-                      style={{
-                        transform: `translate(-50%, -50%) translate(${avatarOffsetX}px, ${avatarOffsetY}px)`,
-                        width: '100%',
-                        height: 'auto',
-                      }}
+                      style={{ transform: 'translate(-50%, -50%) translate(0px, 0px)', width: '100%', height: 'auto' }}
                     />
                   ) : (
                     profileInitial

@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search } from 'lucide-react';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { SongCard } from '@/components/SongCard';
 import { Navigation } from '@/components/Navigation';
@@ -8,6 +8,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useAuth } from '@/context/AuthContext';
 import { useSongPopularity, useArtistFollowerCounts } from '@/hooks/usePopularity';
@@ -58,20 +59,25 @@ export default function ArtistDetail() {
   const artistSongs = SONGS.filter(s => s.artistId === id);
   const isFollowingArtist = id ? isArtistLiked(id) : false;
 
-  const { data: artistAccount } = useQuery({
+  const { data: artistAccount, isLoading: isArtistAccountLoading } = useQuery({
     queryKey: ['artist-account', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await (supabase as any)
-        .from('artist_accounts')
-        .select('user_id, profile_theme, is_verified')
-        .eq('artist_id', id)
-        .maybeSingle();
-      if (error) return null;
-      return (data as { user_id: string; profile_theme?: string | null; is_verified?: boolean | null } | null) ?? null;
+      try {
+        const { data, error } = await (supabase as any)
+          .from('artist_accounts')
+          .select('user_id, profile_theme, is_verified')
+          .eq('artist_id', id)
+          .maybeSingle();
+        if (error) return null;
+        return (data as { user_id: string; profile_theme?: string | null; is_verified?: boolean | null } | null) ?? null;
+      } catch {
+        return null;
+      }
     },
     enabled: !!id,
     staleTime: 1000 * 10,
+    retry: 1,
   });
 
   const shouldAutoCreateArtistAccount = !!id && !!user && isArtist && artistId === id;
@@ -120,15 +126,28 @@ export default function ArtistDetail() {
     queryFn: async () => {
       const userId = ownerUserId;
       if (!userId) return null;
-      const { data } = await supabase
-        .from('audience_profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-      return (data as any) ?? null;
+      try {
+        // Try user_id column first (standard auth profiles)
+        const { data: byUserId } = await supabase
+          .from('audience_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (byUserId) return (byUserId as any);
+        // Fall back to id column (legacy profiles where id = user_id)
+        const { data: byId } = await supabase
+          .from('audience_profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        return (byId as any) ?? null;
+      } catch {
+        return null;
+      }
     },
     enabled: !!ownerUserId,
     staleTime: 1000 * 10,
+    retry: 1,
   });
 
   const displayName = (artistProfile as any)?.profile_name || artist?.name;
@@ -508,9 +527,36 @@ export default function ArtistDetail() {
   );
 
   if (!artist) {
+    // Still loading — show skeleton while artist account/profile resolves
+    if (isArtistAccountLoading) {
+      return (
+        <div className="min-h-screen bg-background">
+          <Navigation />
+          <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+            <div className="mb-6">
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <div className="relative h-48 md:h-64 rounded-3xl overflow-hidden mb-8">
+              <Skeleton className="w-full h-full" />
+            </div>
+            <div className="flex flex-col md:flex-row gap-8">
+              <Skeleton className="w-48 h-48 rounded-2xl shrink-0" />
+              <div className="flex-1 space-y-4">
+                <Skeleton className="h-10 w-64" />
+                <Skeleton className="h-4 w-48" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center max-w-md"
@@ -520,7 +566,7 @@ export default function ArtistDetail() {
           </div>
           <h1 className="text-2xl font-heading font-bold text-foreground mb-3">Artist Not Found</h1>
           <p className="text-muted-foreground mb-6">
-            We couldn't find this artist. They may have been removed or the link might be incorrect.
+            We couldn&apos;t find this artist. They may have been removed or the link might be incorrect.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button asChild>
@@ -557,7 +603,7 @@ export default function ArtistDetail() {
     >
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         {/* Back Button */}
         <Link 
           to="/artists" 

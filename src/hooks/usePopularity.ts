@@ -331,67 +331,68 @@ function buildSeedHotSongs(limit: number): TodayHotSong[] {
     .slice(0, limit);
 }
 
-export function useTodayHotSongs(limit = 5) {
-  const now = new Date();
-  const todayUTC = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+// Returns the start of the current day in CAT (UTC+2) as a Date object.
+// Hot Today resets at midnight Johannesburg / Nairobi time.
+function catDayStart(): Date {
+  const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
+  const nowMs = Date.now();
+  const catMs = nowMs + CAT_OFFSET_MS;
+  const catMidnightMs = Math.floor(catMs / 86_400_000) * 86_400_000 - CAT_OFFSET_MS;
+  return new Date(catMidnightMs);
+}
+
+export function useTodayHotSongs(limit = 10) {
+  // Midnight CAT (UTC+2) — resets section every day at midnight Johannesburg/Nairobi time
+  const windowStart = catDayStart();
+  const todayCAT = windowStart.toISOString().slice(0, 10);
+
   return useQuery({
-    queryKey: ['today-hot-songs', limit, todayUTC],
+    queryKey: ['today-hot-songs', limit, todayCAT],
     queryFn: async () => {
       maybeResetRpcFlags();
-      const d = new Date();
-      const windowStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
+      // Primary path: SECURITY DEFINER RPC so anon users get full counts
       if (canUseGetTodayHotSongsRpc !== false) {
         const { data, error } = await (supabase as any).rpc('get_today_hot_songs', {
           p_since: windowStart.toISOString(),
           p_limit: limit,
         });
-        if (!error && Array.isArray(data)) {
+        if (!error) {
           canUseGetTodayHotSongsRpc = true;
-          if (data.length > 0) {
-            return data
-              .map((row: any) => {
-                const song = SONGS.find(s => s.id === String(row.song_id));
-                return song ? { song, playsToday: Number(row.plays_today) } : null;
-              })
-              .filter(Boolean) as TodayHotSong[];
-          }
-          // RPC exists but no plays in window — fall through to seed
-        } else {
-          canUseGetTodayHotSongsRpc = false;
+          return ((data as any[]) || [])
+            .map((row: any) => {
+              const song = SONGS.find(s => s.id === String(row.song_id));
+              return song ? { song, playsToday: Number(row.plays_today) } : null;
+            })
+            .filter(Boolean) as TodayHotSong[];
         }
+        canUseGetTodayHotSongsRpc = false;
       }
 
-      // Fallback: direct query (limited by per-user RLS)
-      const { data: fallbackData } = await supabase
+      // Fallback: direct query when RPC unavailable
+      const { data: rows } = await supabase
         .from('song_analytics')
         .select('song_id')
         .eq('event_type', 'play')
         .gte('created_at', windowStart.toISOString());
 
-      if (fallbackData && fallbackData.length > 0) {
-        const counts = new Map<string, number>();
-        (fallbackData as any[]).forEach((row) => {
-          const songId = row.song_id as string | null;
-          if (!songId) return;
-          counts.set(songId, (counts.get(songId) || 0) + 1);
-        });
+      if (!rows || rows.length === 0) return [] as TodayHotSong[];
 
-        const result: TodayHotSong[] = [];
-        counts.forEach((playsToday, songId) => {
+      const counts = new Map<string, number>();
+      (rows as any[]).forEach(r => {
+        if (r.song_id) counts.set(r.song_id, (counts.get(r.song_id) || 0) + 1);
+      });
+      return Array.from(counts.entries())
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, limit)
+        .flatMap(([songId, playsToday]) => {
           const song = SONGS.find(s => s.id === songId);
-          if (song) result.push({ song, playsToday });
+          return song ? [{ song, playsToday }] : [];
         });
-        result.sort((a, b) => b.playsToday - a.playsToday);
-        if (result.length > 0) return result.slice(0, limit);
-      }
-
-      // Final fallback: deterministic seed so Hot Today always has content
-      return buildSeedHotSongs(limit);
     },
-    staleTime: 1000 * 60,
-    refetchInterval: 1000 * 60,
-    placeholderData: () => buildSeedHotSongs(limit),
+    staleTime: 1000 * 30,
+    refetchInterval: 1000 * 30,
+    placeholderData: () => [] as TodayHotSong[],
   });
 }
 

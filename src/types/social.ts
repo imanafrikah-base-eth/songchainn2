@@ -1,14 +1,19 @@
 import { AudienceProfile } from './database';
 
+export type PostType =
+  | 'text' | 'song_share' | 'playlist_share' | 'listening'
+  | 'welcome' | 'song_like' | 'song_pulse' | 'artist_follow';
+
 export interface SocialPost {
   id: string;
   user_id: string;
   content: string | null;
   song_id: string | null;
+  artist_id?: string | null;
   playlist_id: string | null;
   image_url?: string | null;
   image_path?: string | null;
-  post_type: 'text' | 'song_share' | 'playlist_share' | 'listening' | 'welcome' | 'song_like';
+  post_type: PostType;
   created_at: string;
   updated_at: string;
 }

@@ -42,6 +42,22 @@ interface PointsBreakdown {
 
 const EngagementContext = createContext<EngagementContextType | undefined>(undefined);
 
+// Safe no-op fallback — used when context is unavailable (HMR context-identity reset,
+// brief state transitions, or components rendering before the provider mounts).
+const ENGAGEMENT_NOOP: EngagementContextType = {
+  engagementPoints: 0,
+  currentStreak: 0,
+  todayPlays: 0,
+  totalPlays: 0,
+  likedSongs: new Set<string>(),
+  addPlay: () => {},
+  addOfflinePlay: () => {},
+  toggleLike: () => {},
+  isLiked: () => false,
+  getPointsBreakdown: () => ({ listening: 0, likes: 0, streak: 0, total: 0 }),
+  sendPulse: () => {},
+};
+
 const POINTS_PER_PLAY = 2;
 const POINTS_PER_LIKE = 1;
 const STREAK_BONUS = 5;
@@ -502,7 +518,10 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
 export function useEngagement() {
   const context = useContext(EngagementContext);
   if (context === undefined) {
-    throw new Error('useEngagement must be used within an EngagementProvider');
+    if (import.meta.env.DEV) {
+      console.warn('[EngagementContext] useEngagement called outside provider — returning no-op. This is usually a Vite HMR context-identity reset; a full page reload will fix it.');
+    }
+    return ENGAGEMENT_NOOP;
   }
   return context;
 }

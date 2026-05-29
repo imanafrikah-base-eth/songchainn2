@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight } from 'lucide-react';
+import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 const logo = '/songchainn-logo.webp';
 const wavewarzHeroBackground = '/wavewarz-africa-background.png';
 import { AnimatedBackground } from '@/components/ui/animated-background';
+import { SearchModal } from '@/components/SearchModal';
 import { CountryCodeSelector } from '@/components/CountryCodeSelector';
 import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
@@ -85,7 +86,8 @@ export default function Auth() {
   const [showMixFinishedPrompt, setShowMixFinishedPrompt] = useState(false);
   const [mixFinishedHandled, setMixFinishedHandled] = useState(false);
   const [guestLockedSongIds, setGuestLockedSongIds] = useState<Set<string>>(new Set());
-  const [isMoshaOpen, setIsMoshaOpen] = useState(true);
+  const [isMoshaOpen, setIsMoshaOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [moshaTransient, setMoshaTransient] = useState<string | null>(null);
   const [moshaLeadMessage, setMoshaLeadMessage] = useState(
     "I'm Mo$ha, your vibe mate and listening buddy. I can guide you through $ongChainn without pressure.",
@@ -502,7 +504,6 @@ export default function Auth() {
 
     const steps: Array<{ id?: string; text: string }> = [
       { text: 'This is Hot Today. It surfaces songs listeners are actively pushing right now.' },
-      { id: 'wavewarz-preview', text: 'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you register your music and country.' },
       { id: 'about-songchainn', text: 'This section explains $ongChainn vision and what early listeners unlock first.' },
       { id: 'featured-catalogs', text: 'Featured Catalogs group the strongest drops so you can discover faster.' },
       { id: 'trending-artists', text: 'Trending Artists helps you catch talent early and stay ahead of the crowd.' },
@@ -566,6 +567,12 @@ export default function Auth() {
     };
   }, [clearMoshaTourTimers]);
 
+  // Delay Mo$ha by 3 s so it doesn't block navigation on first load
+  useEffect(() => {
+    const t = window.setTimeout(() => setIsMoshaOpen(true), 3000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     const handleOpen = () => setIsMoshaOpen(true);
     window.addEventListener('songchainn:open-mosha', handleOpen as EventListener);
@@ -577,7 +584,6 @@ export default function Auth() {
   useEffect(() => {
     if (isMoshaOpen) return;
     const cues: Array<{ id: string; text: string }> = [
-      { id: 'wavewarz-preview', text: 'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and submit your country.' },
       { id: 'about-songchainn', text: '$ongChainn turns listening into signal. Want the full story? Tap Learn More.' },
       { id: 'featured-catalogs', text: 'These catalogs are trending now. You can preview first, then sign in when ready.' },
       { id: 'trending-artists', text: 'Early ears catch artists before the crowd. Your taste matters here.' },
@@ -626,6 +632,15 @@ export default function Auth() {
               <button type="button" onClick={() => navigate('/install')} className="hover:text-foreground transition-colors">Install App</button>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors text-xs"
+                aria-label="Search"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Search</span>
+              </button>
               <Button
                 type="button"
                 variant="ghost"
@@ -651,7 +666,8 @@ export default function Auth() {
           </div>
         </div>
 
-        <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[250px_1fr] gap-3 p-3 md:p-4">
+        <div className={`max-w-[1400px] mx-auto p-3 md:p-4${hotTodaySongs.length > 0 ? ' lg:grid lg:grid-cols-[280px_1fr] lg:gap-4' : ''}`}>
+          {hotTodaySongs.length > 0 && (
           <aside className="hidden lg:block rounded-xl border border-border/40 bg-background/80 backdrop-blur p-3">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-foreground">Hot Today</h3>
@@ -673,7 +689,7 @@ export default function Auth() {
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-md overflow-hidden bg-background/60 flex items-center justify-center shrink-0">
                       {song.coverImage ? (
-                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
+                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" loading="eager" width="40" height="40" />
                       ) : (
                         <img src={logo} alt={song.title} className="w-6 h-6 object-contain opacity-80" />
                       )}
@@ -686,15 +702,17 @@ export default function Auth() {
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className="text-[10px] text-primary">{playsToday.toLocaleString()} plays today</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {!user && guestLockedSongIds.has(song.id) ? 'Locked' : 'Play once'}
+                      {!user && guestLockedSongIds.has(song.id) ? 'Sign in to replay' : 'Free preview'}
                     </p>
                   </div>
                 </button>
               ))}
             </div>
           </aside>
+          )}
 
           <main className="rounded-xl border border-border/40 bg-background/80 backdrop-blur p-4 md:p-5">
+            {hotTodaySongs.length > 0 && (
             <section id="hot-today" className="mb-7 lg:hidden">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-heading text-foreground">Hot Today</h2>
@@ -715,7 +733,7 @@ export default function Auth() {
                   >
                     <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                       {song.coverImage ? (
-                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
+                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" loading="eager" />
                       ) : (
                         <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
                       )}
@@ -725,13 +743,14 @@ export default function Auth() {
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <p className="text-[11px] text-primary">{playsToday.toLocaleString()} plays today</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {!user && guestLockedSongIds.has(song.id) ? 'Locked' : 'Play once'}
+                        {!user && guestLockedSongIds.has(song.id) ? 'Sign in to replay' : 'Free preview'}
                       </p>
                     </div>
                   </button>
                 ))}
               </div>
             </section>
+            )}
 
             <div className="rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-primary/20 p-4 md:p-5 mb-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -762,53 +781,6 @@ export default function Auth() {
                 </div>
               </div>
             </div>
-
-            <section id="wavewarz-preview" className="mb-7">
-              <div
-                className="overflow-hidden rounded-3xl border border-cyan-400/35 bg-black/75 p-4 md:p-5"
-                style={{
-                  backgroundImage: `linear-gradient(120deg, rgba(0,0,0,0.9), rgba(0,0,0,0.5)), url(${wavewarzHeroBackground})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              >
-                <div className="space-y-3">
-                  <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/35 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-100">
-                    <Flame className="h-3.5 w-3.5" />
-                    WaveWarz Africa
-                  </p>
-                  <h2 className="text-2xl md:text-3xl font-bold text-white">WaveWarz Africa</h2>
-                  <p className="max-w-2xl text-sm md:text-base text-zinc-200">
-                    Register your music and country on $ongChainn. All WaveWarz Africa battle activity happens on WaveWarz.com.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      className="bg-emerald-400 text-black hover:bg-emerald-300"
-                      onClick={() => window.open('/wavewarz-africa', '_self')}
-                    >
-                      Register on $ongChainn
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-cyan-300/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
-                      onClick={() => { void fcOpenUrl('https://www.wavewarz.com'); }}
-                    >
-                      Open WaveWarz.com
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-emerald-300/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
-                      onClick={() => { void fcOpenUrl('https://subscribepage.io/XFM0pk'); }}
-                    >
-                      Learn More
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </section>
 
             <section id="about-songchainn" className="mb-7 scroll-mt-24">
               <div className="rounded-3xl border border-border/50 bg-gradient-to-br from-background via-background to-primary/5 p-5 md:p-6">
@@ -1016,14 +988,6 @@ export default function Auth() {
                   {isMoshaTourRunning ? 'Exploring...' : 'Click here if ready to explore'}
                 </Button>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-2 h-9 w-full text-xs border-primary/30 text-primary"
-                onClick={tellAboutWaveWarz}
-              >
-                Tell me about WaveWarz
-              </Button>
               {isMoshaTourCompleted && !isMoshaTourRunning && (
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Button
@@ -1610,6 +1574,7 @@ export default function Auth() {
         </div>
       )}
       <AudioPlayer />
+      <SearchModal open={isSearchOpen} onOpenChange={setIsSearchOpen} />
     </div>
   );
 }

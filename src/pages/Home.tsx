@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart, PlayCircle, Disc3, Info, Sword, Wand2 } from 'lucide-react';
+import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart, PlayCircle, Disc3, Info, Search, Wand2 } from 'lucide-react';
+// Note: Sword removed — WaveWarz quick action replaced by Search
 import { CATALOGS, ARTISTS, SONGS, type Catalog, type Song } from '@/data/musicData';
 import { useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useAuth } from '@/context/AuthContext';
@@ -22,7 +23,6 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
-import { WaveWarzHomeHero } from '@/components/wavewarz/WaveWarzHomeHero';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -32,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import djShuffleBranding from '@/assets/Dj Suffle Branding.png';
+import { SearchModal } from '@/components/SearchModal';
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -47,7 +48,7 @@ const itemVariants = {
   show: { opacity: 1, y: 0 },
 };
 
-const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
+const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 14;
 
 const PLAYLIST_GRADIENTS = [
   'from-emerald-500/70 via-emerald-400/40 to-cyan-500/70',
@@ -76,10 +77,11 @@ function getPlaylistGradient(playlist: { id: string; name: string; mood?: string
 export default function Home() {
   const { rankedArtists } = useRankedArtists();
   const { audienceProfile, refreshProfile, user } = useAuth();
-  const { data: todayHotSongs = [] } = useTodayHotSongs(5);
+  const { data: todayHotSongs = [] } = useTodayHotSongs(10);
   const { playlists, createPlaylist, addSongToPlaylist, likedArtists } = useAudienceInteractions();
   const { createPost } = useSocial();
   const { createNotification } = useNotifications();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [newPlaylistDescription, setNewPlaylistDescription] = useState('');
@@ -134,17 +136,16 @@ export default function Home() {
       }),
     [catalogs, hotScoreByCatalog],
   );
-  const newReleases = useMemo(
-    () =>
-      [...catalogs]
-        .sort((a, b) => {
-          const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
-          const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
-          return timeB - timeA;
-        })
-        .slice(0, 5),
-    [catalogs],
-  );
+  const newReleases = useMemo(() => {
+    const sorted = [...catalogs].sort((a, b) => {
+      const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+      const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+      return timeB - timeA;
+    });
+    // Show only genuinely new releases; fall back to 5 most-recent if none qualify
+    const fresh = sorted.filter(isCatalogNew);
+    return fresh.length > 0 ? fresh : sorted.slice(0, 5);
+  }, [catalogs]);
   const songsByCatalog = useMemo(
     () =>
       catalogs
@@ -220,10 +221,10 @@ export default function Home() {
       to: '/room',
     },
     {
-      label: 'WaveWarz Africa',
-      description: 'Battles happen on WaveWarz.com. Register music/country on $ongChainn.',
-      icon: Sword,
-      href: 'https://www.wavewarz.com',
+      label: 'Search',
+      description: 'Find songs, artists and catalogs instantly.',
+      icon: Search,
+      action: () => setIsSearchOpen(true),
     },
     {
       label: 'Open DJ Shuffle',
@@ -361,7 +362,7 @@ export default function Home() {
       <UpdateAvailableBanner />
       <DownloadAppBanner />
 
-      <main className="px-4 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
         {playerState?.isRoomMode && playerState.currentSong && (
           <div className="mb-4 sm:mb-6">
             <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
@@ -453,8 +454,6 @@ export default function Home() {
           </div>
         </section>
 
-        <WaveWarzHomeHero />
-
         <div className="my-4 sm:my-6 flex items-center gap-2">
           <Button
             type="button"
@@ -521,8 +520,7 @@ export default function Home() {
             initial="hidden"
             animate="show"
           >
-            {todayHotSongs.length > 0 && (
-              <motion.section variants={itemVariants}>
+            <motion.section variants={itemVariants}>
                 <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
                   <motion.div
                     aria-hidden="true"
@@ -541,7 +539,7 @@ export default function Home() {
                           </h2>
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          Most played songs in the last 24 hours on $ongChainn.
+                          Top 10 most streamed songs today on $ongChainn — resets at midnight.
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -559,6 +557,11 @@ export default function Home() {
                     </div>
                     <div className="max-h-[420px] overflow-y-auto pr-2">
                       <div className="space-y-3">
+                        {todayHotSongs.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-6">
+                            No streams yet today — be the first to play a song!
+                          </p>
+                        )}
                         {todayHotSongs.map(({ song, playsToday }, index) => (
                           <div key={song.id} className="space-y-1">
                             <SongCard song={song} index={index} variant="compact" />
@@ -578,7 +581,6 @@ export default function Home() {
                   </div>
                 </div>
               </motion.section>
-            )}
 
             {newReleases.length > 0 && (
               <motion.section variants={itemVariants}>
@@ -1109,6 +1111,8 @@ export default function Home() {
       </main>
 
       <AudioPlayer />
+
+      <SearchModal open={isSearchOpen} onOpenChange={setIsSearchOpen} />
 
       <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
         <DialogContent className="max-w-2xl w-[95vw] sm:w-full">

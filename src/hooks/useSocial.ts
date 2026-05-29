@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { broadcastCountDelta } from '@/hooks/usePopularity';
 import type { Database } from '@/integrations/supabase/types';
 
 export function useSocial() {
@@ -110,6 +111,8 @@ export function useSocial() {
         user_id: post.user_id,
         content: post.content,
         song_id: post.song_id,
+        // artist_id: stored directly on the row OR in metadata
+        artist_id: (post as any).artist_id ?? (post as any).metadata?.artist_id ?? null,
         playlist_id: post.playlist_id,
         image_url: (post as any).image_url ?? null,
         image_path: (post as any).image_path ?? null,
@@ -120,7 +123,6 @@ export function useSocial() {
         likes_count: likesCount.get(String(post.id)) || 0,
         comments_count: commentsCount.get(String(post.id)) || 0,
         is_liked: userLikedPosts.has(String(post.id)),
-        artist_id: null,
         artist_is_verified: null,
       }));
 
@@ -287,6 +289,14 @@ export function useSocial() {
       const isCurrentlyFollowing = following.includes(userId);
 
       if (isCurrentlyFollowing) {
+        // Optimistic local update before DB write
+        setFollowing((prev) => {
+          const next = prev.filter((id) => id !== userId);
+          followingRef.current = next;
+          return next;
+        });
+        broadcastCountDelta('follow', { artistId: userId, delta: -1 });
+
         const { error } = await supabase
           .from('user_follows')
           .delete()
@@ -294,6 +304,13 @@ export function useSocial() {
           .eq('following_id', userId);
 
         if (error) {
+          // Revert
+          setFollowing((prev) => {
+            const next = Array.from(new Set([...prev, userId]));
+            followingRef.current = next;
+            return next;
+          });
+          broadcastCountDelta('follow', { artistId: userId, delta: 1 });
           toast({
             title: 'Could not unfollow',
             description: error.message || 'Please try again in a moment.',
@@ -301,19 +318,28 @@ export function useSocial() {
           });
           return;
         }
-
+        toast({ title: 'Unfollowed' });
+      } else {
+        // Optimistic local update before DB write
         setFollowing((prev) => {
-          const next = prev.filter((id) => id !== userId);
+          const next = Array.from(new Set([...prev, userId]));
           followingRef.current = next;
           return next;
         });
-        toast({ title: 'Unfollowed' });
-      } else {
+        broadcastCountDelta('follow', { artistId: userId, delta: 1 });
+
         const { error } = await supabase
           .from('user_follows')
           .insert({ follower_id: user.id, following_id: userId } as any);
 
         if (error) {
+          // Revert
+          setFollowing((prev) => {
+            const next = prev.filter((id) => id !== userId);
+            followingRef.current = next;
+            return next;
+          });
+          broadcastCountDelta('follow', { artistId: userId, delta: -1 });
           toast({
             title: 'Could not follow',
             description: error.message || 'Please check your connection and try again.',
@@ -321,12 +347,6 @@ export function useSocial() {
           });
           return;
         }
-
-        setFollowing((prev) => {
-          const next = Array.from(new Set([...prev, userId]));
-          followingRef.current = next;
-          return next;
-        });
         toast({ title: 'Following!' });
       }
     },

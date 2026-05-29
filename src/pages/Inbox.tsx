@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Bot, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Navigation } from '@/components/Navigation';
@@ -190,7 +190,7 @@ export default function Inbox() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="px-4 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
         <section className="rounded-2xl border border-border/50 bg-background/85 backdrop-blur p-3 sm:p-4">
           <div className="flex items-center gap-2 mb-3">
             <Bot className="w-4 h-4 text-primary" />

@@ -25,7 +25,7 @@ interface SongCardProps {
   variant?: 'default' | 'compact' | 'featured';
 }
 
-const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 5;
+const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 14;
 
 export const SongCard = memo(function SongCard({ song, index = 0, variant = 'default' }: SongCardProps) {
   const { currentSong, isPlaying } = usePlayerState();
