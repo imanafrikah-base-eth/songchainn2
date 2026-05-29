@@ -19,6 +19,7 @@ interface AuthContextType {
   signInWithFarcasterToken: (token: string) => Promise<{ error: Error | null }>;
   signInWithFarcaster: (message: string, signature: string) => Promise<{ error: Error | null }>;
   signInWithFarcasterContext: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => Promise<{ error: Error | null }>;
+  signInWithFarcasterMiniApp: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }, message: string, signature: string) => Promise<{ error: Error | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -489,24 +490,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const uid = user?.id;
     if (!uid || !isSupabaseConfigured) return;
 
-    const { data: existing } = await supabase
-      .from('audience_profiles')
-      .select('id, onboarding_completed')
-      .eq('user_id', uid)
-      .maybeSingle();
-
-    if (existing?.onboarding_completed) return;
-
     const profileName = farcasterUser.displayName || farcasterUser.username || `User ${farcasterUser.fid}`;
 
-    const profileData = {
+    // Always upsert with all relevant columns so the profile is complete in every view
+    const profileData: Record<string, unknown> = {
       user_id: uid,
+      id: uid,
+      display_name: profileName,
+      username: farcasterUser.username || null,
       profile_name: profileName,
+      avatar_url: farcasterUser.pfpUrl || null,
       profile_picture_url: farcasterUser.pfpUrl || null,
       location: farcasterUser.location || null,
       is_public: true,
       onboarding_completed: true,
     };
+
+    const { data: existing } = await supabase
+      .from('audience_profiles')
+      .select('id')
+      .eq('user_id', uid)
+      .maybeSingle();
 
     if (existing) {
       await supabase.from('audience_profiles').update(profileData).eq('user_id', uid);
@@ -518,6 +522,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsOnboarding(false);
     try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
   }, [user?.id, refreshProfile]);
+
+  /**
+   * Mini-app sign-in path: authenticates via SIWF then immediately creates/updates
+   * audience_profiles so the user appears everywhere in the app without going through
+   * onboarding. Falls back to local-only context sign-in if Supabase auth fails.
+   */
+  const signInWithFarcasterMiniApp = useCallback(async (
+    fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string },
+    message: string,
+    signature: string,
+  ) => {
+    try {
+      if (!isSupabaseConfigured) throw new Error('Supabase not configured');
+
+      const { data, error: fnError } = await supabase.functions.invoke('farcaster-auth', {
+        body: { message, signature },
+      });
+      if (fnError) throw new Error(fnError.message || 'Farcaster auth failed');
+
+      const { email, otp } = data as { email: string; otp: string };
+      const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+        email, token: otp, type: 'magiclink',
+      });
+      if (otpError) throw otpError;
+
+      const u = otpData.user;
+      if (!u) throw new Error('Sign-in failed');
+
+      // Immediately create/update the profile BEFORE setting needsOnboarding
+      // so there is no flash of the onboarding screen for mini-app users.
+      const profileName = fc.displayName || fc.username || `User ${fc.fid}`;
+      const profileData: Record<string, unknown> = {
+        user_id: u.id,
+        id: u.id,
+        display_name: profileName,
+        username: fc.username || null,
+        profile_name: profileName,
+        avatar_url: fc.pfpUrl || null,
+        profile_picture_url: fc.pfpUrl || null,
+        location: fc.location || null,
+        is_public: true,
+        onboarding_completed: true,
+      };
+
+      const { data: existing } = await supabase
+        .from('audience_profiles')
+        .select('id')
+        .eq('user_id', u.id)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from('audience_profiles').update(profileData).eq('user_id', u.id);
+      } else {
+        await supabase.from('audience_profiles').insert(profileData as any);
+      }
+
+      // Now set auth state — profile already exists so needsOnboarding stays false
+      setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+      await refreshRoles(u.id);
+      setIsArtist(false);
+      setArtistId(null);
+      setNeedsOnboarding(false);
+      try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
+
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(err?.message || 'Mini-app sign-in failed') };
+    }
+  }, [refreshRoles]);
 
   const signInWithFarcasterContext = useCallback(async (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => {
     try {
@@ -589,6 +662,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithFarcasterToken,
       signInWithFarcaster,
       signInWithFarcasterContext,
+      signInWithFarcasterMiniApp,
       signUpWithEmail,
       signInWithEmail,
       signOut,
@@ -621,6 +695,7 @@ export function useAuth() {
       signInWithFarcasterToken: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcaster: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcasterContext: async () => ({ error: new Error('AuthProvider missing') }),
+      signInWithFarcasterMiniApp: async () => ({ error: new Error('AuthProvider missing') }),
       signUpWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signOut: async () => {},

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
-import { useFarcaster } from '@/hooks/useFarcaster';
+import { useFarcaster, requestFarcasterSignIn } from '@/hooks/useFarcaster';
 import { useAuth } from '@/context/AuthContext';
 import { fcAddMiniApp } from '@/lib/farcasterActions';
 import type { Context as FarcasterCoreContext } from '@farcaster/miniapp-core';
@@ -22,31 +22,48 @@ const FarcasterContext = createContext<FarcasterContextType>({
 
 export function FarcasterProvider({ children }: { children: ReactNode }) {
   const state = useFarcaster();
-  const { user, signInWithFarcasterContext } = useAuth();
+  const { user, signInWithFarcasterMiniApp, signInWithFarcasterContext } = useAuth();
   const signedInRef = useRef(false);
   const [quickAuthFailed, setQuickAuthFailed] = useState(false);
 
-  // Trust sdk.context.user for client-side sign-in. Per Farcaster Mini Apps docs,
-  // context.user is untrusted (no signature) but fine for UI gating. No backend
-  // round-trip, no Supabase OTP — we just unlock the app.
+  // Auto-register FC mini-app users in Supabase so they appear in all app tables.
+  // Strategy:
+  //   1. Try silent SIWF (sdk.actions.signIn) → real Supabase user + audience_profiles row
+  //   2. Fallback: local-only fc-XXX context user (still writes to farcaster_profiles)
   useEffect(() => {
     if (!state.isInFarcaster || user || signedInRef.current) return;
     const fc = state.context?.user;
     if (!fc?.fid) return;
     signedInRef.current = true;
-    void signInWithFarcasterContext({
+
+    const fcData = {
       fid: fc.fid,
       username: fc.username,
       displayName: fc.displayName,
       pfpUrl: fc.pfpUrl,
       location: fc.location?.description,
-    }).then((r) => {
-      if (r?.error) {
+    };
+
+    const doSignIn = async () => {
+      // Path 1: Silent SIWF → real Supabase session + full profile registration
+      try {
+        const { message, signature } = await requestFarcasterSignIn();
+        const result = await signInWithFarcasterMiniApp(fcData, message, signature);
+        if (!result.error) return; // Success — user is fully registered
+      } catch {
+        // SIWF failed (network, host doesn't support it, etc.) — use fallback
+      }
+
+      // Path 2: Context-only sign-in (writes fc-XXX to localStorage + farcaster_profiles for community)
+      const result = await signInWithFarcasterContext(fcData);
+      if (result?.error) {
         setQuickAuthFailed(true);
         signedInRef.current = false;
       }
-    });
-  }, [state.isInFarcaster, state.context, user, signInWithFarcasterContext]);
+    };
+
+    void doSignIn();
+  }, [state.isInFarcaster, state.context, user, signInWithFarcasterMiniApp, signInWithFarcasterContext]);
 
   // If we're in Farcaster but context never resolved within ~3s, surface the
   // manual button so the user isn't stranded.
