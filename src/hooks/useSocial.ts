@@ -78,22 +78,25 @@ export function useSocial() {
       const postIds = rows.map((p) => p.id);
       const userIds = Array.from(new Set(rows.map((p) => p.user_id).filter(Boolean)));
 
-      const [profilesByIdRes, profilesByUserIdRes, likesRes, commentsRes, userLikesRes] = await Promise.all([
-        supabase.from('audience_profiles').select('*').in('id', userIds),
-        supabase.from('audience_profiles').select('*').in('user_id', userIds),
-        supabase.from('post_likes').select('post_id,user_id').in('post_id', postIds),
+      // Single profile query covering both id and user_id columns, minimal columns only
+      const [profilesRes, likesRes, commentsRes, userLikesRes] = await Promise.all([
+        supabase
+          .from('audience_profiles')
+          .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
+          .or(`id.in.(${userIds.join(',')}),user_id.in.(${userIds.join(',')})`),
+        supabase.from('post_likes').select('post_id').in('post_id', postIds),
         supabase.from('post_comments').select('post_id').in('post_id', postIds),
         supabase.from('post_likes').select('post_id').eq('user_id', uid).in('post_id', postIds),
       ]);
 
       const profilesMap = new Map<string, AudienceProfile>();
-      ([...(profilesByIdRes.data || []), ...(profilesByUserIdRes.data || [])] as any[]).forEach((p: any) => {
+      ((profilesRes.data || []) as any[]).forEach((p: any) => {
         profilesMap.set(String(p.id), p as any);
         if (p?.user_id) profilesMap.set(String(p.user_id), p as any);
       });
 
       const likesCount = new Map<string, number>();
-      (likesRes.data || []).forEach((l: any) => {
+      ((likesRes.data || []) as any[]).forEach((l) => {
         const pid = String(l.post_id);
         likesCount.set(pid, (likesCount.get(pid) || 0) + 1);
       });
@@ -434,11 +437,22 @@ export function useSocial() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => {
         void fetchPostsRef.current(feedTypeRef.current);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
-        void fetchPostsRef.current(feedTypeRef.current);
+      // Targeted count updates — avoid full 5-query refetch on every like/comment
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, (payload) => {
+        const postId = String((payload.new as any)?.post_id || (payload.old as any)?.post_id || '');
+        if (!postId) return;
+        const delta = payload.eventType === 'INSERT' ? 1 : -1;
+        setPosts(prev => prev.map(p =>
+          p.id === postId ? { ...p, likes_count: Math.max(0, p.likes_count + delta) } : p
+        ));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => {
-        void fetchPostsRef.current(feedTypeRef.current);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, (payload) => {
+        const postId = String((payload.new as any)?.post_id || (payload.old as any)?.post_id || '');
+        if (!postId) return;
+        const delta = payload.eventType === 'INSERT' ? 1 : -1;
+        setPosts(prev => prev.map(p =>
+          p.id === postId ? { ...p, comments_count: Math.max(0, p.comments_count + delta) } : p
+        ));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_follows' }, () => {
         void fetchFollowDataRef.current();

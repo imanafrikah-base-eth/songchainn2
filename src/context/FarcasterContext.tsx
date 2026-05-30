@@ -45,13 +45,17 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
     };
 
     const doSignIn = async () => {
-      // Path 1: Silent SIWF → real Supabase session + full profile registration
+      // Path 1: Silent SIWF → real Supabase session + full profile registration.
+      // 15 s timeout: enough for the host UI but won't hang forever on broken clients.
       try {
-        const { message, signature } = await requestFarcasterSignIn();
-        const result = await signInWithFarcasterMiniApp(fcData, message, signature);
+        const siwf = await Promise.race([
+          requestFarcasterSignIn(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('siwf:timeout')), 15000)),
+        ]);
+        const result = await signInWithFarcasterMiniApp(fcData, siwf.message, siwf.signature);
         if (!result.error) return; // Success — user is fully registered
       } catch {
-        // SIWF failed (network, host doesn't support it, etc.) — use fallback
+        // SIWF failed (network, host doesn't support it, timeout, etc.) — use fallback
       }
 
       // Path 2: Context-only sign-in (writes fc-XXX to localStorage + farcaster_profiles for community)

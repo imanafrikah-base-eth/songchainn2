@@ -208,13 +208,20 @@ export default function Social() {
         ref={feedRef}
         className="absolute inset-0 overflow-y-scroll overscroll-none snap-y snap-mandatory"
       >
-        {effectiveIsLoading ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-12 h-12 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-white/60">Loading your feed…</p>
-            </div>
-          </div>
+        {effectiveIsLoading && postsToRender.length === 0 ? (
+          /* Skeleton cards — render 3 immediately so the screen isn't blank */
+          <>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-full w-full snap-start bg-black flex items-center justify-center relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent animate-pulse" />
+                <div className="flex flex-col items-center gap-4 opacity-30">
+                  <div className="w-52 h-52 rounded-full bg-white/10" />
+                  <div className="h-3 w-36 rounded bg-white/10" />
+                  <div className="h-2 w-24 rounded bg-white/10" />
+                </div>
+              </div>
+            ))}
+          </>
         ) : postsToRender.length === 0 ? (
           <div className="h-full flex items-center justify-center px-6">
             <motion.div

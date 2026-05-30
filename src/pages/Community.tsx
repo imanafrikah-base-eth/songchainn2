@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type SyntheticEvent } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -163,128 +163,122 @@ export default function Community() {
       .then(() => {});
   }, [user?.id]);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoading(true);
-      setLoadError(null);
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
 
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('fetch:timeout')), 12000)
-      );
+    // Each call gets its own timeout so a slow RPC doesn't eat the fallback budget
+    const makeTimeout = (ms: number) => new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('fetch:timeout')), ms)
+    );
 
-      // Try SECURITY DEFINER RPC first — bypasses any restrictive RLS on audience_profiles.
-      // Falls back to direct table query if the RPC doesn't exist yet.
-      let profiles: any[] | null = null;
-      let fetchError: any = null;
+    let profiles: any[] | null = null;
+    let fetchError: any = null;
 
-      const rpcResult = await Promise.race([
-        (supabase as any).rpc('get_community_profiles', { p_limit: 300, p_offset: 0 }).then((r: any) => r),
-        timeout,
+    // Primary: SECURITY DEFINER RPC (bypasses RLS, includes farcaster_profiles UNION)
+    const rpcResult = await Promise.race([
+      (supabase as any).rpc('get_community_profiles', { p_limit: 300, p_offset: 0 }).then((r: any) => r),
+      makeTimeout(8000),
+    ]).catch((err: any) => ({ data: null, error: err })) as any;
+
+    if (!rpcResult.error && Array.isArray(rpcResult.data)) {
+      profiles = rpcResult.data;
+    } else {
+      // Fallback: direct table query — RLS has USING(true) policies so all rows visible
+      const directResult = await Promise.race([
+        supabase
+          .from('audience_profiles')
+          .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,cover_photo_url,bio,location,is_public,created_at,updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(300)
+          .then((r) => r),
+        makeTimeout(8000),
       ]).catch((err: any) => ({ data: null, error: err })) as any;
+      profiles = directResult.data;
+      fetchError = directResult.error;
+    }
 
-      if (!rpcResult.error && Array.isArray(rpcResult.data)) {
-        profiles = rpcResult.data;
-      } else {
-        // RPC not available — fall back with updated_at ordering for recency
-        const directResult = await Promise.race([
-          supabase
-            .from('audience_profiles')
-            .select('*')
-            .order('updated_at', { ascending: false })
-            .limit(300)
-            .then((r) => r),
-          timeout,
-        ]).catch((err: any) => ({ data: null, error: err })) as any;
-        profiles = directResult.data;
-        fetchError = directResult.error;
+    if (fetchError || !profiles) {
+      if (import.meta.env.DEV) {
+        console.error('Error fetching community profiles:', fetchError);
       }
-
-      if (fetchError || !profiles) {
-        if (import.meta.env.DEV) {
-          console.error('Error fetching community profiles:', fetchError);
-        }
-        const cached = Object.values(getAllProfiles() || {}).filter((p) => p?.user_id);
-        const normalizedCached: UserProfile[] = cached
-          .map((p: any) => normalizeProfile(p))
-          .filter((p): p is UserProfile => Boolean(p));
-        if (normalizedCached.length) {
-          setUsers(normalizedCached);
-          setFilteredUsers(normalizedCached);
-        } else {
-          setLoadError('Unable to load community right now. Please try again later.');
-        }
-        setIsLoading(false);
-        return;
-      }
-
-      const normalizedProfiles: UserProfile[] = ((profiles as any[]) || [])
-        .map((p) => normalizeProfile(p))
-        .filter((p): p is UserProfile => Boolean(p));
-
-      const dedupedByUserId = new Map<string, UserProfile>();
-      normalizedProfiles.forEach((p) => {
-        if (!dedupedByUserId.has(p.user_id)) dedupedByUserId.set(p.user_id, p);
-      });
-      const uniqueProfiles = Array.from(dedupedByUserId.values());
-      uniqueProfiles.forEach((profile) => upsertProfile(profile as any));
-
-      // Show profiles immediately so UI is not empty while counts load
-      setUsers(uniqueProfiles);
-      setFilteredUsers(uniqueProfiles);
+      setLoadError('Unable to load community right now. Please try again later.');
       setIsLoading(false);
+      return;
+    }
 
-      // Enrich with counts in the background — non-blocking
-      const userIds = uniqueProfiles.map(p => p.user_id);
-      if (!userIds.length) return;
+    const normalizedProfiles: UserProfile[] = ((profiles as any[]) || [])
+      .map((p) => normalizeProfile(p))
+      .filter((p): p is UserProfile => Boolean(p));
 
-      try {
-        // Hard caps below match the per-page community size (300 profiles).
-        // Without them, each tab open could pull every analytics/follow row
-        // for the entire community → tens-of-MB payloads at scale.
-        const playsQuery = supabase
-          .from('song_analytics')
-          .select('user_id')
-          .eq('event_type', 'play')
-          .in('user_id', userIds)
-          .limit(5000);
+    const dedupedByUserId = new Map<string, UserProfile>();
+    normalizedProfiles.forEach((p) => {
+      if (!dedupedByUserId.has(p.user_id)) dedupedByUserId.set(p.user_id, p);
+    });
+    const uniqueProfiles = Array.from(dedupedByUserId.values());
+    uniqueProfiles.forEach((profile) => upsertProfile(profile as any));
 
-        const [followersRes, postsRes, playsRes] = await Promise.all([
-          supabase.from('user_follows').select('following_id').in('following_id', userIds).limit(5000),
-          supabase.from('social_posts').select('user_id').in('user_id', userIds).limit(5000),
-          playsQuery,
-        ]);
+    // Show profiles immediately so UI is not empty while counts load
+    setUsers(uniqueProfiles);
+    setFilteredUsers(uniqueProfiles);
+    setIsLoading(false);
 
-        const followerCounts = new Map<string, number>();
-        followersRes.data?.forEach(f => {
-          followerCounts.set(f.following_id, (followerCounts.get(f.following_id) || 0) + 1);
-        });
+    // Enrich with counts in the background — non-blocking
+    const userIds = uniqueProfiles.map(p => p.user_id);
+    if (!userIds.length) return;
 
-        const postCounts = new Map<string, number>();
-        postsRes.data?.forEach(p => {
-          postCounts.set(p.user_id, (postCounts.get(p.user_id) || 0) + 1);
-        });
+    try {
+      // Hard caps below match the per-page community size (300 profiles).
+      // Without them, each tab open could pull every analytics/follow row
+      // for the entire community → tens-of-MB payloads at scale.
+      const playsQuery = supabase
+        .from('song_analytics')
+        .select('user_id')
+        .eq('event_type', 'play')
+        .in('user_id', userIds)
+        .limit(5000);
 
-        const playCounts = new Map<string, number>();
-        playsRes.data?.forEach(p => {
-          if (!p.user_id) return;
-          playCounts.set(p.user_id, (playCounts.get(p.user_id) || 0) + 1);
-        });
+      const [followersRes, postsRes, playsRes] = await Promise.all([
+        supabase.from('user_follows').select('following_id').in('following_id', userIds).limit(5000),
+        supabase.from('social_posts').select('user_id').in('user_id', userIds).limit(5000),
+        playsQuery,
+      ]);
 
-        const enrichedUsers: UserProfile[] = uniqueProfiles.map(profile => ({
-          ...profile,
-          follower_count: followerCounts.get(profile.user_id) || 0,
-          post_count: postCounts.get(profile.user_id) || 0,
-          play_count: playCounts.get(profile.user_id) || 0,
-        }));
+      const followerCounts = new Map<string, number>();
+      followersRes.data?.forEach(f => {
+        followerCounts.set(f.following_id, (followerCounts.get(f.following_id) || 0) + 1);
+      });
 
-        setUsers(enrichedUsers);
-        setFilteredUsers(enrichedUsers);
-      } catch {
-        // Counts failed — profiles already shown without them, which is fine
-      }
-    };
+      const postCounts = new Map<string, number>();
+      postsRes.data?.forEach(p => {
+        postCounts.set(p.user_id, (postCounts.get(p.user_id) || 0) + 1);
+      });
 
-    fetchUsers();
+      const playCounts = new Map<string, number>();
+      playsRes.data?.forEach(p => {
+        if (!p.user_id) return;
+        playCounts.set(p.user_id, (playCounts.get(p.user_id) || 0) + 1);
+      });
+
+      const enrichedUsers: UserProfile[] = uniqueProfiles.map(profile => ({
+        ...profile,
+        follower_count: followerCounts.get(profile.user_id) || 0,
+        post_count: postCounts.get(profile.user_id) || 0,
+        play_count: playCounts.get(profile.user_id) || 0,
+      }));
+
+      setUsers(enrichedUsers);
+      setFilteredUsers(enrichedUsers);
+    } catch {
+      // Counts failed — profiles already shown without them, which is fine
+    }
+  }, []);
+
+  const fetchUsersRef = useRef(fetchUsers);
+  fetchUsersRef.current = fetchUsers;
+
+  useEffect(() => {
+    void fetchUsersRef.current();
   }, []);
 
   useEffect(() => {
@@ -336,6 +330,32 @@ export default function Community() {
             )
           );
         }
+      )
+      // New audience profile: add immediately so the member count and grid update live
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'audience_profiles' },
+        (payload) => {
+          const profile = normalizeProfile(payload.new as any);
+          if (!profile) return;
+          upsertProfile(profile as any);
+          setUsers((prev) => {
+            if (prev.some((p) => p.user_id === profile.user_id)) return prev;
+            return [...prev, profile];
+          });
+        }
+      )
+      // Farcaster profiles: synthetic UUID is computed server-side, so refetch to get
+      // the correctly keyed entry rather than trying to replicate md5 in the browser.
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'farcaster_profiles' },
+        () => { void fetchUsersRef.current(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'farcaster_profiles' },
+        () => { void fetchUsersRef.current(); }
       )
       .subscribe();
 

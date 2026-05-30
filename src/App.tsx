@@ -15,7 +15,7 @@ import { NotificationBanner } from "@/components/NotificationBanner";
 const VibeAgent = lazy(() => import("@/components/VibeAgent").then(m => ({ default: m.VibeAgent })));
 const BehaviorCtaPopups = lazy(() => import("@/components/BehaviorCtaPopups").then(m => ({ default: m.BehaviorCtaPopups })));
 import { useUserPresence } from "@/hooks/useUserPresence";
-import { FarcasterProvider } from "@/context/FarcasterContext";
+import { FarcasterProvider, useFarcasterContext } from "@/context/FarcasterContext";
 import { supabase } from "@/integrations/supabase/client";
 // Lazy load pages for better initial load performance
 const Home = lazy(() => import("./pages/Home"));
@@ -201,6 +201,7 @@ function isPublicRoute(pathname: string) {
 // AppContent must be rendered inside AuthProvider and BrowserRouter
 function AppContent() {
   const { isAuthenticated, isLoading, needsOnboarding, user } = useAuth();
+  const { isInFarcaster, quickAuthFailed } = useFarcasterContext();
   const location = useLocation();
   useUserPresence(user?.id ?? null, { includeLastSeen: true });
 
@@ -231,6 +232,12 @@ function AppContent() {
   }
 
   if (isLoading) {
+    return <PageLoader />;
+  }
+
+  // FC mini-app: auto-sign-in is in progress — show a silent loader so the user
+  // never sees the Auth/landing page during the one-tap sign-in flow.
+  if (!isAuthenticated && isInFarcaster && !quickAuthFailed) {
     return <PageLoader />;
   }
 
