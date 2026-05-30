@@ -537,7 +537,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isSupabaseConfigured) throw new Error('Supabase not configured');
 
       const { data, error: fnError } = await supabase.functions.invoke('farcaster-auth', {
-        body: { message, signature },
+        // Pass full FC profile so the edge function can enrich the auth.users metadata
+        body: {
+          fid: fc.fid,
+          username: fc.username ?? null,
+          displayName: fc.displayName ?? null,
+          pfpUrl: fc.pfpUrl ?? null,
+          location: fc.location ?? null,
+          message,
+          signature,
+        },
       });
       if (fnError) throw new Error(fnError.message || 'Farcaster auth failed');
 
@@ -595,37 +604,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithFarcasterContext = useCallback(async (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => {
     try {
       if (!fc?.fid) return { error: new Error('Missing Farcaster fid') };
+
+      // Try edge function first — gives a real Supabase UUID so all social
+      // actions (follow, post, like) work. Falls back to local-only if unavailable.
+      if (isSupabaseConfigured) {
+        try {
+          const { data: authData, error: authErr } = await supabase.functions.invoke('farcaster-auth', {
+            body: {
+              fid: fc.fid,
+              username: fc.username ?? null,
+              displayName: fc.displayName ?? null,
+              pfpUrl: fc.pfpUrl ?? null,
+              location: fc.location ?? null,
+            },
+          });
+          if (!authErr && authData?.otp) {
+            const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+              email: authData.email, token: authData.otp, type: 'magiclink',
+            });
+            if (!otpError && otpData?.user) {
+              const u = otpData.user;
+              const profileName = fc.displayName || fc.username || `User ${fc.fid}`;
+              const profileData: Record<string, unknown> = {
+                user_id: u.id, id: u.id,
+                display_name: profileName, username: fc.username || null,
+                profile_name: profileName, avatar_url: fc.pfpUrl || null,
+                profile_picture_url: fc.pfpUrl || null, location: fc.location || null,
+                is_public: true, onboarding_completed: true,
+              };
+              const { data: existing } = await supabase.from('audience_profiles').select('id').eq('user_id', u.id).maybeSingle();
+              if (existing) {
+                await supabase.from('audience_profiles').update(profileData).eq('user_id', u.id);
+              } else {
+                await supabase.from('audience_profiles').insert(profileData as any);
+              }
+              setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+              setAudienceProfile(profileData as any);
+              setIsAdmin(false); setIsArtist(false); setArtistId(null);
+              setNeedsOnboarding(false);
+              try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
+              // Also write to farcaster_profiles for community visibility
+              void supabase.from('farcaster_profiles' as any).upsert(
+                { fid: fc.fid, username: fc.username ?? null, display_name: profileName, pfp_url: fc.pfpUrl ?? null, location: fc.location ?? null, updated_at: new Date().toISOString() },
+                { onConflict: 'fid' }
+              ).then(() => {});
+              return { error: null };
+            }
+          }
+        } catch { /* edge function unavailable — fall through to local-only */ }
+      }
+
+      // Local-only fallback: synthetic fc-xxx user (no Supabase writes)
       const { user: fcUser, profile } = buildFcUserAndProfile(fc);
       setUser(fcUser);
       setAudienceProfile(profile);
-      setIsAdmin(false);
-      setIsArtist(false);
-      setArtistId(null);
+      setIsAdmin(false); setIsArtist(false); setArtistId(null);
       setNeedsOnboarding(false);
       try {
         localStorage.setItem(FC_USER_KEY, JSON.stringify({ user: fcUser, profile }));
         localStorage.setItem('songchainn_needs_onboarding', '0');
       } catch { void 0; }
-
-      // Persist to farcaster_profiles so this user appears in community for all users.
-      // Fire-and-forget — failure is non-critical (user is still signed in locally).
       if (isSupabaseConfigured) {
-        void supabase
-          .from('farcaster_profiles' as any)
-          .upsert(
-            {
-              fid: fc.fid,
-              username: fc.username ?? null,
-              display_name: fc.displayName ?? fc.username ?? `User ${fc.fid}`,
-              pfp_url: fc.pfpUrl ?? null,
-              location: fc.location ?? null,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'fid' }
-          )
-          .then(() => {});
+        void supabase.from('farcaster_profiles' as any).upsert(
+          { fid: fc.fid, username: fc.username ?? null, display_name: fc.displayName ?? fc.username ?? `User ${fc.fid}`, pfp_url: fc.pfpUrl ?? null, location: fc.location ?? null, updated_at: new Date().toISOString() },
+          { onConflict: 'fid' }
+        ).then(() => {});
       }
-
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Farcaster sign-in failed') };

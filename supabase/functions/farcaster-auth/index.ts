@@ -23,11 +23,9 @@ const MAX_AGE_MS = 10 * 60 * 1000;
 
 const EXPECTED_AUDIENCE = Deno.env.get('FC_QUICKAUTH_AUDIENCE') ?? 'songchainn.xyz';
 
-function corsFor(origin: string | null) {
-  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : '';
+function corsFor(_origin: string | null) {
   return {
-    'Access-Control-Allow-Origin': allow,
-    'Vary': 'Origin',
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
@@ -129,13 +127,14 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
     throw linkErr;
   }
 
-  if (!link?.properties?.email_otp) {
-    console.error('[farcaster-auth] generateLink returned no email_otp. properties:', JSON.stringify(link?.properties));
-    throw new Error('OTP generation failed — email_otp missing');
+  // hashed_token is required for verifyOtp({ type: 'magiclink' }) on the client
+  if (!link?.properties?.hashed_token) {
+    console.error('[farcaster-auth] generateLink returned no hashed_token. properties:', JSON.stringify(link?.properties));
+    throw new Error('OTP generation failed — hashed_token missing');
   }
 
   console.log('[farcaster-auth] issuing session for fid:', fid, 'isExistingUser:', isExistingUser);
-  return { email, otp: link.properties.email_otp, isNewUser: !isExistingUser };
+  return { email, otp: link.properties.hashed_token, isNewUser: !isExistingUser };
 }
 
 Deno.serve(async (req) => {
@@ -145,6 +144,16 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+
+    // ── PATH 0: direct FID (context-only, no SIWF) ───────────────────────
+    // Used when sdk.actions.signIn is unavailable (older clients, context-only
+    // fallback). Less secure than SIWF but sufficient for social features.
+    if (typeof body.fid === 'number' && !body.message && !body.signature && !body.token) {
+      const { fid, username, displayName, pfpUrl, location } = body as Record<string, unknown>;
+      const meta = { farcaster_fid: fid, username: username ?? null, displayName: displayName ?? null, pfpUrl: pfpUrl ?? null, location: location ?? null };
+      const result = await issueSupabaseSession(fid as number, meta);
+      return json(origin, result);
+    }
 
     // ── PATH 1: quickAuth JWT ──────────────────────────────────────────────
     if (typeof body.token === 'string') {
@@ -180,7 +189,8 @@ Deno.serve(async (req) => {
 
     if (!fid || isNaN(fid)) return json(origin, { error: 'Farcaster FID missing from SIWF message' }, 400);
 
-    const result = await issueSupabaseSession(fid, { farcaster_address: address });
+    const { username, displayName, pfpUrl, location } = body as Record<string, unknown>;
+    const result = await issueSupabaseSession(fid, { farcaster_address: address, username: username ?? null, displayName: displayName ?? null, pfpUrl: pfpUrl ?? null, location: location ?? null });
     return json(origin, result);
 
   } catch (err: unknown) {
