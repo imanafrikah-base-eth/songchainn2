@@ -371,12 +371,12 @@ export function useSocial() {
     if (rows.length === 0) return [];
 
     const userIds = Array.from(new Set(rows.map((c) => c.user_id).filter(Boolean)));
-    const [profilesByIdRes, profilesByUserIdRes] = await Promise.all([
-      supabase.from('audience_profiles').select('*').in('id', userIds),
-      supabase.from('audience_profiles').select('*').in('user_id', userIds),
-    ]);
+    const { data: profileData } = await supabase
+      .from('audience_profiles')
+      .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
+      .or(`id.in.(${userIds.join(',')}),user_id.in.(${userIds.join(',')})`);
     const profilesMap = new Map<string, AudienceProfile>();
-    ([...(profilesByIdRes.data || []), ...(profilesByUserIdRes.data || [])] as any[]).forEach((p: any) => {
+    ((profileData || []) as any[]).forEach((p: any) => {
       profilesMap.set(String(p.id), p);
       if (p?.user_id) profilesMap.set(String(p.user_id), p);
     });

@@ -140,6 +140,7 @@ export default function Community() {
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isResorting, setIsResorting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('active');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -198,11 +199,14 @@ export default function Community() {
       fetchError = directResult.error;
     }
 
-    if (fetchError || !profiles) {
+    if (!Array.isArray(profiles)) {
       if (import.meta.env.DEV) {
         console.error('Error fetching community profiles:', fetchError);
       }
-      setLoadError('Unable to load community right now. Please try again later.');
+      // Show empty state with retry — never wall the user with a hard error
+      setUsers([]);
+      setFilteredUsers([]);
+      setLoadError('Could not load members. Tap retry to try again.');
       setIsLoading(false);
       return;
     }
@@ -280,6 +284,14 @@ export default function Community() {
   useEffect(() => {
     void fetchUsersRef.current();
   }, []);
+
+  const handleSortChange = useCallback((newSort: 'newest' | 'popular' | 'active') => {
+    if (newSort === sortBy) return;
+    setIsResorting(true);
+    setSortBy(newSort);
+    // 280ms skeleton flash before animating in newly-sorted cards
+    setTimeout(() => setIsResorting(false), 280);
+  }, [sortBy]);
 
   useEffect(() => {
     const channel = supabase
@@ -582,7 +594,7 @@ export default function Community() {
           </div>
 
           {/* Sort Tabs */}
-          <Tabs value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+          <Tabs value={sortBy} onValueChange={(v) => handleSortChange(v as typeof sortBy)}>
             <TabsList className="w-full sm:w-auto">
               <TabsTrigger value="newest" className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
@@ -601,13 +613,19 @@ export default function Community() {
         </motion.div>
 
         {loadError && !isLoading && (
-          <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {loadError}
+          <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-4">
+            <span>{loadError}</span>
+            <button
+              onClick={() => { setLoadError(null); void fetchUsersRef.current(); }}
+              className="shrink-0 rounded-lg bg-destructive/10 px-3 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors"
+            >
+              Retry
+            </button>
           </div>
         )}
 
         {/* Users List */}
-        {isLoading ? (
+        {isLoading || isResorting ? (
           <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="glass-card rounded-2xl p-4">
@@ -635,6 +653,7 @@ export default function Community() {
           </motion.div>
         ) : (
           <motion.div
+            key={sortBy}
             variants={containerVariants}
             initial="hidden"
             animate="show"
