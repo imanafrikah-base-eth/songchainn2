@@ -31,7 +31,9 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
   //   1. Try silent SIWF (sdk.actions.signIn) → real Supabase user + audience_profiles row
   //   2. Fallback: local-only fc-XXX context user (still writes to farcaster_profiles)
   useEffect(() => {
-    if (!state.isInFarcaster || user || signedInRef.current) return;
+    // Allow sign-in for local-only fc- users (no real Supabase session) so they can be upgraded.
+    const hasRealSession = user && !user.id?.startsWith('fc-');
+    if (!state.isInFarcaster || hasRealSession || signedInRef.current) return;
     const fc = state.context?.user;
     if (!fc?.fid) return;
     signedInRef.current = true;

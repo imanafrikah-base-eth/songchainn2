@@ -21,7 +21,7 @@ export function useSocial() {
 
   const fetchFollowData = useCallback(async () => {
     const uid = userIdRef.current;
-    if (!uid) {
+    if (!uid || uid.startsWith('fc-')) {
       setFollowing([]);
       setFollowers([]);
       return;
@@ -286,6 +286,14 @@ export function useSocial() {
   const followUser = useCallback(
     async (userId: string) => {
       if (!user || userId === user.id) {
+        return;
+      }
+      if (user.id.startsWith('fc-')) {
+        toast({
+          title: 'Sign in required',
+          description: 'Please sign in with Farcaster to follow users.',
+          variant: 'destructive',
+        });
         return;
       }
 

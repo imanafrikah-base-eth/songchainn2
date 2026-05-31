@@ -81,6 +81,11 @@ export default function AudienceProfile() {
 
   const fetchProfile = useCallback(async () => {
     if (!userId) return;
+    // fc- IDs are local-only and not stored as UUIDs in Supabase — skip all DB queries
+    if (userId.startsWith('fc-')) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
 
@@ -132,7 +137,7 @@ export default function AudienceProfile() {
   }, []);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || userId.startsWith('fc-')) return;
     const channel = supabase
       .channel(`audience-profile-${userId}`)
       .on(
