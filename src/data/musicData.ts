@@ -3409,7 +3409,7 @@ const SONGS_RAW: Song[] = [
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/SANTANA%20x%20RVSSIAN%20-%20ISLAND%20VILLA%20RIDDM%20FREESTYLE.mp3',
     coverImage:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
+      'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Santana/Santana%20(1).png',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
