@@ -286,7 +286,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(OFFLINE_PLAYS_KEY);
       try {
         const payload = batch
-          .filter((p) => p.durationSeconds >= 15)
+          .filter((p) => p.durationSeconds >= 3)
           .map((p) => ({
             event_type: 'play',
             song_id: p.songId,

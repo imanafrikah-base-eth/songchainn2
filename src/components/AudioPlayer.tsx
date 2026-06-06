@@ -84,7 +84,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const showReturnToRoom = isRoomMode && isRoomHidden;
 
-  const PLAY_THRESHOLD_SECONDS = 20;
+  const PLAY_THRESHOLD_SECONDS = 3;
 
   const nextSong = useMemo(() => {
     if (!currentSong || !queue || queue.length <= 1) return null;
