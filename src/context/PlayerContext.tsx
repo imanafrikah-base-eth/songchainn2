@@ -164,44 +164,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [currentSong?.id]);
 
   useEffect(() => {
-    if (!currentSong) return;
-
-    console.log("🔥 Sync triggered", currentSong);
-
-    const syncSong = async () => {
-      try {
-        const artistRecord = ARTISTS.find(a => a.id === currentSong.artistId);
-        const songWithArtistImage = currentSong as Song & { artistImage?: string };
-        const payload = {
-          id: String(currentSong.id),
-          title: currentSong.title,
-          artist_name: currentSong.artist,
-          audio_url: currentSong.audioUrl,
-          cover_art_url: currentSong.coverImage,
-          artist_image_url: songWithArtistImage.artistImage || artistRecord?.profileImage || null,
-          is_published: true
-        };
-
-        console.log("📦 Payload:", payload);
-
-        const { data, error } = await (supabase as any)
-          .from("songs")
-          .upsert(payload as any, { onConflict: "id" });
-
-        if (error) {
-          console.error("❌ Supabase error:", error);
-        } else {
-          console.log("✅ Insert success:", data);
-        }
-      } catch (err) {
-        console.error("🔥 Crash:", err);
-      }
-    };
-
-    syncSong();
-  }, [currentSong]);
-
-  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 

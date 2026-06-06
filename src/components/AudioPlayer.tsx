@@ -78,8 +78,6 @@ export const AudioPlayer = memo(function AudioPlayer() {
   const roomOnlineCount = useRoomOnlineCount({ roomId: 'global', viewerUserId: user?.id, isListening: isRoomMode });
   
   const hasCountedPlay = useRef(false);
-  const playStartTime = useRef<number | null>(null);
-  const accumulatedPlayTime = useRef(0);
   const lastSongId = useRef<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const showReturnToRoom = isRoomMode && isRoomHidden;
@@ -96,62 +94,26 @@ export const AudioPlayer = memo(function AudioPlayer() {
     return candidate;
   }, [currentSong, queue]);
 
-  // Record play to database and local state
-  const recordPlay = useCallback(async (songId: string) => {
-    if (hasCountedPlay.current) return;
-    
-    hasCountedPlay.current = true;
-    addPlay(songId);
-  }, [addPlay]);
-
   // Reset tracking when song changes
   useEffect(() => {
     if (currentSong?.id !== lastSongId.current) {
       hasCountedPlay.current = false;
-      playStartTime.current = null;
-      accumulatedPlayTime.current = 0;
       lastSongId.current = currentSong?.id || null;
     }
   }, [currentSong?.id]);
 
-  // Track play time - count after 3 seconds of actual playback
-  useEffect(() => {
-    if (!currentSong || hasCountedPlay.current) return;
-
-    if (isPlaying) {
-      // Start tracking play time
-      playStartTime.current = Date.now();
-    } else if (playStartTime.current !== null) {
-      const sessionTime = (Date.now() - playStartTime.current) / 1000;
-      accumulatedPlayTime.current += sessionTime;
-      if (!navigator.onLine && currentSong) {
-        addOfflinePlay(currentSong.id, sessionTime);
-      }
-      playStartTime.current = null;
-    }
-  }, [isPlaying, currentSong, addOfflinePlay]);
-
-  // Check if threshold reached during playback
+  // Count play when audio position reaches 3 seconds — uses actual audio time from PlayerContext,
+  // not a manual wall-clock timer, so it can't be fooled by pausing/resuming or effect re-runs.
   useEffect(() => {
     if (!currentSong || hasCountedPlay.current || !isPlaying) return;
-
-    const checkPlayTime = () => {
-      if (playStartTime.current === null) return;
-      
-      const currentSessionTime = (Date.now() - playStartTime.current) / 1000;
-      const totalPlayTime = accumulatedPlayTime.current + currentSessionTime;
-      
-      if (totalPlayTime >= PLAY_THRESHOLD_SECONDS) {
-        recordPlay(currentSong.id);
+    if (currentTime >= PLAY_THRESHOLD_SECONDS) {
+      hasCountedPlay.current = true;
+      addPlay(currentSong.id);
+      if (!navigator.onLine) {
+        addOfflinePlay(currentSong.id, currentTime);
       }
-    };
-
-    // Check immediately and then every 500ms
-    checkPlayTime();
-    const interval = setInterval(checkPlayTime, 500);
-    
-    return () => clearInterval(interval);
-  }, [currentSong, isPlaying, recordPlay]);
+    }
+  }, [currentTime, currentSong, isPlaying, addPlay, addOfflinePlay]);
 
   // Media Session API for background playback
   useEffect(() => {
