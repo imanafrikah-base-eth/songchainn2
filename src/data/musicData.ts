@@ -3311,9 +3311,9 @@ const SONGS_RAW: Song[] = [
     artist: 'IMAN AFRIKAH',
     artistId: '3',
     audioUrl:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20CHOSEN%20KING%20ME.mp3',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20CHOSEN%20KING%20ME.mp3',
     coverImage:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -3327,9 +3327,9 @@ const SONGS_RAW: Song[] = [
     artist: 'IMAN AFRIKAH',
     artistId: '3',
     audioUrl:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20HENG%20DEM.mp3',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20HENG%20DEM.mp3',
     coverImage:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -3343,9 +3343,9 @@ const SONGS_RAW: Song[] = [
     artist: 'IMAN AFRIKAH',
     artistId: '3',
     audioUrl:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20JD%20GAT%20IT.mp3',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20JD%20GAT%20IT.mp3',
     coverImage:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -3359,9 +3359,9 @@ const SONGS_RAW: Song[] = [
     artist: 'IMAN AFRIKAH',
     artistId: '3',
     audioUrl:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20R.W.I.N.S.mp3',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20R.W.I.N.S.mp3',
     coverImage:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -3375,9 +3375,9 @@ const SONGS_RAW: Song[] = [
     artist: 'IMAN AFRIKAH',
     artistId: '3',
     audioUrl:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20SHE%20STILL%20DEYA.mp3',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20SHE%20STILL%20DEYA.mp3',
     coverImage:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -3391,9 +3391,9 @@ const SONGS_RAW: Song[] = [
     artist: 'IMAN AFRIKAH x RVSSIAN',
     artistId: '3',
     audioUrl:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20x%20RVSSIAN%20-%20TOPIER%20(ISLAND%20VILLA%20RIDDM).mp3',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20x%20RVSSIAN%20-%20TOPIER%20(ISLAND%20VILLA%20RIDDM).mp3',
     coverImage:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/VAPACHALO%20ARTWORK.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -3407,7 +3407,7 @@ const SONGS_RAW: Song[] = [
     artist: 'SANTANA x RVSSIAN',
     artistId: '7',
     audioUrl:
-      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/SANTANA%20x%20RVSSIAN%20-%20ISLAND%20VILLA%20RIDDM%20FREESTYLE.mp3',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/songchainnaud3/IMAN%20AFRIKAH%20-%20VAPACHALO%20CATALOG/SANTANA%20x%20RVSSIAN%20-%20ISLAND%20VILLA%20RIDDM%20FREESTYLE.mp3',
     coverImage:
       'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Santana/Santana%20(1).png',
     plays: 0,
