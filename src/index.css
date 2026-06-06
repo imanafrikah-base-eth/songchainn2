@@ -107,11 +107,25 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Prevent iOS from auto-scaling text in landscape / after orientation changes */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Prevent overscroll bounce leaking through to the body on iOS PWA */
+    overscroll-behavior: none;
   }
 
   body {
     @apply bg-background text-foreground font-body antialiased;
     font-family: var(--font-body);
+    /* Prevent pull-to-refresh and elastic scroll exposing the background */
+    overscroll-behavior: none;
+    /* Prevent tap delay on all interactive elements */
+    touch-action: manipulation;
+  }
+
+  /* iOS zooms into inputs with font-size < 16px — lock all text inputs to 16px to prevent that */
+  input, textarea, select {
+    font-size: 16px;
   }
 
   /* GPU acceleration for smooth animations */
