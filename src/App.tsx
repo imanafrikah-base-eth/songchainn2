@@ -16,6 +16,7 @@ const VibeAgent = lazy(() => import("@/components/VibeAgent").then(m => ({ defau
 const BehaviorCtaPopups = lazy(() => import("@/components/BehaviorCtaPopups").then(m => ({ default: m.BehaviorCtaPopups })));
 import { useUserPresence } from "@/hooks/useUserPresence";
 import { FarcasterProvider, useFarcasterContext } from "@/context/FarcasterContext";
+import { FacebookProvider } from "@/context/FacebookContext";
 import { supabase } from "@/integrations/supabase/client";
 // Lazy load pages for better initial load performance
 const Home = lazy(() => import("./pages/Home"));
@@ -316,11 +317,13 @@ const App = () => (
   <BrowserRouter>
     <AuthProvider>
       <FarcasterProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppContent />
-        </TooltipProvider>
+        <FacebookProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppContent />
+          </TooltipProvider>
+        </FacebookProvider>
       </FarcasterProvider>
     </AuthProvider>
   </BrowserRouter>

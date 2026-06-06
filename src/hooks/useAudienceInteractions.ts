@@ -5,7 +5,11 @@ import { Playlist } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
-import { getLikedArtists, getLikedSongs, getPlaylistSongs as getLocalPlaylistSongs, listPlaylists, savePlaylists, setPlaylistSongs } from '@/lib/localDb';
+import { getLikedArtists, getLikedSongs, getPlaylistSongs as getLocalPlaylistSongs, listPlaylists, savePlaylists, setPlaylistSongs, setLikedArtists as saveLocalLikedArtists, setLikedSongs as saveLocalLikedSongs } from '@/lib/localDb';
+
+function isSyntheticId(id: string | null | undefined): boolean {
+  return !!id && (id.startsWith('fc-') || id.startsWith('fb-'));
+}
 
 export function useAudienceInteractions() {
   const { user } = useAuth();
@@ -39,7 +43,8 @@ export function useAudienceInteractions() {
 
     const fetchData = async () => {
       setIsLoading(true);
-      if (!isSupabaseConfigured) {
+      if (!isSupabaseConfigured || isSyntheticId(user.id)) {
+        // No Supabase session (offline or synthetic fc-/fb- user) — read from local storage
         setLikedSongs(getLikedSongs(user.id));
         setLikedArtists(getLikedArtists(user.id));
         const ownPlaylists = listPlaylists(user.id);
@@ -200,6 +205,13 @@ export function useAudienceInteractions() {
 
     // Broadcast to all other connected clients for instant cross-app update
     broadcastCountDelta('follow', { artistId, delta });
+
+    if (isSyntheticId(user.id)) {
+      // No Supabase session — persist to local storage only
+      saveLocalLikedArtists(user.id, next);
+      toast({ title: isLiked ? 'Artist unfollowed' : 'Artist followed!' });
+      return;
+    }
 
     try {
       if (isLiked) {

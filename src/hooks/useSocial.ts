@@ -5,7 +5,12 @@ import { SocialPostWithProfile, PostComment } from '@/types/social';
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
+import { listFollows, saveFollows } from '@/lib/localDb';
 import type { Database } from '@/integrations/supabase/types';
+
+function isSyntheticId(id: string | null | undefined): boolean {
+  return !!id && (id.startsWith('fc-') || id.startsWith('fb-'));
+}
 
 export function useSocial() {
   const { user } = useAuth();
@@ -21,8 +26,18 @@ export function useSocial() {
 
   const fetchFollowData = useCallback(async () => {
     const uid = userIdRef.current;
-    if (!uid || uid.startsWith('fc-')) {
+    if (!uid) {
       setFollowing([]);
+      setFollowers([]);
+      return;
+    }
+
+    if (isSyntheticId(uid)) {
+      // No Supabase session — read from local storage only
+      const allFollows = listFollows();
+      const localFollowing = allFollows[uid] ?? [];
+      followingRef.current = localFollowing;
+      setFollowing(localFollowing);
       setFollowers([]);
       return;
     }
@@ -288,16 +303,33 @@ export function useSocial() {
       if (!user || userId === user.id) {
         return;
       }
-      if (user.id.startsWith('fc-')) {
-        toast({
-          title: 'Sign in required',
-          description: 'Please sign in with Farcaster to follow users.',
-          variant: 'destructive',
-        });
-        return;
-      }
 
       const isCurrentlyFollowing = following.includes(userId);
+
+      if (isSyntheticId(user.id)) {
+        // No Supabase session — persist follow in local storage only
+        const allFollows = listFollows();
+        if (isCurrentlyFollowing) {
+          const next = (allFollows[user.id] ?? []).filter((id) => id !== userId);
+          saveFollows({ ...allFollows, [user.id]: next });
+          setFollowing((prev) => {
+            const n = prev.filter((id) => id !== userId);
+            followingRef.current = n;
+            return n;
+          });
+          toast({ title: 'Unfollowed' });
+        } else {
+          const next = Array.from(new Set([...(allFollows[user.id] ?? []), userId]));
+          saveFollows({ ...allFollows, [user.id]: next });
+          setFollowing((prev) => {
+            const n = Array.from(new Set([...prev, userId]));
+            followingRef.current = n;
+            return n;
+          });
+          toast({ title: 'Following!' });
+        }
+        return;
+      }
 
       if (isCurrentlyFollowing) {
         // Optimistic local update before DB write

@@ -81,8 +81,8 @@ export default function AudienceProfile() {
 
   const fetchProfile = useCallback(async () => {
     if (!userId) return;
-    // fc- IDs are local-only and not stored as UUIDs in Supabase — skip all DB queries
-    if (userId.startsWith('fc-')) {
+    // synthetic fc-/fb- IDs are local-only and not stored as UUIDs in Supabase — skip all DB queries
+    if (userId.startsWith('fc-') || userId.startsWith('fb-')) {
       setLoading(false);
       return;
     }
@@ -137,7 +137,7 @@ export default function AudienceProfile() {
   }, []);
 
   useEffect(() => {
-    if (!userId || userId.startsWith('fc-')) return;
+    if (!userId || userId.startsWith('fc-') || userId.startsWith('fb-')) return;
     const channel = supabase
       .channel(`audience-profile-${userId}`)
       .on(

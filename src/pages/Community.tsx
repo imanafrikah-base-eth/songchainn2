@@ -156,7 +156,7 @@ export default function Community() {
 
   // Touch our own profile's updated_at so we appear near the top of "Recent" list
   useEffect(() => {
-    if (!user?.id || user.id.startsWith('fc-')) return;
+    if (!user?.id || user.id.startsWith('fc-') || user.id.startsWith('fb-')) return;
     void supabase
       .from('audience_profiles')
       .update({ updated_at: new Date().toISOString() } as any)
