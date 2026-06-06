@@ -56,7 +56,7 @@ export interface Song {
   artistWallet?: string;
   isTokenGated?: boolean;
   addedAt?: string;
-  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP' | 'LIKE,COMMENT,SUBSCRIBE' | '7USHIMI';
+  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP' | 'LIKE,COMMENT,SUBSCRIBE' | '7USHIMI' | 'Single';
 }
 
 export interface Catalog {
@@ -3319,6 +3319,7 @@ const SONGS_RAW: Song[] = [
     townSquare: 'Livingstone Town Square',
     genre: 'Dancehall',
     addedAt: '2026-06-06T00:00:00.000Z',
+    volume: 'Single',
   },
   {
     id: '223',
@@ -3334,6 +3335,7 @@ const SONGS_RAW: Song[] = [
     townSquare: 'Livingstone Town Square',
     genre: 'Dancehall',
     addedAt: '2026-06-06T00:00:00.000Z',
+    volume: 'Single',
   },
 ];
 
