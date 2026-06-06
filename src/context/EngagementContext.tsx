@@ -247,8 +247,23 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       song_id: songId,
       user_id: user?.id ?? null,
     } as any).then(({ error }) => {
-      if (error && import.meta.env.DEV) console.error('Failed to record play', error);
-      else queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
+      if (error) {
+        if (import.meta.env.DEV) console.error('Failed to record play', error);
+        // Roll back the optimistic increment so the count stays accurate
+        queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+          if (!old) return old;
+          return old.map((item: any) =>
+            String(item.song_id) === String(songId)
+              ? { ...item, play_count: Math.max(0, (item.play_count || 0) - 1) }
+              : item
+          );
+        });
+      } else {
+        // INSERT confirmed — now refetch so the merged seed+db count is canonical
+        queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
+        queryClient.invalidateQueries({ queryKey: ['today-hot-songs'] });
+        queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
+      }
     });
   }, [user, queryClient]);
 
