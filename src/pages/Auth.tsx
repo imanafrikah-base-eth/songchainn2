@@ -150,6 +150,13 @@ export default function Auth() {
     );
   }, [popularityBySongId]);
 
+  const newMusicSongs = useMemo(() => {
+    return [...SONGS]
+      .filter((s) => !!s.addedAt)
+      .sort((a, b) => new Date(b.addedAt!).getTime() - new Date(a.addedAt!).getTime())
+      .slice(0, 12);
+  }, []);
+
   // Detect any wallet provider (MetaMask, Coinbase, Rainbow, etc.)
   const hasWallet = typeof window !== 'undefined' && (() => {
     const ethereum = (window as any).ethereum;
@@ -471,6 +478,12 @@ export default function Auth() {
     setShowMixFinishedPrompt(false);
     setAuthMode('signin');
     setAuthView('main');
+  }, []);
+
+  const handleNewMusicPlayAttempt = useCallback(() => {
+    setAuthMode('signup');
+    setAuthView('main');
+    setError('Sign in or create an account to play new music.');
   }, []);
 
   const openPublicAbout = useCallback(() => {
@@ -892,6 +905,45 @@ export default function Auth() {
                 ))}
               </div>
             </section>
+
+            {newMusicSongs.length > 0 && (
+            <section id="new-music" className="mb-7">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-heading text-foreground">New Music</h2>
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-primary/15 text-primary">
+                    <Sparkles className="w-3 h-3" />
+                    Just Dropped
+                  </span>
+                </div>
+                <button type="button" onClick={handleNewMusicPlayAttempt} className="text-sm text-muted-foreground hover:text-foreground">Sign in to play</button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {newMusicSongs.map((song) => (
+                  <button
+                    key={song.id}
+                    type="button"
+                    onClick={handleNewMusicPlayAttempt}
+                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-colors p-2.5 group"
+                  >
+                    <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                      {song.coverImage ? (
+                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
+                      )}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Play className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                    <p className="text-[11px] text-primary mt-1">Sign in to play</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+            )}
 
             <section id="trending-artists" className="mb-7">
               <div className="flex items-center justify-between mb-3">
