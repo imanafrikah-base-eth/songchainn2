@@ -950,8 +950,7 @@ export default function ArtistDetail() {
             {isOwner ? 'My Music' : 'Discography'}
           </h2>
           {(() => {
-            const volumeOrder: Array<'VAPACHALO' | "ER'TING FLEX" | '3.0' | 'Lovers EP' | 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7'> = [
-              'VAPACHALO',
+            const volumeOrder: Array<"ER'TING FLEX" | '3.0' | 'Lovers EP' | 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7'> = [
               "ER'TING FLEX",
               '3.0',
               'Lovers EP',
