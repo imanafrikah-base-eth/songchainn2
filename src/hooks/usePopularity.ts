@@ -50,8 +50,8 @@ function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined):
 
     merged.set(songId, {
       song_id: songId,
-      play_count: Math.max(seedPlays, dbPlays),
-      like_count: dbLikes,                          // real likes only — no seeding
+      play_count: seedPlays + dbPlays,   // seed = historical baseline; db = real new plays stacked on top
+      like_count: dbLikes,
       comment_count: numberOrZero(row.comment_count),
       share_count: numberOrZero(row.share_count),
       view_count: numberOrZero(row.view_count),
