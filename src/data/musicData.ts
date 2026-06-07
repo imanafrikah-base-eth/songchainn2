@@ -21,7 +21,8 @@ export type Genre =
   | 'Afro-Dancehall'
   | 'Alternative'
   | 'Pop-Dancehall'
-  | 'Hiphop/Soul';
+  | 'Hiphop/Soul'
+  | 'Trap/Dancehall Fusion';
 
 export const GENRES: Genre[] = [
   'Trap',
@@ -36,6 +37,7 @@ export const GENRES: Genre[] = [
   'Alternative',
   'Pop-Dancehall',
   'Hiphop/Soul',
+  'Trap/Dancehall Fusion',
 ];
 
 export interface Song {
@@ -3329,12 +3331,28 @@ const SONGS_RAW: Song[] = [
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/SANTANA%20x%20RVSSIAN%20-%20ISLAND%20VILLA%20RIDDM%20FREESTYLE.mp3',
     coverImage:
-      'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Santana/Santana%20(1).png',
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/ISLAND%20VILLA%20RIDDIM%20ARTWORK%20SANTANA.jpg',
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
     genre: 'Dancehall',
     addedAt: '2026-06-06T00:00:00.000Z',
+    volume: 'Single',
+  },
+  {
+    id: '224',
+    title: 'I Miss You Bad',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20I%20MISS%20YOU%20BAD/IMAN%20AFRIKAH%20-%20I%20MISS%20YOU%20BAD.mp3',
+    coverImage:
+      'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20I%20MISS%20YOU%20BAD/I%20Miss%20you%20bad%20artwork%20IMan%20Afrikah.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Trap/Dancehall Fusion',
+    addedAt: '2026-06-07T00:00:00.000Z',
     volume: 'Single',
   },
 ];
@@ -3471,7 +3489,7 @@ export const ARTISTS: Artist[] = [
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
     profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/file_0000000077c8722f8f65c9d1abd8bca1-2.png',
-    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182', '190', '191', '192', '193', '194', '195', '196', '197', '198', '199', '200', '201', '202', '203', '215', '216', '217', '218', '219', '220', '221', '222'],
+    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182', '190', '191', '192', '193', '194', '195', '196', '197', '198', '199', '200', '201', '202', '203', '215', '216', '217', '218', '219', '220', '221', '222', '224'],
   },
   {
     id: '4',

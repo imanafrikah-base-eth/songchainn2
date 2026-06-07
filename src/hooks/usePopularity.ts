@@ -331,23 +331,15 @@ function buildSeedHotSongs(limit: number): TodayHotSong[] {
     .slice(0, limit);
 }
 
-// Returns the start of the current day in CAT (UTC+2) as a Date object.
-// Hot Today resets at midnight Johannesburg / Nairobi time.
-function catDayStart(): Date {
-  const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
-  const nowMs = Date.now();
-  const catMs = nowMs + CAT_OFFSET_MS;
-  const catMidnightMs = Math.floor(catMs / 86_400_000) * 86_400_000 - CAT_OFFSET_MS;
-  return new Date(catMidnightMs);
-}
-
 export function useTodayHotSongs(limit = 10) {
-  // Midnight CAT (UTC+2) — resets section every day at midnight Johannesburg/Nairobi time
-  const windowStart = catDayStart();
-  const todayCAT = windowStart.toISOString().slice(0, 10);
+  // Rolling 24-hour window — always shows the most recently hot songs regardless of timezone midnight.
+  // Recomputed each render so the window stays fresh without needing a page reload.
+  const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // Bucket by the hour so the query key only changes once an hour (not every render).
+  const windowHour = windowStart.toISOString().slice(0, 13);
 
   return useQuery({
-    queryKey: ['today-hot-songs', limit, todayCAT],
+    queryKey: ['today-hot-songs', limit, windowHour],
     queryFn: async () => {
       maybeResetRpcFlags();
 
@@ -390,8 +382,8 @@ export function useTodayHotSongs(limit = 10) {
           return song ? [{ song, playsToday }] : [];
         });
     },
-    staleTime: 1000 * 30,
-    refetchInterval: 1000 * 30,
+    staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
     placeholderData: () => [] as TodayHotSong[],
   });
 }
