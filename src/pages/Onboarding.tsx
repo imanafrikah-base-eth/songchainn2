@@ -17,7 +17,7 @@ import { uploadPublicImage } from '../lib/storage';
 const profileSchema = z.object({
   profileName: z.string().trim().min(1, 'Profile name is required').max(50, 'Profile name must be less than 50 characters'),
   bio: z.string().max(500, 'Bio must be less than 500 characters').optional(),
-  location: z.string().trim().min(1, 'Location is required').max(100, 'Location must be less than 100 characters'),
+  location: z.string().trim().max(100, 'Location must be less than 100 characters').optional().or(z.literal('')),
   xProfileLink: z.string().url('Invalid URL').optional().or(z.literal('')),
   baseProfileLink: z.string().max(200, 'Link too long').optional(),
 });
@@ -181,7 +181,7 @@ export default function Onboarding() {
         user_id: authedUserId,
         profile_name: profileName.trim(),
         bio: bio.trim() || null,
-        location: location.trim(),
+        location: location.trim() || null,
         x_profile_link: xProfileLink.trim() || null,
         base_profile_link: baseProfileLink.trim() || null,
         onboarding_completed: true,
@@ -473,7 +473,7 @@ export default function Onboarding() {
           <div className="space-y-2">
             <Label htmlFor="location" className="text-sm font-medium flex items-center gap-2">
               <MapPin className="w-4 h-4" />
-              Where are you listening from? <span className="text-destructive">*</span>
+              Where are you listening from? <span className="text-muted-foreground text-xs">(optional)</span>
             </Label>
             <Input
               id="location"

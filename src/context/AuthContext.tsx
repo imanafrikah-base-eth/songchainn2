@@ -20,6 +20,8 @@ interface AuthContextType {
   signInWithFarcaster: (message: string, signature: string) => Promise<{ error: Error | null }>;
   signInWithFarcasterContext: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => Promise<{ error: Error | null }>;
   signInWithFarcasterMiniApp: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }, message: string, signature: string) => Promise<{ error: Error | null }>;
+  signInWithFacebook: (fb: { id: string; name: string; email?: string; picture_url?: string; access_token?: string }) => Promise<{ error: Error | null }>;
+  signInWithFacebookContext: (fb: { id: string; name: string; email?: string; picture_url?: string }) => Promise<{ error: Error | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -28,9 +30,18 @@ interface AuthContextType {
 }
 
 const FC_USER_KEY = 'songchainn_fc_user';
+const FB_USER_KEY = 'songchainn_fb_user';
 
 function isFcUserId(id?: string | null) {
   return !!id && id.startsWith('fc-');
+}
+
+function isFbUserId(id?: string | null) {
+  return !!id && id.startsWith('fb-');
+}
+
+function isSyntheticUserId(id?: string | null) {
+  return isFcUserId(id) || isFbUserId(id);
 }
 
 function loadFcUserFromStorage(): { user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null; profile: AudienceProfile | null } {
@@ -43,6 +54,41 @@ function loadFcUserFromStorage(): { user: { id: string; email?: string | null; u
   } catch {
     return { user: null, profile: null };
   }
+}
+
+function loadFbUserFromStorage(): { user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null; profile: AudienceProfile | null } {
+  try {
+    const raw = localStorage.getItem(FB_USER_KEY);
+    if (!raw) return { user: null, profile: null };
+    const parsed = JSON.parse(raw);
+    if (!parsed?.user?.id || !isFbUserId(parsed.user.id)) return { user: null, profile: null };
+    return { user: parsed.user, profile: parsed.profile ?? null };
+  } catch {
+    return { user: null, profile: null };
+  }
+}
+
+function buildFbUserAndProfile(fb: { id: string; name: string; email?: string; picture_url?: string }) {
+  const syntheticId = `fb-${fb.id}`;
+  const user = {
+    id: syntheticId,
+    email: fb.email ?? null,
+    user_metadata: {
+      facebook_id: fb.id,
+      provider: 'facebook_context',
+      name: fb.name,
+      picture_url: fb.picture_url,
+    },
+  };
+  const profile = {
+    id: syntheticId,
+    user_id: syntheticId,
+    profile_name: fb.name,
+    profile_picture_url: fb.picture_url ?? null,
+    is_public: true,
+    onboarding_completed: true,
+  } as unknown as AudienceProfile;
+  return { user, profile };
 }
 
 function buildFcUserAndProfile(fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) {
@@ -84,13 +130,16 @@ function shouldRequireOnboardingFromStorage() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const fcBoot = loadFcUserFromStorage();
-  const [user, setUser] = useState<{ id: string; email?: string | null; user_metadata?: Record<string, any> } | null>(fcBoot.user);
+  const fbBoot = fcBoot.user ? { user: null, profile: null } : loadFbUserFromStorage();
+  const bootUser = fcBoot.user ?? fbBoot.user;
+  const bootProfile = fcBoot.profile ?? fbBoot.profile;
+  const [user, setUser] = useState<{ id: string; email?: string | null; user_metadata?: Record<string, any> } | null>(bootUser);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isArtist, setIsArtist] = useState(false);
   const [artistId, setArtistId] = useState<string | null>(null);
-  const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(fcBoot.profile);
-  const [needsOnboarding, setNeedsOnboarding] = useState(fcBoot.user ? false : shouldRequireOnboardingFromStorage());
+  const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(bootProfile);
+  const [needsOnboarding, setNeedsOnboarding] = useState(bootUser ? false : shouldRequireOnboardingFromStorage());
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isWalletDetected, setIsWalletDetected] = useState(false);
   const userRef = React.useRef(user);
@@ -125,8 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
-    if (isFcUserId(user.id)) {
-      // FC users are purely local — no Supabase profile lookup.
+    if (isSyntheticUserId(user.id)) {
+      // Synthetic fc-/fb- users are local-only — no Supabase profile lookup.
       setNeedsOnboarding(false);
       try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
       return;
@@ -175,9 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       upsertProfile(profileData as any);
       // A profile with any name set means onboarding was already done (handles rows
       // created before the onboarding_completed column existed).
-      const hasName = Boolean(
-        (profileData as any).profile_name || (profileData as any).display_name || (profileData as any).username
-      );
+      const hasName = Boolean((profileData as any).profile_name);
       const completed = (profileData as any).onboarding_completed === true || hasName;
       const needsOnboardingFlag = !completed;
       setNeedsOnboarding(needsOnboardingFlag);
@@ -204,8 +251,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const bootstrap = async () => {
       if (!isSupabaseConfigured) {
         if (!mounted) return;
-        // Keep any rehydrated FC user in place.
-        if (!isFcUserId(userRef.current?.id)) {
+        // Keep any rehydrated FC/FB synthetic user in place.
+        if (!isSyntheticUserId(userRef.current?.id)) {
           setUser(null);
           setAudienceProfile(null);
           setNeedsOnboarding(false);
@@ -231,7 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = sessionResult.data?.session?.user ?? null;
         if (u) {
           setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-        } else if (!isFcUserId(userRef.current?.id)) {
+        } else if (!isSyntheticUserId(userRef.current?.id)) {
           setUser(null);
           setIsAdmin(false);
         }
@@ -258,8 +305,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (u) {
         setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
         await refreshRoles(u.id);
-      } else if (!isFcUserId(userRef.current?.id)) {
-        // Don't wipe a synthetic FC session when no Supabase session exists.
+      } else if (!isSyntheticUserId(userRef.current?.id)) {
+        // Don't wipe a synthetic FC/FB session when no Supabase session exists.
         setUser(null);
         setIsAdmin(false);
       }
@@ -676,11 +723,98 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Facebook sign-in: verifies the access_token with Facebook Graph API via
+   * the facebook-auth edge function, then immediately creates/updates the
+   * audience_profiles row so the user needs no onboarding. Falls back to a
+   * local-only fb-XXX synthetic user if the edge function is unreachable.
+   */
+  const signInWithFacebook = useCallback(async (fb: { id: string; name: string; email?: string; picture_url?: string; access_token?: string }) => {
+    try {
+      if (!fb?.id) return { error: new Error('Missing Facebook user ID') };
+
+      if (isSupabaseConfigured) {
+        try {
+          const { data: authData, error: authErr } = await supabase.functions.invoke('facebook-auth', {
+            body: {
+              facebook_id: fb.id,
+              access_token: fb.access_token ?? null,
+              name: fb.name ?? null,
+              email: fb.email ?? null,
+              picture_url: fb.picture_url ?? null,
+            },
+          });
+          if (!authErr && authData?.otp) {
+            const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+              email: authData.email, token: authData.otp, type: 'magiclink',
+            });
+            if (!otpError && otpData?.user) {
+              const u = otpData.user;
+              const profileData: Record<string, unknown> = {
+                user_id: u.id, id: u.id,
+                display_name: fb.name, username: null,
+                profile_name: fb.name,
+                avatar_url: fb.picture_url || null,
+                profile_picture_url: fb.picture_url || null,
+                location: null,
+                is_public: true, onboarding_completed: true,
+              };
+              const { data: existing } = await supabase.from('audience_profiles').select('id').eq('user_id', u.id).maybeSingle();
+              if (existing) {
+                await supabase.from('audience_profiles').update(profileData).eq('user_id', u.id);
+              } else {
+                await supabase.from('audience_profiles').insert(profileData as any);
+              }
+              setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+              setAudienceProfile(profileData as any);
+              await refreshRoles(u.id);
+              setIsArtist(false); setArtistId(null);
+              setNeedsOnboarding(false);
+              try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
+              return { error: null };
+            }
+          }
+        } catch { /* edge function unavailable — fall through to local-only */ }
+      }
+
+      return signInWithFacebookContext(fb);
+    } catch (err: any) {
+      return { error: new Error(err?.message || 'Facebook sign-in failed') };
+    }
+  }, [refreshRoles]);
+
+  const signInWithFacebookContext = useCallback(async (fb: { id: string; name: string; email?: string; picture_url?: string }) => {
+    try {
+      if (!fb?.id) return { error: new Error('Missing Facebook user ID') };
+
+      const { user: fbUser, profile } = buildFbUserAndProfile(fb);
+      setUser(fbUser);
+      setAudienceProfile(profile);
+      setIsAdmin(false); setIsArtist(false); setArtistId(null);
+      setNeedsOnboarding(false);
+      try {
+        localStorage.setItem(FB_USER_KEY, JSON.stringify({ user: fbUser, profile }));
+        localStorage.setItem('songchainn_needs_onboarding', '0');
+      } catch { void 0; }
+      // Write to facebook_profiles for community visibility
+      if (isSupabaseConfigured) {
+        void supabase.from('facebook_profiles' as any).upsert(
+          { facebook_id: fb.id, name: fb.name, email: fb.email ?? null, picture_url: fb.picture_url ?? null, updated_at: new Date().toISOString() },
+          { onConflict: 'facebook_id' }
+        ).then(() => {});
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(err?.message || 'Facebook sign-in failed') };
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
     try { localStorage.removeItem(FC_USER_KEY); } catch { void 0; }
+    try { localStorage.removeItem(FB_USER_KEY); } catch { void 0; }
     setUser(null);
     setIsAdmin(false);
     setIsArtist(false);
@@ -707,6 +841,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithFarcaster,
       signInWithFarcasterContext,
       signInWithFarcasterMiniApp,
+      signInWithFacebook,
+      signInWithFacebookContext,
       signUpWithEmail,
       signInWithEmail,
       signOut,
@@ -740,6 +876,8 @@ export function useAuth() {
       signInWithFarcaster: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcasterContext: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcasterMiniApp: async () => ({ error: new Error('AuthProvider missing') }),
+      signInWithFacebook: async () => ({ error: new Error('AuthProvider missing') }),
+      signInWithFacebookContext: async () => ({ error: new Error('AuthProvider missing') }),
       signUpWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signOut: async () => {},
