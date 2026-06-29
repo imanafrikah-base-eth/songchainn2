@@ -16,6 +16,7 @@ const VibeAgent = lazy(() => import("@/components/VibeAgent").then(m => ({ defau
 const BehaviorCtaPopups = lazy(() => import("@/components/BehaviorCtaPopups").then(m => ({ default: m.BehaviorCtaPopups })));
 import { useUserPresence } from "@/hooks/useUserPresence";
 import { FarcasterProvider, useFarcasterContext } from "@/context/FarcasterContext";
+import { FacebookProvider } from "@/context/FacebookContext";
 import { supabase } from "@/integrations/supabase/client";
 // Lazy load pages for better initial load performance
 const Home = lazy(() => import("./pages/Home"));
@@ -174,6 +175,7 @@ function AppShell() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/bettercallzaal" element={<BetterCallZaal />} />
             <Route path="/auth" element={<Navigate to="/" replace />} />
+            <Route path="/not-found" element={<NotFound />} />
             {/* Vanity slug routes — must be after all specific routes */}
             <Route path="/:artistSlug/:songSlug" element={<SlugResolver />} />
             <Route path="/:artistSlug" element={<SlugResolver />} />
@@ -275,6 +277,7 @@ function AppContent() {
                   <Route path="/admin" element={<Auth />} />
                   <Route path="/audience/:userId" element={<Auth />} />
                   <Route path="/post/:id" element={<Auth />} />
+                  <Route path="/not-found" element={<NotFound />} />
                   {/* Vanity slug routes — must be after all specific routes */}
                   <Route path="/:artistSlug/:songSlug" element={<SlugResolver />} />
                   <Route path="/:artistSlug" element={<SlugResolver />} />
@@ -316,11 +319,13 @@ const App = () => (
   <BrowserRouter>
     <AuthProvider>
       <FarcasterProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppContent />
-        </TooltipProvider>
+        <FacebookProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppContent />
+          </TooltipProvider>
+        </FacebookProvider>
       </FarcasterProvider>
     </AuthProvider>
   </BrowserRouter>

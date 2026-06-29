@@ -180,6 +180,7 @@ export default function Onboarding() {
       const profileFields = {
         user_id: authedUserId,
         profile_name: profileName.trim(),
+        display_name: profileName.trim(),
         bio: bio.trim() || null,
         location: location.trim() || null,
         x_profile_link: xProfileLink.trim() || null,

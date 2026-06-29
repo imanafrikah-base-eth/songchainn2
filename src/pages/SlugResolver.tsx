@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { getArtistBySlug, getSongBySlug } from '@/lib/slugRoutes';
 
 /**
@@ -21,15 +21,11 @@ export default function SlugResolver() {
       const artist = getArtistBySlug(artistSlug);
       if (artist) { navigate(`/artist/${artist.id}`, { replace: true }); return; }
     }
-    // Slug not recognized — mark as not found (let NotFound component render)
     setNotFound(true);
   }, [artistSlug, songSlug, navigate]);
 
   if (notFound) {
-    // Lazy-import NotFound inline so we don't need it at module load time
-    // Just redirect to a known 404 path
-    navigate('/404-not-found', { replace: true });
-    return null;
+    return <Navigate to="/not-found" replace />;
   }
 
   return (
