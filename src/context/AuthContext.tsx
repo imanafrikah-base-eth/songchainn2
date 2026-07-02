@@ -300,11 +300,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     bootstrap();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       if (u) {
         setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-        await refreshRoles(u.id);
+        // Supabase serializes auth operations with an internal lock while this
+        // callback runs — awaiting another Supabase call (refreshRoles needs the
+        // session token) synchronously here deadlocks the client until reload.
+        // Defer to the next tick so this callback returns immediately.
+        setTimeout(() => { void refreshRoles(u.id); }, 0);
       } else if (!isSyntheticUserId(userRef.current?.id)) {
         // Don't wipe a synthetic FC/FB session when no Supabase session exists.
         setUser(null);
@@ -622,21 +626,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onboarding_completed: true,
       };
 
-      const { data: existing } = await supabase
-        .from('audience_profiles')
-        .select('id')
-        .eq('user_id', u.id)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase.from('audience_profiles').update(profileData).eq('user_id', u.id);
-      } else {
-        await supabase.from('audience_profiles').insert(profileData as any);
-      }
+      // Upsert profile and refresh roles in parallel — eliminates the extra SELECT
+      // round-trip and overlaps the roles query with the profile write.
+      await Promise.all([
+        (supabase as any).from('audience_profiles').upsert(profileData, { onConflict: 'user_id' }),
+        refreshRoles(u.id),
+      ]);
 
       // Now set auth state — profile already exists so needsOnboarding stays false
       setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-      await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
       setNeedsOnboarding(false);
