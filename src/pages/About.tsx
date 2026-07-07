@@ -1,11 +1,12 @@
-﻿import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { Sparkles, Headphones, Users, Music, ArrowRight, Radio, Brain, ShieldCheck, LineChart } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Sparkles, Headphones, Users, ArrowRight, Flame, Shuffle, Bot, Store, Mic } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { Button } from '@/components/ui/button';
+import { ArtistSubmissionForm } from '@/components/ArtistSubmissionForm';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -20,8 +21,58 @@ const itemVariants = {
   show: { opacity: 1, y: 0 },
 };
 
+const FEATURE_HIGHLIGHTS = [
+  {
+    title: 'The Room',
+    description: 'A live listening session with the community. Chat, vibe together, feel it bounce in real time.',
+    icon: Headphones,
+    accent: 'text-primary',
+    surface: 'bg-primary/10',
+  },
+  {
+    title: 'WaveWarz Africa',
+    description: 'Two artists, one battle. Back your favorite in a live song battle and watch the crowd decide.',
+    icon: Flame,
+    accent: 'text-orange-400',
+    surface: 'bg-orange-500/10',
+  },
+  {
+    title: 'DJ $huffle',
+    description: "Pick your artists, songs or catalogs and let DJ $huffle keep the mix flowing, nonstop.",
+    icon: Shuffle,
+    accent: 'text-emerald-400',
+    surface: 'bg-emerald-500/10',
+  },
+  {
+    title: 'Mo$ha',
+    description: 'Your vibe guide around $ongChainn. Ask anything, get put on to new music, never feel lost.',
+    icon: Bot,
+    accent: 'text-purple-400',
+    surface: 'bg-purple-500/10',
+  },
+  {
+    title: 'Marketplace',
+    description: 'Support a song or artist early and matter to the music you love, not just the algorithm.',
+    icon: Store,
+    accent: 'text-cyan-400',
+    surface: 'bg-cyan-500/10',
+  },
+] as const;
+
 export default function About() {
   const hasTriggeredBottomPromptRef = useRef(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      const el = document.getElementById(id);
+      if (el) {
+        // Let the page paint first so scrollIntoView measures real layout.
+        window.setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      }
+    }
+  }, [location.hash]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -45,12 +96,17 @@ export default function About() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  const scrollTo = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         <motion.section
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -91,7 +147,7 @@ export default function About() {
                 className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full glass text-xs sm:text-sm font-medium text-primary"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>ðŸ‘€ What to Do Now</span>
+                <span>What's $ongChainn?</span>
               </motion.div>
 
               <motion.h1
@@ -100,7 +156,7 @@ export default function About() {
                 transition={{ delay: 0.18 }}
                 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-foreground leading-tight"
               >
-                $ongChainn is where sound becomes signal and culture becomes tradeable.
+                Music that comes alive, where early listeners get to matter.
               </motion.h1>
 
               <motion.div
@@ -112,34 +168,25 @@ export default function About() {
                 <button
                   type="button"
                   className="px-2 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                  onClick={() => {
-                    const el = document.getElementById('listener-mode');
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
+                  onClick={() => scrollTo('features')}
                 >
-                  Listeners
+                  Features
                 </button>
-                <span className="opacity-50">â€¢</span>
+                <span className="opacity-50">•</span>
                 <button
                   type="button"
                   className="px-2 py-0.5 rounded-full hover:bg-muted/80 transition-colors"
-                  onClick={() => {
-                    const el = document.getElementById('culture');
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
+                  onClick={() => scrollTo('culture')}
                 >
-                  Culture
+                  Community
                 </button>
-                <span className="opacity-50">â€¢</span>
+                <span className="opacity-50">•</span>
                 <button
                   type="button"
                   className="px-2 py-0.5 rounded-full hover:bg-muted/80 transition-colors"
-                  onClick={() => {
-                    const el = document.getElementById('for-traders');
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
+                  onClick={() => scrollTo('artist-submission')}
                 >
-                  Traders
+                  Artists
                 </button>
               </motion.div>
 
@@ -151,58 +198,36 @@ export default function About() {
               >
                 <div className="space-y-4 sm:space-y-5">
                   <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                    Right now:
+                    Here's what you can do right now:
                   </p>
                   <div className="grid gap-2 sm:gap-3">
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs sm:text-sm w-max">
                       <Headphones className="w-4 h-4" />
-                      <span>Listen</span>
+                      <span>Listen and hang out in The Room</span>
                     </div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs sm:text-sm w-max">
-                      <Sparkles className="w-4 h-4" />
-                      <span>Observe</span>
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 text-orange-400 text-xs sm:text-sm w-max">
+                      <Flame className="w-4 h-4" />
+                      <span>Back an artist in a WaveWarz Africa battle</span>
                     </div>
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs sm:text-sm w-max">
-                      <Music className="w-4 h-4" />
-                      <span>Track what people are replaying</span>
+                      <Shuffle className="w-4 h-4" />
+                      <span>Let DJ $huffle and Mo$ha keep you company</span>
                     </div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 text-purple-400 text-xs sm:text-sm w-max">
-                      <Users className="w-4 h-4" />
-                      <span>Watch what communities gravitate toward</span>
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs sm:text-sm w-max">
+                      <Store className="w-4 h-4" />
+                      <span>Support your favorite songs on the Marketplace</span>
                     </div>
-                  </div>
-
-                  <div className="space-y-2 text-sm sm:text-base text-muted-foreground leading-relaxed">
-                    <p>You donâ€™t need to ape. You donâ€™t need to rush.</p>
-                    <p>
-                      But if you understand markets, youâ€™ll recognize this moment.
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 sm:px-5 sm:py-4 space-y-2">
-                    <p className="text-sm sm:text-base text-primary font-medium">
-                      ðŸŽ¶ Music. Markets. Meet.
-                    </p>
-                    <p className="text-xs sm:text-sm text-primary/90">
-                      If youâ€™ve ever wished you could trade meaning instead of noise,
-                      youâ€™re early to the right place.
-                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-4 sm:space-y-5">
                   <div className="glass rounded-2xl p-4 sm:p-5 space-y-3">
                     <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                      $ongChainn is your on-chain listening home built around Create On
-                      Base Town Squares.
+                      $ongChainn is your onchain listening home. Play music, hang out with the community,
+                      and let every play, like and share build your footprint here.
                     </p>
                     <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                      Listen in public with the community, or in private with your
-                      own queue, while every play helps surface what actually matters.
-                    </p>
-                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                      Here, listening is a market signal. Culture is tradable. Attention
-                      is a primitive, not an accident.
+                      Listening isn't passive anymore, it's how you show up for the music and artists you love.
                     </p>
                   </div>
 
@@ -256,98 +281,35 @@ export default function About() {
         </motion.section>
 
         <motion.section
+          id="features"
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="grid gap-4 sm:gap-6 md:grid-cols-3 mb-10 sm:mb-12"
+          className="mb-10 sm:mb-12 scroll-mt-24"
         >
-          <motion.div
-            variants={itemVariants}
-            className="glass-card rounded-2xl p-4 sm:p-5 shine-overlay space-y-2"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-primary/15">
-                <Headphones className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="font-heading text-sm sm:text-base font-semibold text-foreground">
-                Listener Mode
-              </h2>
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Listen, replay, and share while every action quietly builds your footprint inside
-              $ongChainn.
+          <div className="mb-4 sm:mb-5">
+            <h2 className="font-heading text-xl sm:text-2xl font-bold text-foreground mb-1.5">
+              The fun stuff
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Five ways to vibe on $ongChainn right now.
             </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-2 gap-1 border-primary/40 text-primary hover:bg-primary/10"
-              onClick={() => {
-                const el = document.getElementById('listener-mode');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-            >
-              Learn more
-              <ArrowRight className="w-3 h-3" />
-            </Button>
-          </motion.div>
-
-          <motion.div
-            variants={itemVariants}
-            className="glass-card rounded-2xl p-4 sm:p-5 shine-overlay space-y-2"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-emerald-500/15">
-                <Radio className="w-5 h-5 text-emerald-400" />
-              </div>
-              <h2 className="font-heading text-sm sm:text-base font-semibold text-foreground">
-                Why $ongChainn
-              </h2>
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              A music platform where songs live onchain and listeners finally matter.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-2 gap-1 border-emerald-400/40 text-emerald-400 hover:bg-emerald-500/10"
-              onClick={() => {
-                const el = document.getElementById('why-songchainn');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-            >
-              Learn more
-              <ArrowRight className="w-3 h-3" />
-            </Button>
-          </motion.div>
-
-          <motion.div
-            variants={itemVariants}
-            className="glass-card rounded-2xl p-4 sm:p-5 shine-overlay space-y-2"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-cyan-500/15">
-                <LineChart className="w-5 h-5 text-cyan-400" />
-              </div>
-              <h2 className="font-heading text-sm sm:text-base font-semibold text-foreground">
-                For Traders
-              </h2>
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Treat songs as onchain, liquid cultural assets and position before the crowd.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-2 gap-1 border-cyan-400/40 text-cyan-400 hover:bg-cyan-500/10"
-              onClick={() => {
-                const el = document.getElementById('for-traders');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-            >
-              Learn more
-              <ArrowRight className="w-3 h-3" />
-            </Button>
-          </motion.div>
+          </div>
+          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURE_HIGHLIGHTS.map(({ title, description, icon: Icon, accent, surface }) => (
+              <motion.div
+                key={title}
+                variants={itemVariants}
+                className="glass-card rounded-2xl p-4 sm:p-5 shine-overlay space-y-2"
+              >
+                <div className={`inline-flex rounded-xl p-2 ${surface}`}>
+                  <Icon className={`w-5 h-5 ${accent}`} />
+                </div>
+                <h3 className="font-heading text-sm sm:text-base font-semibold text-foreground">{title}</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{description}</p>
+              </motion.div>
+            ))}
+          </div>
         </motion.section>
 
         <motion.section
@@ -371,27 +333,13 @@ export default function About() {
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
               <p>
-                $ongChainn simply means music that's not just for listening.
+                Music has always moved culture, but the people who support a song early rarely get to
+                share in what it becomes. $ongChainn changes that.
               </p>
               <p>
-                It's for participating.
+                Every play, like, share and comment leaves a real footprint. You're not just streaming
+                music here, you're part of its story.
               </p>
-              <p>
-                Music has always moved culture, shaped moments and brought people together. But the value created by
-                great songs rarely flows back to the people who actually support them: the listeners.
-              </p>
-              <p>$ongChainn changes that.</p>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p className="font-medium text-foreground flex items-center gap-2">
-                <Music className="w-4 h-4 text-primary" />
-                <span>What $ongChainn Is</span>
-              </p>
-              <p>
-                $ongChainn is a music platform built on Base, where songs live onchain and listeners matter. Here, music
-                isnâ€™t just streamed and forgotten. Every play, like, share and conversation leaves a real footprint.
-              </p>
-              <p>Youâ€™re not just consuming music, youâ€™re part of its journey.</p>
             </div>
           </motion.div>
 
@@ -405,42 +353,17 @@ export default function About() {
                 <Headphones className="w-5 h-5 text-emerald-400" />
               </div>
               <h2 className="font-heading text-base sm:text-lg font-semibold text-foreground">
-                Listener Mode (Where You Are Now)
+                Being an early supporter matters
               </h2>
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p>Right now, youâ€™re in Listener Mode.</p>
-              <p>That means:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>You listen to music</li>
-                <li>You like, share, and discover tracks</li>
-                <li>You earn points just by being active</li>
-              </ul>
               <p>
-                These points arenâ€™t random. They unlock future drops, access and experiences as $ongChainn grows. If you
-                have good taste, it will eventually matter.
+                On most platforms, you stream a song, it blows up, and you get nothing for having found it first.
               </p>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p className="font-medium text-foreground flex items-center gap-2">
-                <Radio className="w-4 h-4 text-emerald-400" />
-                <span>What Makes $ongChainn Different</span>
-              </p>
-              <p>On most platforms:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>You stream</li>
-                <li>The song blows up</li>
-                <li>You getâ€¦ nothing</li>
-              </ul>
-              <p>On $ongChainn:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Songs are preparing to become music tokens</li>
-                <li>These tokens live on Base</li>
-                <li>They can be collected, traded and moved like any other onchain asset</li>
-              </ul>
               <p>
-                When a song people love starts gaining attention, the community and the artist can share in that upside.
-                No fake promises. No guaranteed profits. Just a system where attention actually counts for something.
+                On $ongChainn, showing love early, listening, liking, sharing, pulsing, is how you build your
+                place in the community and how you support the artists you believe in before everyone else
+                catches on.
               </p>
             </div>
           </motion.div>
@@ -459,178 +382,33 @@ export default function About() {
               </h2>
             </div>
             <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p>Music doesnâ€™t stay in one place. It spreads, from friend to friend, chats to timelines, rooms to cities.</p>
-              <p>$ongChainn is designed around that idea.</p>
-              <p>As songs move:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Artists benefit</li>
-                <li>Listeners are recognized</li>
-                <li>Communities form around sound, not algorithms</li>
-              </ul>
-              <p>Your taste becomes visible. Your support becomes meaningful and rewarding.</p>
-            </div>
-          </motion.div>
-
-          <motion.div
-            variants={itemVariants}
-            className="glass-card rounded-2xl p-5 sm:p-7 shine-overlay space-y-4 sm:space-y-5"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-slate-500/15">
-                <ShieldCheck className="w-5 h-5 text-slate-300" />
-              </div>
-              <h2 className="font-heading text-base sm:text-lg font-semibold text-foreground">
-                Why Blockchain
-              </h2>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p>We use blockchain not for hype, but for clarity.</p>
-              <p>Blockchain lets us:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Make ownership transparent</li>
-                <li>Make participation provable</li>
-                <li>Make music portable and programmable</li>
-              </ul>
-              <p>Built on Base, $ongChainn benefits from:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Ethereum-level security</li>
-                <li>Low fees</li>
-                <li>Deep liquidity</li>
-                <li>A growing onchain culture</li>
-              </ul>
+              <p>Music doesn't stay in one place. It spreads, from friend to friend, chats to timelines, rooms to cities.</p>
+              <p>As songs move on $ongChainn: artists benefit, listeners get recognized, and communities form around sound.</p>
               <p>
-                You donâ€™t need to understand blockchain to enjoy $ongChainn, but itâ€™s there to make sure the system stays
-                open and fair.
+                Whether you're here to discover new music, hang out in The Room, or support artists early,
+                you belong here.
               </p>
             </div>
           </motion.div>
 
           <motion.div
+            id="artist-submission"
             variants={itemVariants}
-            className="glass-card rounded-2xl p-5 sm:p-7 shine-overlay space-y-4 sm:space-y-5"
+            className="glass-card rounded-2xl p-5 sm:p-7 shine-overlay space-y-4 sm:space-y-5 scroll-mt-24"
           >
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-purple-500/15">
-                <Brain className="w-5 h-5 text-purple-400" />
+              <div className="p-2 rounded-xl bg-primary/15">
+                <Mic className="w-5 h-5 text-primary" />
               </div>
               <h2 className="font-heading text-base sm:text-lg font-semibold text-foreground">
-                Culture First, Tech Second
+                Are You An Artist?
               </h2>
             </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p>$ongChainn isnâ€™t trying to replace music culture. Itâ€™s trying to protect and extend it.</p>
-              <p>Thatâ€™s why:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Music plays first</li>
-                <li>Community comes before numbers</li>
-                <li>Identity matters more than clout</li>
-              </ul>
-              <p>
-                Whether youâ€™re here to discover new music, hang out in The Room, support artists early or just vibe and
-                listen, you belong here.
-              </p>
-            </div>
-          </motion.div>
-
-          <motion.div
-            id="for-traders"
-            variants={itemVariants}
-            className="glass-card rounded-2xl p-5 sm:p-7 shine-overlay space-y-4 sm:space-y-5"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-cyan-500/15">
-                <LineChart className="w-5 h-5 text-cyan-400" />
-              </div>
-              <h2 className="font-heading text-base sm:text-lg font-semibold text-foreground">
-                For Traders: Music as an Asset Class
-              </h2>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p>If you trade markets, pause for a second.</p>
-              <p>Now imagine this:</p>
-              <p>
-                What if you bought Michael Jacksonâ€™s biggest song the week it dropped, not the vinyl, not royalties, but a
-                liquid, tradeable onchain position tied to that songâ€™s cultural momentum?
-              </p>
-              <p>Not thousands of dollars. Not millions. A few dollars. And then you simply held.</p>
-              <p className="font-medium text-foreground flex items-center gap-2 pt-2">
-                <Music className="w-4 h-4 text-cyan-400" />
-                <span>Songs Are Not Like Other Assets</span>
-              </p>
-              <p>Most assets decay. Companies die, products expire, narratives rotate, markets forget.</p>
-              <p>
-                Music doesnâ€™t. A great song can trend again 10 years later, go viral across generations, resurface in films,
-                games, social media, clubs and culture cycles, and even outlive its creator.
-              </p>
-              <p>Music is a timeless asset, but until now, it hasnâ€™t been tradeable like one.</p>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p className="font-medium text-foreground flex items-center gap-2">
-                <LineChart className="w-4 h-4 text-cyan-400" />
-                <span>What $ongChainn Unlocks</span>
-              </p>
-              <p>$ongChainn brings music into the same world as tokens, liquidity and onchain discovery.</p>
-              <p>Songs on $ongChainn are evolving into music tokens on Base. That means:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Songs can be collected early</li>
-                <li>Songs can be traded peer-to-peer</li>
-                <li>Attention becomes a measurable signal</li>
-                <li>Cultural momentum becomes market momentum</li>
-              </ul>
-              <p>This isnâ€™t streaming. This is price discovery for sound.</p>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p className="font-medium text-foreground flex items-center gap-2">
-                <Brain className="w-4 h-4 text-cyan-400" />
-                <span>Think Like a Trader</span>
-              </p>
-              <p>
-                If you trade forex, crypto, or NFTs, you already understand this: markets move on attention, narrative,
-                volume, community belief.
-              </p>
-              <p>Music has all of these, before price ever exists.</p>
-              <p>
-                On $ongChainn, traders can spot songs early, watch community activity, track engagement before mainstream
-                exposure and position before wider discovery.
-              </p>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p className="font-medium text-foreground flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                <span>Liquidity Meets Culture</span>
-              </p>
-              <p>
-                Traditional music deals lock value behind contracts and gatekeepers. Onchain music is different:
-                ownership is transparent, movement is permissionless, transfers are instant, markets are global.
-              </p>
-              <p>Built on Base, $ongChainn benefits from low fees, Ethereum security and deep onchain liquidity.</p>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p className="font-medium text-foreground flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-cyan-400" />
-                <span>Why Being Early Matters</span>
-              </p>
-              <p>
-                Early crypto wasnâ€™t about perfect products. It was about new primitives. $ongChainn is introducing one:
-                music as a liquid, onchain asset.
-              </p>
-              <p>Not every song will moon. Not every trade will win.</p>
-              <p>
-                But being early means understanding the mechanics before the crowd, learning how music moves onchain and
-                building conviction before noise arrives.
-              </p>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              <p className="font-medium text-foreground flex items-center gap-2">
-                <LineChart className="w-4 h-4 text-cyan-400" />
-                <span>The Asymmetry</span>
-              </p>
-              <p>
-                A song can be bought for a few dollars today and be listened to by millions tomorrow. That asymmetry
-                doesnâ€™t exist in most markets.
-              </p>
-              <p>Music doesnâ€™t dilute. Music doesnâ€™t expire. Music doesnâ€™t sleep. It waits.</p>
-            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              Want your music on $ongChainn? Tell us about yourself below, our team reviews every
+              submission personally.
+            </p>
+            <ArtistSubmissionForm />
           </motion.div>
         </motion.section>
 
@@ -667,13 +445,13 @@ export default function About() {
               <div className="space-y-2 sm:space-y-3 max-w-xl">
                 <p className="text-xs sm:text-sm uppercase tracking-wide text-primary font-semibold flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
-                  <span>You&apos;re early to $ongChainn</span>
+                  <span>You're early to $ongChainn</span>
                 </p>
                 <h2 className="font-heading text-lg sm:text-xl md:text-2xl font-semibold text-foreground">
                   Press play, stay a while, and help shape what music onchain feels like.
                 </h2>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Discover artists, hang out in The Room, and let your listening, taste and attention leave a real onchain footprint.
+                  Discover artists, hang out in The Room, and let your listening leave a real footprint.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
