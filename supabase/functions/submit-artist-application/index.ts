@@ -139,6 +139,29 @@ serve(async (req) => {
       </li>
     `).join("");
 
+    const songsText = songsWithLinks.map((song) =>
+      `- ${song.title}\n  Audio: ${song.audioUrl}${song.coverUrl ? `\n  Cover: ${song.coverUrl}` : ""}`
+    ).join("\n");
+
+    // Send from a verified Resend domain when one exists — the sandbox sender
+    // (onboarding@resend.dev) is heavily spam-filtered by Gmail.
+    let fromAddress = "$ongChainn Artist Submissions <onboarding@resend.dev>";
+    try {
+      const domainsRes = await fetch("https://api.resend.com/domains", {
+        headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
+      });
+      if (domainsRes.ok) {
+        const domainsBody = await domainsRes.json();
+        const list = Array.isArray(domainsBody?.data) ? domainsBody.data : [];
+        const verified = list.find((d: { status?: string; name?: string }) =>
+          d?.status === "verified" && typeof d?.name === "string"
+        );
+        if (verified) {
+          fromAddress = `$ongChainn Artist Submissions <submissions@${verified.name}>`;
+        }
+      }
+    } catch (_e) { /* fall back to sandbox sender */ }
+
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -146,10 +169,11 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "$ongChainn Artist Submissions <onboarding@resend.dev>",
+        from: fromAddress,
         to: [NOTIFY_TO],
         reply_to: safeContactEmail ? contactEmail.trim() : undefined,
         subject: `New artist submission: ${artistName.trim()} (${cleanSongs.length} song${cleanSongs.length === 1 ? "" : "s"})`,
+        text: `New artist submission\n\nReal name: ${realName.trim()}\nArtist name: ${artistName.trim()}\nLocation: ${location.trim()}\n${safeContactEmail ? `Contact email: ${contactEmail.trim()}\n` : ""}Wallet: ${walletAddress.trim()}\n\nWhy:\n${reason.trim()}\n\nSongs (${cleanSongs.length}):\n${songsText}\n\nDownload links expire in 30 days.`,
         html: `
           <h2>New artist submission</h2>
           <p><strong>Real name:</strong> ${safeRealName}</p>

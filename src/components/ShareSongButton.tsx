@@ -1,9 +1,11 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Share2, Link2, Copy, Check, X, Music, ChevronRight } from 'lucide-react';
 import { useShare } from '@/hooks/useShare';
 import { useSocial } from '@/hooks/useSocial';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { fcComposeCast, fcOpenUrl, isInMiniApp } from '@/lib/farcasterActions';
 
 interface ShareSongButtonProps {
@@ -53,6 +55,8 @@ export function ShareSongButton({
   const [showSheet, setShowSheet] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inMiniApp, setInMiniApp] = useState(false);
+  const [postingToFeed, setPostingToFeed] = useState(false);
+  const postingToFeedRef = useRef(false);
   const { getSongShareUrl } = useShare();
   const { createPost } = useSocial();
 
@@ -141,9 +145,20 @@ export function ShareSongButton({
   }, [shareUrl, shareText]);
 
   const handleShareToFeed = useCallback(async () => {
-    await createPost('', 'song_share', songId);
-    toast.success('Shared to your feed');
-    setShowSheet(false);
+    // Synchronous ref guard: a double tap must never create two posts
+    if (postingToFeedRef.current) return;
+    postingToFeedRef.current = true;
+    setPostingToFeed(true);
+    try {
+      const ok = await createPost('', 'song_share', songId);
+      if (ok) {
+        toast.success('Shared to your feed');
+        setShowSheet(false);
+      }
+    } finally {
+      postingToFeedRef.current = false;
+      setPostingToFeed(false);
+    }
   }, [createPost, songId]);
 
   const platforms = useMemo(() => [
@@ -189,7 +204,7 @@ export function ShareSongButton({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setShowSheet(true); }}
-        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors ${className}`}
+        className={cn('inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors', className)}
       >
         <Share2 className="w-4 h-4" />
         Share
@@ -201,16 +216,15 @@ export function ShareSongButton({
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={(e) => { e.stopPropagation(); setShowSheet(true); }}
-        className={`p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all ${className}`}
+        className={cn('p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all', className)}
       >
         <Share2 className="w-4 h-4" />
       </motion.button>
     );
 
-  return (
-    <>
-      {trigger}
-
+  // The sheet is portaled to <body> so ancestors with CSS transforms or
+  // overflow clipping (animated section shells, carousels) can never trap it.
+  const sheet = (
       <AnimatePresence>
         {showSheet && (
           <>
@@ -315,12 +329,15 @@ export function ShareSongButton({
                 <button
                   type="button"
                   onClick={handleShareToFeed}
-                  className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/10 active:bg-white/[12%] rounded-2xl px-4 py-3.5 transition-colors border border-white/5"
+                  disabled={postingToFeed}
+                  className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/10 active:bg-white/[12%] rounded-2xl px-4 py-3.5 transition-colors border border-white/5 disabled:opacity-60"
                 >
                   <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
                     <Share2 className="w-4 h-4 text-primary" />
                   </div>
-                  <p className="text-sm font-medium text-white flex-1 text-left">Share to $ongChainn Feed</p>
+                  <p className="text-sm font-medium text-white flex-1 text-left">
+                    {postingToFeed ? 'Sharing...' : 'Share to $ongChainn Feed'}
+                  </p>
                   <ChevronRight className="w-4 h-4 text-white/25 flex-shrink-0" />
                 </button>
               </div>
@@ -331,6 +348,12 @@ export function ShareSongButton({
           </>
         )}
       </AnimatePresence>
+  );
+
+  return (
+    <>
+      {trigger}
+      {typeof document !== 'undefined' && createPortal(sheet, document.body)}
     </>
   );
 }

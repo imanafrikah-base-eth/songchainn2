@@ -23,6 +23,8 @@ export function useSocial() {
   // Ref so callbacks don't need user in their deps array — prevents re-renders on token refresh
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = user?.id ?? null;
+  // Guards against the same post being written twice by rapid double-submits
+  const lastPostRef = useRef<{ sig: string; at: number }>({ sig: '', at: 0 });
 
   const fetchFollowData = useCallback(async () => {
     const uid = userIdRef.current;
@@ -226,6 +228,14 @@ export function useSocial() {
           return false;
         }
 
+        const sig = `${uid}|${postType}|${cleanContent}|${cleanSongId}|${cleanPlaylistId}`;
+        const now = Date.now();
+        if (lastPostRef.current.sig === sig && now - lastPostRef.current.at < 5000) {
+          // Identical post submitted again within 5s — treat as already shared
+          return true;
+        }
+        lastPostRef.current = { sig, at: now };
+
         const payload: Database['public']['Tables']['social_posts']['Insert'] = {
           user_id: uid,
           post_type: postType,
@@ -253,6 +263,8 @@ export function useSocial() {
         await fetchPosts();
         return true;
       } catch (error: any) {
+        // Failed insert should not block an immediate retry
+        lastPostRef.current = { sig: '', at: 0 };
         const msg = String(error?.message || '');
         console.error('social_posts insert failed', { error: msg, payload: payloadForLog });
         toast({

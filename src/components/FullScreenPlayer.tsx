@@ -2,25 +2,18 @@ import { memo, useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, Share2, ListMusic, Shuffle, Repeat, Repeat1, Copy, Check, MessageCircle, GripVertical } from 'lucide-react';
+import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, ListMusic, Shuffle, Repeat, Repeat1, GripVertical } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { useShare } from '@/hooks/useShare';
 import { toast } from '@/hooks/use-toast';
-import { fcOpenUrl } from '@/lib/farcasterActions';
 import { useAuth } from '@/context/AuthContext';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
 import { OwnershipBadge } from '@/components/OwnershipBadge';
 import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
 import { UnlockSongModal } from '@/components/UnlockSongModal';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ShareSongButton } from '@/components/ShareSongButton';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { useArtworkColor, hslToRgbTriplet } from '@/hooks/useArtworkColor';
@@ -46,7 +39,6 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
 
   const { toggleLike, isLiked, sendPulse } = useEngagement();
   const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
-  const { copied, shareSong, copyToClipboard, shareToX, getSongShareUrl } = useShare();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showQueue, setShowQueue] = useState(false);
@@ -131,41 +123,6 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
       duration,
     });
   }, [currentSong, isInstalled, hasPlayedEnoughToSave, isOnline, isSaved, isSaving, cacheSong, duration]);
-
-  const handleNativeShare = async () => {
-    if (currentSong) {
-      await shareSong(currentSong.title, currentSong.artist, currentSong.id, currentSong.coverImage);
-    }
-  };
-
-  const handleCopyLink = async () => {
-    if (currentSong) {
-      const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
-      await copyToClipboard(url);
-    }
-  };
-
-  const handleShareToX = () => {
-    if (currentSong) {
-      const text = `🎵 Listening to "${currentSong.title}" by ${currentSong.artist} on @$ongChainn`;
-      const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
-      shareToX(text, url);
-    }
-  };
-
-  const handleShareToWhatsApp = () => {
-    if (!currentSong) return;
-    const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
-    const text = `Check out "${currentSong.title}" by ${currentSong.artist} on $ongChainn!`;
-    void fcOpenUrl(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`);
-  };
-
-  const handleShareToTelegram = () => {
-    if (!currentSong) return;
-    const url = getSongShareUrl({ id: currentSong.id, title: currentSong.title, artist: currentSong.artist, coverImage: currentSong.coverImage });
-    const text = `Check out "${currentSong.title}" by ${currentSong.artist} on $ongChainn!`;
-    void fcOpenUrl(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
-  };
 
   const toggleRepeat = () => {
     setRepeatMode(repeatMode === 'off' ? 'all' : repeatMode === 'all' ? 'one' : 'off');
@@ -642,37 +599,13 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   />
                 </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="p-3 rounded-full glass hover:bg-secondary/50 transition-all press-effect text-muted-foreground">
-                      <Share2 className="w-5 h-5" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={handleNativeShare} className="gap-2">
-                      <Share2 className="w-4 h-4" />
-                      Share
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleCopyLink} className="gap-2">
-                      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                      Copy Link
-                    </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleShareToX} className="gap-2">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                    </svg>
-                    Share on X
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleShareToWhatsApp} className="gap-2">
-                    <MessageCircle className="w-4 h-4" />
-                    WhatsApp
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleShareToTelegram} className="gap-2">
-                    <Share2 className="w-4 h-4" />
-                    Telegram
-                  </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <ShareSongButton
+                  songId={currentSong.id}
+                  songTitle={currentSong.title}
+                  artistName={currentSong.artist}
+                  coverImage={currentSong.coverImage}
+                  className="p-3 glass hover:bg-secondary/50 press-effect"
+                />
               </motion.div>
               <div className="mt-6 w-full max-w-[320px] text-xs text-muted-foreground text-center">
                 {queue.length > 1 && (
