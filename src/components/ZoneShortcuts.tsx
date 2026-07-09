@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, Crown, Flame, Headphones, ListMusic, Radio, Shuffle, Store } from 'lucide-react';
+import { ArrowRight, Bot, Crown, Headphones, ListMusic, Radio, Shuffle, Store, Waves } from 'lucide-react';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { CARD_TILES, type BgImage } from '@/data/backgroundPools';
 import { cn } from '@/lib/utils';
@@ -86,7 +86,7 @@ export function ZoneShortcuts() {
             Battle Zone
           </span>
           <div className="inline-flex w-fit rounded-lg p-1.5 mb-2 bg-background/60 backdrop-blur-sm text-orange-400">
-            <Flame className="w-5 h-5" />
+            <Waves className="w-5 h-5" />
           </div>
           <p className="font-heading text-lg sm:text-2xl font-bold text-foreground leading-tight">WaveWarz Africa</p>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-sm">

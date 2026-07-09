@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight, Search, Shuffle, Bot, Store, Mic, Lock } from 'lucide-react';
+import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight, Search, Shuffle, Bot, Store, Mic, Lock, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -50,7 +50,7 @@ const ABOUT_HIGHLIGHTS = [
   {
     title: 'WaveWarz Africa',
     description: 'Two artists. One battle. Back your favorite in a live song battle and watch the crowd decide.',
-    icon: Flame,
+    icon: Waves,
     accent: 'text-orange-400',
     surface: 'bg-orange-500/10',
     photo: CARD_TILES.waveWarz,
