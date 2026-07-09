@@ -27,6 +27,7 @@ import { SellSongModal } from '@/components/SellSongModal';
 import { OwnershipBadge } from '@/components/OwnershipBadge';
 import { usePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
+import { requestWalletConnection } from '@/lib/walletGate';
 import { cn } from '@/lib/utils';
 
 // Component for individual marketplace song card
@@ -211,8 +212,14 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
                 <Button
                   variant="outline"
                   className="flex-1 gap-2 text-destructive hover:text-destructive"
-                  disabled={!walletAddress}
-                  onClick={() => setShowSellModal(true)}
+                  onClick={async () => {
+                    if (!walletAddress) {
+                      const address = await requestWalletConnection();
+                      if (!address) return;
+                      setWalletAddress(address);
+                    }
+                    setShowSellModal(true);
+                  }}
                 >
                   Sell
                 </Button>

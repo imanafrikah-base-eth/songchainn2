@@ -1568,6 +1568,29 @@ export default function Auth() {
                     </>
                   )}
                 </form>
+
+                {/* Alternative sign-in methods: Google + Base wallets */}
+                <div className="flex items-center gap-3 my-5">
+                  <div className="flex-1 h-px bg-border/60" />
+                  <span className="text-xs text-muted-foreground">
+                    or {authMode === 'signup' ? 'sign up' : 'sign in'} with
+                  </span>
+                  <div className="flex-1 h-px bg-border/60" />
+                </div>
+
+                <GoogleSignIn oneTap onError={setError} />
+
+                <WalletPicker
+                  onConnect={handleWalletSignIn}
+                  busy={isWalletLoading}
+                  busyContent={getButtonContent()}
+                />
+
+                {!hasWallet && !isWalletDetected && (
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    Have a Base wallet like MetaMask or Coinbase? Install it and it appears here.
+                  </p>
+                )}
               </motion.div>
             ) : authView === 'phone' ? (
               <motion.div key="phone" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>

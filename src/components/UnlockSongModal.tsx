@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { X, Unlock, Loader2, Music, Wallet, AlertCircle, Check, ArrowRight, Crown, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Song } from '@/data/musicData';
-import { connectWallet, hasWalletProvider } from '@/lib/baseWallet';
+import { hasWalletProvider } from '@/lib/baseWallet';
+import { requestWalletConnection } from '@/lib/walletGate';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
@@ -69,14 +70,16 @@ export function UnlockSongModal({
     setError(null);
 
     try {
-      const result = await connectWallet();
-      if (result.success && result.address) {
-        setConnectedAddress(result.address);
-        onWalletConnected?.(result.address);
+      // Smart gate: frame wallet in miniapps, direct connect with one wallet,
+      // picker or install links otherwise.
+      const address = await requestWalletConnection();
+      if (address) {
+        setConnectedAddress(address);
+        onWalletConnected?.(address);
         setStep('select');
         toast.success('Wallet connected!');
       } else {
-        setError(result.error || 'Failed to connect wallet');
+        setError('Connect a wallet to continue');
       }
     } catch (err: any) {
       setError(err?.message || 'Connection failed');

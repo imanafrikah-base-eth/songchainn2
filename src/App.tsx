@@ -12,6 +12,7 @@ import { PlayerProvider } from "@/context/PlayerContext";
 import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { ConnectWalletModal } from "@/components/ConnectWalletModal";
 import { NotificationBanner } from "@/components/NotificationBanner";
 import { GlobalAmbientLayer } from "@/components/GlobalAmbientLayer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -196,6 +197,7 @@ function AppShell() {
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><BehaviorCtaPopups /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><PhaseTwoAnnouncement /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
+      <ErrorBoundary fallback={null}><ConnectWalletModal /></ErrorBoundary>
     </>
   );
 }
