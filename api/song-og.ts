@@ -51,6 +51,8 @@ const AFT = `${R2A}/FAITH%20ART%20WORK.png`;
 const AJM = `${R2B}/JMN%20ARTWORK.png`;
 const ASM = `${R2B}/Sammie%20Song%20ART.png`;
 const ANM = `${R2C}/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20LIKE%20COMMENT%20SUBSCRIBE%20ARTWORK.jpg`;
+const AHB = `${R2C}/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg`;
+const ASHD = `${R2C}/NEMESIS%20VS%20LADYRYN/grey/SHADOW/SHADOW%20ARTWORK.jpg`;
 
 interface SongMeta { t: string; a: string; img: string }
 const SONG_META: Record<string, SongMeta> = {
@@ -308,6 +310,16 @@ const SONG_META: Record<string, SongMeta> = {
   "212": { t: "Block is Hot", a: "NEMESISvsLADYRYN", img: ANM },
   "213": { t: "Vib3", a: "NEMESISvsLADYRYN", img: ANM },
   "214": { t: "Gr3Y", a: "NEMESISvsLADYRYN", img: ANM },
+  // IMAN AFRIKAH HIGH-BRED
+  "225": { t: "10 10", a: "IMAN AFRIKAH", img: AHB },
+  "226": { t: "BUILD A BETTER WORLD", a: "IMAN AFRIKAH", img: AHB },
+  "227": { t: "CAME A LONG WAY", a: "IMAN AFRIKAH", img: AHB },
+  "228": { t: "FINALLY THEY PUT ME ON", a: "IMAN AFRIKAH", img: AHB },
+  "229": { t: "IYA PEOPLE SONG", a: "IMAN AFRIKAH", img: AHB },
+  "230": { t: "LATELY ALOT", a: "IMAN AFRIKAH", img: AHB },
+  "231": { t: "THE BIGMAN CALL", a: "IMAN AFRIKAH", img: AHB },
+  // NEMESISvsLADYRYN SHADOW single
+  "232": { t: "SHADOW", a: "NEMESISvsLADYRYN", img: ASHD },
 };
 
 export default async function handler(req: any, res: any) {

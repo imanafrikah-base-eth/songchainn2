@@ -3355,6 +3355,134 @@ const SONGS_RAW: Song[] = [
     addedAt: '2026-06-07T00:00:00.000Z',
     volume: 'Single',
   },
+  {
+    id: '225',
+    title: '10 10',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%2010%2010.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro-Fusion',
+    addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'HIGH-BRED',
+  },
+  {
+    id: '226',
+    title: 'BUILD A BETTER WORLD',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20BUILD%20A%20BETTER%20WORLD.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro-Fusion',
+    addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'HIGH-BRED',
+  },
+  {
+    id: '227',
+    title: 'CAME A LONG WAY',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20CAME%20A%20LONG%20WAY.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro-Fusion',
+    addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'HIGH-BRED',
+  },
+  {
+    id: '228',
+    title: 'FINALLY THEY PUT ME ON',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20FINALLY%20THEY%20PUT%20ME%20ON.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro-Fusion',
+    addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'HIGH-BRED',
+  },
+  {
+    id: '229',
+    title: 'IYA PEOPLE SONG',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20IYA%20PEOPLE%20SONG.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro-Fusion',
+    addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'HIGH-BRED',
+  },
+  {
+    id: '230',
+    title: 'LATELY ALOT',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20LATELY%20ALOT.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro-Fusion',
+    addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'HIGH-BRED',
+  },
+  {
+    id: '231',
+    title: 'THE BIGMAN CALL',
+    artist: 'IMAN AFRIKAH',
+    artistId: '3',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20THE%20BIGMAN%20CALL.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Livingstone Town Square',
+    genre: 'Afro-Fusion',
+    addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'HIGH-BRED',
+  },
+  {
+    id: '232',
+    title: 'SHADOW',
+    artist: 'NEMESISvsLADYRYN',
+    artistId: '11',
+    audioUrl:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/grey/SHADOW/NEMESISvsLADYRN%20-%20SHADOW.mp3',
+    coverImage:
+      'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/grey/SHADOW/SHADOW%20ARTWORK.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Lusaka Townsquare',
+    genre: 'Hiphop/Soul',
+    addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'Single',
+  },
 ];
 
 const ARTIST_STREAM_TARGETS: Record<string, number> = {
@@ -3489,7 +3617,7 @@ export const ARTISTS: Artist[] = [
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
     profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/file_0000000077c8722f8f65c9d1abd8bca1-2.png',
-    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182', '190', '191', '192', '193', '194', '195', '196', '197', '198', '199', '200', '201', '202', '203', '215', '216', '217', '218', '219', '220', '221', '222', '224'],
+    songs: ['3', '31', '32', '33', '34', '35', '36', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '100', '101', '102', '103', '104', '105', '106', '127', '128', '129', '130', '131', '132', '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145', '146', '147', '176', '177', '178', '179', '180', '181', '182', '190', '191', '192', '193', '194', '195', '196', '197', '198', '199', '200', '201', '202', '203', '215', '216', '217', '218', '219', '220', '221', '222', '224', '225', '226', '227', '228', '229', '230', '231'],
   },
   {
     id: '4',
@@ -3564,7 +3692,7 @@ export const ARTISTS: Artist[] = [
     location: 'Lusaka',
     townSquare: 'Lusaka Townsquare',
     profileImage: artistNemesisVsLadyryn,
-    songs: ['212', '213', '214'],
+    songs: ['212', '213', '214', '232'],
     addedAt: '2026-05-11T00:00:00.000Z',
   },
 ];
