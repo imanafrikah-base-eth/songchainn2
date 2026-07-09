@@ -58,7 +58,8 @@ const STORAGE_MODE_KEY = 'songchainn_vibe_agent_mode_v2';
 const STORAGE_DISMISSED_UNTIL_KEY = 'songchainn_vibe_agent_dismissed_until_v2';
 const STORAGE_LANE_PLAYLIST_ID_KEY = 'songchainn_vibe_agent_lane_playlist_id';
 const STORAGE_SESSION_START_KEY = 'songchainn_vibe_session_started_at';
-const DISMISS_COOLDOWN_MS = 1000 * 60 * 12;
+// Closing Mo$ha means "not now": stay quiet for a full hour.
+const DISMISS_COOLDOWN_MS = 1000 * 60 * 60;
 
 function modeTone(mode: AgentMode) {
   if (mode === 'chill') return 'soft';
@@ -155,6 +156,8 @@ export function VibeAgent() {
   const [suggestedSong, setSuggestedSong] = useState<Song | null>(null);
   const [roomInvite, setRoomInvite] = useState<RoomInviteSummary | null>(null);
   const [dismissedUntil, setDismissedUntil] = useState(0);
+  const dismissedUntilRef = useRef(0);
+  useEffect(() => { dismissedUntilRef.current = dismissedUntil; }, [dismissedUntil]);
   const [lanePlaylistId, setLanePlaylistId] = useState<string | null>(null);
   const [discoveryArtistName, setDiscoveryArtistName] = useState<string | null>(null);
   const [sessionStartAt, setSessionStartAt] = useState<number>(Date.now());
@@ -260,7 +263,9 @@ export function VibeAgent() {
         ctaLabel: detail?.ctaLabel,
         ctaPath: detail?.ctaPath,
       };
-      setDismissedUntil(0);
+      // App-initiated prompts respect a user's dismissal; only a direct
+      // "Call Mo$ha" click (handleOpen) overrides the quiet period.
+      if (Date.now() < dismissedUntilRef.current) return;
       setExternalPrompt(prompt);
       setStep('external-prompt');
     };
@@ -357,8 +362,8 @@ export function VibeAgent() {
     if (mode === 'unset' || mode === 'music') return;
     if (Date.now() < dismissedUntil) return;
     const now = Date.now();
-    if (now - sessionStartAt < 1000 * 60 * 6) return;
-    if (now - lastSwitchPromptAtRef.current < 1000 * 60 * 7) return;
+    if (now - sessionStartAt < 1000 * 60 * 15) return;
+    if (now - lastSwitchPromptAtRef.current < 1000 * 60 * 25) return;
     if (step) return;
     lastSwitchPromptAtRef.current = now;
     setStep('switch-check');
@@ -383,7 +388,7 @@ export function VibeAgent() {
       const rows = (data as RoomLiveUserRow[]).filter((row) => row.user_id && row.user_id !== user.id);
       if (rows.length < 1) return;
       const now = Date.now();
-      if (now - lastRoomPromptAtRef.current < 1000 * 60 * 6) return;
+      if (now - lastRoomPromptAtRef.current < 1000 * 60 * 20) return;
       if (step) return;
       const names = rows
         .map((row) => (row.room_name || '').trim())

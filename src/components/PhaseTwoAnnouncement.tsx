@@ -19,7 +19,7 @@ export function PhaseTwoAnnouncement() {
     } catch {
       // localStorage unavailable -- show once for this session instead of erroring.
     }
-    const timer = setTimeout(() => setIsVisible(true), 1200);
+    const timer = setTimeout(() => setIsVisible(true), 6000);
     return () => clearTimeout(timer);
   }, [user]);
 

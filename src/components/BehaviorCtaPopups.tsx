@@ -21,10 +21,31 @@ interface CtaItem {
   songId?: string;
 }
 
-const AUTO_DISMISS_MS = 9_000;
-const FOLLOW_PROMPT_COOLDOWN_MS = 1000 * 60 * 14;
-const SUGGESTION_COOLDOWN_MS = 1000 * 60 * 6;
-const CTA_MIN_GAP_MS = 1000 * 75;
+// Gentle-touch pacing: popups should feel like a friend nudging once in a
+// while, never like the app imposing. Long cooldowns, big gaps between any
+// two popups, quick auto-dismiss, and a hard per-session cap.
+const AUTO_DISMISS_MS = 7_000;
+const FOLLOW_PROMPT_COOLDOWN_MS = 1000 * 60 * 45;
+const SUGGESTION_COOLDOWN_MS = 1000 * 60 * 25;
+const CTA_MIN_GAP_MS = 1000 * 60 * 5;
+const MAX_CTAS_PER_SESSION = 2;
+const SESSION_CTA_COUNT_KEY = 'songchainn_cta_count_session';
+
+function sessionCtaCount(): number {
+  try {
+    return Number(sessionStorage.getItem(SESSION_CTA_COUNT_KEY) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+function bumpSessionCtaCount(): void {
+  try {
+    sessionStorage.setItem(SESSION_CTA_COUNT_KEY, String(sessionCtaCount() + 1));
+  } catch {
+    /* storage unavailable: fail open, cooldowns still apply */
+  }
+}
 
 function uniqueSongCountWithinWindow(songs: Array<{ songId: string; at: number }>, windowMs: number) {
   const cutoff = Date.now() - windowMs;
@@ -84,17 +105,21 @@ export function BehaviorCtaPopups() {
 
   const showNextInQueue = useCallback(() => {
     if (activeItem) return;
+    if (sessionCtaCount() >= MAX_CTAS_PER_SESSION) return;
     const next = queueRef.current.shift() || null;
     if (!next) return;
+    bumpSessionCtaCount();
     setActiveItem(next);
   }, [activeItem]);
 
   const enqueue = useCallback((item: CtaItem) => {
+    if (sessionCtaCount() >= MAX_CTAS_PER_SESSION) return;
     if (activeItem?.id === item.id) return;
     if (queueRef.current.some((queued) => queued.id === item.id)) return;
     queueRef.current.push(item);
     if (!activeItem) {
       const next = queueRef.current.shift() || null;
+      if (next) bumpSessionCtaCount();
       setActiveItem(next);
     }
   }, [activeItem]);
