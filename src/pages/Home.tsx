@@ -18,7 +18,7 @@ import { CatalogCard } from '@/components/CatalogCard';
 import { CatalogGrid } from '@/components/CatalogGrid';
 import { SongCard } from '@/components/SongCard';
 import { EngagementPanel } from '@/components/EngagementPanel';
-import { WaveWarzHomeHero } from '@/components/wavewarz/WaveWarzHomeHero';
+import { ZoneShortcuts } from '@/components/ZoneShortcuts';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
@@ -517,7 +517,7 @@ export default function Home() {
           </div>
         </div>
 
-        <WaveWarzHomeHero />
+        <ZoneShortcuts />
 
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-8">
           {/* Main Content */}

@@ -146,4 +146,7 @@ export const CARD_TILES = {
   signupCrowd: tile(5, 0), // hands up crowd
   makeMusic: tile(3, 2), // studio microphone
   heroArtist: tile(6, 0), // artist portrait with chains
+  leaderboard: tile(4, 6), // neon crown
+  feed: tile(1, 1), // friends sharing headphones
+  playlists: tile(6, 6), // flowing music notes
 } satisfies Record<string, BgImage>;
