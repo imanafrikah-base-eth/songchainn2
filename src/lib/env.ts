@@ -69,10 +69,10 @@ export function getEnv(): EnvConfig {
   if (!supabaseUrl) problems.push('VITE_SUPABASE_URL is missing');
   if (!supabaseAnonKey) problems.push('VITE_SUPABASE_ANON_KEY is missing');
   if (rawUrl.trim() && cleanedUrl !== rawUrl.trim()) {
-    problems.push('VITE_SUPABASE_URL has wrapping quotes — remove quotes in Vercel env');
+    problems.push('VITE_SUPABASE_URL has wrapping quotes. Remove quotes in Vercel env');
   }
   if (rawKey.trim() && cleanedKey !== rawKey.trim()) {
-    problems.push('VITE_SUPABASE_ANON_KEY has wrapping quotes — remove quotes in Vercel env');
+    problems.push('VITE_SUPABASE_ANON_KEY has wrapping quotes. Remove quotes in Vercel env');
   }
   if (supabaseUrl && !supabaseUrl.includes('supabase.co')) {
     problems.push(`VITE_SUPABASE_URL looks wrong: "${supabaseUrl}"`);

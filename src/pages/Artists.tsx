@@ -4,6 +4,7 @@ import { Users, Music, TrendingUp, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { useSongPopularity, useArtistFollowerCounts, useArtistStreamTotals } from '@/hooks/usePopularity';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
@@ -33,11 +34,14 @@ export default function Artists() {
   const { data: popularityData } = useSongPopularity();
   const { data: followerCounts } = useArtistFollowerCounts();
   const { data: streamTotals } = useArtistStreamTotals();
+  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  const allArtists = useMemo(() => [...ARTISTS, ...publishedArtists], [publishedArtists]);
+  const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
 
   // Calculate stats for each artist
   const artistsWithStats = useMemo(() => {
-    return ARTISTS.map(artist => {
-      const songs = SONGS.filter(s => s.artistId === artist.id);
+    return allArtists.map(artist => {
+      const songs = allSongs.filter(s => s.artistId === artist.id);
       let totalPlays = 0;
       
       songs.forEach(song => {
@@ -52,7 +56,7 @@ export default function Artists() {
         followerCount: followerCounts?.find((entry) => entry.artist_id === artist.id)?.follower_count || 0,
       };
     }).sort((a, b) => b.totalStreams - a.totalStreams);
-  }, [popularityData, streamTotals, followerCounts]);
+  }, [popularityData, streamTotals, followerCounts, allArtists, allSongs]);
 
   const totalStats = useMemo(() => {
     return artistsWithStats.reduce(
@@ -71,7 +75,7 @@ export default function Artists() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         {/* Page Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

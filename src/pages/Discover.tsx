@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music, Flame, HardDrive, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CATALOGS, SONGS, GENRES, Genre, type Catalog } from '@/data/musicData';
+import { CATALOGS, SONGS, GENRES, Genre, type Catalog, buildCatalogs } from '@/data/musicData';
 import { useTodayHotSongs } from '@/hooks/usePopularity';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { CatalogCard } from '@/components/CatalogCard';
 import { CatalogGrid } from '@/components/CatalogGrid';
 import { SongCard } from '@/components/SongCard';
@@ -71,7 +72,12 @@ export default function Discover() {
     viewerUserId: user?.id,
     isListening: Boolean(playerState?.isRoomMode),
   });
-  const catalogs = useMemo(() => CATALOGS, []);
+  const { songs: publishedSongs } = usePublishedCatalog();
+  const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
+  const catalogs = useMemo(
+    () => (publishedSongs.length ? buildCatalogs(allSongs) : CATALOGS),
+    [allSongs, publishedSongs.length],
+  );
 
   // Get user's preferred genres based on likes
   const preferredGenres = useMemo(() => {
@@ -88,10 +94,11 @@ export default function Discover() {
       Alternative: 0,
       'Pop-Dancehall': 0,
       'Hiphop/Soul': 0,
+      'Trap/Dancehall Fusion': 0,
     };
 
     likedSongIds.forEach(songId => {
-      const song = SONGS.find(s => s.id === songId);
+      const song = allSongs.find(s => s.id === songId);
       if (song) {
         genreCounts[song.genre]++;
       }
@@ -101,7 +108,7 @@ export default function Discover() {
       .filter(([_, count]) => count > 0)
       .sort((a, b) => b[1] - a[1])
       .map(([genre]) => genre as Genre);
-  }, [likedSongIds]);
+  }, [likedSongIds, allSongs]);
 
   const newReleases = useMemo(
     () =>
@@ -184,10 +191,10 @@ export default function Discover() {
     return (catalogList: Catalog[]) => {
       const songIds = Array.from(new Set(catalogList.flatMap((catalog) => catalog.songIds)));
       return songIds
-        .map((songId) => SONGS.find((song) => song.id === songId))
+        .map((songId) => allSongs.find((song) => song.id === songId))
         .filter(Boolean) as typeof SONGS;
     };
-  }, []);
+  }, [allSongs]);
 
   const getGenreColor = (genre: Genre) => {
     const colors: Record<Genre, string> = {
@@ -203,6 +210,7 @@ export default function Discover() {
       Alternative: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
       'Pop-Dancehall': 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
       'Hiphop/Soul': 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+      'Trap/Dancehall Fusion': 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
     };
     return colors[genre] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';
   };
@@ -212,7 +220,7 @@ export default function Discover() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         {playerState?.isRoomMode && playerState.currentSong && (
           <div className="mb-6">
             <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
@@ -285,7 +293,7 @@ export default function Discover() {
                   <div className="p-2.5 rounded-xl gradient-primary shadow-glow-intense">
                     <Compass className="w-6 h-6 text-primary-foreground" />
                   </div>
-                  <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
+                  <h1 className="font-heading text-2xl md:text-4xl font-bold text-foreground">
                     Discover
                   </h1>
                 </div>

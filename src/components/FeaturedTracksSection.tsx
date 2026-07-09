@@ -62,7 +62,7 @@ export const FeaturedTracksSection = memo(function FeaturedTracksSection({ songs
 
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-heading text-lg sm:text-2xl md:text-3xl font-bold text-foreground">
+              <h2 className="font-heading text-2xl md:text-4xl font-bold text-foreground">
                 Featured Tracks
               </h2>
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />

@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
-import { Playlist } from '@/types/database';
+import { Playlist, PlaylistCollaboratorWithProfile } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
-import { getLikedArtists, getLikedSongs, getPlaylistSongs as getLocalPlaylistSongs, listPlaylists, savePlaylists, setPlaylistSongs } from '@/lib/localDb';
+import { getLikedArtists, getLikedSongs, getPlaylistSongs as getLocalPlaylistSongs, listPlaylists, savePlaylists, setPlaylistSongs, setLikedArtists as saveLocalLikedArtists, setLikedSongs as saveLocalLikedSongs } from '@/lib/localDb';
+
+function isSyntheticId(id: string | null | undefined): boolean {
+  return !!id && (id.startsWith('fc-') || id.startsWith('fb-'));
+}
 
 export function useAudienceInteractions() {
   const { user } = useAuth();
@@ -39,7 +43,8 @@ export function useAudienceInteractions() {
 
     const fetchData = async () => {
       setIsLoading(true);
-      if (!isSupabaseConfigured) {
+      if (!isSupabaseConfigured || isSyntheticId(user.id)) {
+        // No Supabase session (offline or synthetic fc-/fb- user) — read from local storage
         setLikedSongs(getLikedSongs(user.id));
         setLikedArtists(getLikedArtists(user.id));
         const ownPlaylists = listPlaylists(user.id);
@@ -201,6 +206,13 @@ export function useAudienceInteractions() {
     // Broadcast to all other connected clients for instant cross-app update
     broadcastCountDelta('follow', { artistId, delta });
 
+    if (isSyntheticId(user.id)) {
+      // No Supabase session — persist to local storage only
+      saveLocalLikedArtists(user.id, next);
+      toast({ title: isLiked ? 'Artist unfollowed' : 'Artist followed!' });
+      return;
+    }
+
     try {
       if (isLiked) {
         const { error } = await supabase.from('liked_artists').delete().eq('user_id', user.id).eq('artist_id', artistId);
@@ -208,8 +220,8 @@ export function useAudienceInteractions() {
       } else {
         const { error } = await supabase.from('liked_artists').insert({ user_id: user.id, artist_id: artistId } as any);
         if (error) throw error;
-        // Create feed post for artist follow (fire-and-forget)
-        void supabase.from('social_posts').insert({
+        // Create feed post for artist follow
+        await supabase.from('social_posts').insert({
           user_id: user.id,
           post_type: 'artist_follow',
           artist_id: artistId,
@@ -264,6 +276,7 @@ export function useAudienceInteractions() {
           name,
           description: description || null,
           is_public: isPublic,
+          is_collaborative: false,
           created_at: now,
           updated_at: now,
           mood: mood || null,
@@ -322,7 +335,7 @@ export function useAudienceInteractions() {
           ].filter(Boolean);
           toast({
             title: 'Failed to create playlist',
-            description: messageParts.join(' — ') || 'Please try again in a moment.',
+            description: messageParts.join(': ') || 'Please try again in a moment.',
             variant: 'destructive',
           });
           return null;
@@ -413,6 +426,45 @@ export function useAudienceInteractions() {
     [playlists, user, toast],
   );
 
+  // Toggle collaborative mode on a playlist (owner only — enforced by RLS too)
+  const updatePlaylistCollaborative = useCallback(
+    async (playlistId: string, isCollaborative: boolean) => {
+      if (!user) return false;
+      if (!isSupabaseConfigured) {
+        const existing = listPlaylists(user.id);
+        const next = existing.map((p) =>
+          p.id === playlistId ? { ...p, is_collaborative: isCollaborative } : p,
+        );
+        savePlaylists(user.id, next);
+        setPlaylists(next);
+        toast({ title: isCollaborative ? 'Playlist is now collaborative' : 'Playlist is no longer collaborative' });
+        return true;
+      }
+
+      const { error } = await supabase
+        .from('playlists')
+        .update({ is_collaborative: isCollaborative } as any)
+        .eq('id', playlistId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        toast({
+          title: 'Could not update playlist',
+          description: error.message || 'Please try again in a moment.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      setPlaylists((prev) =>
+        prev.map((p) => (p.id === playlistId ? { ...p, is_collaborative: isCollaborative } : p)),
+      );
+      toast({ title: isCollaborative ? 'Playlist is now collaborative' : 'Playlist is no longer collaborative' });
+      return true;
+    },
+    [user, toast],
+  );
+
   // Add Song to Playlist
   const addSongToPlaylist = useCallback(async (playlistId: string, songId: string) => {
     if (!user) return;
@@ -474,6 +526,111 @@ export function useAudienceInteractions() {
     return (data || []).map((r: any) => r.song_id).filter(Boolean);
   }, []);
 
+  // Reorder Playlist Songs — bulk-updates `position` to match orderedSongIds
+  const reorderPlaylistSongs = useCallback(async (playlistId: string, orderedSongIds: string[]) => {
+    if (!isSupabaseConfigured) {
+      setPlaylistSongs(playlistId, orderedSongIds);
+      return;
+    }
+    const results = await Promise.all(
+      orderedSongIds.map((songId, index) =>
+        supabase
+          .from('playlist_songs')
+          .update({ position: index } as any)
+          .eq('playlist_id', playlistId)
+          .eq('song_id', songId),
+      ),
+    );
+    const failed = results.some((r) => r.error);
+    if (failed) {
+      toast({ title: 'Could not save track order', variant: 'destructive' });
+    }
+  }, [toast]);
+
+  // Get Playlist Collaborators (joined with audience_profiles, same pattern as useSocial)
+  const getPlaylistCollaborators = useCallback(async (playlistId: string): Promise<PlaylistCollaboratorWithProfile[]> => {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase
+      .from('playlist_collaborators')
+      .select('*')
+      .eq('playlist_id', playlistId);
+    if (error || !data || data.length === 0) return [];
+
+    const userIds = Array.from(new Set((data as any[]).map((c) => c.user_id).filter(Boolean)));
+    const { data: profileData } = await supabase
+      .from('audience_profiles')
+      .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
+      .or(`id.in.(${userIds.join(',')}),user_id.in.(${userIds.join(',')})`);
+
+    const profilesMap = new Map<string, any>();
+    ((profileData || []) as any[]).forEach((p: any) => {
+      profilesMap.set(String(p.id), p);
+      if (p?.user_id) profilesMap.set(String(p.user_id), p);
+    });
+
+    return (data as any[]).map((c) => ({
+      id: c.id,
+      playlist_id: c.playlist_id,
+      user_id: c.user_id,
+      can_edit: c.can_edit,
+      created_at: c.created_at,
+      profile: profilesMap.get(String(c.user_id)),
+    }));
+  }, []);
+
+  // Add a collaborator to a playlist (owner only — enforced by RLS)
+  const addPlaylistCollaborator = useCallback(async (playlistId: string, userId: string) => {
+    if (!user || !isSupabaseConfigured) return false;
+    const { error } = await supabase
+      .from('playlist_collaborators')
+      .insert({ playlist_id: playlistId, user_id: userId } as any);
+    if (error) {
+      toast({
+        title: 'Could not add collaborator',
+        description: error.message || 'Please try again in a moment.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    toast({ title: 'Collaborator added!' });
+    return true;
+  }, [user, toast]);
+
+  // Remove a collaborator (owner, or the collaborator removing themselves — enforced by RLS)
+  const removePlaylistCollaborator = useCallback(async (playlistId: string, userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const { error } = await supabase
+      .from('playlist_collaborators')
+      .delete()
+      .eq('playlist_id', playlistId)
+      .eq('user_id', userId);
+    if (error) {
+      toast({ title: 'Could not remove collaborator', variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Collaborator removed' });
+  }, [toast]);
+
+  // Search users by display name / username to add as a playlist collaborator
+  const searchUsersByUsername = useCallback(async (query: string) => {
+    const q = query.trim();
+    if (!q || !isSupabaseConfigured || !user) return [];
+    const escaped = q.replace(/[\\%_]/g, '\\$&');
+    const { data } = await supabase
+      .from('audience_profiles')
+      .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url')
+      .or(`username.ilike.%${escaped}%,display_name.ilike.%${escaped}%`)
+      .limit(8);
+    return ((data || []) as any[])
+      .filter((p) => p.user_id && p.user_id !== user.id)
+      .map((p) => ({
+        user_id: p.user_id as string,
+        display_name: (p.display_name || p.profile_name || p.username || null) as string | null,
+        username: (p.username || null) as string | null,
+        avatar_url: (p.avatar_url || p.profile_picture_url || null) as string | null,
+      }));
+  }, [user]);
+
   // Check if song is liked
   const isSongLiked = useCallback((songId: string) => likedSongs.includes(songId), [likedSongs]);
   
@@ -499,6 +656,12 @@ export function useAudienceInteractions() {
     addSongToPlaylist,
     removeSongFromPlaylist,
     getPlaylistSongs,
+    reorderPlaylistSongs,
     updatePlaylistVisibility,
+    updatePlaylistCollaborative,
+    getPlaylistCollaborators,
+    addPlaylistCollaborator,
+    removePlaylistCollaborator,
+    searchUsersByUsername,
   };
 }

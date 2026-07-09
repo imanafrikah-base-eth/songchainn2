@@ -230,6 +230,7 @@ export type Database = {
           total_rounds: number
           updated_at: string
           winner: string | null
+          x_space_url: string | null
         }
         Insert: {
           artist_a_image?: string | null
@@ -254,6 +255,7 @@ export type Database = {
           total_rounds?: number
           updated_at?: string
           winner?: string | null
+          x_space_url?: string | null
         }
         Update: {
           artist_a_image?: string | null
@@ -278,6 +280,7 @@ export type Database = {
           total_rounds?: number
           updated_at?: string
           winner?: string | null
+          x_space_url?: string | null
         }
         Relationships: []
       }

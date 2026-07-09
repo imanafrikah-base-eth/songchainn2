@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode, useMemo } from 'react';
-import { Song, SONGS, ARTISTS, CATALOGS } from '@/data/musicData';
+import { Song, SONGS } from '@/data/musicData';
 import { supabase } from '@/integrations/supabase/client';
-import { syncPublicSongsInBackground } from '@/lib/publicSongsSync';
 
 // Split context for better performance - components only re-render for what they need
 interface PlayerStateContext {
@@ -18,7 +17,7 @@ interface PlayerTimeContext {
 }
 
 interface PlayerActionsContext {
-  playSong: (song: Song, options?: { userAddress?: string; hasOwnership?: boolean; force?: boolean }) => void;
+  playSong: (song: Song, options?: { userAddress?: string; hasOwnership?: boolean; force?: boolean; startTime?: number }) => void;
   togglePlay: () => void;
   pause: () => void;
   play: () => void;
@@ -28,6 +27,9 @@ interface PlayerActionsContext {
   playPrevious: () => void;
   addToQueue: (song: Song) => void;
   playQueue: (songs: Song[], options?: { startIndex?: number }) => void;
+  jumpToIndex: (index: number) => void;
+  removeFromQueue: (index: number) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
   volume: number;
   repeatMode: 'off' | 'all' | 'one';
   setRepeatMode: (mode: 'off' | 'all' | 'one') => void;
@@ -42,6 +44,47 @@ interface PlayerActionsContext {
 const PlayerStateCtx = createContext<PlayerStateContext | undefined>(undefined);
 const PlayerTimeCtx = createContext<PlayerTimeContext | undefined>(undefined);
 const PlayerActionsCtx = createContext<PlayerActionsContext | undefined>(undefined);
+
+function shuffleArray<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+// Picks 3-5 unplayed tracks to keep the session going once the queue runs out:
+// same artist(s) as the queue first, then same genre(s), then a random sample —
+// always excluding anything already in the queue or already played this session.
+function pickAutoplayContinuation(currentQueue: Song[], playedIds: Set<string>): Song[] {
+  const targetCount = 3 + Math.floor(Math.random() * 3); // 3-5
+  const excluded = new Set(playedIds);
+  currentQueue.forEach(song => excluded.add(song.id));
+
+  const artistIds = new Set(currentQueue.map(song => song.artistId));
+  const genres = new Set(currentQueue.map(song => song.genre));
+
+  const picks: Song[] = [];
+  const take = (pool: Song[]) => {
+    for (const song of shuffleArray(pool)) {
+      if (picks.length >= targetCount) break;
+      if (excluded.has(song.id)) continue;
+      excluded.add(song.id);
+      picks.push(song);
+    }
+  };
+
+  take(SONGS.filter(song => artistIds.has(song.artistId) && !excluded.has(song.id)));
+  if (picks.length < targetCount) {
+    take(SONGS.filter(song => genres.has(song.genre) && !excluded.has(song.id)));
+  }
+  if (picks.length < targetCount) {
+    take(SONGS.filter(song => !excluded.has(song.id)));
+  }
+
+  return picks;
+}
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -72,6 +115,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const volumeRef = useRef(0.8);
   const queueRef = useRef<Song[]>(SONGS);
   const currentSongRef = useRef<Song | null>(null);
+  const playHistoryRef = useRef<Set<string>>(new Set());
   const isPlayingRef = useRef(false);
   const currentTimeRef = useRef(0);
   const isRoomModeRef = useRef(false);
@@ -125,6 +169,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     currentSongRef.current = currentSong;
+    if (currentSong) playHistoryRef.current.add(currentSong.id);
   }, [currentSong]);
 
   useEffect(() => {
@@ -138,25 +183,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     isRoomModeRef.current = isRoomMode;
   }, [isRoomMode]);
-
-  const bootstrapSongSources = useMemo(() => {
-    const byId = new Map<string, Song>();
-    for (const song of SONGS) {
-      byId.set(song.id, song);
-    }
-    for (const catalog of CATALOGS) {
-      for (const songId of catalog.songIds) {
-        const song = byId.get(songId);
-        if (song) byId.set(song.id, song);
-      }
-    }
-    return Array.from(byId.values());
-  }, []);
-
-  // Background sync of all current app song sources (SONGS + catalog-referenced songs).
-  useEffect(() => {
-    void syncPublicSongsInBackground(bootstrapSongSources, ARTISTS);
-  }, [bootstrapSongSources]);
 
   useEffect(() => {
     recoverAttemptsRef.current = 0;
@@ -442,10 +468,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [audioVersion, recoverRoomPlayback]);
 
-  const playSong = useCallback((song: Song, options?: { userAddress?: string; hasOwnership?: boolean; force?: boolean }) => {
+  const playSong = useCallback((song: Song, options?: { userAddress?: string; hasOwnership?: boolean; force?: boolean; startTime?: number }) => {
     if (isRoomModeRef.current && !options?.force) return;
     if (audioRef.current) {
-      if (isPlayingRef.current && currentSongRef.current) {
+      if (typeof options?.startTime === 'number' && options.startTime > 0) {
+        // A specific playback position was requested (e.g. seeking a feed
+        // card to the moment a song was pulsed) — crossfade doesn't support
+        // seeking, so jump straight in via forceSetSong instead.
+        void forceSetSong(song, { shouldPlay: true, startTime: options.startTime });
+      } else if (isPlayingRef.current && currentSongRef.current) {
         crossfadeToSong(song);
       } else {
         void forceSetSong(song, { shouldPlay: true });
@@ -544,7 +575,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       while (queue.length > 1 && randomIndex === currentIndex);
       nextIndex = randomIndex;
     } else if (currentIndex === queue.length - 1) {
-      nextIndex = repeatMode === 'all' ? 0 : currentIndex;
+      if (repeatMode === 'all') {
+        nextIndex = 0;
+      } else if (!isRoomMode) {
+        const additions = pickAutoplayContinuation(queue, playHistoryRef.current);
+        if (additions.length > 0) {
+          setQueue(prev => [...prev, ...additions]);
+          const nextSong = additions[0];
+          if (isPlaying) crossfadeToSong(nextSong);
+          else playSong(nextSong, { force: isRoomMode });
+          return;
+        }
+        nextIndex = currentIndex;
+      } else {
+        nextIndex = currentIndex;
+      }
     } else {
       nextIndex = currentIndex + 1;
     }
@@ -599,6 +644,60 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       void forceSetSong(nextSong, { shouldPlay: true });
     }
   }, [crossfadeToSong, currentSong, forceSetSong, isPlaying]);
+
+  const jumpToIndex = useCallback((index: number) => {
+    const song = queue[index];
+    if (!song) return;
+    if (isPlaying) {
+      crossfadeToSong(song);
+    } else {
+      playSong(song, { force: isRoomMode });
+    }
+  }, [queue, isPlaying, isRoomMode, crossfadeToSong, playSong]);
+
+  const removeFromQueue = useCallback((index: number) => {
+    setQueue(prev => {
+      if (index < 0 || index >= prev.length) return prev;
+      const removedSong = prev[index];
+      const next = prev.filter((_, i) => i !== index);
+
+      if (currentSong && removedSong.id === currentSong.id) {
+        if (next.length === 0) {
+          audioRef.current?.pause();
+          nextAudioRef.current?.pause();
+          setCurrentSong(null);
+          setIsPlaying(false);
+          setCurrentTime(0);
+        } else {
+          const nextIndex = Math.min(index, next.length - 1);
+          const nextSong = next[nextIndex];
+          if (isPlaying) {
+            crossfadeToSong(nextSong);
+          } else {
+            void forceSetSong(nextSong, { shouldPlay: false });
+          }
+        }
+      }
+
+      return next;
+    });
+  }, [currentSong, isPlaying, crossfadeToSong, forceSetSong]);
+
+  const reorderQueue = useCallback((fromIndex: number, toIndex: number) => {
+    setQueue(prev => {
+      if (
+        fromIndex < 0 || fromIndex >= prev.length ||
+        toIndex < 0 || toIndex >= prev.length ||
+        fromIndex === toIndex
+      ) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
 
   const enterRoomMode = useCallback(async (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => {
     if (playlist.length === 0) return false;
@@ -738,6 +837,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     playPrevious,
     addToQueue,
     playQueue,
+    jumpToIndex,
+    removeFromQueue,
+    reorderQueue,
     volume,
     repeatMode,
     setRepeatMode,
@@ -747,7 +849,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     exitRoomMode,
     hideRoom,
     showRoom,
-  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, pause, play, playNext, playPrevious, playQueue, playSong, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
+  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, jumpToIndex, pause, play, playNext, playPrevious, playQueue, playSong, removeFromQueue, reorderQueue, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
 
   return (
     <PlayerStateCtx.Provider value={stateValue}>

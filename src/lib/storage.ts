@@ -35,3 +35,27 @@ export async function uploadPublicImage(params: {
 
   return data.publicUrl;
 }
+
+// artist-uploads is a private bucket — submissions aren't reviewed yet, so
+// there's no public URL. The submit-artist-application edge function reads
+// these back with signed URLs using the service role key.
+export async function uploadArtistSubmissionFile(params: {
+  submissionId: string;
+  label: string;
+  file: File;
+}) {
+  const { submissionId, label, file } = params;
+
+  const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+  const objectPath = `${submissionId}/${label}.${sanitizeFileName(ext || 'bin')}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('artist-uploads')
+    .upload(objectPath, file, {
+      contentType: file.type || 'application/octet-stream',
+    });
+
+  if (uploadError) throw uploadError;
+
+  return objectPath;
+}

@@ -473,6 +473,11 @@ export default function About() {
               </div>
             </div>
           </div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            <Link to="/terms" className="underline-offset-2 hover:underline hover:text-foreground transition-colors">
+              Terms of Use and Privacy Notice
+            </Link>
+          </p>
         </motion.footer>
       </main>
 

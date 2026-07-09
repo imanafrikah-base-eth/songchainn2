@@ -30,7 +30,7 @@ interface EngagementContextType {
   toggleLike: (songId: string) => void;
   isLiked: (songId: string) => boolean;
   getPointsBreakdown: () => PointsBreakdown;
-  sendPulse: (songId: string, options?: { roomName?: string | null }) => void;
+  sendPulse: (songId: string, options?: { roomName?: string | null; positionSeconds?: number }) => void;
 }
 
 interface PointsBreakdown {
@@ -102,7 +102,6 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const offlinePlaysRef = useRef<OfflinePlay[]>([]);
   const playChannelRef = useRef<BroadcastChannel | null>(null);
   const likeInFlightRef = useRef<Set<string>>(new Set());
-  const pulsedSongPostsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const raw = localStorage.getItem('songchainn_last_play');
@@ -333,7 +332,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     };
   }, [user, isAuthLoading]);
 
-  const sendPulse = useCallback((songId: string, options?: { roomName?: string | null }) => {
+  const sendPulse = useCallback((songId: string, options?: { roomName?: string | null; positionSeconds?: number }) => {
     if (!songId) return;
     const now = Date.now();
     if (now - lastPulseAtRef.current < PULSE_DEDUPE_WINDOW_MS) return;
@@ -381,32 +380,19 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
+        // A DB trigger on song_analytics (create_song_pulse_social_post) creates
+        // the matching feed post server-side, with its own 4h-per-song cooldown.
+        const positionSeconds =
+          typeof options?.positionSeconds === 'number' && Number.isFinite(options.positionSeconds) && options.positionSeconds >= 0
+            ? options.positionSeconds
+            : null;
         await supabase.from('song_analytics').insert({
           event_type: 'pulse',
           song_id: songId,
           user_id: user?.id ?? null,
+          position_seconds: positionSeconds,
         } as any);
         queryClient.invalidateQueries({ queryKey: ['pulse-counts'] });
-
-        if (user?.id && !pulsedSongPostsRef.current.has(songId)) {
-          pulsedSongPostsRef.current.add(songId);
-          const cutoff = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
-          const { data: existing } = await supabase
-            .from('social_posts')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('song_id', songId)
-            .eq('post_type', 'song_pulse')
-            .gte('created_at', cutoff)
-            .limit(1);
-          if (!existing || existing.length === 0) {
-            await supabase.from('social_posts').insert({
-              user_id: user.id,
-              song_id: songId,
-              post_type: 'song_pulse',
-            } as any);
-          }
-        }
       } catch {
         if (import.meta.env.DEV) {
           console.error('Failed to record pulse event');
@@ -450,26 +436,10 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           const { error } = await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', songId);
           if (error) throw error;
         } else {
+          // A DB trigger on liked_songs (create_song_like_social_post) creates the
+          // matching feed post server-side, at most once per user+song.
           const { error: insertError } = await supabase.from('liked_songs').insert({ user_id: user.id, song_id: songId } as any);
           if (insertError) throw insertError;
-
-          const { data: existingLikes, error: selectError } = await supabase
-            .from('social_posts')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('song_id', songId)
-            .eq('post_type', 'song_like')
-            .limit(1);
-
-          if (!selectError && (!existingLikes || existingLikes.length === 0)) {
-            await supabase.from('social_posts').insert({
-              user_id: user.id,
-              song_id: songId,
-              playlist_id: null,
-              content: null,
-              post_type: 'song_like',
-            } as any);
-          }
         }
         // Immediately refresh global like counts without waiting for realtime
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });

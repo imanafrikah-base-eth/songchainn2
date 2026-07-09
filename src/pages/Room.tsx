@@ -586,7 +586,7 @@ export default function Room() {
 
       const profileRes = await (supabase as any)
         .from('room_profiles')
-        .select('room_name')
+        .select('room_name, has_custom_name')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -594,7 +594,12 @@ export default function Room() {
         setChatBackend('local');
       }
 
-      const loadedName = profileRes?.data?.room_name as string | undefined;
+      // join_room's insert sets room_name to a NOT NULL placeholder ('global')
+      // before the user has picked a name — has_custom_name distinguishes a
+      // real choice from that placeholder, so this doesn't skip the name
+      // prompt just because join_room's RPC happened to land first.
+      const hasCustomName = profileRes?.data?.has_custom_name === true;
+      const loadedName = hasCustomName ? (profileRes?.data?.room_name as string | undefined) : undefined;
       if (loadedName) {
         const normalized = normalizeRoomName(loadedName);
         setRoomName(normalized);
@@ -752,9 +757,7 @@ export default function Room() {
     const fallbackName = normalizeRoomName(roomNameRef.current || roomName || '') || 'Guest';
 
     const callRoomRpc = async (fn: 'join_room' | 'heartbeat_room' | 'leave_room') => {
-      const first = await (supabase as any).rpc(fn, { room_id: ROOM_ID });
-      if (!first?.error) return first;
-      return (supabase as any).rpc(fn, { roomId: ROOM_ID });
+      return (supabase as any).rpc(fn, { _room_id: ROOM_ID });
     };
 
     const setOptimisticSelf = () => {
@@ -831,11 +834,6 @@ export default function Room() {
     const joinRoom = async () => {
       setOptimisticSelf();
       await callRoomRpc('join_room');
-      // Direct upsert as fallback in case the RPC doesn't write to room_live_users
-      await (supabase as any).from('room_live_users').upsert(
-        { room_id: ROOM_ID, user_id: user.id, joined_at: new Date().toISOString(), last_seen_at: new Date().toISOString() },
-        { onConflict: 'room_id,user_id' }
-      );
       await refreshLiveUsers();
     };
 
@@ -870,8 +868,6 @@ export default function Room() {
       if (heartbeatInterval) window.clearInterval(heartbeatInterval);
       supabase.removeChannel(profilesChannel);
       void callRoomRpc('leave_room');
-      void (supabase as any).from('room_live_users').delete()
-        .eq('room_id', ROOM_ID).eq('user_id', user.id);
       setLiveUsers([]);
       setOnlineCount(0);
     };
@@ -1068,7 +1064,7 @@ export default function Room() {
     const { error } = await (supabase as any)
       .from('room_profiles')
       .upsert(
-        { user_id: user.id, room_name: normalized, updated_at: new Date().toISOString() },
+        { user_id: user.id, room_id: ROOM_ID, room_name: normalized, has_custom_name: true, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       );
 

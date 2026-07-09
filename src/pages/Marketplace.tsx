@@ -20,12 +20,13 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SONGS, ARTISTS } from '@/data/musicData';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
+import { useSongCoins } from '@/hooks/useSongCoins';
 import { useSongPopularity } from '@/hooks/usePopularity';
 import { UnlockSongModal } from '@/components/UnlockSongModal';
+import { SellSongModal } from '@/components/SellSongModal';
 import { OwnershipBadge } from '@/components/OwnershipBadge';
 import { usePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
-import { SONG_REGISTRY_ADDRESS } from '@/lib/songRegistry';
 import { cn } from '@/lib/utils';
 
 // Component for individual marketplace song card
@@ -44,12 +45,15 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
     offlinePlaysRemaining,
     previewSecondsRemaining,
     unlockSong,
+    sellSong,
     isLoading,
-    balance
+    balance,
+    coinAddress
   } = useSongOwnership(song.id);
-  
+  const [showSellModal, setShowSellModal] = useState(false);
+
   const isCurrentSong = currentSong?.id === song.id;
-  
+
   // Get real stats from database
   const realStats = useMemo(() => {
     const songData = popularityData?.find(p => p.song_id === song.id);
@@ -163,16 +167,24 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
           </div>
           
           {/* Token Info */}
-          {song.isTokenGated && (
+          {coinAddress && (
             <div className="pt-2 border-t border-border/50 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Token ID</span>
-                <span className="font-mono text-foreground">#{song.onChainId}</span>
+                <span className="text-muted-foreground">Coin</span>
+                <a
+                  href={`https://basescan.org/address/${coinAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="font-mono text-foreground hover:text-primary transition-colors"
+                >
+                  {coinAddress.slice(0, 6)}...{coinAddress.slice(-4)}
+                </a>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Your Balance</span>
                 <span className="font-mono text-foreground">
-                  {isLoading ? '...' : balance.toString()}
+                  {isLoading ? '...' : (Number(balance) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </span>
               </div>
               {ownershipStatus === 'offline_ready' && (
@@ -183,18 +195,28 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
               )}
             </div>
           )}
-          
+
           {/* Action Button */}
           <div className="pt-2">
             {ownershipStatus === 'owned' || ownershipStatus === 'offline_ready' ? (
-              <Button 
-                variant="outline" 
-                className="w-full gap-2"
-                onClick={handlePlay}
-              >
-                <Play size={16} />
-                Play Now
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2"
+                  onClick={handlePlay}
+                >
+                  <Play size={16} />
+                  Play Now
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2 text-destructive hover:text-destructive"
+                  disabled={!walletAddress}
+                  onClick={() => setShowSellModal(true)}
+                >
+                  Sell
+                </Button>
+              </div>
             ) : ownershipStatus === 'preview' ? (
               <div className="flex gap-2">
                 <Button 
@@ -236,6 +258,18 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
           onWalletConnected={setWalletAddress}
         />
       )}
+
+      {showSellModal && coinAddress && walletAddress && (
+        <SellSongModal
+          song={song}
+          isOpen={showSellModal}
+          onClose={() => setShowSellModal(false)}
+          balance={balance}
+          coinAddress={coinAddress}
+          walletAddress={walletAddress}
+          onSell={sellSong}
+        />
+      )}
     </>
   );
 }
@@ -243,11 +277,14 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
 export default function Marketplace() {
   const { user } = useAuth();
   const [filter, setFilter] = useState<'all' | 'owned' | 'available'>('all');
-  
-  // Get all token-gated songs
+  const { data: songCoins } = useSongCoins();
+
+  // Songs with a real, live Zora Content Coin
   const tokenGatedSongs = useMemo(() => {
-    return SONGS.filter(song => song.isTokenGated);
-  }, []);
+    if (!songCoins) return [];
+    const mintedIds = new Set(songCoins.map((c) => c.song_id));
+    return SONGS.filter(song => mintedIds.has(song.id));
+  }, [songCoins]);
   
   return (
     <div className="min-h-screen bg-background">
@@ -273,14 +310,14 @@ export default function Marketplace() {
             </div>
             
             <a
-              href={`https://basescan.org/address/${SONG_REGISTRY_ADDRESS}`}
+              href="https://zora.co/@songchainn"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:flex"
             >
               <Button variant="outline" size="sm" className="gap-2">
                 <ExternalLink size={14} />
-                View Contract
+                View on Zora
               </Button>
             </a>
           </div>

@@ -33,3 +33,20 @@ Song Arts/
 
 # Private credentials — never commit this folder
 .private/
+
+# Onchain minting tooling — may contain wallet keys, logs, and tx data
+scripts/zora-mint/
+
+# Local audit/debug artifacts
+e2e-audit/
+shots/
+screenshot.png
+state.json
+skills-lock.json
+_verify_tmp.cjs
+test-results/
+playwright-report/
+.agents/
+.claude/
+.mcp.json
+this is me SONGCHAINN.txt

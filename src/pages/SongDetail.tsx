@@ -2,16 +2,19 @@
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music, ListMusic, Lock, Globe } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
 import { usePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
 import { useSongPopularity } from '@/hooks/usePopularity';
+import { useSongOwnership } from '@/hooks/useSongOwnership';
 import { cn } from '@/lib/utils';
 import { SongCard } from '@/components/SongCard';
 import { SongComments } from '@/components/SongComments';
 import { ShareSongButton } from '@/components/ShareSongButton';
+import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
 import { useMemo, useEffect, useCallback, useState } from 'react';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -34,10 +37,12 @@ export default function SongDetail() {
   const [newPlaylistIsPublic, setNewPlaylistIsPublic] = useState(false);
   const [isSubmittingPlaylist, setIsSubmittingPlaylist] = useState(false);
 
-  const song = SONGS.find(s => s.id === id);
-  const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
+  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  const song = SONGS.find(s => s.id === id) ?? publishedSongs.find(s => s.id === id);
+  const artist = song ? (ARTISTS.find(a => a.id === song.artistId) ?? publishedArtists.find(a => a.id === song.artistId)) : null;
   const isCurrentSong = currentSong?.id === song?.id;
   const liked = song ? isLiked(song.id) : false;
+  const { coinAddress } = useSongOwnership(song?.id ?? '');
 
   const handleAddToExistingPlaylist = useCallback(async (playlistId: string) => {
     if (!song || isSubmittingPlaylist) return;
@@ -181,7 +186,7 @@ export default function SongDetail() {
     <div className="min-h-screen bg-background">
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6">
         {/* Back Button */}
         <Link 
           to="/" 
@@ -247,6 +252,12 @@ export default function SongDetail() {
                   {artist.name}
                 </span>
               </Link>
+
+              {coinAddress && (
+                <div className="mb-6">
+                  <OnchainVerifiedBadge coinAddress={coinAddress} size="md" />
+                </div>
+              )}
 
               {/* Stats */}
               <div className="flex items-center gap-6 mb-6">

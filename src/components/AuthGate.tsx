@@ -46,7 +46,7 @@ export function AuthGate({ onLogin }: AuthGateProps) {
             <h1 className="font-heading text-4xl font-bold text-foreground mb-2">
               $ongChainn
             </h1>
-            <p className="text-primary font-medium mb-2">Audience Edition · Phase One</p>
+            <p className="text-primary font-medium mb-2">Marketplace Edition · Phase Two</p>
             <p className="text-muted-foreground text-sm mb-8">
               Your decentralized music platform built with artists and fans together.
             </p>

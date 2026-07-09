@@ -1,8 +1,19 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SONGS, ARTISTS, Song, Artist } from '@/data/musicData';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+
+// Merges admin-published songs/artists (stored in the `songs` table) into the
+// static musicData catalog, so every popularity/ranking hook below sees them.
+function useMergedCatalog() {
+  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  const songs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
+  const artists = useMemo(() => [...ARTISTS, ...publishedArtists], [publishedArtists]);
+  return { songs, artists };
+}
 
 interface SongPopularity {
   song_id: string | null;
@@ -22,11 +33,11 @@ function getSeedPlayBaseline(songId: string): number {
   return 180 + ((n * 41 + n * 7 + 23) % 520);
 }
 
-function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined): SongPopularity[] {
+function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined, songs: Song[] = SONGS): SongPopularity[] {
   const merged = new Map<string, SongPopularity>();
 
-  // Seed play counts from static data only — NEVER seed likes (only real user actions count)
-  SONGS.forEach((song) => {
+  // Seed play counts from static + published data only — NEVER seed likes (only real user actions count)
+  songs.forEach((song) => {
     const seedPlays = numberOrZero(song.plays);
     const baseline = seedPlays === 0 ? getSeedPlayBaseline(song.id) : seedPlays;
     merged.set(song.id, {
@@ -283,25 +294,26 @@ function usePopularityRealtime() {
 
 export function useSongPopularity() {
   usePopularityRealtime();
-  
+  const { songs } = useMergedCatalog();
+
   return useQuery({
-    queryKey: ['song-popularity'],
+    queryKey: ['song-popularity', songs.length],
     queryFn: async () => {
       maybeResetRpcFlags();
       if (canUseGetSongPopularityRpc !== false) {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error) {
           canUseGetSongPopularityRpc = true;
-          return mergeSongPopularityWithSeed((data as SongPopularity[]) || []);
+          return mergeSongPopularityWithSeed((data as SongPopularity[]) || [], songs);
         }
         canUseGetSongPopularityRpc = false;
       }
 
-      return mergeSongPopularityWithSeed([] as SongPopularity[]);
+      return mergeSongPopularityWithSeed([] as SongPopularity[], songs);
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,
-    placeholderData: () => mergeSongPopularityWithSeed([]),
+    placeholderData: () => mergeSongPopularityWithSeed([], songs),
   });
 }
 
@@ -324,36 +336,30 @@ export function useProfilePopularity() {
   });
 }
 
-function buildSeedHotSongs(limit: number): TodayHotSong[] {
-  return SONGS
-    .map(song => ({ song, playsToday: getSeedPlayBaseline(song.id) }))
-    .sort((a, b) => b.playsToday - a.playsToday)
-    .slice(0, limit);
-}
-
 export function useTodayHotSongs(limit = 10) {
-  // Rolling 24-hour window — always shows the most recently hot songs regardless of timezone midnight.
-  // Recomputed each render so the window stays fresh without needing a page reload.
-  const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  // Bucket by the hour so the query key only changes once an hour (not every render).
-  const windowHour = windowStart.toISOString().slice(0, 13);
+  // Key by today's date in CAT (UTC+2) so the cache automatically invalidates at midnight CAT
+  // and the list resets cleanly with no rolling-window bleed from the previous day.
+  const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
+  const nowAsCat = new Date(Date.now() + CAT_OFFSET_MS);
+  const todayCat = nowAsCat.toISOString().slice(0, 10); // "YYYY-MM-DD" in CAT
+  const { songs } = useMergedCatalog();
 
   return useQuery({
-    queryKey: ['today-hot-songs', limit, windowHour],
+    queryKey: ['today-hot-songs', limit, todayCat, songs.length],
     queryFn: async () => {
       maybeResetRpcFlags();
 
-      // Primary path: SECURITY DEFINER RPC so anon users get full counts
+      // Primary path: omit p_since so the DB function computes midnight CAT itself.
+      // The SECURITY DEFINER RPC bypasses RLS so anon users see global counts.
       if (canUseGetTodayHotSongsRpc !== false) {
         const { data, error } = await (supabase as any).rpc('get_today_hot_songs', {
-          p_since: windowStart.toISOString(),
           p_limit: limit,
         });
         if (!error) {
           canUseGetTodayHotSongsRpc = true;
           return ((data as any[]) || [])
             .map((row: any) => {
-              const song = SONGS.find(s => s.id === String(row.song_id));
+              const song = songs.find(s => s.id === String(row.song_id));
               return song ? { song, playsToday: Number(row.plays_today) } : null;
             })
             .filter(Boolean) as TodayHotSong[];
@@ -361,12 +367,13 @@ export function useTodayHotSongs(limit = 10) {
         canUseGetTodayHotSongsRpc = false;
       }
 
-      // Fallback: direct query when RPC unavailable
+      // Fallback: direct query — compute midnight CAT on the client.
+      const midnightCat = new Date(`${todayCat}T00:00:00+02:00`).toISOString();
       const { data: rows } = await supabase
         .from('song_analytics')
         .select('song_id')
         .eq('event_type', 'play')
-        .gte('created_at', windowStart.toISOString());
+        .gte('created_at', midnightCat);
 
       if (!rows || rows.length === 0) return [] as TodayHotSong[];
 
@@ -378,7 +385,7 @@ export function useTodayHotSongs(limit = 10) {
         .sort(([, a], [, b]) => b - a)
         .slice(0, limit)
         .flatMap(([songId, playsToday]) => {
-          const song = SONGS.find(s => s.id === songId);
+          const song = songs.find(s => s.id === songId);
           return song ? [{ song, playsToday }] : [];
         });
     },
@@ -430,11 +437,12 @@ export function usePulseCounts() {
 
 export function useArtistFollowerCounts() {
   usePopularityRealtime();
+  const { artists } = useMergedCatalog();
 
   return useQuery({
-    queryKey: ['artist-follower-counts'],
+    queryKey: ['artist-follower-counts', artists.length],
     queryFn: async () => {
-      const artistIds = ARTISTS.map((artist) => artist.id);
+      const artistIds = artists.map((artist) => artist.id);
       const countsByArtist = new Map<string, number>();
       artistIds.forEach((artistId) => {
         countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE);
@@ -494,28 +502,29 @@ export function useArtistFollowerCounts() {
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,
-    placeholderData: () => ARTISTS.map(a => ({ artist_id: a.id, follower_count: ARTIST_FOLLOWER_BASELINE })),
+    placeholderData: () => artists.map(a => ({ artist_id: a.id, follower_count: ARTIST_FOLLOWER_BASELINE })),
   });
 }
 
 export function useArtistStreamTotals() {
   usePopularityRealtime();
+  const { songs } = useMergedCatalog();
 
   return useQuery({
-    queryKey: ['artist-stream-totals'],
+    queryKey: ['artist-stream-totals', songs.length],
     queryFn: async () => {
-      let popularityData: SongPopularity[] = mergeSongPopularityWithSeed([]);
+      let popularityData: SongPopularity[] = mergeSongPopularityWithSeed([], songs);
       if (canUseGetSongPopularityRpc !== false) {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error && data) {
           canUseGetSongPopularityRpc = true;
-          popularityData = mergeSongPopularityWithSeed(data as SongPopularity[]);
+          popularityData = mergeSongPopularityWithSeed(data as SongPopularity[], songs);
         } else {
           canUseGetSongPopularityRpc = false;
         }
       }
 
-      const songToArtist = new Map<string, string>(SONGS.map((song) => [song.id, song.artistId]));
+      const songToArtist = new Map<string, string>(songs.map((song) => [song.id, song.artistId]));
       const totals = new Map<string, number>();
 
       popularityData.forEach((row) => {
@@ -535,8 +544,8 @@ export function useArtistStreamTotals() {
     staleTime: 1000 * 10,
     refetchInterval: 10000,
     placeholderData: () => {
-      const seed = mergeSongPopularityWithSeed([]);
-      const songToArtist = new Map<string, string>(SONGS.map(s => [s.id, s.artistId]));
+      const seed = mergeSongPopularityWithSeed([], songs);
+      const songToArtist = new Map<string, string>(songs.map(s => [s.id, s.artistId]));
       const totals = new Map<string, number>();
       seed.forEach(row => {
         const artistId = songToArtist.get(String(row.song_id || ''));
@@ -548,16 +557,17 @@ export function useArtistStreamTotals() {
 }
 
 export function useRankedSongs() {
+  const { songs } = useMergedCatalog();
   const { data: popularityData, isLoading } = useSongPopularity();
   const { data: pulseCounts } = usePulseCounts();
-  
-  const rankedSongsBase: RankedSong[] = SONGS.map(song => {
+
+  const rankedSongsBase: RankedSong[] = songs.map(song => {
     const dbData = popularityData?.find(p => p.song_id === song.id);
     const baseScore = calculateSongScore(dbData);
     const pulseData = pulseCounts?.find(p => p.song_id === song.id);
     const pulseBonus = pulseData ? Math.sqrt(pulseData.pulse_count) : 0;
     const score = baseScore + pulseBonus;
-    
+
     return {
       ...song,
       plays: dbData?.play_count || 0,
@@ -573,22 +583,23 @@ export function useRankedSongs() {
 }
 
 export function useRankedArtists() {
+  const { artists } = useMergedCatalog();
   const { rankedSongs, isLoading } = useRankedSongs();
-  
+
   // Calculate artist popularity based on their songs' performance
   const artistScores = new Map<string, number>();
-  
+
   rankedSongs.forEach(song => {
     const current = artistScores.get(song.artistId) || 0;
     artistScores.set(song.artistId, current + song.popularity_score);
   });
-  
-  const rankedArtists = [...ARTISTS].sort((a, b) => {
+
+  const rankedArtists = [...artists].sort((a, b) => {
     const scoreA = artistScores.get(a.id) || 0;
     const scoreB = artistScores.get(b.id) || 0;
     return scoreB - scoreA;
   });
-  
+
   return { rankedArtists, isLoading };
 }
 

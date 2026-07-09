@@ -54,6 +54,7 @@ export interface Playlist {
   name: string;
   description: string | null;
   is_public: boolean;
+  is_collaborative?: boolean;
   created_at: string;
   updated_at: string;
   mood: string | null;
@@ -66,4 +67,16 @@ export interface PlaylistSong {
   song_id: string;
   position: number;
   added_at: string;
+}
+
+export interface PlaylistCollaborator {
+  id: string;
+  playlist_id: string;
+  user_id: string;
+  can_edit: boolean;
+  created_at: string;
+}
+
+export interface PlaylistCollaboratorWithProfile extends PlaylistCollaborator {
+  profile?: AudienceProfile;
 }

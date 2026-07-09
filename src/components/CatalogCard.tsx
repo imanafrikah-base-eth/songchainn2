@@ -17,7 +17,7 @@ export function CatalogCard({ catalog, isNew, className }: CatalogCardProps) {
         whileHover={{ y: -4 }}
         whileTap={{ scale: 0.99 }}
         className={cn(
-          'relative overflow-hidden rounded-2xl border border-white/10 bg-background/40 backdrop-blur glass-card transition-shadow',
+          'relative overflow-hidden rounded-xl glass-card transition-shadow',
           className,
         )}
       >

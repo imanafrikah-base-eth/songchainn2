@@ -8,6 +8,7 @@ export default defineConfig(() => ({
     port: 5173,
     host: true,
     strictPort: true,
+    open: true,
   },
   esbuild: {
     sourcemap: false,

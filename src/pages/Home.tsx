@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart, PlayCircle, Disc3, Info, Search, Wand2 } from 'lucide-react';
 // Note: Sword removed — WaveWarz quick action replaced by Search
-import { CATALOGS, ARTISTS, SONGS, type Catalog, type Song } from '@/data/musicData';
+import { CATALOGS, ARTISTS, SONGS, type Catalog, type Song, buildCatalogs } from '@/data/musicData';
 import { useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { useAuth } from '@/context/AuthContext';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 import { usePlayerActions, useSafePlayerState } from '@/context/PlayerContext';
@@ -17,6 +18,7 @@ import { CatalogCard } from '@/components/CatalogCard';
 import { CatalogGrid } from '@/components/CatalogGrid';
 import { SongCard } from '@/components/SongCard';
 import { EngagementPanel } from '@/components/EngagementPanel';
+import { WaveWarzHomeHero } from '@/components/wavewarz/WaveWarzHomeHero';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
@@ -48,7 +50,7 @@ const itemVariants = {
   show: { opacity: 1, y: 0 },
 };
 
-const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 14;
+const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 7;
 
 const PLAYLIST_GRADIENTS = [
   'from-emerald-500/70 via-emerald-400/40 to-cyan-500/70',
@@ -99,7 +101,12 @@ export default function Home() {
     isListening: Boolean(playerState?.isRoomMode),
   });
 
-  const catalogs = useMemo(() => CATALOGS, []);
+  const { songs: publishedSongs } = usePublishedCatalog();
+  const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
+  const catalogs = useMemo(
+    () => (publishedSongs.length ? buildCatalogs(allSongs) : CATALOGS),
+    [allSongs, publishedSongs.length],
+  );
   const catalogBySongId = useMemo(() => {
     const map = new Map<string, Catalog>();
     catalogs.forEach((catalog) => {
@@ -142,26 +149,24 @@ export default function Home() {
       const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
       return timeB - timeA;
     });
-    // Show only genuinely new releases; fall back to 5 most-recent if none qualify
-    const fresh = sorted.filter(isCatalogNew);
-    return fresh.length > 0 ? fresh : sorted.slice(0, 5);
+    return sorted.filter(isCatalogNew);
   }, [catalogs]);
   const songsByCatalog = useMemo(
     () =>
       catalogs
         .map((catalog) => {
           const songs: Song[] = catalog.songIds
-            .map((id) => SONGS.find((song) => song.id === id))
+            .map((id) => allSongs.find((song) => song.id === id))
             .filter(Boolean) as Song[];
           return { catalog, songs };
         })
         .filter((entry) => entry.songs.length > 0),
-    [catalogs],
+    [catalogs, allSongs],
   );
   const likedArtistSongs = useMemo(
     () => {
       const hotRank = new Map<string, number>(todayHotSongs.map((entry, index) => [entry.song.id, index]));
-      return SONGS.filter((song) => likedArtists.includes(song.artistId))
+      return allSongs.filter((song) => likedArtists.includes(song.artistId))
         .sort((a, b) => {
           const rankA = hotRank.get(a.id);
           const rankB = hotRank.get(b.id);
@@ -172,7 +177,7 @@ export default function Home() {
         })
         .slice(0, 8);
     },
-    [likedArtists, todayHotSongs],
+    [likedArtists, todayHotSongs, allSongs],
   );
   const allCatalogsCardRef = useRef<HTMLDivElement | null>(null);
   const { scrollYProgress: allCatalogsScrollProgress } = useScroll({
@@ -185,9 +190,9 @@ export default function Home() {
   const songsFromCatalogs = useCallback((catalogList: Catalog[]) => {
     const songIds = Array.from(new Set(catalogList.flatMap((catalog) => catalog.songIds)));
     return songIds
-      .map((songId) => SONGS.find((song) => song.id === songId))
+      .map((songId) => allSongs.find((song) => song.id === songId))
       .filter(Boolean) as Song[];
-  }, []);
+  }, [allSongs]);
 
   const handlePlayAllHotToday = useCallback(() => {
     const queueSongs = todayHotSongs.map((entry) => entry.song);
@@ -256,8 +261,8 @@ export default function Home() {
 
       window.setTimeout(() => {
         const promptText = hasSeenNewUserPrompt
-          ? 'Yo welcome back fam. Quick heads up: WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and submit your country for rollout.'
-          : 'Welcome to $ongChainn Phase One: Audience First. WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and submit your country for rollout.';
+          ? 'Yo welcome back fam. Quick heads up: WaveWarz Africa battles now run right here in $ongChainn -- watch live, vote, and speak in the room.'
+          : 'Welcome to $ongChainn. We are live in Phase Two: The Music Marketplace, where songs are real tradeable coins on Base. WaveWarz Africa battles now run right here too -- watch live, vote, and speak in the room.';
         window.dispatchEvent(
           new CustomEvent('songchainn:mosha-prompt', {
             detail: {
@@ -362,7 +367,7 @@ export default function Home() {
       <UpdateAvailableBanner />
       <DownloadAppBanner />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         {playerState?.isRoomMode && playerState.currentSong && (
           <div className="mb-4 sm:mb-6">
             <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
@@ -512,6 +517,8 @@ export default function Home() {
           </div>
         </div>
 
+        <WaveWarzHomeHero />
+
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-8">
           {/* Main Content */}
           <motion.div
@@ -539,7 +546,7 @@ export default function Home() {
                           </h2>
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          Top 10 most streamed songs today on $ongChainn — resets at midnight.
+                          Top 10 most streamed songs today on $ongChainn. Resets at midnight.
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -559,14 +566,16 @@ export default function Home() {
                       <div className="space-y-3">
                         {todayHotSongs.length === 0 && (
                           <p className="text-sm text-muted-foreground text-center py-6">
-                            No streams yet today — be the first to play a song!
+                            No streams yet today. Be the first to play a song!
                           </p>
                         )}
-                        {todayHotSongs.map(({ song, playsToday }, index) => (
+                        {todayHotSongs.map(({ song }, index) => (
                           <div key={song.id} className="space-y-1">
                             <SongCard song={song} index={index} variant="compact" />
                             <div className="text-[10px] sm:text-xs text-muted-foreground px-1 flex items-center gap-2">
-                              <span>{playsToday.toLocaleString()} plays today</span>
+                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-300 font-semibold text-[9px]">
+                                #{index + 1}
+                              </span>
                               {playerState?.currentSong && playerState.currentSong.id === song.id && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-sky-100">
                                   <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
@@ -929,8 +938,8 @@ export default function Home() {
                           <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary group-hover:translate-x-1 transition-transform" />
                         </h3>
                         <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4 max-w-lg">
-                          Own songs on-chain with any Base wallet. Unlock unlimited streaming, 
-                          1,000 offline plays, and support artists directly with 95% going to creators.
+                          Buy a song's coin on Base to truly own it: unlimited streaming, 1,000 offline
+                          plays, and you can resell it anytime. 95% of every purchase goes straight to the artist.
                         </p>
                         
                         {/* Stats */}
@@ -1037,10 +1046,10 @@ export default function Home() {
 
             {/* Phase Info */}
             <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 shine-overlay">
-              <h3 className="font-heading font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Phase One</h3>
+              <h3 className="font-heading font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Phase Two</h3>
               <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-5 leading-relaxed">
-                You're part of the early audience building listening culture.
-                Ownership, minting, and rewards activate in later phases.
+                Songs are now real, tradeable coins on Base. Buy them, sell them,
+                and back the artists you love directly, on-chain.
               </p>
               <div className="space-y-2 sm:space-y-3">
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
@@ -1052,8 +1061,8 @@ export default function Home() {
                   <span className="text-foreground">Community Participation</span>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" />
-                  <span className="text-foreground">Music Ownership in Beta Mode</span>
+                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full gradient-primary shadow-glow" />
+                  <span className="text-foreground">On-Chain Ownership & Trading</span>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                   <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-muted" />

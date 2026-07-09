@@ -502,8 +502,8 @@ function Hero() {
             <p style={{ fontFamily:"'Outfit',sans-serif",fontSize:"clamp(15px,2vw,18px)",
               color:"rgba(255,255,255,.55)",lineHeight:1.8,maxWidth:460,marginBottom:36,
               animation:"fadeUp .8s .2s ease both",opacity:0,animationFillMode:"forwards" }}>
-              Tell me what you're building. I'll bring the right people to the table —
-              including myself — to build, grow, and ship.
+              Tell me what you're building. I'll bring the right people to the table,
+              including myself, to build, grow, and ship.
             </p>
 
             <div style={{ display:"flex",gap:14,flexWrap:"wrap",
@@ -646,17 +646,17 @@ function About() {
               Closing the gap between builders and the people who need them.
             </h2>
             <p style={{ fontFamily:"'Outfit',sans-serif",fontSize:16,color:T.slate,lineHeight:1.85,marginBottom:18 }}>
-              For too long, middlemen have extracted from artists — their revenue, their data, their audiences.
+              For too long, middlemen have extracted from artists: their revenue, their data, their audiences.
               I build the infrastructure that gives it back.
             </p>
             <p style={{ fontFamily:"'Outfit',sans-serif",fontSize:16,color:T.slate,lineHeight:1.85,marginBottom:18 }}>
-              I'm <strong style={{color:T.navy}}>Zaal</strong> — electrical engineer turned ecosystem architect,
+              I'm <strong style={{color:T.navy}}>Zaal</strong>, electrical engineer turned ecosystem architect,
               based in Maine. I founded <strong style={{color:T.gold}}>The ZAO</strong> to close the gap between
               blockchain tools and creator distribution.
             </p>
             <p style={{ fontFamily:"'Outfit',sans-serif",fontSize:16,color:T.slate,lineHeight:1.85,marginBottom:28 }}>
               I also connect builders, artists, and communities with the right people to make things happen.
-              Whether you need infrastructure built or the right introduction made — <em style={{color:T.ink}}>that's what I do.</em>
+              Whether you need infrastructure built or the right introduction made, <em style={{color:T.ink}}>that's what I do.</em>
             </p>
             <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginBottom:32 }}>
               {["Ecosystem Architect","Creator Economy","DAO Governance","Farcaster","Solana","IRL Events","Open Source","MIT Licensed"].map(t=><Pill key={t} label={t} />)}
@@ -675,7 +675,7 @@ function About() {
 function Serve() {
   const cards = [
     { icon:"🎨",who:"Artists & Creators",
-      blurb:"You make the work. You should own it — the revenue, the audience, the data. Zaal builds infrastructure that puts power back in creative hands.",
+      blurb:"You make the work. You should own it: the revenue, the audience, the data. Zaal builds infrastructure that puts power back in creative hands.",
       detail:"Connect with the community, find collaborators, and own your work.",
       cta:"Join the ZAO →",href:"https://www.thezao.com/about" },
     { icon:"🏗️",who:"Builders & Founders",
@@ -683,7 +683,7 @@ function Serve() {
       detail:"Tell me about your challenge. I'll connect you with the right people.",
       cta:"Get Connected →",href:"#contact" },
     { icon:"🌐",who:"Communities & DAOs",
-      blurb:"Governance, open tooling, fractal coordination — building the spaces where serious people do serious work together.",
+      blurb:"Governance, open tooling, fractal coordination: building the spaces where serious people do serious work together.",
       detail:"Open-source infrastructure built for the long game.",
       cta:"Let's Build →",href:"#contact" },
   ];
@@ -807,7 +807,7 @@ function Work() {
   const projects = [
     { emoji:"🌐",name:"The ZAO",
       tags:["DAO","Creator Economy","MIT Licensed"],
-      desc:"Impact organization bringing ownership back to independent artists. Community infrastructure, fractal governance, creator tools — all open source.",
+      desc:"Impact organization bringing ownership back to independent artists. Community infrastructure, fractal governance, creator tools, all open source.",
       stats:["1,000+ participants","90+ governance meetings","MIT licensed"],
       url:"https://www.thezao.com/",domain:"thezao.com" },
     { emoji:"🎵",name:"WaveWarZ",
@@ -822,7 +822,7 @@ function Work() {
       url:"https://zaoos.com",domain:"zaoos.com" },
     { emoji:"🎪",name:"ZAO Festivals",
       tags:["IRL","Events","NYC · Miami"],
-      desc:"Real-world events at crypto conferences. ZAO-Palooza in NYC and ZAO-Chella in Miami — 22 artists, live on-chain music battles.",
+      desc:"Real-world events at crypto conferences. ZAO-Palooza in NYC and ZAO-Chella in Miami: 22 artists, live on-chain music battles.",
       stats:["2 festivals · 22 artists"],
       url:"https://zaofestivals.com/",domain:"zaofestivals.com" },
     { emoji:"🎙️",name:"Let's Talk About Ethereum",
@@ -863,7 +863,7 @@ function Work() {
               The Work
             </h2>
             <p style={{ fontFamily:"'Outfit',sans-serif",fontSize:15,color:T.slate,maxWidth:380 }}>
-              Every project is live and shipping — not a concept or a deck.
+              Every project is live and shipping, not a concept or a deck.
             </p>
           </div>
           <div style={{ display:"flex",gap:10 }}>
@@ -944,11 +944,11 @@ function Work() {
 function Journey() {
   const events = [
     {year:"2022",icon:"🎓",title:"BS Electrical Engineering, RIT",
-      detail:"Led a $1.5M robotics project — achieved 7× throughput improvement. Started seeing the systems that hold creators back."},
+      detail:"Led a $1.5M robotics project that achieved 7× throughput improvement. Started seeing the systems that hold creators back."},
     {year:"2022",icon:"🌊",title:"Entered Web3 in the Bear Market",
-      detail:'"The people still building were serious." Bear markets reveal who is building for real — Zaal stayed.'},
+      detail:'"The people still building were serious." Bear markets reveal who is building for real: Zaal stayed.'},
     {year:"2023",icon:"🌱",title:"Founded The ZAO",
-      detail:"Creator infrastructure for independent artists — open source from day one. Community first, always."},
+      detail:"Creator infrastructure for independent artists, open source from day one. Community first, always."},
     {year:"2024",icon:"🎪",title:"ZAO-Palooza & ZAO-Chella",
       detail:"Produced 2 live festivals: NYC and Miami. 22 artists. On-chain music battles, IRL energy, no middlemen."},
     {year:"2025",icon:"📈",title:"300+ Newsletters · WaveWarZ $50K+",
@@ -1083,7 +1083,7 @@ function Testimonials() {
           flexWrap:"wrap",gap:16 }}>
           <div>
             <div style={{ fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:15,color:T.navy,marginBottom:4 }}>Worked with Zaal?</div>
-            <div style={{ fontFamily:"'Outfit',sans-serif",fontSize:13,color:T.mist }}>Leave a testimonial — submissions are reviewed before going live.</div>
+            <div style={{ fontFamily:"'Outfit',sans-serif",fontSize:13,color:T.mist }}>Leave a testimonial. Submissions are reviewed before going live.</div>
           </div>
           <Btn href="mailto:zaalp99@gmail.com?subject=Testimonial" v="outline">Submit a Testimonial →</Btn>
         </div>

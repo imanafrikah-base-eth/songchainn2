@@ -47,6 +47,7 @@ const HostCreate = () => {
     songA: "",
     songB: "",
     schedule: "",
+    xSpaceUrl: "",
     notes: "",
   });
   const [coHostSearch, setCoHostSearch] = useState("");
@@ -210,6 +211,13 @@ const HostCreate = () => {
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
+  // Live audio runs on X Spaces while in-app voice is off; store a clean absolute URL.
+  const normalizedSpaceUrl = (): string | null => {
+    const raw = form.xSpaceUrl.trim();
+    if (!raw) return null;
+    return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  };
+
   const filteredUsers = useMemo(() => {
     if (!coHostSearch.trim()) return users.filter(u => !selectedCoHosts.find(s => s.user_id === u.user_id));
     return users.filter(
@@ -285,15 +293,19 @@ const HostCreate = () => {
 
   const upsertCoHostsInRoom = async (battleId: string) => {
     if (!selectedCoHosts.length) return;
+    const failed: string[] = [];
     for (const coHost of selectedCoHosts) {
-      await supabase.from("battle_rooms").delete().eq("battle_id", battleId).eq("user_id", coHost.user_id);
-      await supabase.from("battle_rooms").insert({
-        battle_id: battleId,
-        user_id: coHost.user_id,
-        role: "co-host",
-        display_name: coHost.display_name || coHost.username || "Co-Host",
-        is_muted: true,
-        is_speaking: false,
+      const { error } = await supabase.rpc("add_battle_cohost", {
+        _battle_id: battleId,
+        _user_id: coHost.user_id,
+        _display_name: coHost.display_name || coHost.username || "Co-Host",
+      });
+      if (error) failed.push(coHost.display_name || coHost.username || "a co-host");
+    }
+    if (failed.length) {
+      toast({
+        title: "Some co-hosts weren't seated",
+        description: `Couldn't add: ${failed.join(", ")}. They can still join the room from their invite and take part in the battle.`,
       });
     }
   };
@@ -380,6 +392,7 @@ const HostCreate = () => {
         host_name: profile?.display_name || profile?.username || (user as any).user_metadata?.display_name || (user as any).user_metadata?.username || (user.email || "").split("@")[0] || "Host",
         co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
         scheduled_time: form.schedule || null,
+        x_space_url: normalizedSpaceUrl(),
         status: "upcoming",
         round: 1,
         total_rounds: 3,
@@ -468,6 +481,7 @@ const HostCreate = () => {
           host_name: hostName,
           co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
           scheduled_time: scheduledTime,
+          x_space_url: normalizedSpaceUrl(),
           status,
           round: 1,
           total_rounds: 3,
@@ -632,6 +646,23 @@ const HostCreate = () => {
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Radio className="h-3.5 w-3.5" />
               Live capacity: {liveBattlesCount}/5 active battles
+            </p>
+          </div>
+
+          {/* X Space link for live audio */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">X Space Link (optional)</label>
+            <div className="relative">
+              <Radio className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <input
+                value={form.xSpaceUrl}
+                onChange={(e) => update("xSpaceUrl", e.target.value)}
+                placeholder="https://x.com/i/spaces/..."
+                className={inputClass}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Live audio runs on X Spaces. Paste your Space link and listeners get a "Listen on X" button in the battle room, while voting and chat stay right here.
             </p>
           </div>
 

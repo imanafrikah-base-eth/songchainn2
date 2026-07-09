@@ -25,13 +25,31 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
   const { user, signInWithFarcasterMiniApp, signInWithFarcasterContext } = useAuth();
   const signedInRef = useRef(false);
   const [quickAuthFailed, setQuickAuthFailed] = useState(false);
+  // Holds the in-flight SIWF promise so the sign-in completion effect can await it.
+  const siwfPromiseRef = useRef<Promise<{ message: string; signature: string } | null> | null>(null);
 
-  // Auto-register FC mini-app users in Supabase so they appear in all app tables.
-  // Strategy:
-  //   1. Try silent SIWF (sdk.actions.signIn) → real Supabase user + audience_profiles row
-  //   2. Fallback: local-only fc-XXX context user (still writes to farcaster_profiles)
+  // Kick off SIWF as soon as we know we're in a Farcaster frame — runs in parallel
+  // with sdk.context so the two round-trips overlap instead of stacking.
   useEffect(() => {
-    // Allow sign-in for local-only fc- users (no real Supabase session) so they can be upgraded.
+    const hasRealSession = user && !user.id?.startsWith('fc-');
+    if (!state.isInFarcaster || hasRealSession || siwfPromiseRef.current || signedInRef.current) return;
+    siwfPromiseRef.current = (async () => {
+      try {
+        return await Promise.race([
+          requestFarcasterSignIn(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('siwf:timeout')), 15000)
+          ),
+        ]);
+      } catch {
+        return null;
+      }
+    })();
+  }, [state.isInFarcaster, user]);
+
+  // Complete sign-in once sdk.context has resolved and the user's fid is available.
+  // By then the SIWF promise (started above) is either already resolved or nearly done.
+  useEffect(() => {
     const hasRealSession = user && !user.id?.startsWith('fc-');
     if (!state.isInFarcaster || hasRealSession || signedInRef.current) return;
     const fc = state.context?.user;
@@ -47,20 +65,20 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
     };
 
     const doSignIn = async () => {
-      // Path 1: Silent SIWF → real Supabase session + full profile registration.
-      // 15 s timeout: enough for the host UI but won't hang forever on broken clients.
-      try {
-        const siwf = await Promise.race([
-          requestFarcasterSignIn(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('siwf:timeout')), 15000)),
-        ]);
-        const result = await signInWithFarcasterMiniApp(fcData, siwf.message, siwf.signature);
-        if (!result.error) return; // Success — user is fully registered
-      } catch {
-        // SIWF failed (network, host doesn't support it, timeout, etc.) — use fallback
+      // Await the already-in-progress SIWF (started in parallel with context fetch).
+      // If SIWF finished first this resolves instantly; if context was faster we wait here.
+      const siwf = siwfPromiseRef.current ? await siwfPromiseRef.current : null;
+
+      if (siwf) {
+        try {
+          const result = await signInWithFarcasterMiniApp(fcData, siwf.message, siwf.signature);
+          if (!result.error) return;
+        } catch {
+          // SIWF path failed — fall through to context-only
+        }
       }
 
-      // Path 2: Context-only sign-in (writes fc-XXX to localStorage + farcaster_profiles for community)
+      // Fallback: context-only sign-in (writes fc-XXX to localStorage + farcaster_profiles)
       const result = await signInWithFarcasterContext(fcData);
       if (result?.error) {
         setQuickAuthFailed(true);

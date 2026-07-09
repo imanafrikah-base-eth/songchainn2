@@ -126,48 +126,6 @@ export default function Social() {
     void load();
   }, [posts, sharedPostId]);
 
-  // Auto-play / pause as posts snap into view (TikTok behaviour)
-  const pauseRef = useRef(() => {});
-  const { pause: pauseFn } = usePlayerActions();
-  pauseRef.current = pauseFn;
-
-  useEffect(() => {
-    const container = feedRef.current;
-    if (!container) return;
-    let timer: ReturnType<typeof setTimeout>;
-
-    const handleScroll = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const idx = Math.round(container.scrollTop / container.clientHeight);
-        const post = postsToRenderRef.current[idx];
-        if (!post) return;
-
-        // Determine which song to play for this post
-        let songToPlay = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
-
-        // Artist-follow post → auto-play that artist's top song
-        if (!songToPlay && post.post_type === 'artist_follow' && post.artist_id) {
-          const artistSongs = SONGS.filter(s => s.artistId === post.artist_id).sort((a,b) => b.plays - a.plays);
-          songToPlay = artistSongs[0] ?? null;
-        }
-
-        if (songToPlay) {
-          playSongRef.current(songToPlay);
-        } else {
-          // Non-music post — pause whatever is playing
-          pauseRef.current();
-        }
-      }, 160);
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      clearTimeout(timer);
-    };
-  }, []);
-
   const filteredPosts = feedType === 'following'
     ? posts.filter((p) => following.includes(p.user_id) || p.user_id === user?.id)
     : posts;
@@ -175,6 +133,98 @@ export default function Social() {
   const postsToRender = sharedPost ? [sharedPost] : filteredPosts;
   postsToRenderRef.current = postsToRender;
   const effectiveIsLoading = isLoading || isLoadingSharedPost;
+
+  // Auto-play / pause as posts scroll into/out of view (TikTok behaviour) —
+  // driven by a real IntersectionObserver per card rather than scrollTop
+  // arithmetic, so "stop when scrolled past" is based on actual visibility.
+  const pauseRef = useRef(() => {});
+  const { pause: pauseFn } = usePlayerActions();
+  pauseRef.current = pauseFn;
+
+  const cardRefs = useRef(new Map<string, HTMLDivElement>());
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const visibleRatiosRef = useRef(new Map<string, number>());
+  const activePostIdRef = useRef<string | null>(null);
+
+  const resolvePostSong = useCallback((post: SocialPostWithProfile) => {
+    let songToPlay = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
+    if (!songToPlay && post.post_type === 'artist_follow' && post.artist_id) {
+      const artistSongs = SONGS.filter(s => s.artistId === post.artist_id).sort((a, b) => b.plays - a.plays);
+      songToPlay = artistSongs[0] ?? null;
+    }
+    return songToPlay;
+  }, []);
+
+  const decideActiveCard = useCallback(() => {
+    let bestId: string | null = null;
+    let bestRatio = 0;
+    for (const [id, ratio] of visibleRatiosRef.current.entries()) {
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestId = id;
+      }
+    }
+    if (bestRatio < 0.5) bestId = null;
+    if (bestId === activePostIdRef.current) return;
+    activePostIdRef.current = bestId;
+
+    const post = bestId ? postsToRenderRef.current.find(p => p.id === bestId) : null;
+    if (!post) {
+      pauseRef.current();
+      return;
+    }
+
+    const songToPlay = resolvePostSong(post);
+    if (!songToPlay) {
+      pauseRef.current();
+      return;
+    }
+
+    const startTime = post.post_type === 'song_pulse' && typeof post.metadata?.position_seconds === 'number'
+      ? post.metadata.position_seconds
+      : undefined;
+    playSongRef.current(songToPlay, typeof startTime === 'number' ? { startTime } : undefined);
+  }, [resolvePostSong]);
+
+  const decideActiveCardRef = useRef(decideActiveCard);
+  decideActiveCardRef.current = decideActiveCard;
+
+  const postIdsKey = useMemo(() => postsToRender.map(p => p.id).join(','), [postsToRender]);
+
+  useEffect(() => {
+    const container = feedRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        const id = (entry.target as HTMLElement).dataset.postId;
+        if (!id) return;
+        visibleRatiosRef.current.set(id, entry.isIntersecting ? entry.intersectionRatio : 0);
+      });
+      decideActiveCardRef.current();
+    }, { root: container, threshold: [0, 0.25, 0.5, 0.75, 1] });
+
+    observerRef.current = observer;
+    cardRefs.current.forEach((el) => observer.observe(el));
+
+    return () => {
+      observer.disconnect();
+      observerRef.current = null;
+      visibleRatiosRef.current.clear();
+      activePostIdRef.current = null;
+    };
+  }, [postIdsKey]);
+
+  const registerCardRef = useCallback((postId: string, el: HTMLDivElement | null) => {
+    const existing = cardRefs.current.get(postId);
+    if (existing && observerRef.current) observerRef.current.unobserve(existing);
+    if (el) {
+      cardRefs.current.set(postId, el);
+      observerRef.current?.observe(el);
+    } else {
+      cardRefs.current.delete(postId);
+    }
+  }, []);
 
   const handleOpenComments = async (postId: string) => {
     setCommentSheet({ isOpen: true, postId });
@@ -259,7 +309,12 @@ export default function Social() {
           </div>
         ) : (
           postsToRender.map((post) => (
-            <div key={post.id} className="h-full w-full snap-start">
+            <div
+              key={post.id}
+              data-post-id={post.id}
+              ref={(el) => registerCardRef(post.id, el)}
+              className="h-full w-full snap-start"
+            >
               <MusicFeedCard
                 post={post}
                 onLike={toggleLikePost}

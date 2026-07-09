@@ -2,130 +2,121 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Repository Layout
 
-**SongChainn** (`songchainn.xyz`) is a decentralized music social platform. Users discover and share music, follow artists, interact through posts, and join live audio battle rooms ("WaveWarz BattleZone"). The stack combines a React SPA with Supabase as the backend and LiveKit for real-time WebRTC audio.
+This is a monorepo-style workspace. The git working tree is rooted at `$ONGCHAINN/` but the git directory lives inside `BattleZone/`. Two distinct apps share the same Supabase backend:
 
-## Tech Stack
+| Path | App | Purpose |
+|---|---|---|
+| `src/` | **SONGCHAINN** | Main PWA — music streaming, social feed, marketplace |
+| `src/battlezone/` | BattleZone (embedded) | WaveWarz Africa sub-app served at `/wavewarz-africa/*` inside the main app |
+| `BattleZone/africa-battle-live-ui/` | **BattleZone standalone** | Separate Vite app for hosting/spectating live battles (own git repo) |
+| `supabase/` | Shared backend | Edge Functions + migrations used by both apps |
 
-| Layer | Technology |
-|---|---|
-| UI | React 18 + TypeScript, Vite 5 |
-| Routing | React Router 6 |
-| Server state | TanStack Query (React Query 5) |
-| Styling | Tailwind CSS 3 + shadcn-ui (Radix UI) |
-| Animation | Framer Motion |
-| Auth / DB | Supabase (Postgres + Auth + Edge Functions) |
-| Real-time audio | LiveKit WebRTC |
-| Web3 | Wagmi 2 + Viem + Coinbase OnchainKit |
-| Forms | React Hook Form + Zod |
-| Testing | Playwright (E2E) |
-
-## Dev Commands
+## Commands — Main App (`$ONGCHAINN/`)
 
 ```bash
-npm run dev              # Start Vite dev server (localhost:5173)
-npm run build            # Production build → dist/
-npm run build:dev        # Dev-mode build
-npm run lint             # ESLint check
-npm run preview          # Preview production build locally
-npm run livekit:token    # Start LiveKit token server locally
-npm run test:e2e         # Run Playwright E2E tests (headless)
-npm run test:e2e:headed  # Run Playwright with browser visible
-npm run test:e2e:list    # List available E2E tests
+npm run dev          # dev server at http://localhost:5173
+npm run build        # tsc type-check + vite build
+npm run build:dev    # vite build in development mode
+npm run lint         # eslint
+npm run preview      # serve dist/
+
+# E2E tests (Playwright, requires built/running app)
+npm run test:e2e
+npm run test:e2e:headed
+npm run test:e2e:list
 ```
 
-## Directory Layout
+## Commands — BattleZone Standalone (`BattleZone/africa-battle-live-ui/`)
 
+```bash
+npm run dev          # vite dev server
+npm run build        # vite build (no tsc check)
+npm run test         # vitest run (unit tests, jsdom)
+npm run test:watch   # vitest watch
+npm run lint         # eslint
 ```
-src/
-  pages/           # Route-level components (Home, Discover, Social, Room, Profile, Admin…)
-  components/      # Reusable UI; social/, wallet/, wavewarz/, ui/ (shadcn primitives)
-  context/         # AuthContext, PlayerContext, EngagementContext
-  hooks/           # useSocial, useShare, usePopularity, usePlayerContext…
-  integrations/
-    supabase/      # Typed Supabase client (client.ts) + generated types (types.ts)
-  lib/             # Utilities: songRegistry, localDb, web3Config, env, networkCheck
-  types/           # database.ts, social.ts
-  data/            # Static music data (SONGS, ARTISTS)
-api/
-  livekit-token.ts # Vercel serverless — mints LiveKit JWT tokens
-BattleZone/
-  africa-battle-live-ui/  # Standalone Vite sub-project (live battles UI)
-supabase/
-  functions/       # Edge functions: livekit-token, generate-artwork, moderate-comment, verify-base-signature
-  migrations/      # 30+ ordered SQL migrations
-e2e/               # Playwright tests
-```
-
-## Application Boot Sequence
-
-1. **`src/main.tsx`** — Mounts React root; sets up QueryClient, Web3Provider, ErrorBoundary, chunk-error auto-reload (max 2/min), Supabase fetch retry interceptor, service worker registration
-2. **`src/App.tsx`** — Renders `AuthProvider` → checks session → shows Onboarding gate or AppShell with all lazy-loaded routes; subscribes to `global-pulse-effects` Supabase channel
-3. **`src/context/AuthContext.tsx`** — Bootstraps Supabase session with an 8-second timeout guard, loads `user_roles` and `audience_profiles`, falls back to IndexedDB cache (`localDb.ts`) when Supabase is unreachable
-
-## Routing
-
-All pages are `lazy()`-imported. Adding a new page: lazy-import in `App.tsx`, add `<Route>`, add to `BottomTabBar` if it belongs in the main nav. Routes at `/room` hide all chrome (full-screen LiveKit). `/wavewarz-africa/*` delegates to the separate BattleZone sub-project.
-
-## State Management
-
-- **Auth / Player / Engagement** — React Context (`useAuth()`, `usePlayerContext()`)
-- **Server data** — TanStack Query: 5 min stale, 10 min gc, `refetchOnWindowFocus: false`, retry: 1
-- **Real-time** — Supabase channels: `song_analytics` INSERT events drive pulse animations dispatched as `custom:pulse-effect` DOM events
-
-## LiveKit / BattleZone Flow
-
-1. Client requests token from `POST /api/livekit-token` (Vercel serverless)
-2. Server validates Supabase JWT via `SUPABASE_SERVICE_ROLE_KEY`, checks `battle_rooms` table for user role (host/co-host/speaker/audience)
-3. Server returns a signed LiveKit access token; client connects to `VITE_LIVEKIT_WS_URL`
-4. Publish permission granted only to host/co-host/speaker roles
-5. In dev, `vite.config.ts` proxies `/api/livekit-token` to the local token server (`npm run livekit:token`)
-
-## Web3
-
-- Wagmi 2 + Base mainnet only; WalletConnect and Coinbase Wallet connectors disabled — injected + EIP-6963 only
-- `Web3Provider` (`src/components/Web3Provider.tsx`) mounts client-side only (useEffect guard)
-- OnchainKit (Coinbase) is lazy-loaded only on the Marketplace page
-- Wallet address flows into `AuthContext`; Base signature verification is handled by the `verify-base-signature` Edge Function
-
-## Supabase
-
-- Client: `src/integrations/supabase/client.ts` — always import from here, never instantiate directly. Has a `localStorage` graceful fallback for private browsing.
-- Types: `src/integrations/supabase/types.ts` — regenerate with `supabase gen types typescript --project-id <id>`
-- RLS is enabled on all tables; test features with both authenticated and anon sessions
-- Key tables: `audience_profiles`, `user_roles`, `liked_songs`, `liked_artists`, `social_posts`, `post_comments`, `song_analytics`, `battle_rooms`, `room_messages`
-- Edge functions: `livekit-token`, `generate-artwork`, `moderate-comment`, `verify-base-signature`, `artist-follow-counts`
 
 ## Environment Variables
 
-Frontend (need `VITE_` prefix):
-- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — validated at startup in `src/lib/env.ts` (shows visible error UI if wrong)
-- `VITE_LIVEKIT_WS_URL` — WebSocket URL for LiveKit
-- `VITE_ONCHAINKIT_API_KEY`, `VITE_ONCHAINKIT_PROJECT_ID` — Coinbase OnchainKit
+Copy `.env.example` to `.env.local` for local development. Required variables:
 
-Server-side (Vercel / Edge Functions, no `VITE_` prefix):
-- `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+```
+VITE_SUPABASE_URL=https://nztccconvwmxpoyjwkrf.supabase.co
+VITE_SUPABASE_ANON_KEY=<JWT anon key — must start with eyJ, NOT sb_publishable_...>
+VITE_LIVEKIT_WS_URL=wss://voice.songchainn.xyz
+VITE_LIVEKIT_TOKEN_ENDPOINT=http://127.0.0.1:7880/token
+```
 
-See `.env.example` for all keys.
+Server-side (Vercel / Supabase Edge Function secrets — no `VITE_` prefix):
+```
+LIVEKIT_API_KEY, LIVEKIT_SECRET, LIVEKIT_URL, SUPABASE_SERVICE_ROLE_KEY
+```
 
-## Code Splitting
+`src/lib/env.ts` validates env at startup and renders a full-screen error overlay in the browser if Supabase URL/key are missing or mismatched — check the browser console first when the app fails to load.
 
-Vite manual chunks: `vendor-react`, `vendor-web3`, `vendor-livekit`, `vendor-ui`. Chunk size warning at 1 000 KB. `VibeAgent` and `BehaviorCtaPopups` are also lazy-loaded inside the AppShell.
+## Architecture — Main App
 
-## Coding Conventions
+**Providers (root → leaf order in `App.tsx`):**
+`BrowserRouter` → `AuthProvider` → `FarcasterProvider` → `FacebookProvider` → `TooltipProvider` → `AppContent`
 
-- Tailwind utility classes only — no inline `style={}` unless CSS variables or truly dynamic values
-- shadcn-ui primitives for all base UI (Button, Avatar, Sheet, Skeleton, Tabs, etc.)
-- All Supabase queries go through `src/integrations/supabase/client.ts`
-- New pages: `lazy()`-import in `App.tsx`, add route, add to nav if needed
-- No comments unless the *why* is non-obvious
+Inside an authenticated session: `OfflineQueueProvider` → `PlayerProvider` → `EngagementProvider` → `AppShell`
 
-## Social Feed
+**Routing:** All pages are lazy-loaded. Auth state gates the route tree:
+- Unauthenticated: public routes render, auth-required routes redirect to `<Auth />`
+- Onboarding incomplete: `<Onboarding />` renders instead of the full shell
+- Authenticated: `<AppShell />` renders with `<BottomTabBar />`, `<VibeAgent />`, `<BehaviorCtaPopups />`
+- Vanity slug routes (`/:artistSlug/:songSlug`) are last and resolved by `<SlugResolver />`
 
-`src/pages/Social.tsx` — free-scroll feed (no snap). `MusicFeedCard` handles manual play/pause on tap; no autoplay on scroll.
+**Context/State:**
+- `AuthContext` — Supabase session + synthetic identities for Farcaster (`fc-` prefix) and Facebook (`fb-` prefix) users stored in `localStorage`. Three auth paths: email, wallet (SIWE via `src/lib/baseWallet.ts`), Farcaster mini-app.
+- `PlayerContext` — Audio playback split into three sub-contexts (`PlayerStateCtx`, `PlayerTimeCtx`, `PlayerActionsCtx`) to minimize re-renders. Manages queue, crossfade, room mode (LiveKit), shuffle/repeat.
+- `EngagementContext` — Tracks engagement events (pulses, listens) and batches analytics writes.
+- `OfflineQueueProvider` — Queues mutations when offline and flushes on reconnect.
 
-## BattleZone Sub-project
+**Data layer:** TanStack Query wraps all Supabase reads. Writes go through hooks in `src/hooks/`. Direct Supabase calls use `src/integrations/supabase/client.ts`. The client gracefully falls back to in-memory storage when `localStorage` is unavailable (private browsing / restricted webviews).
 
-`BattleZone/africa-battle-live-ui/` has its own `package.json` and Vite config. Run it independently or access via `/wavewarz-africa/*` routes in the main app.
+**PWA / offline:** `useOfflineAudio.ts` caches audio, `src/lib/localDb.ts` is an in-browser SQLite-style store for offline-first profile and playlist data.
+
+**Realtime:** Global pulse animations are triggered by Supabase Realtime subscriptions on `song_analytics` inserts (event_type = 'pulse') — see `AppShell` in `App.tsx`.
+
+**Vite build:** All `node_modules` are bundled into a single `vendor` chunk. Splitting was attempted but caused React `forwardRef` errors in production (chunk load order). Do not attempt chunk splitting without verifying React + react-dom + scheduler co-locate in the same chunk.
+
+## Architecture — BattleZone (`src/battlezone/` and `BattleZone/africa-battle-live-ui/`)
+
+The embedded (`src/battlezone/`) and standalone versions share the same structure and Supabase schema. They differ only in routing (standalone has its own `BrowserRouter`) and auth (standalone has its own `AuthContext` in `src/battlezone/contexts/`).
+
+Key modules:
+- `src/battlezone/lib/livekit.ts` — LiveKit token fetch and room management
+- `src/battlezone/lib/songchain.ts` — Reads `audience_profiles` to verify SONGCHAINN membership
+- `src/battlezone/hooks/useBattles.ts` — Battle CRUD via Supabase
+- `src/battlezone/hooks/useHostAudio.ts` — Host-side microphone/LiveKit audio
+
+**Embed mode:** `EmbedModeContext` detects whether the app is running inside an iframe (the main SONGCHAINN app embeds Results at `/wavewarz-africa/results`). In embed mode, navigation and the top bar are suppressed.
+
+## Supabase Edge Functions (`supabase/functions/`)
+
+| Function | Purpose |
+|---|---|
+| `livekit-token` | Issues LiveKit JWT for room participants |
+| `wallet-auth` | Verifies SIWE signature, returns Supabase JWT |
+| `farcaster-auth` | Verifies Farcaster frame signature |
+| `facebook-auth` | Exchanges Facebook token, upserts profile |
+| `generate-artwork` | AI artwork generation |
+| `moderate-comment` | Comment moderation |
+| `artist-follow-counts` | Aggregates follow counts |
+| `verify-base-signature` | Verifies Base chain signatures |
+
+Deploy with `supabase functions deploy <name>`.
+
+## Path Aliases
+
+`@` resolves to `src/` in both the main app and `africa-battle-live-ui`. Inside `src/battlezone/`, imports use `@/battlezone/` as the prefix (e.g., `@/battlezone/components/ui/button`).
+
+## Deployment
+
+Deployed to Vercel. `vercel.json` at repo root configures:
+- SPA fallback rewrite (all non-asset paths → `index.html`)
+- OG image API rewrites: `/share/:id` → `/api/song-og`, `/share/artist/:id` → `/api/artist-og`
+- Long-lived cache headers for `/assets/` (hashed filenames, 1 year)

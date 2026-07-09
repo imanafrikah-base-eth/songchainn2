@@ -2,7 +2,7 @@ import { memo, useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, Share2, ListMusic, Shuffle, Repeat, Repeat1, Copy, Check, MessageCircle } from 'lucide-react';
+import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, Share2, ListMusic, Shuffle, Repeat, Repeat1, Copy, Check, MessageCircle, GripVertical } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
 import { Slider } from '@/components/ui/slider';
@@ -10,6 +10,11 @@ import { cn } from '@/lib/utils';
 import { useShare } from '@/hooks/useShare';
 import { toast } from '@/hooks/use-toast';
 import { fcOpenUrl } from '@/lib/farcasterActions';
+import { useAuth } from '@/context/AuthContext';
+import { useSongOwnership } from '@/hooks/useSongOwnership';
+import { OwnershipBadge } from '@/components/OwnershipBadge';
+import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
+import { UnlockSongModal } from '@/components/UnlockSongModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +23,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
+import { useArtworkColor, hslToRgbTriplet } from '@/hooks/useArtworkColor';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -34,17 +41,33 @@ interface FullScreenPlayerProps {
 export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose }: FullScreenPlayerProps) {
   const { currentSong, isPlaying, queue, isRoomMode } = usePlayerState();
   const { currentTime, duration } = usePlayerTime();
-  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume, repeatMode, setRepeatMode, shuffleMode, toggleShuffle } = usePlayerActions();
+  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume, repeatMode, setRepeatMode, shuffleMode, toggleShuffle, jumpToIndex, removeFromQueue, reorderQueue } = usePlayerActions();
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const { toggleLike, isLiked, sendPulse } = useEngagement();
   const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();
   const { copied, shareSong, copyToClipboard, shareToX, getSongShareUrl } = useShare();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [showQueue, setShowQueue] = useState(false);
   const [pulseRipples, setPulseRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const [showPulseHint, setShowPulseHint] = useState(false);
   const [showSoftHint, setShowSoftHint] = useState(false);
   const [showPulseSent, setShowPulseSent] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | undefined>(user?.user_metadata?.wallet_address);
+
+  const {
+    status: ownershipStatus,
+    offlinePlaysRemaining,
+    unlockSong,
+    coinAddress,
+  } = useSongOwnership(currentSong?.id ?? '');
+
+  const handleWalletConnected = useCallback((address: string) => {
+    setWalletAddress(address);
+  }, []);
 
   const pulsePointerDownRef = useRef(false);
   const pulseTimerRef = useRef<number | null>(null);
@@ -58,6 +81,9 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
   const liked = currentSong ? isLiked(currentSong.id) : false;
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const isSaved = currentSong ? isSongCached(currentSong.id) : false;
+
+  const { color: artworkColor } = useArtworkColor(currentSong?.coverImage);
+  const glowRgbTriplet = artworkColor ? hslToRgbTriplet(artworkColor) : '56, 189, 248';
   const isSaving = currentSong ? cachingInProgress === currentSong.id : false;
   const hasPlayedEnoughToSave = currentTime >= 20;
 
@@ -242,7 +268,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
     window.setTimeout(() => {
       setPulseRipples(prev => prev.filter(r => r.id !== id));
     }, 600);
-    sendPulse(currentSong.id);
+    sendPulse(currentSong.id, { positionSeconds: currentTime });
     if (!hasShownPulseSentRef.current) {
       hasShownPulseSentRef.current = true;
       setShowPulseSent(true);
@@ -253,7 +279,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
         void 0;
       }
     }
-  }, [currentSong, isPlaying, sendPulse]);
+  }, [currentSong, isPlaying, currentTime, sendPulse]);
 
   const handlePulseButtonClick = useCallback(() => {
     const node = pulseButtonRef.current;
@@ -320,6 +346,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           className="fixed inset-0 z-[100] bg-background"
+          style={artworkColor ? ({ '--artwork-glow': artworkColor } as React.CSSProperties) : undefined}
         >
           {/* Animated background blur based on cover */}
           <div className="absolute inset-0 overflow-hidden">
@@ -334,6 +361,11 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   initial={{ scale: 1.1, opacity: 0 }}
                   animate={{ scale: 1, opacity: 0.3 }}
                   transition={{ duration: 1 }}
+                />
+                {/* Color wash sampled from this song's artwork, layered over the blur */}
+                <div
+                  className="absolute inset-0"
+                  style={{ background: 'radial-gradient(circle at 50% 30%, hsl(var(--artwork-glow, var(--glow-blue)) / 0.25) 0%, transparent 70%)' }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
               </>
@@ -380,9 +412,9 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   ref={pulseButtonRef}
                   type="button"
                   onClick={handlePulseButtonClick}
-                  className="relative w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center shadow-glow-intense"
-                  animate={{ scale: [1, 1.08, 1], boxShadow: ['0 0 0 0 rgba(56,189,248,0.0)', '0 0 18px 4px rgba(56,189,248,0.5)', '0 0 0 0 rgba(56,189,248,0.0)'] }}
-                  transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                  className="relative w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center shadow-glow-artwork-intense"
+                  animate={prefersReducedMotion ? {} : { scale: [1, 1.08, 1], boxShadow: [`0 0 0 0 rgba(${glowRgbTriplet},0.0)`, `0 0 18px 4px rgba(${glowRgbTriplet},0.5)`, `0 0 0 0 rgba(${glowRgbTriplet},0.0)`] }}
+                  transition={prefersReducedMotion ? undefined : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                 >
                   <span className="w-3 h-3 rounded-full bg-primary" />
                 </motion.button>
@@ -407,21 +439,29 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                 transition={{ type: 'spring', damping: 20, stiffness: 200, delay: 0.1 }}
                 className="relative w-full max-w-[320px] aspect-square mb-8"
               >
-                <div className="absolute inset-0 rounded-3xl shadow-glow-intense opacity-60" />
-                <div className="relative w-full h-full rounded-3xl overflow-hidden glass-card shine-overlay">
-                  {currentSong.coverImage ? (
-                    <img
-                      src={currentSong.coverImage}
-                      alt={currentSong.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary/40 to-primary/10" />
-                  )}
-                </div>
+                <motion.div
+                  className="relative w-full h-full"
+                  animate={isPlaying && !prefersReducedMotion ? { scale: [1, 1.015, 1] } : { scale: 1 }}
+                  transition={isPlaying && !prefersReducedMotion
+                    ? { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+                    : { duration: 0.3 }}
+                >
+                  <div className="absolute inset-0 rounded-3xl shadow-glow-artwork-intense opacity-60" />
+                  <div className="relative w-full h-full rounded-3xl overflow-hidden glass-card shine-overlay">
+                    {currentSong.coverImage ? (
+                      <img
+                        src={currentSong.coverImage}
+                        alt={currentSong.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-primary/40 to-primary/10" />
+                    )}
+                  </div>
 
-                {/* Vinyl ring effect (optional decorative) */}
-                <div className="absolute inset-0 rounded-3xl border border-foreground/5 pointer-events-none" />
+                  {/* Vinyl ring effect (optional decorative) */}
+                  <div className="absolute inset-0 rounded-3xl border border-foreground/5 pointer-events-none" />
+                </motion.div>
               </motion.div>
 
               {/* Song Info */}
@@ -441,6 +481,27 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                 >
                   {currentSong.artist}
                 </button>
+                {currentSong.isTokenGated && ownershipStatus !== 'free' && (
+                  <div className="mt-2 flex items-center justify-center gap-2">
+                    {(ownershipStatus === 'owned' || ownershipStatus === 'offline_ready') && (
+                      <OwnershipBadge status={ownershipStatus} offlinePlays={offlinePlaysRemaining} size="sm" />
+                    )}
+                    {(ownershipStatus === 'preview' || ownershipStatus === 'preview_used') && (
+                      <button
+                        type="button"
+                        onClick={() => setShowUnlockModal(true)}
+                        className="text-[11px] font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                      >
+                        Unlock this song
+                      </button>
+                    )}
+                  </div>
+                )}
+                {coinAddress && (
+                  <div className="mt-2 flex items-center justify-center">
+                    <OnchainVerifiedBadge coinAddress={coinAddress} size="md" />
+                  </div>
+                )}
                 <div className="mt-3 flex items-center justify-center gap-2">
                   <button
                     onClick={handleKeepThis}
@@ -655,7 +716,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                       height: 160,
                       borderRadius: '9999px',
                       background:
-                        'radial-gradient(circle, rgba(56,189,248,0.35) 0%, rgba(56,189,248,0.0) 70%)',
+                        `radial-gradient(circle, rgba(${glowRgbTriplet},0.35) 0%, rgba(${glowRgbTriplet},0.0) 70%)`,
                       pointerEvents: 'none',
                     }}
                   />
@@ -726,13 +787,24 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                           initial={{ opacity: 0, x: 20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: index * 0.05 }}
+                          draggable
+                          onDragStart={() => setDragIndex(index)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => {
+                            if (dragIndex !== null && dragIndex !== index) reorderQueue(dragIndex, index);
+                            setDragIndex(null);
+                          }}
+                          onDragEnd={() => setDragIndex(null)}
+                          onClick={() => jumpToIndex(index)}
                           className={cn(
-                            "flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer",
+                            "flex items-center gap-2 p-3 rounded-xl transition-colors cursor-pointer",
                             currentSong.id === song.id
                               ? "bg-primary/10 border border-primary/30"
-                              : "hover:bg-secondary/50"
+                              : "hover:bg-secondary/50",
+                            dragIndex === index && "opacity-50"
                           )}
                         >
+                          <GripVertical className="w-4 h-4 text-muted-foreground/50 flex-shrink-0 cursor-grab active:cursor-grabbing" />
                           <div className="w-10 h-10 rounded-lg bg-secondary overflow-hidden flex-shrink-0">
                             {song.coverImage ? (
                               <img
@@ -755,6 +827,14 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                             </p>
                             <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
                           </div>
+                          <button
+                            type="button"
+                            aria-label="Remove from queue"
+                            onClick={(e) => { e.stopPropagation(); removeFromQueue(index); }}
+                            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors flex-shrink-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </motion.div>
                       ))}
                     </div>
@@ -764,6 +844,16 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
             </AnimatePresence>
           </div>
         </motion.div>
+      )}
+      {showUnlockModal && currentSong && (
+        <UnlockSongModal
+          song={currentSong}
+          isOpen={showUnlockModal}
+          onClose={() => setShowUnlockModal(false)}
+          onUnlock={unlockSong}
+          walletAddress={walletAddress}
+          onWalletConnected={handleWalletConnected}
+        />
       )}
     </AnimatePresence>
   );

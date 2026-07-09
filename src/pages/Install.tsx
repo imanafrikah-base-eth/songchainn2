@@ -153,7 +153,7 @@ export default function Install() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         <AnimatePresence>
           {showIOSInstructions && (
             <motion.div

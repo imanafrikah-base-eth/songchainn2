@@ -186,6 +186,7 @@ export default function Onboarding() {
         x_profile_link: xProfileLink.trim() || null,
         base_profile_link: baseProfileLink.trim() || null,
         onboarding_completed: true,
+        terms_accepted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         ...(avatarUrl ? { profile_picture_url: avatarUrl } : {}),
         ...(coverUrl ? { cover_photo_url: coverUrl } : {}),
@@ -558,7 +559,7 @@ export default function Onboarding() {
 
           {/* Early Access Note */}
           <p className="text-xs text-muted-foreground text-center">
-            You're early — your Audience activity here unlocks future access and ownership.
+            You're early. Your Audience activity here unlocks future access and ownership.
           </p>
         </motion.form>
       </div>

@@ -2,7 +2,8 @@
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music } from 'lucide-react';
-import { CATALOGS, SONGS, ARTISTS, type Song } from '@/data/musicData';
+import { CATALOGS, SONGS, ARTISTS, buildCatalogs, type Song } from '@/data/musicData';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
@@ -17,14 +18,22 @@ export default function CatalogDetail() {
   const { playQueue, togglePlay } = usePlayerActions();
   const { toggleSaveCatalog, isCatalogSaved } = useAudienceInteractions();
 
-  const catalog = useMemo(() => CATALOGS.find((item) => item.id === id), [id]);
-  const artist = useMemo(() => (catalog ? ARTISTS.find((item) => item.id === catalog.artistId) : null), [catalog]);
+  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
+  const allArtists = useMemo(() => [...ARTISTS, ...publishedArtists], [publishedArtists]);
+  const catalogs = useMemo(
+    () => (publishedSongs.length ? buildCatalogs(allSongs) : CATALOGS),
+    [allSongs, publishedSongs.length],
+  );
+
+  const catalog = useMemo(() => catalogs.find((item) => item.id === id), [catalogs, id]);
+  const artist = useMemo(() => (catalog ? allArtists.find((item) => item.id === catalog.artistId) : null), [catalog, allArtists]);
   const songs = useMemo(() => {
     if (!catalog) return [];
     return catalog.songIds
-      .map((songId) => SONGS.find((song) => song.id === songId))
+      .map((songId) => allSongs.find((song) => song.id === songId))
       .filter(Boolean) as Song[];
-  }, [catalog]);
+  }, [catalog, allSongs]);
 
   const isCurrentCatalog = Boolean(currentSong && catalog?.songIds.includes(currentSong.id));
   const isSaved = Boolean(catalog && isCatalogSaved(catalog.id));
@@ -61,7 +70,7 @@ export default function CatalogDetail() {
     <div className="min-h-screen bg-background">
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6">
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"

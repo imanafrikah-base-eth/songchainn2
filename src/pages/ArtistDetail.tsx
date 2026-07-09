@@ -1,8 +1,10 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search } from 'lucide-react';
-import { ARTISTS, SONGS } from '@/data/musicData';
+import { ARTISTS, SONGS, getRelatedArtists } from '@/data/musicData';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { SongCard } from '@/components/SongCard';
+import { ArtistCard } from '@/components/ArtistCard';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
@@ -55,8 +57,9 @@ export default function ArtistDetail() {
     addComment,
   } = useSocial();
   
-  const artist = ARTISTS.find(a => a.id === id);
-  const artistSongs = SONGS.filter(s => s.artistId === id);
+  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  const artist = ARTISTS.find(a => a.id === id) ?? publishedArtists.find(a => a.id === id);
+  const artistSongs = [...SONGS, ...publishedSongs].filter(s => s.artistId === id);
   const isFollowingArtist = id ? isArtistLiked(id) : false;
 
   const { data: artistAccount, isLoading: isArtistAccountLoading } = useQuery({
@@ -526,13 +529,20 @@ export default function ArtistDetail() {
     [followerCounts, id],
   );
 
+  const relatedArtists = useMemo(() => {
+    if (!id) return [];
+    const allArtists = [...ARTISTS, ...publishedArtists];
+    const allSongs = [...SONGS, ...publishedSongs];
+    return getRelatedArtists(id, allArtists, allSongs, 6);
+  }, [id, publishedArtists, publishedSongs]);
+
   if (!artist) {
     // Still loading — show skeleton while artist account/profile resolves
     if (isArtistAccountLoading) {
       return (
         <div className="min-h-screen bg-background">
           <Navigation />
-          <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+          <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6">
             <div className="mb-6">
               <Skeleton className="h-4 w-32" />
             </div>
@@ -603,7 +613,7 @@ export default function ArtistDetail() {
     >
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6">
         {/* Back Button */}
         <Link 
           to="/artists" 
@@ -1028,6 +1038,19 @@ export default function ArtistDetail() {
             ));
           })()}
         </section>
+
+        {relatedArtists.length > 0 && (
+          <section className="mt-10">
+            <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Related Artists</h2>
+            <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+              {relatedArtists.map((relatedArtist, index) => (
+                <div key={relatedArtist.id} className="w-44 sm:w-52 shrink-0">
+                  <ArtistCard artist={relatedArtist} index={index} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       <AudioPlayer />

@@ -7,10 +7,12 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'follow' | 'like' | 'comment' | 'mention' | 'playlist';
-  from_user_id: string;
+  type: 'follow' | 'like' | 'comment' | 'mention' | 'playlist' | 'announcement';
+  from_user_id: string | null;
   post_id: string | null;
   message: string | null;
+  title?: string | null;
+  metadata?: { cta_path?: string; [key: string]: unknown } | null;
   is_read: boolean;
   created_at: string;
   from_profile?: AudienceProfile;
@@ -62,12 +64,11 @@ export function useNotifications() {
       .limit(50);
 
     if (notificationsData && notificationsData.length > 0) {
-      const fromUserIds = [...new Set(notificationsData.map(n => n.from_user_id))];
-      
-      const { data: profilesData } = await supabase
-        .from('audience_profiles')
-        .select('*')
-        .in('id', fromUserIds);
+      const fromUserIds = [...new Set(notificationsData.map(n => n.from_user_id).filter((id): id is string => !!id))];
+
+      const { data: profilesData } = fromUserIds.length > 0
+        ? await supabase.from('audience_profiles').select('*').in('id', fromUserIds)
+        : { data: [] as AudienceProfile[] };
 
       const normalizedProfiles = ((profilesData as any[]) || []).map((p) => ({
         ...p,
@@ -81,10 +82,12 @@ export function useNotifications() {
       const enrichedNotifications: Notification[] = notificationsData.map(n => ({
         id: n.id,
         user_id: n.user_id,
-        type: n.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist',
+        type: n.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist' | 'announcement',
         from_user_id: n.from_user_id,
         post_id: n.post_id,
         message: n.message,
+        title: (n as any).title ?? null,
+        metadata: (n as any).metadata ?? null,
         is_read: n.is_read,
         created_at: n.created_at,
         from_profile: profilesMap.get(n.from_user_id),
@@ -200,7 +203,7 @@ export function useNotifications() {
 
       const enrichedNotification: Notification = {
         ...newNotification,
-        type: newNotification.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist',
+        type: newNotification.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist' | 'announcement',
         from_profile: profileData
           ? ({
               ...(profileData as any),

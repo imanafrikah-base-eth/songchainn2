@@ -12,9 +12,11 @@ import { SpinningSongArt } from './SpinningSongArt';
 import { AIArtwork } from './AIArtwork';
 import { ShareSongButton } from './ShareSongButton';
 import { OwnershipBadge } from './OwnershipBadge';
+import { OnchainVerifiedBadge } from './OnchainVerifiedBadge';
 import { UnlockSongModal } from './UnlockSongModal';
 import { useAuth } from '@/context/AuthContext';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
+import { useArtworkColor } from '@/hooks/useArtworkColor';
 import { Button } from '@/components/ui/button';
 import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { toast } from '@/hooks/use-toast';
@@ -26,6 +28,16 @@ interface SongCardProps {
 }
 
 const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 14;
+
+function NowPlayingDot() {
+  return (
+    <motion.span
+      className="inline-block w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"
+      animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
+      transition={{ duration: 1.5, repeat: Infinity }}
+    />
+  );
+}
 
 export const SongCard = memo(function SongCard({ song, index = 0, variant = 'default' }: SongCardProps) {
   const { currentSong, isPlaying } = usePlayerState();
@@ -39,11 +51,12 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
   const navigate = useNavigate();
   
   // Song ownership for token-gated songs
-  const { 
-    status: ownershipStatus, 
+  const {
+    status: ownershipStatus,
     offlinePlaysRemaining,
     previewSecondsRemaining,
     unlockSong,
+    coinAddress,
   } = useSongOwnership(song.id);
   
   const [showUnlockModal, setShowUnlockModal] = useState(false);
@@ -51,6 +64,10 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
   const [coverImageFailed, setCoverImageFailed] = useState(false);
 
   const isCurrentSong = currentSong?.id === song.id;
+  const { color: artworkColor } = useArtworkColor(isCurrentSong ? song.coverImage : undefined);
+  const artworkGlowStyle = isCurrentSong && artworkColor
+    ? ({ '--artwork-glow': artworkColor } as React.CSSProperties)
+    : undefined;
   const liked = isLiked(song.id);
   const isTokenGated = song.isTokenGated;
   const isSaved = isSongCached(song.id);
@@ -99,8 +116,8 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     if (!isCurrentSong) {
       playSong(song);
     }
-    sendPulse(song.id);
-  }, [isCurrentSong, playSong, sendPulse, song]);
+    sendPulse(song.id, isCurrentSong ? { positionSeconds: currentTime } : undefined);
+  }, [isCurrentSong, playSong, sendPulse, song, currentTime]);
 
   const handleShareToFeed = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -174,9 +191,12 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           className={cn(
             "group flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl sm:rounded-2xl transition-all cursor-pointer",
             isCurrentSong
-              ? "glass-card border-primary/30"
+              ? artworkColor
+                ? "glass-card border-[hsl(var(--artwork-glow)/0.3)]"
+                : "glass-card border-primary/30"
               : "hover:bg-secondary/30"
           )}
+          style={artworkGlowStyle}
           onClick={handlePlay}
         >
           <div className="relative w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl bg-secondary flex items-center justify-center flex-shrink-0 overflow-hidden shadow-soft shine-overlay">
@@ -208,6 +228,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
+              {isCurrentSong && isPlaying && <NowPlayingDot />}
               <p className={cn(
                 "font-medium truncate text-sm sm:text-base",
                 isCurrentSong ? "text-primary" : "text-foreground"
@@ -265,6 +286,8 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               coverImage={song.coverImage}
             />
             <motion.button
+              type="button"
+              aria-label={liked ? 'Unlike song' : 'Like song'}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={handleLike}
@@ -279,7 +302,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
         </motion.div>
         
         {isCurrentSong && (
-          <div className="flex items-center justify-between px-2 sm:px-3 mt-1">
+          <div className="flex items-center justify-between px-2 sm:px-3 mt-1 gap-2">
             <span className="text-[10px] sm:text-xs text-muted-foreground">
               {isSaved
                 ? 'Saved for offline'
@@ -287,18 +310,21 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   ? 'Tap to keep this on your device'
                   : 'Play once to keep this offline'}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                void handleKeepThis();
-              }}
-              disabled={isSaved || isSaving}
-              className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 h-auto"
-            >
-              {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Keep this'}
-            </Button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {coinAddress && <OnchainVerifiedBadge coinAddress={coinAddress} size="sm" />}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleKeepThis();
+                }}
+                disabled={isSaved || isSaving}
+                className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 h-auto"
+              >
+                {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Keep this'}
+              </Button>
+            </div>
           </div>
         )}
         
@@ -320,9 +346,6 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     return (
       <>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1, ease: [0.4, 0, 0.2, 1] }}
           whileHover={{ y: -4, scale: 1.02 }}
           className="group relative overflow-hidden rounded-2xl glass-card cursor-pointer shine-overlay"
           onClick={handlePlay}
@@ -390,6 +413,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-heading font-semibold text-foreground truncate flex items-center gap-2">
+                {isCurrentSong && isPlaying && <NowPlayingDot />}
                 <span className="truncate">{song.title}</span>
                 {isNewSong && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide flex-shrink-0">
@@ -404,6 +428,11 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               >
                 {song.artist}
               </button>
+              {coinAddress && (
+                <div className="mt-1">
+                  <OnchainVerifiedBadge coinAddress={coinAddress} size="sm" />
+                </div>
+              )}
             </div>
             <ShareSongButton
               songId={song.id}
@@ -412,6 +441,8 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               coverImage={song.coverImage}
             />
             <motion.button
+              type="button"
+              aria-label={liked ? 'Unlike song' : 'Like song'}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={handleLike}
@@ -460,6 +491,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
       transition={{ delay: index * 0.05, ease: [0.4, 0, 0.2, 1] }}
       whileHover={{ y: -6 }}
       className="group relative glass-card rounded-2xl overflow-hidden hover:shadow-float transition-all duration-300 cursor-pointer shine-overlay"
+      style={artworkGlowStyle}
       onClick={handlePlay}
     >
       <div className="aspect-square bg-secondary relative overflow-hidden">
@@ -487,7 +519,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             className={cn(
               "w-16 h-16 rounded-full flex items-center justify-center transition-all",
               isCurrentSong && isPlaying
-                ? "gradient-primary shadow-glow-intense scale-100 opacity-100"
+                ? "gradient-primary-artwork shadow-glow-artwork-intense scale-100 opacity-100"
                 : "glass opacity-0 group-hover:opacity-100"
             )}
           >
@@ -506,6 +538,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             "font-heading font-semibold truncate text-base flex items-center gap-2",
             isCurrentSong ? "text-primary" : "text-foreground"
           )}>
+            {isCurrentSong && isPlaying && <NowPlayingDot />}
             <span className="truncate">{song.title}</span>
             {isNewSong && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide flex-shrink-0">
@@ -533,6 +566,12 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           {song.artist}
         </button>
 
+        {coinAddress && (
+          <div className="mb-3">
+            <OnchainVerifiedBadge coinAddress={coinAddress} size="sm" />
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground tabular-nums flex items-center gap-1">
             {isSaved && (
@@ -556,6 +595,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               coverImage={song.coverImage}
             />
             <motion.button
+              type="button"
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.96 }}
               onClick={handleShareToFeed}
@@ -565,6 +605,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             </motion.button>
             {isCurrentSong && isPlaying && (
               <motion.button
+                type="button"
                 whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={handlePulseClick}
@@ -574,6 +615,8 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               </motion.button>
             )}
             <motion.button
+              type="button"
+              aria-label={liked ? 'Unlike song' : 'Like song'}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={handleLike}

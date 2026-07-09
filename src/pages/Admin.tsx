@@ -1,18 +1,19 @@
 import { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Music, Users, Upload, Edit, Trash2, Plus } from 'lucide-react';
+import { Music, Users, Upload, Edit, Trash2, Plus, FileMusic } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ARTISTS, SONGS, Artist, Song } from '@/data/musicData';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useSongPopularity } from '@/hooks/usePopularity';
+import { ArtistApplicationsPanel } from '@/components/admin/ArtistApplicationsPanel';
 const logo = '/songchainn-logo.webp';
 
 export default function Admin() {
   const { isAdmin, isLoading } = useAuth();
   const { data: popularityData } = useSongPopularity();
-  const [activeTab, setActiveTab] = useState<'artists' | 'songs'>('artists');
+  const [activeTab, setActiveTab] = useState<'artists' | 'songs' | 'applications'>('artists');
   const [artists, setArtists] = useState(ARTISTS);
 
   const songsWithRealStats = useMemo(() => {
@@ -85,6 +86,17 @@ export default function Admin() {
             >
               <Music className="w-4 h-4 inline mr-2" />
               Songs ({songsWithRealStats.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('applications')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                activeTab === 'applications'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <FileMusic className="w-4 h-4 inline mr-2" />
+              Applications
             </button>
           </div>
 
@@ -192,6 +204,16 @@ export default function Admin() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Applications Tab */}
+          {activeTab === 'applications' && (
+            <div className="space-y-4">
+              <h2 className="font-heading text-xl font-semibold text-foreground">
+                Artist Applications
+              </h2>
+              <ArtistApplicationsPanel />
             </div>
           )}
         </motion.div>

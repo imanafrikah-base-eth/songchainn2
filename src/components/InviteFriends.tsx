@@ -80,7 +80,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
             onKeyDown={resetAutoCloseTimer}
             onTouchStart={resetAutoCloseTimer}
           >
-            <div className="rounded-3xl p-6 shadow-glow border border-border/70 bg-background/98 backdrop-blur-xl">
+            <div className="rounded-3xl p-6 shadow-glow border border-border bg-background backdrop-blur-2xl">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -102,7 +102,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="rounded-2xl p-4 text-center border border-border/60 bg-card/95">
+                <div className="rounded-2xl p-4 text-center border border-border bg-card">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Star className="w-4 h-4 text-primary" />
                     <span className="font-heading text-2xl font-bold text-foreground">
@@ -111,7 +111,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
                   </div>
                   <p className="text-xs text-muted-foreground">Total Points</p>
                 </div>
-                <div className="rounded-2xl p-4 text-center border border-border/60 bg-card/95">
+                <div className="rounded-2xl p-4 text-center border border-border bg-card">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Users className="w-4 h-4 text-primary" />
                     <span className="font-heading text-2xl font-bold text-foreground">
@@ -123,7 +123,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
               </div>
 
               {/* Rewards Info */}
-              <div className="rounded-2xl p-4 mb-6 border border-border/60 bg-card/95">
+              <div className="rounded-2xl p-4 mb-6 border border-border bg-card">
                 <div className="flex items-start gap-3">
                   <Sparkles className="w-5 h-5 text-primary mt-0.5" />
                   <div>
@@ -141,7 +141,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
               {/* Referral Code */}
               <div className="mb-6">
                 <p className="text-sm text-muted-foreground mb-2">Your invite code</p>
-                <div className="rounded-xl p-4 flex items-center justify-between border border-border/60 bg-card/95">
+                <div className="rounded-xl p-4 flex items-center justify-between border border-border bg-card">
                   <code className="font-mono text-lg font-bold text-primary">
                     {referralCode || 'Loading...'}
                   </code>
@@ -160,7 +160,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
               {/* Invite Link */}
               <div className="mb-6">
                 <p className="text-sm text-muted-foreground mb-2">Or share this link</p>
-                <div className="rounded-xl p-3 overflow-hidden border border-border/60 bg-card/95">
+                <div className="rounded-xl p-3 overflow-hidden border border-border bg-card">
                   <p className="text-xs text-muted-foreground truncate">
                     {getInviteLink() || 'Generating link...'}
                   </p>

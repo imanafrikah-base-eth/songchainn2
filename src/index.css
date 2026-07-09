@@ -194,6 +194,28 @@
     box-shadow: var(--shadow-glow-intense);
   }
 
+  /* Artwork-aware variants: read a per-element --artwork-glow custom property
+     (set inline by playing song's extracted color) and fall back to the exact
+     default theme glow when it's unset — loading/CORS-failed artwork looks
+     identical to today, no JS branching required at render time. */
+  .gradient-primary-artwork {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--artwork-glow, var(--glow-blue))) 0%,
+      hsl(var(--artwork-glow, var(--glow-cyan)) / 0.85) 100%
+    );
+  }
+
+  .shadow-glow-artwork {
+    box-shadow: 0 0 40px hsl(var(--artwork-glow, var(--glow-blue)) / 0.3);
+  }
+
+  .shadow-glow-artwork-intense {
+    box-shadow:
+      0 0 60px hsl(var(--artwork-glow, var(--glow-blue)) / 0.4),
+      0 0 100px hsl(var(--artwork-glow, var(--glow-cyan)) / 0.2);
+  }
+
   .shadow-card {
     box-shadow: var(--shadow-card);
   }

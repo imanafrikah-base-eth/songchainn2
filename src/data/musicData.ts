@@ -200,7 +200,7 @@ const ARTWORK_BY_ARTIST: Record<string, string> = {
   'NEMESIS VS LADYRYN': artistNemesisVsLadyryn,
 };
 
-function buildCatalogs(songs: Song[]): Catalog[] {
+export function buildCatalogs(songs: Song[]): Catalog[] {
   const grouped = new Map<string, Song[]>();
   songs.forEach((song) => {
     const key = `${song.artistId}-${song.volume ?? 'Singles'}`;
@@ -3569,6 +3569,42 @@ export const ARTISTS: Artist[] = [
   },
 ];
 
+export function getDominantGenres(songs: Song[], limit = 2): Genre[] {
+  const counts = new Map<Genre, number>();
+  songs.forEach((song) => counts.set(song.genre, (counts.get(song.genre) ?? 0) + 1));
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([genre]) => genre);
+}
+
+export function getRelatedArtists(
+  artistId: string,
+  artists: Artist[],
+  songs: Song[],
+  limit = 6
+): Artist[] {
+  const others = artists.filter((a) => a.id !== artistId);
+  const targetGenres = new Set(getDominantGenres(songs.filter((s) => s.artistId === artistId)));
+  if (targetGenres.size === 0) return others.slice(0, limit);
+
+  const ranked = others
+    .map((a) => {
+      const genres = getDominantGenres(songs.filter((s) => s.artistId === a.id));
+      const overlap = genres.filter((g) => targetGenres.has(g)).length;
+      return { artist: a, overlap };
+    })
+    .filter((entry) => entry.overlap > 0)
+    .sort((a, b) => b.overlap - a.overlap)
+    .map((entry) => entry.artist);
+
+  if (ranked.length >= limit) return ranked.slice(0, limit);
+
+  const rankedIds = new Set(ranked.map((a) => a.id));
+  const rest = others.filter((a) => !rankedIds.has(a.id));
+  return [...ranked, ...rest].slice(0, limit);
+}
+
 export const TOWN_SQUARES = [
   {
     id: 'livingstone',
@@ -3581,7 +3617,7 @@ export const TOWN_SQUARES = [
     id: 'lusaka',
     name: 'Lusaka Townsquare',
     location: 'Zambia',
-    description: 'Lusaka — the capital sound. Where Zambian urban voices meet the world.',
+    description: 'Lusaka, the capital sound. Where Zambian urban voices meet the world.',
     artistCount: 1,
   },
 ];

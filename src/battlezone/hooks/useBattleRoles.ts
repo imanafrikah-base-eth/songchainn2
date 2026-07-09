@@ -93,6 +93,14 @@ export const getRolePermissions = (role: BattleRole): RolePermissions => {
   }
 };
 
+const VALID_ROLES: BattleRole[] = ['host', 'co-host', 'speaker', 'audience'];
+
+// Supabase's generated types type battle_rooms.role as plain `string` (codegen doesn't
+// derive unions from CHECK constraints), even though the DB guarantees one of BattleRole.
+function toBattleRole(role: string | null | undefined): BattleRole {
+  return VALID_ROLES.includes(role as BattleRole) ? (role as BattleRole) : 'audience';
+}
+
 export const useBattleRoles = (battleId: string) => {
   const { user } = useAuth();
   const [participants, setParticipants] = useState<BattleParticipant[]>([]);
@@ -113,11 +121,12 @@ export const useBattleRoles = (battleId: string) => {
         .order('joined_at', { ascending: true });
 
       if (error) throw error;
-      setParticipants(data || []);
+      const typedParticipants = (data || []).map((row) => ({ ...row, role: toBattleRole(row.role) }));
+      setParticipants(typedParticipants);
 
       // Set current user's role
       if (user) {
-        const myParticipant = data?.find(p => p.user_id === user.id);
+        const myParticipant = typedParticipants.find(p => p.user_id === user.id);
         setMyRole(myParticipant?.role || 'audience');
       }
     } catch (err) {

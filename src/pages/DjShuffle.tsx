@@ -98,7 +98,7 @@ export default function DjShuffle() {
     <div className="min-h-screen bg-background relative">
       <AnimatedBackground variant="default" />
       <Navigation />
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10 space-y-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10 space-y-6">
         <section className="rounded-3xl border border-cyan-400/30 bg-black/65 overflow-hidden">
           <div className="grid gap-4 p-4 md:grid-cols-[1.1fr_0.9fr] md:p-6">
             <div className="space-y-3">

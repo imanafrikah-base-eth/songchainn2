@@ -79,7 +79,7 @@ function modeLabel(mode: AgentMode) {
 }
 
 function getWaveWarzPrimer() {
-  return 'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and/or country.';
+  return 'WaveWarz Africa battles now run right here in $ongChainn -- watch live, vote, and speak in the room.';
 }
 
 function getTopCatalogBySong(song: Song) {
@@ -234,8 +234,11 @@ export function VibeAgent() {
       setStep(null);
       return;
     }
+    // Don't auto-expand the full panel for brand-new users — it covers most of
+    // the screen (near-full-width on mobile) and blocks page-level controls like
+    // the feed's floating create-post button. Show the small pill instead; the
+    // user opens the full welcome flow with a tap.
     if (mode === 'unset') {
-      openStep('welcome');
       return;
     }
     if (mode !== 'music' && currentSong && !firstMoodAskedRef.current) {
@@ -459,9 +462,9 @@ export function VibeAgent() {
 
   const openWaveWarzPrimer = useCallback(() => {
     setExternalPrompt({
-      text: `${getWaveWarzPrimer()} Want to watch or host battles? Open WaveWarz.com.`,
-      ctaLabel: 'Open WaveWarz.com',
-      ctaPath: 'https://www.wavewarz.com',
+      text: `${getWaveWarzPrimer()} Want to watch or host a battle right now?`,
+      ctaLabel: 'Watch Live Battles',
+      ctaPath: '/wavewarz-africa/battles/live',
     });
     setStep('external-prompt');
   }, []);
@@ -521,9 +524,22 @@ export function VibeAgent() {
   }, [addSongToPlaylist, createPlaylist, displayName, mode, tasteLane]);
 
   if (!step) {
-    if (mode === 'unset') return null;
+    if (mode === 'unset') {
+      return (
+        <div className="fixed z-[58] bottom-40 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6">
+          <button
+            type="button"
+            onClick={() => setStep('welcome')}
+            className="rounded-full border border-primary/35 bg-background/90 backdrop-blur px-2.5 py-1.5 text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors flex items-center gap-1"
+          >
+            <Sparkles className="w-3 h-3" />
+            Mosha
+          </button>
+        </div>
+      );
+    }
     return (
-      <div className="fixed z-[58] bottom-20 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6">
+      <div className="fixed z-[58] bottom-40 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6">
         <button
           type="button"
           onClick={() => setStep('taste-lane')}

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronUp, Headphones } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
@@ -10,6 +10,10 @@ import { ShareSongButton } from './ShareSongButton';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
+import { useArtworkColor } from '@/hooks/useArtworkColor';
+import { useSongOwnership } from '@/hooks/useSongOwnership';
+import { OwnershipBadge } from '@/components/OwnershipBadge';
+import { UnlockSongModal } from '@/components/UnlockSongModal';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -19,19 +23,21 @@ function formatTime(seconds: number): string {
 }
 
 // Memoized progress bar component - only re-renders on time changes
-const ProgressBar = memo(function ProgressBar({ 
-  currentTime, 
-  duration, 
+const ProgressBar = memo(function ProgressBar({
+  currentTime,
+  duration,
   onSeek,
   disabled = false,
-}: { 
-  currentTime: number; 
-  duration: number; 
+  isPlaying = false,
+}: {
+  currentTime: number;
+  duration: number;
   onSeek: (time: number) => void;
   disabled?: boolean;
+  isPlaying?: boolean;
 }) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-  
+
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
@@ -43,12 +49,20 @@ const ProgressBar = memo(function ProgressBar({
       className={`absolute top-0 left-0 right-0 h-1 bg-muted/30 group ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
       onClick={disabled ? undefined : handleClick}
     >
-      <div
-        className="h-full gradient-primary relative"
+      <motion.div
+        className="h-full gradient-primary-artwork relative"
         style={{ width: `${progress}%` }}
+        animate={isPlaying ? {
+          boxShadow: [
+            '0 0 0px hsl(var(--primary) / 0)',
+            '0 0 8px hsl(var(--primary) / 0.6)',
+            '0 0 0px hsl(var(--primary) / 0)',
+          ],
+        } : { boxShadow: '0 0 0px hsl(var(--primary) / 0)' }}
+        transition={isPlaying ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
       >
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary shadow-glow opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary shadow-glow-artwork opacity-0 group-hover:opacity-100 transition-opacity" />
+      </motion.div>
     </div>
   );
 });
@@ -80,7 +94,19 @@ export const AudioPlayer = memo(function AudioPlayer() {
   const hasCountedPlay = useRef(false);
   const lastSongId = useRef<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | undefined>(user?.user_metadata?.wallet_address);
   const showReturnToRoom = isRoomMode && isRoomHidden;
+  const { color: artworkColor } = useArtworkColor(currentSong?.coverImage);
+  const {
+    status: ownershipStatus,
+    offlinePlaysRemaining,
+    unlockSong,
+  } = useSongOwnership(currentSong?.id ?? '');
+
+  const handleWalletConnected = useCallback((address: string) => {
+    setWalletAddress(address);
+  }, []);
 
   const PLAY_THRESHOLD_SECONDS = 3;
 
@@ -170,9 +196,9 @@ export const AudioPlayer = memo(function AudioPlayer() {
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="fixed bottom-0 left-0 right-0 z-50"
+        className="fixed bottom-0 left-0 right-0 z-50 lg:left-auto lg:right-6 lg:bottom-6 lg:w-full lg:max-w-sm"
       >
-        <div className="glass-surface border-t border-border/50 pb-safe">
+        <div className="glass-surface border-t border-border/50 pb-safe lg:rounded-2xl lg:border lg:border-border/50 lg:pb-0">
           <div className="px-4 py-2.5 sm:py-3">
             <div className="flex items-center gap-2.5">
               <button
@@ -211,18 +237,22 @@ export const AudioPlayer = memo(function AudioPlayer() {
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="fixed bottom-0 left-0 right-0 z-50"
+        className="fixed bottom-0 left-0 right-0 z-50 lg:left-auto lg:right-6 lg:bottom-6 lg:w-full lg:max-w-sm"
+        style={artworkColor ? ({ '--artwork-glow': artworkColor } as React.CSSProperties) : undefined}
       >
-        {/* Glass background with safe area padding for mobile */}
-        <div className="glass-surface border-t border-border/50 pb-safe">
-          <ProgressBar currentTime={currentTime} duration={duration} onSeek={seekTo} disabled={isRoomMode} />
+        {/* Glass background with safe area padding for mobile; docks as a floating card at lg:+ */}
+        <div className="glass-surface border-t border-border/50 pb-safe lg:rounded-2xl lg:border lg:border-border/50 lg:pb-0 overflow-hidden">
+          <ProgressBar currentTime={currentTime} duration={duration} onSeek={seekTo} disabled={isRoomMode} isPlaying={isPlaying} />
 
           <div className="px-4 py-2.5 sm:py-3">
             <div className="flex items-center justify-between gap-2 sm:gap-4">
               {/* Song info - clickable to expand */}
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={handleOpenFullScreen}
-                className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 text-left group"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenFullScreen(); } }}
+                className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 text-left group cursor-pointer"
               >
                 <div className="relative flex-shrink-0">
                   <SpinningSongArt isPlaying={isPlaying} size="md" className="shadow-soft" coverImage={currentSong.coverImage} />
@@ -239,9 +269,23 @@ export const AudioPlayer = memo(function AudioPlayer() {
                       </span>
                     )}
                   </div>
-                  <p className="font-medium text-foreground truncate text-sm sm:text-base group-hover:text-primary transition-colors">
-                    {currentSong.title}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-foreground truncate text-sm sm:text-base group-hover:text-primary transition-colors">
+                      {currentSong.title}
+                    </p>
+                    {currentSong.isTokenGated && (ownershipStatus === 'owned' || ownershipStatus === 'offline_ready') && (
+                      <OwnershipBadge status={ownershipStatus} offlinePlays={offlinePlaysRemaining} size="sm" className="flex-shrink-0" />
+                    )}
+                    {currentSong.isTokenGated && (ownershipStatus === 'preview' || ownershipStatus === 'preview_used') && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setShowUnlockModal(true); }}
+                        className="text-[10px] font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors flex-shrink-0"
+                      >
+                        Unlock
+                      </button>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); navigate(`/artist/${currentSong.artistId}`); }}
@@ -256,7 +300,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                   )}
                 </div>
                 <ChevronUp className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
-              </button>
+              </div>
 
               {/* Controls - more prominent on mobile */}
               <div className="flex items-center gap-1 sm:gap-2">
@@ -271,15 +315,35 @@ export const AudioPlayer = memo(function AudioPlayer() {
                 <motion.button
                   onClick={isRoomMode ? undefined : togglePlay}
                   disabled={isRoomMode}
-                  className="p-3 sm:p-3 gradient-primary rounded-full shadow-glow press-effect disabled:opacity-40"
+                  className="p-3 sm:p-3 gradient-primary-artwork rounded-full shadow-glow-artwork press-effect disabled:opacity-40"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  {isPlaying ? (
-                    <Pause className="w-5 h-5 sm:w-5 sm:h-5 text-primary-foreground" />
-                  ) : (
-                    <Play className="w-5 h-5 sm:w-5 sm:h-5 text-primary-foreground ml-0.5" />
-                  )}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {isPlaying ? (
+                      <motion.span
+                        key="pause"
+                        initial={{ scale: 0.6, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.6, opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="block"
+                      >
+                        <Pause className="w-5 h-5 sm:w-5 sm:h-5 text-primary-foreground" />
+                      </motion.span>
+                    ) : (
+                      <motion.span
+                        key="play"
+                        initial={{ scale: 0.6, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.6, opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="block"
+                      >
+                        <Play className="w-5 h-5 sm:w-5 sm:h-5 text-primary-foreground ml-0.5" />
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </motion.button>
 
                 <button
@@ -299,8 +363,8 @@ export const AudioPlayer = memo(function AudioPlayer() {
                 />
               </div>
 
-              {/* Time & Volume - desktop only */}
-              <div className="hidden md:flex items-center gap-4 flex-1 justify-end">
+              {/* Time & Volume - shown in the md-lg range; hidden once docked as a narrow floating card at lg:+ */}
+              <div className="hidden md:flex lg:hidden items-center gap-4 flex-1 justify-end">
                 <TimeDisplay currentTime={currentTime} duration={duration} />
 
                 <div className="flex items-center gap-2 w-28">
@@ -330,6 +394,17 @@ export const AudioPlayer = memo(function AudioPlayer() {
 
       {/* Full Screen Player */}
       <FullScreenPlayer isOpen={isFullScreen} onClose={handleCloseFullScreen} />
+
+      {showUnlockModal && (
+        <UnlockSongModal
+          song={currentSong}
+          isOpen={showUnlockModal}
+          onClose={() => setShowUnlockModal(false)}
+          onUnlock={unlockSong}
+          walletAddress={walletAddress}
+          onWalletConnected={handleWalletConnected}
+        />
+      )}
     </>
   );
 });

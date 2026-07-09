@@ -13,6 +13,15 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useAuth } from '@/context/AuthContext';
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
+};
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
+
 export default function Playlists() {
   const { playlists, publicPlaylists, createPlaylist, deletePlaylist, updatePlaylistVisibility } = useAudienceInteractions();
   const { user } = useAuth();
@@ -47,7 +56,7 @@ export default function Playlists() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -110,10 +119,17 @@ export default function Playlists() {
             </div>
           ) : (
             <ScrollArea className="max-h-[480px] pr-2">
-              <div className="space-y-3">
+              <motion.div
+                className="space-y-3"
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+              >
                 {playlists.map((playlist) => (
-                  <div
+                  <motion.div
                     key={playlist.id}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.01, x: 4 }}
                     className="flex items-center justify-between gap-3 p-3 bg-card border border-border rounded-xl hover:bg-card/70 transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -169,9 +185,9 @@ export default function Playlists() {
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </ScrollArea>
           )}
         </section>
@@ -190,10 +206,17 @@ export default function Playlists() {
             </div>
           ) : (
             <ScrollArea className="max-h-[420px] pr-2">
-              <div className="space-y-3">
+              <motion.div
+                className="space-y-3"
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+              >
                 {communityPlaylists.map((playlist) => (
-                  <div
+                  <motion.div
                     key={playlist.id}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.01, x: 4 }}
                     className="flex items-center justify-between gap-3 p-3 bg-card border border-border rounded-xl hover:bg-card/70 transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -213,9 +236,9 @@ export default function Playlists() {
                       <Globe className="w-3 h-3" />
                       Public
                     </span>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </ScrollArea>
           )}
         </section>

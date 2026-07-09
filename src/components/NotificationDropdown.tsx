@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, Flame, Heart, MessageCircle, UserPlus, X, ListMusic } from 'lucide-react';
+import { Bell, Check, Flame, Heart, MessageCircle, UserPlus, X, ListMusic, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -21,6 +21,7 @@ const notificationIcons = {
   comment: MessageCircle,
   mention: MessageCircle,
   playlist: ListMusic,
+  announcement: Sparkles,
 };
 
 const notificationMessages = {
@@ -29,14 +30,15 @@ const notificationMessages = {
   comment: 'commented on your post',
   mention: 'mentioned you in a post',
   playlist: 'shared a new playlist',
+  announcement: '',
 };
 
 function extractBattleRoute(message?: string | null) {
   if (!message) return null;
   const markerMatch = message.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)/);
-  if (markerMatch?.[1]) return 'https://www.wavewarz.com';
+  if (markerMatch?.[1]) return `/wavewarz-africa/room/${markerMatch[1]}`;
   const pathMatch = message.match(/\/wavewarz-africa\/room\/([a-zA-Z0-9-]+)/);
-  if (pathMatch?.[1]) return 'https://www.wavewarz.com';
+  if (pathMatch?.[1]) return `/wavewarz-africa/room/${pathMatch[1]}`;
   return null;
 }
 
@@ -52,6 +54,7 @@ function NotificationItem({
   onNavigate: (notification: Notification) => void | Promise<void>;
 }) {
   const battleRoute = extractBattleRoute(notification.message);
+  const isAnnouncement = notification.type === 'announcement';
   const Icon = battleRoute ? Flame : notificationIcons[notification.type];
   const message = notification.message || notificationMessages[notification.type];
   const profile = notification.from_profile;
@@ -70,27 +73,42 @@ function NotificationItem({
       exit={{ opacity: 0, x: 20 }}
       className={cn(
         "flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer group",
-        notification.is_read 
-          ? "bg-transparent hover:bg-muted/50" 
+        notification.is_read
+          ? "bg-transparent hover:bg-muted/50"
           : "bg-primary/10 hover:bg-primary/15"
       )}
       onClick={handleClick}
     >
-      <Avatar className="w-10 h-10 flex-shrink-0">
-        <AvatarImage src={profile?.profile_picture_url || undefined} />
-        <AvatarFallback className="bg-primary/20 text-primary">
-          {profile?.profile_name?.[0]?.toUpperCase() || '?'}
-        </AvatarFallback>
-      </Avatar>
+      {isAnnouncement ? (
+        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+          <Sparkles className="w-5 h-5 text-primary" />
+        </div>
+      ) : (
+        <Avatar className="w-10 h-10 flex-shrink-0">
+          <AvatarImage src={profile?.profile_picture_url || undefined} />
+          <AvatarFallback className="bg-primary/20 text-primary">
+            {profile?.profile_name?.[0]?.toUpperCase() || '?'}
+          </AvatarFallback>
+        </Avatar>
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm">
-            <span className="font-semibold text-foreground">
-              {profile?.profile_name || 'Someone'}
-            </span>{' '}
-            <span className="text-muted-foreground">{message}</span>
-          </p>
+          {isAnnouncement ? (
+            <p className="text-sm">
+              {notification.title && (
+                <span className="font-semibold text-foreground block">{notification.title}</span>
+              )}
+              <span className="text-muted-foreground">{message}</span>
+            </p>
+          ) : (
+            <p className="text-sm">
+              <span className="font-semibold text-foreground">
+                {profile?.profile_name || 'Someone'}
+              </span>{' '}
+              <span className="text-muted-foreground">{message}</span>
+            </p>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -150,6 +168,9 @@ export function NotificationDropdown() {
     }
     
     switch (notification.type) {
+      case 'announcement':
+        navigate(notification.metadata?.cta_path || '/marketplace');
+        break;
       case 'follow':
         // Navigate to the follower's profile
         if (notification.from_user_id) {

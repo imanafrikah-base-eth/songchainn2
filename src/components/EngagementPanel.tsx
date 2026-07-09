@@ -1,10 +1,19 @@
 import { motion } from 'framer-motion';
-import { Flame, Play, Heart, TrendingUp } from 'lucide-react';
+import { Flame, Play, Heart, TrendingUp, Trophy } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useEngagement } from '@/context/EngagementContext';
+import { useAuth } from '@/context/AuthContext';
+import { useUserPoints } from '@/hooks/useUserPoints';
+import { TierBadge, OgBadge } from '@/components/TierBadge';
 
 export function EngagementPanel() {
   const { engagementPoints, currentStreak, totalPlays, likedSongs, getPointsBreakdown } = useEngagement();
+  const { user } = useAuth();
+  const { lifetimePoints, tier, isOg } = useUserPoints();
   const breakdown = getPointsBreakdown();
+  // Signed-in users see the authoritative server balance; signed-out fall back
+  // to the local estimate until they create an account and it is imported.
+  const displayPoints = user ? lifetimePoints : engagementPoints;
 
   return (
     <motion.div
@@ -20,9 +29,15 @@ export function EngagementPanel() {
       {/* Total Points */}
       <div className="text-center mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-border">
         <p className="text-2xl sm:text-4xl font-heading font-bold text-gradient mb-1">
-          {engagementPoints.toLocaleString()}
+          {displayPoints.toLocaleString()}
         </p>
-        <p className="text-xs sm:text-sm text-muted-foreground">Engagement Points</p>
+        <p className="text-xs sm:text-sm text-muted-foreground mb-2">Loyalty Points</p>
+        {user && (
+          <div className="flex items-center justify-center gap-2">
+            <TierBadge tier={tier} />
+            {isOg && <OgBadge />}
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}
@@ -67,10 +82,16 @@ export function EngagementPanel() {
         </div>
       </div>
 
-      {/* Unlock Message */}
-      <div className="mt-4 sm:mt-6 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-primary/5 border border-primary/10">
+      {/* Leaderboard link + Phase Two promise */}
+      <Link
+        to="/leaderboard"
+        className="mt-4 sm:mt-6 flex items-center justify-center gap-2 rounded-lg sm:rounded-xl bg-primary/10 border border-primary/20 py-2.5 text-xs sm:text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
+      >
+        <Trophy className="w-4 h-4" /> View Top Fans
+      </Link>
+      <div className="mt-3 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-primary/5 border border-primary/10">
         <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
-          Audience activity here unlocks future access and ownership. Keep listening!
+          Your points are your head start in Phase Two: top fans get early access to new song coins and battle rewards. Keep listening.
         </p>
       </div>
     </motion.div>

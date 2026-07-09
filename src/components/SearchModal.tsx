@@ -1,9 +1,49 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Music, User, Disc3, X, TrendingUp } from 'lucide-react';
+import { Search, Music, User, Disc3, X, TrendingUp, Clock } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { SONGS, ARTISTS, CATALOGS } from '@/data/musicData';
+import { SONGS, ARTISTS, CATALOGS, buildCatalogs, type Song, type Artist, type Catalog } from '@/data/musicData';
 import { usePlayerActions } from '@/context/PlayerContext';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+
+const RECENT_SEARCHES_KEY = 'songchainn_recent_searches';
+const MAX_RECENT_SEARCHES = 8;
+
+// Graceful localStorage wrapper — falls back to in-memory in private browsing / restricted webviews
+// (mirrors the pattern in src/integrations/supabase/client.ts)
+function safeStorage(): Storage | undefined {
+  try {
+    window.localStorage.setItem('__ss_probe', '1');
+    window.localStorage.removeItem('__ss_probe');
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function loadRecentSearches(): string[] {
+  if (typeof window === 'undefined') return [];
+  const storage = safeStorage();
+  if (!storage) return [];
+  try {
+    const raw = storage.getItem(RECENT_SEARCHES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentSearches(items: string[]) {
+  const storage = safeStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(items));
+  } catch {
+    // ignore write failures (e.g. quota exceeded)
+  }
+}
 
 interface SearchModalProps {
   open: boolean;
@@ -32,12 +72,12 @@ function scoreMatch(text: string, query: string): number {
   return 0;
 }
 
-function buildResults(query: string): SearchResult[] {
+function buildResults(query: string, songs: Song[], artists: Artist[], catalogs: Catalog[]): SearchResult[] {
   const q = query.trim();
   if (!q) return [];
   const results: SearchResult[] = [];
 
-  SONGS.forEach((song) => {
+  songs.forEach((song) => {
     const titleScore = scoreMatch(song.title, q);
     const artistScore = scoreMatch(song.artist, q) * 0.6;
     const score = Math.max(titleScore, artistScore);
@@ -53,7 +93,7 @@ function buildResults(query: string): SearchResult[] {
     }
   });
 
-  ARTISTS.forEach((artist) => {
+  artists.forEach((artist) => {
     const score = scoreMatch(artist.name, q);
     if (score > 0) {
       results.push({
@@ -67,7 +107,7 @@ function buildResults(query: string): SearchResult[] {
     }
   });
 
-  CATALOGS.forEach((catalog) => {
+  catalogs.forEach((catalog) => {
     const titleScore = scoreMatch(catalog.title, q);
     const artistScore = scoreMatch(catalog.artist, q) * 0.5;
     const score = Math.max(titleScore, artistScore);
@@ -98,32 +138,86 @@ const KIND_ICON: Record<ResultKind, typeof Music> = {
   catalog: Disc3,
 };
 
+type FilterKind = ResultKind | 'all';
+
+const FILTERS: { id: FilterKind; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'song', label: 'Songs' },
+  { id: 'artist', label: 'Artists' },
+  { id: 'catalog', label: 'Catalogs' },
+];
+
 export function SearchModal({ open, onOpenChange }: SearchModalProps) {
   const navigate = useNavigate();
   const { playSong } = usePlayerActions();
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [activeFilter, setActiveFilter] = useState<FilterKind>('all');
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => loadRecentSearches());
   const inputRef = useRef<HTMLInputElement>(null);
+  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
+  const allArtists = useMemo(() => [...ARTISTS, ...publishedArtists], [publishedArtists]);
+  const allCatalogs = useMemo(
+    () => (publishedSongs.length ? buildCatalogs(allSongs) : CATALOGS),
+    [allSongs, publishedSongs.length],
+  );
 
-  const results = useMemo(() => buildResults(query), [query]);
+  const results = useMemo(
+    () => buildResults(query, allSongs, allArtists, allCatalogs),
+    [query, allSongs, allArtists, allCatalogs],
+  );
+
+  const filteredResults = useMemo(
+    () => (activeFilter === 'all' ? results : results.filter((r) => r.kind === activeFilter)),
+    [results, activeFilter],
+  );
 
   useEffect(() => {
     if (open) {
       setQuery('');
       setActiveIndex(0);
+      setActiveFilter('all');
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
 
   useEffect(() => {
     setActiveIndex(0);
-  }, [query]);
+  }, [query, activeFilter]);
+
+  const recordSearch = useCallback((rawQuery: string) => {
+    const trimmed = rawQuery.trim();
+    if (!trimmed) return;
+    setRecentSearches((prev) => {
+      const next = [trimmed, ...prev.filter((s) => s.toLowerCase() !== trimmed.toLowerCase())].slice(
+        0,
+        MAX_RECENT_SEARCHES,
+      );
+      saveRecentSearches(next);
+      return next;
+    });
+  }, []);
+
+  const removeRecentSearch = useCallback((term: string) => {
+    setRecentSearches((prev) => {
+      const next = prev.filter((s) => s !== term);
+      saveRecentSearches(next);
+      return next;
+    });
+  }, []);
+
+  const runRecentSearch = useCallback((term: string) => {
+    setQuery(term);
+    inputRef.current?.focus();
+  }, []);
 
   const handleSelect = useCallback(
     (result: SearchResult) => {
+      recordSearch(query);
       onOpenChange(false);
       if (result.kind === 'song') {
-        const song = SONGS.find((s) => s.id === result.id);
+        const song = allSongs.find((s) => s.id === result.id);
         if (song) playSong(song);
       } else if (result.kind === 'artist') {
         navigate(`/artist/${result.id}`);
@@ -131,35 +225,39 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
         navigate(`/catalog/${result.id}`);
       }
     },
-    [navigate, onOpenChange, playSong],
+    [navigate, onOpenChange, playSong, allSongs, query, recordSearch],
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setActiveIndex((i) => Math.min(i + 1, results.length - 1));
+        setActiveIndex((i) => Math.min(i + 1, filteredResults.length - 1));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setActiveIndex((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter' && results[activeIndex]) {
-        handleSelect(results[activeIndex]);
+      } else if (e.key === 'Enter') {
+        if (filteredResults[activeIndex]) {
+          handleSelect(filteredResults[activeIndex]);
+        } else if (query.trim()) {
+          recordSearch(query);
+        }
       }
     },
-    [activeIndex, handleSelect, results],
+    [activeIndex, handleSelect, filteredResults, query, recordSearch],
   );
 
   const trending = useMemo(
     () =>
-      [...SONGS]
+      [...allSongs]
         .sort((a, b) => (b.plays || 0) - (a.plays || 0))
         .slice(0, 5)
         .map((s) => ({ kind: 'song' as const, id: s.id, title: s.title, subtitle: s.artist, image: s.coverImage, score: s.plays })),
-    [],
+    [allSongs],
   );
 
-  const displayList = query.trim() ? results : trending;
-  const emptySearch = query.trim().length > 0 && results.length === 0;
+  const displayList = query.trim() ? filteredResults : trending;
+  const emptySearch = query.trim().length > 0 && filteredResults.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -190,9 +288,59 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
           )}
         </div>
 
+        {/* Filter chips */}
+        <div className="flex items-center gap-2 px-4 pt-3 pb-1 overflow-x-auto">
+          {FILTERS.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              onClick={() => setActiveFilter(filter.id)}
+              className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                activeFilter === filter.id
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-transparent text-muted-foreground border-border/60 hover:text-foreground hover:border-foreground/30'
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Recent searches */}
+        {!query.trim() && recentSearches.length > 0 && (
+          <div className="px-4 pt-2 pb-1">
+            <div className="flex items-center gap-2 pb-1.5">
+              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Recent searches
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {recentSearches.map((term) => (
+                <div
+                  key={term}
+                  className="flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-full bg-muted text-xs text-foreground"
+                >
+                  <button type="button" onClick={() => runRecentSearch(term)} className="hover:text-primary transition-colors">
+                    {term}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeRecentSearch(term)}
+                    className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                    aria-label={`Remove "${term}" from recent searches`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Label */}
         {!query.trim() && (
-          <div className="flex items-center gap-2 px-4 pt-3 pb-1">
+          <div className="flex items-center gap-2 px-4 pt-2 pb-1">
             <TrendingUp className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Trending</span>
           </div>

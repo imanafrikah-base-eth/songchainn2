@@ -14,51 +14,386 @@ export type Database = {
   }
   public: {
     Tables: {
+      artist_applications: {
+        Row: {
+          artist_name: string
+          contact_email: string | null
+          created_at: string
+          id: string
+          location: string
+          real_name: string
+          reason: string
+          songs: Json
+          wallet_address: string
+        }
+        Insert: {
+          artist_name: string
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          location: string
+          real_name: string
+          reason: string
+          songs?: Json
+          wallet_address: string
+        }
+        Update: {
+          artist_name?: string
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          location?: string
+          real_name?: string
+          reason?: string
+          songs?: Json
+          wallet_address?: string
+        }
+        Relationships: []
+      }
       audience_profiles: {
         Row: {
+          avatar_url: string | null
+          base_name: string | null
           base_profile_link: string | null
           bio: string | null
           cover_photo_url: string | null
-          created_at: string
+          cover_url: string | null
+          created_at: string | null
+          display_name: string | null
           id: string
           is_public: boolean
           location: string | null
           onboarding_completed: boolean
-          profile_name: string
+          profile_name: string | null
           profile_picture_url: string | null
-          updated_at: string
+          terms_accepted_at: string | null
+          twitter_url: string | null
+          updated_at: string | null
           user_id: string
+          username: string | null
+          wallet_address: string | null
+          x_profile: string | null
           x_profile_link: string | null
         }
         Insert: {
+          avatar_url?: string | null
+          base_name?: string | null
           base_profile_link?: string | null
           bio?: string | null
           cover_photo_url?: string | null
-          created_at?: string
-          id?: string
+          cover_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id: string
           is_public?: boolean
           location?: string | null
           onboarding_completed?: boolean
-          profile_name: string
+          profile_name?: string | null
           profile_picture_url?: string | null
-          updated_at?: string
+          terms_accepted_at?: string | null
+          twitter_url?: string | null
+          updated_at?: string | null
           user_id: string
+          username?: string | null
+          wallet_address?: string | null
+          x_profile?: string | null
           x_profile_link?: string | null
         }
         Update: {
+          avatar_url?: string | null
+          base_name?: string | null
           base_profile_link?: string | null
           bio?: string | null
           cover_photo_url?: string | null
-          created_at?: string
+          cover_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
           id?: string
           is_public?: boolean
           location?: string | null
           onboarding_completed?: boolean
-          profile_name?: string
+          profile_name?: string | null
           profile_picture_url?: string | null
-          updated_at?: string
+          terms_accepted_at?: string | null
+          twitter_url?: string | null
+          updated_at?: string | null
           user_id?: string
+          username?: string | null
+          wallet_address?: string | null
+          x_profile?: string | null
           x_profile_link?: string | null
+        }
+        Relationships: []
+      }
+      battle_room_messages: {
+        Row: {
+          battle_id: string
+          created_at: string
+          id: string
+          message_text: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          battle_id: string
+          created_at?: string
+          id?: string
+          message_text: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          battle_id?: string
+          created_at?: string
+          id?: string
+          message_text?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_room_messages_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_rooms: {
+        Row: {
+          avatar_url: string | null
+          battle_id: string
+          display_name: string | null
+          id: string
+          is_active: boolean
+          is_muted: boolean
+          is_speaking: boolean
+          joined_at: string
+          last_seen_at: string
+          livekit_participant_id: string | null
+          mic_on: boolean | null
+          requested_to_speak: boolean
+          role: string
+          room_id: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          battle_id: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          is_muted?: boolean
+          is_speaking?: boolean
+          joined_at?: string
+          last_seen_at?: string
+          livekit_participant_id?: string | null
+          mic_on?: boolean | null
+          requested_to_speak?: boolean
+          role?: string
+          room_id?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          battle_id?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          is_muted?: boolean
+          is_speaking?: boolean
+          joined_at?: string
+          last_seen_at?: string
+          livekit_participant_id?: string | null
+          mic_on?: boolean | null
+          requested_to_speak?: boolean
+          role?: string
+          room_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rooms_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_speaker_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          battle_id: string
+          display_name: string
+          id: string
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          battle_id: string
+          display_name: string
+          id?: string
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          battle_id?: string
+          display_name?: string
+          id?: string
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_speaker_requests_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_votes: {
+        Row: {
+          battle_id: string
+          created_at: string
+          id: string
+          round: number
+          side: string
+          user_id: string
+        }
+        Insert: {
+          battle_id: string
+          created_at?: string
+          id?: string
+          round?: number
+          side: string
+          user_id: string
+        }
+        Update: {
+          battle_id?: string
+          created_at?: string
+          id?: string
+          round?: number
+          side?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_votes_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battles: {
+        Row: {
+          artist_a_image: string | null
+          artist_a_name: string
+          artist_a_region: string | null
+          artist_b_image: string | null
+          artist_b_name: string
+          artist_b_region: string | null
+          co_hosts: string[] | null
+          created_at: string
+          created_by: string | null
+          ended_at: string | null
+          ended_time: string | null
+          feed_post_id: string | null
+          host_name: string
+          host_user_id: string | null
+          id: string
+          launch_mode: string
+          launched_at: string | null
+          region: string
+          room_id: string | null
+          round: number
+          scheduled_for: string | null
+          scheduled_time: string | null
+          song_a: string
+          song_b: string
+          status: string
+          title: string
+          total_rounds: number
+          updated_at: string
+          winner: string | null
+          x_space_url: string | null
+        }
+        Insert: {
+          artist_a_image?: string | null
+          artist_a_name: string
+          artist_a_region?: string | null
+          artist_b_image?: string | null
+          artist_b_name: string
+          artist_b_region?: string | null
+          co_hosts?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          ended_time?: string | null
+          feed_post_id?: string | null
+          host_name: string
+          host_user_id?: string | null
+          id?: string
+          launch_mode?: string
+          launched_at?: string | null
+          region?: string
+          room_id?: string | null
+          round?: number
+          scheduled_for?: string | null
+          scheduled_time?: string | null
+          song_a: string
+          song_b: string
+          status?: string
+          title: string
+          total_rounds?: number
+          updated_at?: string
+          winner?: string | null
+          x_space_url?: string | null
+        }
+        Update: {
+          artist_a_image?: string | null
+          artist_a_name?: string
+          artist_a_region?: string | null
+          artist_b_image?: string | null
+          artist_b_name?: string
+          artist_b_region?: string | null
+          co_hosts?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          ended_time?: string | null
+          feed_post_id?: string | null
+          host_name?: string
+          host_user_id?: string | null
+          id?: string
+          launch_mode?: string
+          launched_at?: string | null
+          region?: string
+          room_id?: string | null
+          round?: number
+          scheduled_for?: string | null
+          scheduled_time?: string | null
+          song_a?: string
+          song_b?: string
+          status?: string
+          title?: string
+          total_rounds?: number
+          updated_at?: string
+          winner?: string | null
+          x_space_url?: string | null
         }
         Relationships: []
       }
@@ -90,6 +425,200 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      direct_messages: {
+        Row: {
+          ai_reply_status: string
+          created_at: string
+          id: string
+          is_read: boolean
+          message_text: string
+          needs_ai_review: boolean
+          sender_type: string
+          sender_user_id: string | null
+          thread_id: string
+        }
+        Insert: {
+          ai_reply_status?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message_text: string
+          needs_ai_review?: boolean
+          sender_type: string
+          sender_user_id?: string | null
+          thread_id: string
+        }
+        Update: {
+          ai_reply_status?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message_text?: string
+          needs_ai_review?: boolean
+          sender_type?: string
+          sender_user_id?: string | null
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "dm_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_ai_jobs: {
+        Row: {
+          created_at: string
+          id: string
+          processed_at: string | null
+          status: string
+          thread_id: string
+          user_message_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          processed_at?: string | null
+          status?: string
+          thread_id: string
+          user_message_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          processed_at?: string | null
+          status?: string
+          thread_id?: string
+          user_message_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_ai_jobs_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "dm_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_ai_jobs_user_message_id_fkey"
+            columns: ["user_message_id"]
+            isOneToOne: false
+            referencedRelation: "direct_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_threads: {
+        Row: {
+          created_at: string
+          id: string
+          is_archived: boolean
+          last_message_at: string | null
+          last_message_preview: string | null
+          title: string | null
+          unread_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          title?: string | null
+          unread_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          title?: string | null
+          unread_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      facebook_profiles: {
+        Row: {
+          bio: string | null
+          created_at: string
+          email: string | null
+          facebook_id: string
+          is_public: boolean
+          location: string | null
+          name: string | null
+          picture_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          email?: string | null
+          facebook_id: string
+          is_public?: boolean
+          location?: string | null
+          name?: string | null
+          picture_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          email?: string | null
+          facebook_id?: string
+          is_public?: boolean
+          location?: string | null
+          name?: string | null
+          picture_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      farcaster_profiles: {
+        Row: {
+          bio: string | null
+          created_at: string
+          display_name: string | null
+          fid: number
+          is_public: boolean
+          location: string | null
+          pfp_url: string | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          fid: number
+          is_public?: boolean
+          location?: string | null
+          pfp_url?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          fid?: number
+          is_public?: boolean
+          location?: string | null
+          pfp_url?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
       }
       liked_artists: {
         Row: {
@@ -135,33 +664,42 @@ export type Database = {
       }
       notifications: {
         Row: {
+          body: string | null
           created_at: string
-          from_user_id: string
+          from_user_id: string | null
           id: string
           is_read: boolean
           message: string | null
+          metadata: Json | null
           post_id: string | null
-          type: string
+          title: string | null
+          type: string | null
           user_id: string
         }
         Insert: {
+          body?: string | null
           created_at?: string
-          from_user_id: string
+          from_user_id?: string | null
           id?: string
           is_read?: boolean
           message?: string | null
+          metadata?: Json | null
           post_id?: string | null
-          type: string
+          title?: string | null
+          type?: string | null
           user_id: string
         }
         Update: {
+          body?: string | null
           created_at?: string
-          from_user_id?: string
+          from_user_id?: string | null
           id?: string
           is_read?: boolean
           message?: string | null
+          metadata?: Json | null
           post_id?: string | null
-          type?: string
+          title?: string | null
+          type?: string | null
           user_id?: string
         }
         Relationships: [
@@ -173,6 +711,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      outbound_email_queue: {
+        Row: {
+          attempts: number
+          body_text: string
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          sent_at: string | null
+          status: string
+          subject: string
+          to_email: string
+        }
+        Insert: {
+          attempts?: number
+          body_text: string
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          sent_at?: string | null
+          status?: string
+          subject: string
+          to_email: string
+        }
+        Update: {
+          attempts?: number
+          body_text?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          to_email?: string
+        }
+        Relationships: []
       }
       playlist_collaborators: {
         Row: {
@@ -208,24 +785,24 @@ export type Database = {
       }
       playlist_songs: {
         Row: {
-          added_at: string
+          created_at: string
           id: string
-          playlist_id: string
-          position: number
+          playlist_id: string | null
+          position: number | null
           song_id: string
         }
         Insert: {
-          added_at?: string
+          created_at?: string
           id?: string
-          playlist_id: string
-          position?: number
+          playlist_id?: string | null
+          position?: number | null
           song_id: string
         }
         Update: {
-          added_at?: string
+          created_at?: string
           id?: string
-          playlist_id?: string
-          position?: number
+          playlist_id?: string | null
+          position?: number | null
           song_id?: string
         }
         Relationships: [
@@ -245,10 +822,9 @@ export type Database = {
           id: string
           is_collaborative: boolean
           is_public: boolean
-          name: string
-          updated_at: string
-          user_id: string
           mood: string | null
+          name: string
+          user_id: string
           vibe: string | null
         }
         Insert: {
@@ -257,10 +833,9 @@ export type Database = {
           id?: string
           is_collaborative?: boolean
           is_public?: boolean
-          name: string
-          updated_at?: string
-          user_id: string
           mood?: string | null
+          name: string
+          user_id: string
           vibe?: string | null
         }
         Update: {
@@ -269,10 +844,9 @@ export type Database = {
           id?: string
           is_collaborative?: boolean
           is_public?: boolean
-          name?: string
-          updated_at?: string
-          user_id?: string
           mood?: string | null
+          name?: string
+          user_id?: string
           vibe?: string | null
         }
         Relationships: []
@@ -282,21 +856,21 @@ export type Database = {
           content: string
           created_at: string
           id: string
-          post_id: string
+          post_id: string | null
           user_id: string
         }
         Insert: {
           content: string
           created_at?: string
           id?: string
-          post_id: string
+          post_id?: string | null
           user_id: string
         }
         Update: {
           content?: string
           created_at?: string
           id?: string
-          post_id?: string
+          post_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -313,19 +887,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          post_id: string
+          post_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          post_id: string
+          post_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          post_id?: string
+          post_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -338,162 +912,297 @@ export type Database = {
           },
         ]
       }
-      profile_views: {
+      pulses: {
         Row: {
           created_at: string
-          id: string
-          profile_id: string
-          viewer_id: string | null
+          id: number
+          song_id: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string
-          id?: string
-          profile_id: string
-          viewer_id?: string | null
+          id?: never
+          song_id?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string
+          id?: never
+          song_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      room_messages: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          message: string
+          reply_to_message_id: string | null
+          room_id: string | null
+          room_name: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
           id?: string
-          profile_id?: string
-          viewer_id?: string | null
+          message: string
+          reply_to_message_id?: string | null
+          room_id?: string | null
+          room_name?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          reply_to_message_id?: string | null
+          room_id?: string | null
+          room_name?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "profile_views_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "room_messages_reply_to_message_id_fkey"
+            columns: ["reply_to_message_id"]
             isOneToOne: false
-            referencedRelation: "audience_profiles"
+            referencedRelation: "room_messages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profile_views_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profile_popularity"
-            referencedColumns: ["profile_id"]
           },
         ]
       }
-      referrals: {
+      room_profiles: {
         Row: {
-          completed_at: string | null
-          created_at: string
-          id: string
-          points_earned: number
-          referral_code: string
-          referred_user_id: string | null
-          referrer_id: string
-          status: string
+          avatar_url: string | null
+          display_name: string | null
+          has_custom_name: boolean
+          is_active: boolean | null
+          joined_at: string | null
+          last_seen_at: string | null
+          room_id: string
+          room_name: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          completed_at?: string | null
-          created_at?: string
-          id?: string
-          points_earned?: number
-          referral_code: string
-          referred_user_id?: string | null
-          referrer_id: string
-          status?: string
+          avatar_url?: string | null
+          display_name?: string | null
+          has_custom_name?: boolean
+          is_active?: boolean | null
+          joined_at?: string | null
+          last_seen_at?: string | null
+          room_id: string
+          room_name: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          completed_at?: string | null
-          created_at?: string
-          id?: string
-          points_earned?: number
-          referral_code?: string
-          referred_user_id?: string | null
-          referrer_id?: string
-          status?: string
+          avatar_url?: string | null
+          display_name?: string | null
+          has_custom_name?: boolean
+          is_active?: boolean | null
+          joined_at?: string | null
+          last_seen_at?: string | null
+          room_id?: string
+          room_name?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
       social_posts: {
         Row: {
+          activity_type: string | null
+          artist_id: string | null
           content: string | null
           created_at: string
           id: string
+          is_deleted: boolean
+          media_url: string | null
+          metadata: Json
           playlist_id: string | null
           post_type: string
           song_id: string | null
+          target_type: string | null
+          text_content: string | null
           updated_at: string
           user_id: string
+          visibility: string
         }
         Insert: {
+          activity_type?: string | null
+          artist_id?: string | null
           content?: string | null
           created_at?: string
           id?: string
+          is_deleted?: boolean
+          media_url?: string | null
+          metadata?: Json
           playlist_id?: string | null
           post_type?: string
           song_id?: string | null
+          target_type?: string | null
+          text_content?: string | null
           updated_at?: string
           user_id: string
+          visibility?: string
         }
         Update: {
+          activity_type?: string | null
+          artist_id?: string | null
           content?: string | null
           created_at?: string
           id?: string
+          is_deleted?: boolean
+          media_url?: string | null
+          metadata?: Json
           playlist_id?: string | null
           post_type?: string
           song_id?: string | null
+          target_type?: string | null
+          text_content?: string | null
           updated_at?: string
           user_id?: string
+          visibility?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "social_posts_playlist_id_fkey"
-            columns: ["playlist_id"]
-            isOneToOne: false
-            referencedRelation: "playlists"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       song_analytics: {
         Row: {
           created_at: string
           event_type: string
           id: string
-          song_id: string
+          position_seconds: number | null
+          song_id: string | null
           user_id: string | null
         }
         Insert: {
           created_at?: string
           event_type: string
           id?: string
-          song_id: string
+          position_seconds?: number | null
+          song_id?: string | null
           user_id?: string | null
         }
         Update: {
           created_at?: string
           event_type?: string
           id?: string
-          song_id?: string
+          position_seconds?: number | null
+          song_id?: string | null
           user_id?: string | null
         }
         Relationships: []
       }
-      song_comments: {
+      song_coins: {
         Row: {
-          content: string
           created_at: string
-          id: string
+          mint_status: string
+          mint_tx_hash: string | null
+          minted_at: string | null
+          payout_recipient: string
           song_id: string
+          updated_at: string
+          zora_coin_address: string | null
+        }
+        Insert: {
+          created_at?: string
+          mint_status?: string
+          mint_tx_hash?: string | null
+          minted_at?: string | null
+          payout_recipient: string
+          song_id: string
+          updated_at?: string
+          zora_coin_address?: string | null
+        }
+        Update: {
+          created_at?: string
+          mint_status?: string
+          mint_tx_hash?: string | null
+          minted_at?: string | null
+          payout_recipient?: string
+          song_id?: string
+          updated_at?: string
+          zora_coin_address?: string | null
+        }
+        Relationships: []
+      }
+      songs: {
+        Row: {
+          artist_id: string | null
+          artist_image_url: string | null
+          artist_name: string | null
+          audio_url: string | null
+          cover_art_url: string | null
+          created_at: string | null
+          genre: string | null
+          id: string
+          is_published: boolean | null
+          title: string | null
+          town_square: string | null
+        }
+        Insert: {
+          artist_id?: string | null
+          artist_image_url?: string | null
+          artist_name?: string | null
+          audio_url?: string | null
+          cover_art_url?: string | null
+          created_at?: string | null
+          genre?: string | null
+          id?: string
+          is_published?: boolean | null
+          title?: string | null
+          town_square?: string | null
+        }
+        Update: {
+          artist_id?: string | null
+          artist_image_url?: string | null
+          artist_name?: string | null
+          audio_url?: string | null
+          cover_art_url?: string | null
+          created_at?: string | null
+          genre?: string | null
+          id?: string
+          is_published?: boolean | null
+          title?: string | null
+          town_square?: string | null
+        }
+        Relationships: []
+      }
+      suggestion_forms: {
+        Row: {
+          created_at: string
+          email_sent: boolean
+          id: string
+          improvement_text: string
+          source: string
+          status: string
+          subject: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          content: string
           created_at?: string
+          email_sent?: boolean
           id?: string
-          song_id: string
+          improvement_text: string
+          source?: string
+          status?: string
+          subject?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          content?: string
           created_at?: string
+          email_sent?: boolean
           id?: string
-          song_id?: string
+          improvement_text?: string
+          source?: string
+          status?: string
+          subject?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -538,30 +1247,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_points: {
-        Row: {
-          created_at: string
-          id: string
-          total_points: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          total_points?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          total_points?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           created_at: string
@@ -585,6 +1270,124 @@ export type Database = {
       }
     }
     Views: {
+      audience_profiles_public: {
+        Row: {
+          avatar_url: string | null
+          base_profile_link: string | null
+          bio: string | null
+          cover_photo_url: string | null
+          cover_url: string | null
+          created_at: string | null
+          display_name: string | null
+          id: string | null
+          onboarding_completed: boolean | null
+          profile_name: string | null
+          updated_at: string | null
+          user_id: string | null
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          base_profile_link?: string | null
+          bio?: string | null
+          cover_photo_url?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string | null
+          onboarding_completed?: boolean | null
+          profile_name?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          base_profile_link?: string | null
+          bio?: string | null
+          cover_photo_url?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string | null
+          onboarding_completed?: boolean | null
+          profile_name?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      battle_listener_counts: {
+        Row: {
+          battle_id: string | null
+          listener_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rooms_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_live_counts: {
+        Row: {
+          battle_id: string | null
+          listener_count: number | null
+          room_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rooms_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_live_users: {
+        Row: {
+          avatar_url: string | null
+          battle_id: string | null
+          display_name: string | null
+          is_active: boolean | null
+          joined_at: string | null
+          last_seen_at: string | null
+          mic_on: boolean | null
+          role: string | null
+          room_id: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rooms_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_vote_counts: {
+        Row: {
+          battle_id: string | null
+          side: string | null
+          vote_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_votes_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_popularity: {
         Row: {
           bio: string | null
@@ -598,50 +1401,101 @@ export type Database = {
           user_id: string | null
           view_count: number | null
         }
-        Insert: {
-          bio?: string | null
-          follower_count?: never
-          popularity_score?: never
-          post_count?: never
-          profile_id?: string | null
-          profile_name?: string | null
-          profile_picture_url?: string | null
-          total_post_likes?: never
-          user_id?: string | null
-          view_count?: never
-        }
-        Update: {
-          bio?: string | null
-          follower_count?: never
-          popularity_score?: never
-          post_count?: never
-          profile_id?: string | null
-          profile_name?: string | null
-          profile_picture_url?: string | null
-          total_post_likes?: never
-          user_id?: string | null
-          view_count?: never
+        Relationships: []
+      }
+      room_live_counts: {
+        Row: {
+          listener_count: number | null
+          room_id: string | null
         }
         Relationships: []
       }
-      song_popularity: {
+      room_live_users: {
         Row: {
-          comment_count: number | null
-          like_count: number | null
-          play_count: number | null
-          popularity_score: number | null
-          share_count: number | null
+          avatar_url: string | null
+          display_name: string | null
+          is_active: boolean | null
+          joined_at: string | null
+          last_seen_at: string | null
+          room_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          is_active?: boolean | null
+          joined_at?: string | null
+          last_seen_at?: string | null
+          room_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          is_active?: boolean | null
+          joined_at?: string | null
+          last_seen_at?: string | null
+          room_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      song_like_counts: {
+        Row: {
+          likes_count: number | null
           song_id: string | null
-          view_count: number | null
+        }
+        Relationships: []
+      }
+      song_pulse_counts: {
+        Row: {
+          pulses_count: number | null
+          song_id: string | null
+        }
+        Relationships: []
+      }
+      songchainn_public_songs: {
+        Row: {
+          artist_image_url: string | null
+          artist_name: string | null
+          audio_url: string | null
+          cover_art_url: string | null
+          created_at: string | null
+          id: string | null
+          title: string | null
+        }
+        Insert: {
+          artist_image_url?: string | null
+          artist_name?: string | null
+          audio_url?: string | null
+          cover_art_url?: string | null
+          created_at?: string | null
+          id?: string | null
+          title?: string | null
+        }
+        Update: {
+          artist_image_url?: string | null
+          artist_name?: string | null
+          audio_url?: string | null
+          cover_art_url?: string | null
+          created_at?: string | null
+          id?: string | null
+          title?: string | null
         }
         Relationships: []
       }
     }
     Functions: {
-      complete_referral: {
-        Args: { p_new_user_id: string; p_referral_code: string }
-        Returns: boolean
+      add_battle_cohost: {
+        Args: { _battle_id: string; _display_name: string; _user_id: string }
+        Returns: undefined
       }
+      create_songchainn_system_post: {
+        Args: { _playlist_id?: string; _song_id?: string; _text: string }
+        Returns: string
+      }
+      create_text_post: { Args: { _text: string }; Returns: string }
+      ensure_dm_thread: { Args: { _user_id: string }; Returns: string }
       get_artist_follow_counts: {
         Args: { artist_ids: string[] }
         Returns: {
@@ -649,7 +1503,31 @@ export type Database = {
           follower_count: number
         }[]
       }
-      get_artist_follower_count: { Args: { p_artist_id: string }; Returns: number }
+      get_community_profiles: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          avatar_url: string
+          bio: string
+          cover_photo_url: string
+          created_at: string
+          display_name: string
+          id: string
+          is_public: boolean
+          location: string
+          profile_name: string
+          profile_picture_url: string
+          updated_at: string
+          user_id: string
+          username: string
+        }[]
+      }
+      get_pulse_counts: {
+        Args: never
+        Returns: {
+          pulse_count: number
+          song_id: string
+        }[]
+      }
       get_song_popularity: {
         Args: never
         Returns: {
@@ -662,17 +1540,39 @@ export type Database = {
           view_count: number
         }[]
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
+      get_today_hot_songs: {
+        Args: { p_limit?: number; p_since?: string }
+        Returns: {
+          plays_today: number
+          song_id: string
+        }[]
       }
-      validate_referral_code: { Args: { code: string }; Returns: boolean }
+      heartbeat_battle_room: {
+        Args: { _battle_id: string }
+        Returns: undefined
+      }
+      heartbeat_room: { Args: { _room_id: string }; Returns: undefined }
+      join_battle_room: { Args: { _battle_id: string }; Returns: undefined }
+      join_room: { Args: { _room_id: string }; Returns: undefined }
+      launch_battle_now: { Args: { _battle_id: string }; Returns: string }
+      leave_battle_room: { Args: { _battle_id: string }; Returns: undefined }
+      leave_room: { Args: { _room_id: string }; Returns: undefined }
+      mark_dm_thread_read: { Args: { _thread_id: string }; Returns: undefined }
+      send_mosha_message: {
+        Args: { _message_text: string; _user_id: string }
+        Returns: string
+      }
+      switch_battle_room: {
+        Args: { _new_battle_id: string }
+        Returns: undefined
+      }
+      sync_battle_listener_count: {
+        Args: { _battle_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      app_role: "admin" | "audience"
+      app_role: "admin" | "artist" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -800,7 +1700,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "audience"],
+      app_role: ["admin", "artist", "user"],
     },
   },
 } as const

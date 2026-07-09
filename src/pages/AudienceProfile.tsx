@@ -81,8 +81,8 @@ export default function AudienceProfile() {
 
   const fetchProfile = useCallback(async () => {
     if (!userId) return;
-    // fc- IDs are local-only and not stored as UUIDs in Supabase — skip all DB queries
-    if (userId.startsWith('fc-')) {
+    // synthetic fc-/fb- IDs are local-only and not stored as UUIDs in Supabase — skip all DB queries
+    if (userId.startsWith('fc-') || userId.startsWith('fb-')) {
       setLoading(false);
       return;
     }
@@ -92,7 +92,7 @@ export default function AudienceProfile() {
     const { data: profileData } = await supabase
       .from('audience_profiles')
       .select('*')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (profileData) {
@@ -137,7 +137,7 @@ export default function AudienceProfile() {
   }, []);
 
   useEffect(() => {
-    if (!userId || userId.startsWith('fc-')) return;
+    if (!userId || userId.startsWith('fc-') || userId.startsWith('fb-')) return;
     const channel = supabase
       .channel(`audience-profile-${userId}`)
       .on(
@@ -278,7 +278,7 @@ export default function AudienceProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background lg:pl-20">
       <div className="relative h-48 md:h-64">
         {profile.cover_photo_url ? (
           <img

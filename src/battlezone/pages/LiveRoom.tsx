@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Mic, MicOff, Hand, Send, Play, Pause, SkipForward,
-  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile, Music, X,
+  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile, Music, X, Radio,
 } from "lucide-react";
+import { VOICE_ENABLED } from "@/battlezone/config";
 import LiveBadge from "@/battlezone/components/LiveBadge";
 import { useBattle } from "@/battlezone/hooks/useBattles";
 import { useBattles } from "@/battlezone/hooks/useBattles";
@@ -232,6 +233,7 @@ const LiveRoom = () => {
   // Publish host mixed audio (mic + song) to LiveKit room when state changes
   const { audioState: hostAudioState, publishToRoom: hostPublish, unpublishFromRoom: hostUnpublish } = hostAudio;
   useEffect(() => {
+    if (!VOICE_ENABLED) return;
     const room = liveKitRoomRef.current;
     if (!room || myRole !== 'host') return;
     if (hostAudioState === 'idle') {
@@ -246,6 +248,7 @@ const LiveRoom = () => {
   const speakers = getParticipantsByRole('speaker');
   const audience = getParticipantsByRole('audience');
   const iAmHostOrCoHost = hasPermission('canApproveSpeakers');
+  const canPublishAudio = hasPermission('canPublishAudio');
 
   useEffect(() => {
     if (!roomId || !user) return;
@@ -288,6 +291,7 @@ const LiveRoom = () => {
   }, [roomId, user, profile?.display_name, profile?.username]);
 
   useEffect(() => {
+    if (!VOICE_ENABLED) return;
     if (!roomId || !user) return;
     let cancelled = false;
     const participantName = profile?.display_name || profile?.username || "WaveWarz Listener";
@@ -338,7 +342,13 @@ const LiveRoom = () => {
       if (room) room.disconnect();
       setAudioConnected(false);
     };
-  }, [roomId, user, profile?.display_name, profile?.username]);
+    // canPublishAudio is included so that when a host approves a speaker request
+    // (battle_rooms.role flips, picked up via realtime subscription in useBattleRoles),
+    // this reconnects with a freshly-minted LiveKit token carrying the new publish grant --
+    // the initial token is minted before approval and LiveKit doesn't let a grant be
+    // upgraded in place, so without this a newly-approved speaker couldn't be heard until
+    // they manually left and rejoined the room.
+  }, [roomId, user, profile?.display_name, profile?.username, canPublishAudio]);
 
 
   useEffect(() => {
@@ -376,6 +386,7 @@ const LiveRoom = () => {
 
 
   const getSidebarTabs = () => {
+    if (!VOICE_ENABLED) return ["audience", "chat"] as const;
     if (!hasPermission('canApproveSpeakers')) return ["audience", "chat"] as const;
     return ["audience", "requests", "chat"] as const;
   };
@@ -440,9 +451,20 @@ const LiveRoom = () => {
             <div className={`rounded-lg border border-border bg-card text-foreground ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
               {myRole === "host" ? "Host" : myRole === "co-host" ? "Co-Host" : myRole === "speaker" ? "Speaker" : "Audience"}
             </div>
-            <div className={`rounded-lg border ${audioConnected ? "border-primary/40 text-primary" : "border-border text-muted-foreground"} bg-card ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
-              {audioConnected ? "Audio On" : "Audio Reconnecting"}
-            </div>
+            {VOICE_ENABLED ? (
+              <div className={`rounded-lg border ${audioConnected ? "border-primary/40 text-primary" : "border-border text-muted-foreground"} bg-card ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
+                {audioConnected ? "Audio On" : "Audio Reconnecting"}
+              </div>
+            ) : battle.xSpaceUrl ? (
+              <a
+                href={battle.xSpaceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`rounded-lg bg-primary font-semibold text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1.5 ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}
+              >
+                <Radio className="h-3.5 w-3.5" /> Listen on X
+              </a>
+            ) : null}
           </div>
         </div>
         <div className={`mx-auto max-w-7xl flex flex-wrap items-center ${isVerySmallMobile ? "mt-2 gap-1.5" : "mt-3 gap-2"}`}>
@@ -464,20 +486,43 @@ const LiveRoom = () => {
       {/* Main */}
       <div className="flex-1 flex flex-col lg:flex-row">
         <div className={`flex-1 ${isEmbedded ? "p-2.5 sm:p-3" : "p-3 sm:p-4"} space-y-4 sm:space-y-6 overflow-y-auto`}>
-          {/* Speaking Area */}
-          <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
-            <h3 className="text-sm font-bold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2">
-              <Mic className="h-4 w-4" /> Speaking Now
-            </h3>
-            <div className={`flex flex-wrap justify-center ${isVerySmallMobile ? "gap-3" : "gap-4 sm:gap-6"}`}>
-              {host && <ParticipantCircle p={host} size="lg" />}
-              {coHosts.map((p) => <ParticipantCircle key={p.id} p={p} />)}
-              {speakers.map((p) => <ParticipantCircle key={p.id} p={p} />)}
-              {participants.length === 0 && (
-                <p className="text-sm text-muted-foreground">No speakers yet - join the room!</p>
-              )}
+          {/* Speaking Area (in-app voice) */}
+          {VOICE_ENABLED && (
+            <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
+              <h3 className="text-sm font-bold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2">
+                <Mic className="h-4 w-4" /> Speaking Now
+              </h3>
+              <div className={`flex flex-wrap justify-center ${isVerySmallMobile ? "gap-3" : "gap-4 sm:gap-6"}`}>
+                {host && <ParticipantCircle p={host} size="lg" />}
+                {coHosts.map((p) => <ParticipantCircle key={p.id} p={p} />)}
+                {speakers.map((p) => <ParticipantCircle key={p.id} p={p} />)}
+                {participants.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No speakers yet - join the room!</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Live audio on X Spaces */}
+          {!VOICE_ENABLED && battle.xSpaceUrl && (
+            <div className={`rounded-2xl border border-primary/30 bg-primary/5 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-5"} backdrop-blur flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
+              <div className="flex items-start gap-3">
+                <Radio className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-foreground">Live audio is on X Spaces</p>
+                  <p className="text-xs text-muted-foreground">Join the Space to hear the battle. Vote and chat right here while you listen.</p>
+                </div>
+              </div>
+              <a
+                href={battle.xSpaceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shrink-0"
+              >
+                Listen on X <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
+          )}
 
           {/* Battle Panel */}
           <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
@@ -584,16 +629,18 @@ const LiveRoom = () => {
           </div>
 
           {/* Microphone Controls */}
-          <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
-            <h3 className="text-sm font-bold text-muted-foreground mb-3">Audio Controls</h3>
-            <MicControls
-              battleId={roomId || ''}
-              liveKitRoom={liveKitRoomRef.current}
-            />
-          </div>
+          {VOICE_ENABLED && (
+            <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
+              <h3 className="text-sm font-bold text-muted-foreground mb-3">Audio Controls</h3>
+              <MicControls
+                battleId={roomId || ''}
+                liveKitRoom={liveKitRoomRef.current}
+              />
+            </div>
+          )}
 
           {/* Speaker Management */}
-          {hasPermission('canApproveSpeakers') && (
+          {VOICE_ENABLED && hasPermission('canApproveSpeakers') && (
             <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
               <h3 className="text-sm font-bold text-muted-foreground mb-3">Speaker Management</h3>
               <SpeakerManagement battleId={roomId || ''} maxSpeakers={10} />
@@ -616,6 +663,7 @@ const LiveRoom = () => {
               </div>
 
               {/* Host Music Broadcast */}
+              {VOICE_ENABLED && (
               <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
@@ -709,6 +757,7 @@ const LiveRoom = () => {
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
 
@@ -754,9 +803,9 @@ const LiveRoom = () => {
                       <p className="text-xs font-medium text-foreground truncate">{p.display_name || "Anonymous"}</p>
                       <p className="text-[10px] text-muted-foreground capitalize">{p.role}</p>
                     </div>
-                    {p.is_speaking && !p.is_muted
+                    {VOICE_ENABLED && p.is_speaking && !p.is_muted
                       ? <Volume2 className="h-3 w-3 text-primary shrink-0" />
-                      : p.is_muted && p.role !== "audience"
+                      : VOICE_ENABLED && p.is_muted && p.role !== "audience"
                       ? <MicOff className="h-3 w-3 text-muted-foreground shrink-0" />
                       : null
                     }

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, Play, Pause, Music,
   UserPlus, Check, Disc3, Copy, PartyPopper, Sparkles, Flame, UserCheck,
+  ListMusic, Headphones,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SocialPostWithProfile } from '@/types/social';
@@ -12,10 +13,16 @@ import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useShare } from '@/hooks/useShare';
-import { fcOpenUrl } from '@/lib/farcasterActions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePulseCounts } from '@/hooks/usePopularity';
 import { getArtistSlugUrl, getSongSlugUrl } from '@/lib/slugRoutes';
+
+function formatPulseTime(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 interface MusicFeedCardProps {
   post: SocialPostWithProfile;
@@ -44,7 +51,14 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
   const isWelcomePost      = post.post_type === 'welcome';
   const isSongLikePost     = post.post_type === 'song_like';
   const isSongPulsePost    = post.post_type === 'song_pulse';
+  const isSongCommentPost  = post.post_type === 'song_comment';
   const isArtistFollowPost = post.post_type === 'artist_follow';
+  const isPlaylistCreatedPost = post.post_type === 'activity' && post.activity_type === 'playlist_created';
+  const isRoomEnteredPost  = post.post_type === 'activity' && post.activity_type === 'room_entered';
+
+  const pulsePositionSeconds = isSongPulsePost && typeof post.metadata?.position_seconds === 'number'
+    ? post.metadata.position_seconds
+    : null;
 
   const battleMatch = post.content?.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)::(.*)/);
   const totalPulses = pulseCounts && song ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count ?? 0) : 0;
@@ -59,8 +73,12 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
 
   const handlePlayPause = () => {
     if (!activeSong) return;
-    if (currentSong?.id === activeSong.id) isPlaying ? pause() : play();
-    else playSong(activeSong);
+    if (currentSong?.id === activeSong.id) {
+      if (isPlaying) pause();
+      else play();
+    } else {
+      playSong(activeSong, pulsePositionSeconds !== null ? { startTime: pulsePositionSeconds } : undefined);
+    }
   };
 
   const goToProfile = () => {
@@ -121,6 +139,29 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
             </motion.div>
           )}
 
+          {/* PLAYLIST CREATED */}
+          {isPlaylistCreatedPost && (
+            <motion.div className="text-center px-8" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+              <div className="w-24 h-24 rounded-3xl bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                <ListMusic className="w-12 h-12 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-1">New Playlist</h2>
+              <p className="text-white/80">{post.playlist_name || 'A new playlist'}</p>
+            </motion.div>
+          )}
+
+          {/* ROOM ENTERED */}
+          {isRoomEnteredPost && (
+            <motion.div className="text-center px-8" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+              <motion.div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4"
+                animate={{ scale: [1, 1.06, 1] }} transition={{ duration: 2, repeat: Infinity }}>
+                <Headphones className="w-12 h-12 text-primary" />
+              </motion.div>
+              <h2 className="text-2xl font-bold text-white mb-1">The Room</h2>
+              <p className="text-white/80">Live listening session</p>
+            </motion.div>
+          )}
+
           {/* ARTIST FOLLOW — large artist pfp */}
           {isArtistFollowPost && postArtist && (
             <div className="flex flex-col items-center gap-5">
@@ -148,12 +189,12 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
           )}
 
           {/* SONG — spinning disc artwork */}
-          {!isWelcomePost && !isArtistFollowPost && (
+          {!isWelcomePost && !isArtistFollowPost && !isPlaylistCreatedPost && !isRoomEnteredPost && (
             <>
               {coverUrl && !imgErr ? (
                 <motion.div
                   className={`rounded-full overflow-hidden shadow-2xl border-4 w-52 h-52 md:w-64 md:h-64 ${
-                    isSongLikePost ? 'border-red-500/70' : isSongPulsePost ? 'border-primary/70' : 'border-white/20'
+                    isSongLikePost ? 'border-red-500/70' : isSongPulsePost ? 'border-primary/70' : isSongCommentPost ? 'border-sky-400/70' : 'border-white/20'
                   }`}
                   animate={isThisSongPlaying ? { rotate: 360 } : {}}
                   transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
@@ -176,6 +217,12 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
                 <motion.div className="absolute top-[24%] right-[calc(50%-110px)] bg-primary rounded-full p-2.5 shadow-lg"
                   animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.8, repeat: Infinity }}>
                   <Sparkles className="w-6 h-6 text-white" />
+                </motion.div>
+              )}
+              {isSongCommentPost && (
+                <motion.div className="absolute top-[24%] right-[calc(50%-110px)] bg-sky-500 rounded-full p-2.5 shadow-lg"
+                  animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                  <MessageCircle className="w-6 h-6 text-white" />
                 </motion.div>
               )}
 
@@ -311,21 +358,52 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
         {isSongLikePost && song && (
           <p className="text-white/90 text-sm flex items-center gap-1.5 mb-2">
             <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400 shrink-0" />
-            liked &quot;{song.title}&quot; by {artist?.name}
+            likes {artist?.name} - {song.title}
           </p>
         )}
         {isSongPulsePost && song && (
           <p className="text-white/90 text-sm flex items-center gap-1.5 mb-2">
             <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
-            pulsed &quot;{song.title}&quot; by {artist?.name}
+            just pulsed {song.title}{pulsePositionSeconds !== null ? ` at ${formatPulseTime(pulsePositionSeconds)}` : ''}
           </p>
         )}
-        {!isWelcomePost && !isArtistFollowPost && !isSongLikePost && !isSongPulsePost && post.content && (
+        {isPlaylistCreatedPost && (
+          <p className="text-white/90 text-sm flex items-center gap-1.5 mb-2">
+            <ListMusic className="w-3.5 h-3.5 text-primary shrink-0" />
+            just created the {post.playlist_name || 'new'} playlist
+          </p>
+        )}
+        {isRoomEnteredPost && (
+          <div className="mb-2">
+            <p className="text-white/90 text-sm flex items-center gap-1.5">
+              <Headphones className="w-3.5 h-3.5 text-primary shrink-0" />
+              just entered the room
+            </p>
+            <button onClick={(e) => { e.stopPropagation(); navigate('/room'); }}
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors">
+              <Headphones className="w-3.5 h-3.5" />
+              Join the Room
+            </button>
+          </div>
+        )}
+        {isSongCommentPost && song && (
+          <div className="mb-2">
+            <p className="text-white/90 text-sm flex items-center gap-1.5">
+              <MessageCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              commented on &quot;{song.title}&quot; by {artist?.name}
+            </p>
+            {post.content && (
+              <p className="text-white/70 text-sm mt-1 line-clamp-2 italic">&quot;{post.content}&quot;</p>
+            )}
+          </div>
+        )}
+        {!isWelcomePost && !isArtistFollowPost && !isSongLikePost && !isSongPulsePost && !isSongCommentPost
+          && !isPlaylistCreatedPost && !isRoomEnteredPost && post.content && (
           <p className="text-white/90 text-sm mb-2 line-clamp-2">{post.content}</p>
         )}
 
         {battleMatch && (
-          <button type="button" onClick={() => void fcOpenUrl('https://www.wavewarz.com')}
+          <button type="button" onClick={(e) => { e.stopPropagation(); navigate(`/wavewarz-africa/room/${battleMatch[1]}`); }}
             className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-rose-300/40 bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-100">
             <Flame className="h-3.5 w-3.5" />
             Live on WaveWarz{battleMatch[2]?.trim() ? `: ${battleMatch[2].trim()}` : ''}
@@ -334,10 +412,11 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
 
         {activeSong && !isWelcomePost && (
           <div className={`flex items-center gap-2 rounded-full py-1.5 px-3 w-fit backdrop-blur-md ${
-            isSongLikePost ? 'bg-red-500/20' : isSongPulsePost ? 'bg-primary/20' : 'bg-white/10'
+            isSongLikePost ? 'bg-red-500/20' : isSongPulsePost ? 'bg-primary/20' : isSongCommentPost ? 'bg-sky-500/20' : 'bg-white/10'
           }`}>
             {isSongLikePost ? <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400 shrink-0" />
               : isSongPulsePost ? <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+              : isSongCommentPost ? <MessageCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
               : <Music className="w-3.5 h-3.5 text-white shrink-0" />}
             {totalPulses > 0 && <span className="text-[11px] text-white/80 tabular-nums shrink-0">❤️‍🔥 {totalPulses.toLocaleString()}</span>}
             <div className="overflow-hidden max-w-[180px]">

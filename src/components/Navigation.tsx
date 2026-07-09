@@ -10,6 +10,7 @@ import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { cn } from '@/lib/utils';
 const logo = '/songchainn-logo.webp';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
+import { NavRail } from '@/components/NavRail';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { InviteFriends } from '@/components/InviteFriends';
 import { SearchModal } from '@/components/SearchModal';
@@ -19,7 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SONGS } from '@/data/musicData';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-const navItems = [
+export const navItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/wavewarz-africa', label: 'WaveWarz', icon: Flame },
   { path: '/dj-shuffle', label: 'DJ Shuffle', icon: Disc3 },
@@ -167,48 +168,6 @@ export function Navigation() {
               </span>
             </Link>
 
-            {/* Desktop Nav Links - hidden on mobile */}
-            <nav className="hidden xl:flex items-center gap-1">
-              {effectiveNavItems.map((item) => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      "relative px-3 py-2 rounded-xl font-medium text-sm transition-all press-effect",
-                      isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <span className="flex items-center gap-2 relative z-10">
-                      <span className="relative">
-                        <item.icon className="w-4 h-4" />
-                        {item.path === '/room' && roomOnlineCount > 0 && (
-                          <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[11px] font-semibold">
-                            {roomOnlineCount}
-                          </span>
-                        )}
-                      </span>
-                      {item.label}
-                      {item.path === '/room' && roomOnlineCount > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-1.5 py-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                          <span>{`${roomOnlineCount} live`}</span>
-                        </span>
-                      )}
-                    </span>
-                    {isActive && (
-                      <motion.div
-                        layoutId="nav-indicator"
-                        className="absolute inset-0 glass rounded-xl"
-                        transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
-                      />
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
-
             {/* Right side actions */}
             <div className="flex items-center gap-1 sm:gap-2">
               {/* Search button — always visible */}
@@ -331,18 +290,18 @@ export function Navigation() {
                 onClick={handleLogout}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
                 aria-label="Sign out"
               >
                 <LogOut className="w-4 h-4" />
-                <span className="hidden xl:inline">Sign Out</span>
+                <span className="hidden lg:inline">Sign Out</span>
               </motion.button>
 
               {/* Mobile Hamburger Menu Button */}
               <motion.button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 whileTap={{ scale: 0.95 }}
-                className="xl:hidden p-2 rounded-xl glass text-foreground hover:bg-primary/10 transition-colors"
+                className="lg:hidden p-2 rounded-xl glass text-foreground hover:bg-primary/10 transition-colors"
                 aria-label="Toggle menu"
               >
                 <AnimatePresence mode="wait">
@@ -375,6 +334,8 @@ export function Navigation() {
 
         <InviteFriends isOpen={showInvite} onClose={() => setShowInvite(false)} />
       </header>
+
+      <NavRail />
 
       <SuggestionDialog open={showSuggestionDialog} onOpenChange={setShowSuggestionDialog} />
       <SearchModal open={isSearchOpen} onOpenChange={setIsSearchOpen} />
@@ -453,7 +414,7 @@ export function Navigation() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileMenuOpen(false)}
-              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 xl:hidden"
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 lg:hidden"
             />
             
             {/* Menu Panel */}
@@ -462,7 +423,7 @@ export function Navigation() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 w-72 glass-surface border-l border-border/50 z-50 xl:hidden"
+              className="fixed top-0 right-0 bottom-0 w-72 glass-surface border-l border-border/50 z-50 lg:hidden"
             >
               <div className="p-4 border-b border-border/50 flex items-center justify-between">
                 <span className="font-heading font-bold text-foreground">Menu</span>

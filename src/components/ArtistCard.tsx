@@ -37,70 +37,62 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
         whileHover={{ y: -6, scale: 1.02 }}
         className="group glass-card rounded-2xl overflow-hidden hover:shadow-float transition-all duration-300 shine-overlay"
       >
-        <div className="aspect-square bg-secondary relative overflow-hidden">
-          {artist.profileImage ? (
-            <div className="relative w-full h-full">
-              <img
-                src={artist.profileImage}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110"
-              />
-              <img 
-                src={artist.profileImage} 
-                alt={artist.name}
-                className="relative w-full h-full object-contain"
-                loading="lazy"
-              />
-            </div>
-          ) : (
-            <>
-              <div className="absolute inset-0 gradient-primary opacity-20 group-hover:opacity-30 transition-opacity" />
-              
-              {/* Simplified gradient background - removed heavy animation */}
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: 'radial-gradient(circle at 50% 50%, hsl(217 91% 60% / 0.2) 0%, transparent 60%)',
-                }}
-              />
-
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-20 h-20 rounded-full glass flex items-center justify-center shadow-glow transition-all duration-300 group-hover:scale-110">
-                  <span className="text-3xl font-heading font-bold text-foreground">
-                    {artist.name.charAt(0)}
-                  </span>
-                </div>
+        <div className="relative pt-6 pb-2 overflow-hidden">
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'radial-gradient(circle at 50% 20%, hsl(217 91% 60% / 0.18) 0%, transparent 65%)',
+            }}
+          />
+          <div className="relative flex justify-center">
+            {artist.profileImage ? (
+              <div className="relative w-24 h-24 rounded-full ring-2 ring-primary/30 shadow-glow transition-transform duration-300 group-hover:scale-105 overflow-hidden">
+                <img
+                  src={artist.profileImage}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
+                />
+                <img
+                  src={artist.profileImage}
+                  alt={artist.name}
+                  className="relative w-full h-full object-contain"
+                  loading="lazy"
+                />
               </div>
-            </>
-          )}
+            ) : (
+              <div className="w-24 h-24 rounded-full glass flex items-center justify-center shadow-glow transition-transform duration-300 group-hover:scale-105">
+                <span className="text-3xl font-heading font-bold text-foreground">
+                  {artist.name.charAt(0)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="p-4">
+        <div className="p-4 text-center">
           <h3 className="font-heading font-semibold text-foreground truncate mb-1 group-hover:text-primary transition-colors">
             {artist.name}
           </h3>
 
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3">
+          <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground mb-3">
             <MapPin className="w-3.5 h-3.5" />
             <span>{artist.location}</span>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
               <Music className="w-3.5 h-3.5" />
               <span>{artistSongs.length} songs</span>
-              <span>•</span>
-              <span>{totalStreams.toLocaleString()} streams</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1">
-                <Users className="w-3.5 h-3.5" />
-                <span>{totalFollowers.toLocaleString()}</span>
-              </span>
-              {totalPulses > 0 && (
-                <span className="tabular-nums text-primary">❤️‍🔥 {totalPulses.toLocaleString()}</span>
-              )}
-            </div>
+            </span>
+            <span>{totalStreams.toLocaleString()} streams</span>
+            <span className="inline-flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" />
+              <span>{totalFollowers.toLocaleString()}</span>
+            </span>
+            {totalPulses > 0 && (
+              <span className="tabular-nums text-primary">❤️‍🔥 {totalPulses.toLocaleString()}</span>
+            )}
           </div>
 
           <div className="mt-3 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs text-center truncate font-medium">

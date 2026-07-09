@@ -197,6 +197,7 @@ export function ShareSongButton({
     ) : (
       <motion.button
         type="button"
+        aria-label="Share song"
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={(e) => { e.stopPropagation(); setShowSheet(true); }}
@@ -294,7 +295,7 @@ export function ShareSongButton({
                 <button
                   type="button"
                   onClick={handleCopyLink}
-                  className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/8 active:bg-white/10 rounded-2xl px-4 py-3.5 transition-colors border border-white/5"
+                  className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/10 active:bg-white/[12%] rounded-2xl px-4 py-3.5 transition-colors border border-white/5"
                 >
                   <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
                     {copied ? (
@@ -314,7 +315,7 @@ export function ShareSongButton({
                 <button
                   type="button"
                   onClick={handleShareToFeed}
-                  className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/8 active:bg-white/10 rounded-2xl px-4 py-3.5 transition-colors border border-white/5"
+                  className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/10 active:bg-white/[12%] rounded-2xl px-4 py-3.5 transition-colors border border-white/5"
                 >
                   <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
                     <Share2 className="w-4 h-4 text-primary" />

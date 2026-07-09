@@ -161,6 +161,16 @@ export default function Profile() {
   const [baseProfileLink, setBaseProfileLink] = useState(audienceProfile?.base_profile_link || audienceProfile?.wallet_address || '');
   const [interests, setInterests] = useState((((audienceProfile as any)?.interests || (audienceProfile as any)?.genre || '') as string));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [pendingProfileSnapshot, setPendingProfileSnapshot] = useState<{
+    display_name: string;
+    username: string | null;
+    bio: string | null;
+    location: string | null;
+    website_url: string | null;
+    twitter_url: string | null;
+    base_profile_link: string | null;
+    interests: string | null;
+  } | null>(null);
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
     if (target.dataset.fallbackApplied === 'true') return;
@@ -179,6 +189,7 @@ export default function Profile() {
       setBaseProfileLink(audienceProfile.base_profile_link || audienceProfile.wallet_address || '');
       setInterests((((audienceProfile as any)?.interests || (audienceProfile as any)?.genre || '') as string));
       setFieldErrors({});
+      setPendingProfileSnapshot(null);
     }
   }, [audienceProfile]);
 
@@ -526,7 +537,8 @@ export default function Profile() {
     setIsSaving(true);
 
     try {
-      if (nextUsername) {
+      const currentUsername = audienceProfile?.username || '';
+      if (nextUsername && nextUsername !== currentUsername) {
         const { data: existingUsernameRows, error: usernameCheckError } = await (supabase as any)
           .from('audience_profiles')
           .select('id,user_id')
@@ -576,12 +588,23 @@ export default function Profile() {
         if (Object.keys(updatePayload).length === 0) throw error;
       }
 
-      await refreshProfile();
+      // Optimistically show new values immediately; refreshProfile syncs context in background
+      setPendingProfileSnapshot({
+        display_name: nextDisplayName,
+        username: nextUsername || null,
+        bio: trimOrNull(nextBio),
+        location: trimOrNull(nextLocation),
+        website_url: nextWebsite,
+        twitter_url: nextXLink,
+        base_profile_link: trimOrNull(nextBaseLink),
+        interests: trimOrNull(nextInterests),
+      });
       setIsEditing(false);
       toast({
         title: 'Profile updated',
         description: 'Your changes are saved across $ongChainn.',
       });
+      void refreshProfile();
     } catch {
       toast({
         title: 'Could not update your profile',
@@ -626,23 +649,35 @@ export default function Profile() {
   const effectiveCoverUrl = pendingCoverUrl || audienceProfile.cover_photo_url;
   const effectiveAvatarUrl =
     pendingAvatarUrl || audienceProfile.avatar_url || audienceProfile.profile_picture_url;
+  const snap = pendingProfileSnapshot;
   const profileDisplayName =
+    snap?.display_name ||
     audienceProfile.display_name ||
     audienceProfile.profile_name ||
     audienceProfile.username ||
     safeProfileName;
-  const profileUsername = audienceProfile.username || '';
-  const profileLocation = audienceProfile.location || '';
+  const profileUsername = (snap ? snap.username : audienceProfile.username) || '';
+  const profileLocation = (snap ? snap.location : audienceProfile.location) || '';
   const profileWebsite =
+    (snap ? snap.website_url : null) ||
     ((audienceProfile as any)?.website_url as string | null | undefined) ||
     ((audienceProfile as any)?.website as string | null | undefined) ||
     '';
-  const profileXLink = audienceProfile.twitter_url || audienceProfile.x_profile_link || '';
-  const profileBaseLink = audienceProfile.base_profile_link || audienceProfile.wallet_address || '';
+  const profileXLink =
+    (snap ? snap.twitter_url : null) ||
+    audienceProfile.twitter_url ||
+    audienceProfile.x_profile_link ||
+    '';
+  const profileBaseLink =
+    (snap ? snap.base_profile_link : null) ||
+    audienceProfile.base_profile_link ||
+    audienceProfile.wallet_address ||
+    '';
   const profileInterests =
-    (((audienceProfile as any)?.interests as string | null | undefined) ||
-      ((audienceProfile as any)?.genre as string | null | undefined) ||
-      '');
+    (snap ? snap.interests : null) ||
+    ((audienceProfile as any)?.interests as string | null | undefined) ||
+    ((audienceProfile as any)?.genre as string | null | undefined) ||
+    '';
 
   return (
     <div className="min-h-screen bg-background">
@@ -943,7 +978,7 @@ export default function Profile() {
         </DialogContent>
       </Dialog>
 
-      <div className="px-4 sm:px-6 lg:px-8 -mt-16 max-w-[1400px] mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 lg:pl-28 -mt-16 max-w-[1400px] mx-auto">
         {/* Profile Picture & Info */}
         <div className="flex items-end gap-4 mb-6">
           <div className="relative">
@@ -1167,7 +1202,7 @@ export default function Profile() {
           ) : (
             <div className="space-y-3">
               <p className="text-muted-foreground">
-                {audienceProfile.bio || 'No bio yet'}
+                {(snap ? snap.bio : audienceProfile.bio) || 'No bio yet'}
               </p>
               {profileLocation && (
                 <p className="text-sm text-muted-foreground">{profileLocation}</p>

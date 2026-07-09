@@ -12,8 +12,7 @@ import { toast } from 'sonner';
 
 type DirectMessage = {
   id: string;
-  user_id: string | null;
-  sender: 'mosha' | 'user';
+  sender: 'mosha' | 'user' | 'system';
   text: string;
   created_at: string;
 };
@@ -47,7 +46,7 @@ function parseMessageWithCtas(text: string): { content: string; ctas: MessageCta
 
 function isRelevantToMoshaReply(text: string) {
   const query = text.toLowerCase();
-  return /(songchainn|wavewarz|battle|room|dj|shuffle|playlist|catalog|artist|how|help|feature|signup|login|about)/i.test(query);
+  return /(songchainn|wavewarz|battle|room|dj|shuffle|playlist|catalog|artist|how|help|feature|signup|login|about|marketplace|coin|token|zora|buy|sell|trade|phase)/i.test(query);
 }
 
 function isFollowUpMessage(text: string) {
@@ -68,7 +67,7 @@ function buildMoshaReply(text: string, history: DirectMessage[]) {
     return 'To share a song to feed: open a song card, tap share to feed, then post. If it fails, refresh feed once and try again while signed in.';
   }
   if (query.includes('wavewarz') || query.includes('battle')) {
-    return 'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and/or country. Open /wavewarz-africa in SongChainn for the registration side.';
+    return 'WaveWarz Africa battles run right here in $ongChainn now: watch live, vote each round, and request to speak in the room. You can also host your own battle or register your music and country for rollout.\nCTA::Watch Live Battles::/wavewarz-africa/battles/live';
   }
   if (contextualQuery.includes('dj') || contextualQuery.includes('shuffle')) {
     return 'DJ Shuffle can run Artist, All Songs, or Catalog shuffle. I can guide you to the best mode for your vibe.';
@@ -76,8 +75,17 @@ function buildMoshaReply(text: string, history: DirectMessage[]) {
   if (contextualQuery.includes('room')) {
     return 'The Room is live community listening plus chat. Join it for shared discovery and real-time reactions.';
   }
-  if (query.includes('phase') || query.includes('audience first')) {
-    return '$ongChainn is in Phase One: Audience First. Your preferences and listening behavior shape discovery early.';
+  if (
+    contextualQuery.includes('marketplace') ||
+    contextualQuery.includes('coin') ||
+    contextualQuery.includes('token') ||
+    contextualQuery.includes('zora') ||
+    ((contextualQuery.includes('buy') || contextualQuery.includes('sell') || contextualQuery.includes('trade') || contextualQuery.includes('own')) && contextualQuery.includes('song'))
+  ) {
+    return 'That is Phase Two: The Music Marketplace. Real songs are now tradeable coins on Base -- buy in to support an artist, or sell back for ETH anytime. Open the Marketplace to try it.\nCTA::Explore Marketplace::/marketplace';
+  }
+  if (query.includes('phase') || query.includes('audience first') || query.includes('phase two') || query.includes('phase 2')) {
+    return '$ongChainn started with Phase One: Audience First -- your preferences and listening behavior shaped discovery. We are now live in Phase Two: The Music Marketplace, where songs are real tradeable coins on Base.\nCTA::Explore Marketplace::/marketplace';
   }
   if (contextualQuery.includes('playlist') || contextualQuery.includes('catalog')) {
     return 'For follow-up discovery, start from your favorite catalog, then branch by artist and room reactions to find the next best songs.';
@@ -86,7 +94,7 @@ function buildMoshaReply(text: string, history: DirectMessage[]) {
 }
 
 const SEED_TEXT =
-  'Hey fam, Mo$ha here. Welcome to your $ongChainn message center. WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and/or country.';
+  'Hey fam, Mo$ha here. Welcome to your $ongChainn message center. WaveWarz Africa battles now run right here in $ongChainn -- watch live, vote, and speak in the room. Also -- Phase Two just launched: the Music Marketplace, where songs are real tradeable coins on Base. Ask me about either anytime.';
 
 export default function Inbox() {
   const { user } = useAuth();
@@ -94,32 +102,57 @@ export default function Inbox() {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
 
   const userId = user?.id || null;
 
   useEffect(() => {
     let active = true;
     const load = async () => {
+      if (!userId) {
+        setMessages([]);
+        return;
+      }
+
+      const { data: newThreadId, error: threadError } = await (supabase as any)
+        .rpc('ensure_dm_thread', { _user_id: userId });
+      if (!active) return;
+      if (threadError || !newThreadId) {
+        setMessages([{ id: 'seed-mosha', sender: 'mosha', text: SEED_TEXT, created_at: new Date().toISOString() }]);
+        return;
+      }
+      setThreadId(newThreadId);
+
       const { data, error } = await (supabase as any)
         .from('direct_messages')
-        .select('id,user_id,sender,text,created_at')
-        .eq('user_id', userId)
+        .select('id,sender_type,message_text,created_at')
+        .eq('thread_id', newThreadId)
         .order('created_at', { ascending: true })
         .limit(120);
       if (!active) return;
-      if (error || !Array.isArray(data) || data.length === 0) {
-        setMessages([
-          {
-            id: 'seed-mosha',
-            user_id: userId,
-            sender: 'mosha',
-            text: SEED_TEXT,
-            created_at: new Date().toISOString(),
-          },
-        ]);
+
+      if (error) {
+        setMessages([{ id: 'seed-mosha', sender: 'mosha', text: SEED_TEXT, created_at: new Date().toISOString() }]);
         return;
       }
-      setMessages(data as DirectMessage[]);
+
+      if (!Array.isArray(data) || data.length === 0) {
+        // First-ever visit to this thread -- persist the welcome message for real.
+        const { data: seedId } = await (supabase as any)
+          .rpc('send_mosha_message', { _user_id: userId, _message_text: SEED_TEXT });
+        if (!active) return;
+        setMessages([{ id: seedId || 'seed-mosha', sender: 'mosha', text: SEED_TEXT, created_at: new Date().toISOString() }]);
+        return;
+      }
+
+      setMessages(
+        data.map((row: any) => ({
+          id: row.id,
+          sender: row.sender_type,
+          text: row.message_text,
+          created_at: row.created_at,
+        })),
+      );
     };
     void load();
     return () => {
@@ -132,26 +165,45 @@ export default function Inbox() {
     [messages],
   );
 
-  const persistMessage = async (message: DirectMessage) => {
-    const { error } = await (supabase as any).from('direct_messages').insert(message);
-    if (error) {
-      void 0;
-    }
+  const persistUserMessage = async (text: string) => {
+    if (!threadId || !userId) return null;
+    const { data, error } = await (supabase as any)
+      .from('direct_messages')
+      .insert({ thread_id: threadId, sender_type: 'user', sender_user_id: userId, message_text: text })
+      .select('id,created_at')
+      .single();
+    if (error) return null;
+    return data as { id: string; created_at: string };
+  };
+
+  const persistMoshaReply = async (text: string) => {
+    if (!userId) return null;
+    const { data, error } = await (supabase as any)
+      .rpc('send_mosha_message', { _user_id: userId, _message_text: text });
+    if (error) return null;
+    return data as string;
   };
 
   const handleSend = async () => {
     if (!draft.trim() || isSending) return;
     setIsSending(true);
+    const text = draft.trim();
+    const optimisticId = `${Date.now()}-user`;
     const userMessage: DirectMessage = {
-      id: `${Date.now()}-user`,
-      user_id: userId,
+      id: optimisticId,
       sender: 'user',
-      text: draft.trim(),
+      text,
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMessage]);
-    void persistMessage(userMessage);
     setDraft('');
+
+    const persisted = await persistUserMessage(text);
+    if (persisted) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimisticId ? { ...m, id: persisted.id, created_at: persisted.created_at } : m)),
+      );
+    }
 
     const conversation = [...sortedMessages, userMessage];
     const shouldReply = isRelevantToMoshaReply(userMessage.text) || isFollowUpMessage(userMessage.text) || conversation.length <= 3;
@@ -163,16 +215,18 @@ export default function Inbox() {
     }
 
     const replyDelay = 650 + Math.floor(Math.random() * 700);
-    window.setTimeout(() => {
-      const reply: DirectMessage = {
-        id: `${Date.now()}-mosha`,
-        user_id: userId,
-        sender: 'mosha',
-        text: buildMoshaReply(userMessage.text, conversation),
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, reply]);
-      void persistMessage(reply);
+    window.setTimeout(async () => {
+      const replyText = buildMoshaReply(userMessage.text, conversation);
+      const replyId = await persistMoshaReply(replyText);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: replyId || `${Date.now()}-mosha`,
+          sender: 'mosha',
+          text: replyText,
+          created_at: new Date().toISOString(),
+        },
+      ]);
       setIsSending(false);
     }, replyDelay);
   };
@@ -190,7 +244,7 @@ export default function Inbox() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         <section className="rounded-2xl border border-border/50 bg-background/85 backdrop-blur p-3 sm:p-4">
           <div className="flex items-center gap-2 mb-3">
             <Bot className="w-4 h-4 text-primary" />

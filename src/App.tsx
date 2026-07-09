@@ -1,5 +1,6 @@
 "use client";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,8 +13,11 @@ import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { NotificationBanner } from "@/components/NotificationBanner";
+import { GlobalAmbientLayer } from "@/components/GlobalAmbientLayer";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 const VibeAgent = lazy(() => import("@/components/VibeAgent").then(m => ({ default: m.VibeAgent })));
 const BehaviorCtaPopups = lazy(() => import("@/components/BehaviorCtaPopups").then(m => ({ default: m.BehaviorCtaPopups })));
+const PhaseTwoAnnouncement = lazy(() => import("@/components/PhaseTwoAnnouncement").then(m => ({ default: m.PhaseTwoAnnouncement })));
 import { useUserPresence } from "@/hooks/useUserPresence";
 import { FarcasterProvider, useFarcasterContext } from "@/context/FarcasterContext";
 import { FacebookProvider } from "@/context/FacebookContext";
@@ -40,6 +44,8 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Room = lazy(() => import("./pages/Room"));
 const About = lazy(() => import("./pages/About"));
+const TermsOfUse = lazy(() => import("./pages/TermsOfUse"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const WaveWarzBattleZoneFeature = lazy(() => import("./pages/WaveWarzBattleZoneFeature"));
 const DjShuffle = lazy(() => import("./pages/DjShuffle"));
 const Inbox = lazy(() => import("./pages/Inbox"));
@@ -84,7 +90,7 @@ function AppShell() {
     location.pathname === '/wavewarz-africa/results';
   const hideFloatingChrome = hideChrome || isWaveWarzEmbedRoute;
   const [isGlobalPulsing, setIsGlobalPulsing] = useState(false);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const pulseTimeoutRef = useRef<number | null>(null);
 
   const triggerGlobalPulse = useCallback((source: string, songId: string | null, senderId: string | null) => {
@@ -101,16 +107,6 @@ function AppShell() {
         setIsGlobalPulsing(false);
       }, 650);
     });
-  }, []);
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const apply = () => setPrefersReducedMotion(media.matches);
-    apply();
-    media.addEventListener('change', apply);
-    return () => {
-      media.removeEventListener('change', apply);
-    };
   }, []);
 
   useEffect(() => {
@@ -148,43 +144,57 @@ function AppShell() {
   return (
     <>
       <div className={`${hideFloatingChrome ? '' : 'pb-chrome lg:pb-0'} ${rootPulseClass}`.trim()}>
+        <GlobalAmbientLayer isGlobalPulsing={isGlobalPulsing} prefersReducedMotion={prefersReducedMotion} />
         <RedirectHandler />
         <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/discover" element={<Discover />} />
-            <Route path="/artists" element={<Artists />} />
-            <Route path="/artist/:id" element={<ArtistDetail />} />
-            <Route path="/catalog/:id" element={<CatalogDetail />} />
-            <Route path="/song/:id" element={<SongDetail />} />
-            <Route path="/playlist/:id" element={<PlaylistDetail />} />
-            <Route path="/playlists" element={<Playlists />} />
-            <Route path="/post/:id" element={<Social />} />
-            <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/social" element={<Social />} />
-            <Route path="/inbox" element={<Inbox />} />
-            <Route path="/community" element={<Community />} />
-            <Route path="/audience/:userId" element={<AudienceProfile />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
-            <Route path="/dj-shuffle" element={<DjShuffle />} />
-            <Route path="/install" element={<Install />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/room" element={<Room />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/bettercallzaal" element={<BetterCallZaal />} />
-            <Route path="/auth" element={<Navigate to="/" replace />} />
-            <Route path="/not-found" element={<NotFound />} />
-            {/* Vanity slug routes — must be after all specific routes */}
-            <Route path="/:artistSlug/:songSlug" element={<SlugResolver />} />
-            <Route path="/:artistSlug" element={<SlugResolver />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -8 }}
+              transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <Routes location={location}>
+                <Route path="/" element={<Home />} />
+                <Route path="/discover" element={<Discover />} />
+                <Route path="/artists" element={<Artists />} />
+                <Route path="/artist/:id" element={<ArtistDetail />} />
+                <Route path="/catalog/:id" element={<CatalogDetail />} />
+                <Route path="/song/:id" element={<SongDetail />} />
+                <Route path="/playlist/:id" element={<PlaylistDetail />} />
+                <Route path="/playlists" element={<Playlists />} />
+                <Route path="/post/:id" element={<Social />} />
+                <Route path="/marketplace" element={<Marketplace />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/social" element={<Social />} />
+                <Route path="/inbox" element={<Inbox />} />
+                <Route path="/community" element={<Community />} />
+                <Route path="/audience/:userId" element={<AudienceProfile />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/terms" element={<TermsOfUse />} />
+                <Route path="/leaderboard" element={<Leaderboard />} />
+                <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
+                <Route path="/dj-shuffle" element={<DjShuffle />} />
+                <Route path="/install" element={<Install />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/room" element={<Room />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/bettercallzaal" element={<BetterCallZaal />} />
+                <Route path="/auth" element={<Navigate to="/" replace />} />
+                <Route path="/not-found" element={<NotFound />} />
+                {/* Vanity slug routes — must be after all specific routes */}
+                <Route path="/:artistSlug/:songSlug" element={<SlugResolver />} />
+                <Route path="/:artistSlug" element={<SlugResolver />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </motion.div>
+          </AnimatePresence>
         </Suspense>
       </div>
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><VibeAgent /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><BehaviorCtaPopups /></Suspense></ErrorBoundary>}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><PhaseTwoAnnouncement /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
     </>
   );
@@ -216,6 +226,7 @@ function AppContent() {
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/about" element={<About />} />
+                <Route path="/terms" element={<TermsOfUse />} />
                 <Route path="/artists" element={<Artists />} />
                 <Route path="/artist/:id" element={<ArtistDetail />} />
                 <Route path="/catalog/:id" element={<CatalogDetail />} />
@@ -254,6 +265,7 @@ function AppContent() {
                 <Routes>
                   {/* Public routes — accessible without login */}
                   <Route path="/about" element={<About />} />
+                  <Route path="/terms" element={<TermsOfUse />} />
                   <Route path="/artists" element={<Artists />} />
                   <Route path="/artist/:id" element={<ArtistDetail />} />
                   <Route path="/catalog/:id" element={<CatalogDetail />} />

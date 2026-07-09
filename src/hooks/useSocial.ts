@@ -5,7 +5,12 @@ import { SocialPostWithProfile, PostComment } from '@/types/social';
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
+import { listFollows, saveFollows } from '@/lib/localDb';
 import type { Database } from '@/integrations/supabase/types';
+
+function isSyntheticId(id: string | null | undefined): boolean {
+  return !!id && (id.startsWith('fc-') || id.startsWith('fb-'));
+}
 
 export function useSocial() {
   const { user } = useAuth();
@@ -21,8 +26,18 @@ export function useSocial() {
 
   const fetchFollowData = useCallback(async () => {
     const uid = userIdRef.current;
-    if (!uid || uid.startsWith('fc-')) {
+    if (!uid) {
       setFollowing([]);
+      setFollowers([]);
+      return;
+    }
+
+    if (isSyntheticId(uid)) {
+      // No Supabase session — read from local storage only
+      const allFollows = listFollows();
+      const localFollowing = allFollows[uid] ?? [];
+      followingRef.current = localFollowing;
+      setFollowing(localFollowing);
       setFollowers([]);
       return;
     }
@@ -77,9 +92,14 @@ export function useSocial() {
 
       const postIds = rows.map((p) => p.id);
       const userIds = Array.from(new Set(rows.map((p) => p.user_id).filter(Boolean)));
+      const playlistIds = Array.from(new Set(
+        rows
+          .filter((p) => p.post_type === 'activity' && (p as any).activity_type === 'playlist_created' && p.playlist_id)
+          .map((p) => p.playlist_id)
+      ));
 
       // Single profile query covering both id and user_id columns, minimal columns only
-      const [profilesRes, likesRes, commentsRes, userLikesRes] = await Promise.all([
+      const [profilesRes, likesRes, commentsRes, userLikesRes, playlistsRes] = await Promise.all([
         supabase
           .from('audience_profiles')
           .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
@@ -87,7 +107,15 @@ export function useSocial() {
         supabase.from('post_likes').select('post_id').in('post_id', postIds),
         supabase.from('post_comments').select('post_id').in('post_id', postIds),
         supabase.from('post_likes').select('post_id').eq('user_id', uid).in('post_id', postIds),
+        playlistIds.length > 0
+          ? supabase.from('playlists').select('id,name').in('id', playlistIds)
+          : Promise.resolve({ data: [] as any[] }),
       ]);
+
+      const playlistNamesMap = new Map<string, string>();
+      ((playlistsRes.data || []) as any[]).forEach((p: any) => {
+        if (p?.id) playlistNamesMap.set(String(p.id), p.name);
+      });
 
       const profilesMap = new Map<string, AudienceProfile>();
       ((profilesRes.data || []) as any[]).forEach((p: any) => {
@@ -120,6 +148,8 @@ export function useSocial() {
         image_url: (post as any).image_url ?? null,
         image_path: (post as any).image_path ?? null,
         post_type: post.post_type,
+        activity_type: (post as any).activity_type ?? null,
+        metadata: (post as any).metadata ?? null,
         created_at: post.created_at,
         updated_at: post.updated_at,
         profile: profilesMap.get(String(post.user_id)),
@@ -127,6 +157,7 @@ export function useSocial() {
         comments_count: commentsCount.get(String(post.id)) || 0,
         is_liked: userLikedPosts.has(String(post.id)),
         artist_is_verified: null,
+        playlist_name: post.playlist_id ? playlistNamesMap.get(String(post.playlist_id)) ?? null : null,
       }));
 
       setPosts(enriched);
@@ -288,16 +319,33 @@ export function useSocial() {
       if (!user || userId === user.id) {
         return;
       }
-      if (user.id.startsWith('fc-')) {
-        toast({
-          title: 'Sign in required',
-          description: 'Please sign in with Farcaster to follow users.',
-          variant: 'destructive',
-        });
-        return;
-      }
 
       const isCurrentlyFollowing = following.includes(userId);
+
+      if (isSyntheticId(user.id)) {
+        // No Supabase session — persist follow in local storage only
+        const allFollows = listFollows();
+        if (isCurrentlyFollowing) {
+          const next = (allFollows[user.id] ?? []).filter((id) => id !== userId);
+          saveFollows({ ...allFollows, [user.id]: next });
+          setFollowing((prev) => {
+            const n = prev.filter((id) => id !== userId);
+            followingRef.current = n;
+            return n;
+          });
+          toast({ title: 'Unfollowed' });
+        } else {
+          const next = Array.from(new Set([...(allFollows[user.id] ?? []), userId]));
+          saveFollows({ ...allFollows, [user.id]: next });
+          setFollowing((prev) => {
+            const n = Array.from(new Set([...prev, userId]));
+            followingRef.current = n;
+            return n;
+          });
+          toast({ title: 'Following!' });
+        }
+        return;
+      }
 
       if (isCurrentlyFollowing) {
         // Optimistic local update before DB write

@@ -156,7 +156,7 @@ export default function Community() {
 
   // Touch our own profile's updated_at so we appear near the top of "Recent" list
   useEffect(() => {
-    if (!user?.id || user.id.startsWith('fc-')) return;
+    if (!user?.id || user.id.startsWith('fc-') || user.id.startsWith('fb-')) return;
     void supabase
       .from('audience_profiles')
       .update({ updated_at: new Date().toISOString() } as any)
@@ -427,6 +427,7 @@ export default function Community() {
 
   const handleFollow = async (userId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!user) return;
     const wasFollowing = isFollowing(userId);
     const delta = wasFollowing ? -1 : 1;
     // Optimistic count update in local state before DB round-trip
@@ -463,7 +464,7 @@ export default function Community() {
       <AnimatedBackground variant="default" />
       <Navigation />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 relative z-10">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         <motion.section
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -575,6 +576,8 @@ export default function Community() {
             {/* View Mode Toggle */}
             <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
               <button
+                type="button"
+                aria-label="Grid view"
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded-md transition-colors ${
                   viewMode === 'grid' ? 'bg-background shadow-sm' : 'hover:bg-background/50'
@@ -583,6 +586,8 @@ export default function Community() {
                 <Grid3X3 className="w-4 h-4" />
               </button>
               <button
+                type="button"
+                aria-label="List view"
                 onClick={() => setViewMode('list')}
                 className={`p-2 rounded-md transition-colors ${
                   viewMode === 'list' ? 'bg-background shadow-sm' : 'hover:bg-background/50'

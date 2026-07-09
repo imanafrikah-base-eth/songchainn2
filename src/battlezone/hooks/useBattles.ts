@@ -22,6 +22,7 @@ export interface BattleRow {
   winner: string | null;
   scheduled_time: string | null;
   ended_time: string | null;
+  x_space_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +47,7 @@ export interface Battle {
   winner?: "A" | "B";
   round: number;
   totalRounds: number;
+  xSpaceUrl?: string;
 }
 
 function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Battle {
@@ -76,6 +78,7 @@ function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Bat
     winner: (row.winner as Battle["winner"]) || undefined,
     round: row.round,
     totalRounds: row.total_rounds,
+    xSpaceUrl: row.x_space_url || undefined,
   };
 }
 

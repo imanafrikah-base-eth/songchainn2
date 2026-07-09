@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { getAllProfiles, listSongComments, saveSongComments } from '@/lib/localDb';
 import { useOnlineUsers } from '@/hooks/useUserPresence';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SongCommentsProps {
   songId: string;
@@ -82,6 +83,15 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
       };
       map[songId] = [next, ...(map[songId] || [])];
       saveSongComments(map);
+
+      // Share to feed — comments themselves stay local-only, but the activity
+      // shows up in the feed like song likes/pulses do.
+      await supabase.from('social_posts').insert({
+        user_id: user.id,
+        song_id: songId,
+        content,
+        post_type: 'song_comment',
+      } as any);
     },
     onSuccess: () => {
       setNewComment('');

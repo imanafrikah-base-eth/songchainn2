@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight, Search } from 'lucide-react';
+import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight, Search, Shuffle, Bot, Store, Mic, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -15,12 +15,14 @@ import { cn } from '@/lib/utils';
 import { useFarcasterContext } from '@/context/FarcasterContext';
 import sdk from '@farcaster/miniapp-sdk';
 import { fcOpenUrl } from '@/lib/farcasterActions';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { CATALOGS, SONGS, type Song } from '@/data/musicData';
 import { usePlayerActions, usePlayerState, usePlayerTime } from '@/context/PlayerContext';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { useRankedArtists, useSongPopularity, useTodayHotSongs } from '@/hooks/usePopularity';
+import { useSongCoins } from '@/hooks/useSongCoins';
+import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -33,32 +35,46 @@ const DAILY_MIX_URL = 'https://pub-6e7e2bb48a994314926f27fb90fa198f.r2.dev/SongC
 const GUEST_LOCKED_SONGS_KEY = 'songchainn_guest_locked_songs';
 const ABOUT_HIGHLIGHTS = [
   {
-    title: 'Music becomes signal',
-    description: 'Every listen, replay, share and conversation helps surface what actually matters in culture.',
-    icon: Sparkles,
+    title: 'The Room',
+    description: 'Jump into a live listening session, chat with the community, and feel the room bounce in real time.',
+    icon: Headphones,
     accent: 'text-primary',
     surface: 'bg-primary/10',
   },
   {
-    title: 'Listeners matter early',
-    description: '$ongChainn is built so early listeners, fans and communities are visible before the crowd arrives.',
-    icon: Headphones,
+    title: 'WaveWarz Africa',
+    description: 'Two artists. One battle. Back your favorite in a live song battle and watch the crowd decide.',
+    icon: Flame,
+    accent: 'text-orange-400',
+    surface: 'bg-orange-500/10',
+  },
+  {
+    title: 'DJ $huffle',
+    description: "Can't decide what to play? Pick your artists, songs or catalogs and let DJ $huffle keep it flowing.",
+    icon: Shuffle,
     accent: 'text-emerald-400',
     surface: 'bg-emerald-500/10',
   },
   {
-    title: 'Culture meets markets',
-    description: 'The long-term vision is onchain music where attention becomes measurable and songs can evolve into liquid assets.',
-    icon: LineChart,
+    title: 'Mo$ha',
+    description: "Your vibe guide around $ongChainn. Ask Mo$ha anything, get put on to new music, never feel lost.",
+    icon: Bot,
+    accent: 'text-purple-400',
+    surface: 'bg-purple-500/10',
+  },
+  {
+    title: 'Marketplace',
+    description: 'Show love to a song early and support the artist directly. Early fans get to matter, not just the algorithm.',
+    icon: Store,
     accent: 'text-cyan-400',
     surface: 'bg-cyan-500/10',
   },
 ] as const;
 
 const ABOUT_STEPS = [
-  'Preview music, catalogs and artists before creating an account.',
-  'Sign in when you are ready to save your vibe, unlock more playback and join the full experience.',
-  'Connect a Base wallet later for onchain identity, ownership and future drops.',
+  'Hit play. Preview real songs, artists and catalogs, no account needed.',
+  'Sign up free to unlock The Room, DJ $huffle, Mo$ha and your full profile.',
+  'Connect a wallet later to collect and support songs on the Marketplace.',
 ] as const;
 
 export default function Auth() {
@@ -106,7 +122,8 @@ export default function Auth() {
   const { currentTime, duration } = usePlayerTime();
   const { rankedArtists } = useRankedArtists();
   const { data: popularityData = [] } = useSongPopularity();
-  const { data: hotTodaySongs = [] } = useTodayHotSongs(8);
+  const { data: hotTodaySongs = [] } = useTodayHotSongs(10);
+  const { data: songCoins = [] } = useSongCoins();
 
   const dailyMixSong = useMemo<Song>(() => ({
     id: DAILY_MIX_ID,
@@ -151,11 +168,22 @@ export default function Auth() {
   }, [popularityBySongId]);
 
   const newMusicSongs = useMemo(() => {
+    const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 7;
     return [...SONGS]
-      .filter((s) => !!s.addedAt)
+      .filter((s) => !!s.addedAt && new Date(s.addedAt!).getTime() >= cutoff)
       .sort((a, b) => new Date(b.addedAt!).getTime() - new Date(a.addedAt!).getTime())
       .slice(0, 12);
   }, []);
+
+  const coinAddressBySongId = useMemo(() => {
+    const map = new Map<string, string>();
+    songCoins.forEach((coin) => {
+      if (coin.mint_status === 'minted' && coin.zora_coin_address) {
+        map.set(coin.song_id, coin.zora_coin_address);
+      }
+    });
+    return map;
+  }, [songCoins]);
 
   // Detect any wallet provider (MetaMask, Coinbase, Rainbow, etc.)
   const hasWallet = typeof window !== 'undefined' && (() => {
@@ -496,7 +524,7 @@ export default function Auth() {
 
   const tellAboutWaveWarz = useCallback(() => {
     showMoshaTransient(
-      'WaveWarz Africa battles run on WaveWarz.com. In $ongChainn you can register your music and submit your country for rollout.',
+      'WaveWarz Africa battles now run right here in $ongChainn: watch live, vote, and speak in the room. Sign up to join in, and register your music and country for rollout.',
       11000,
     );
   }, [showMoshaTransient]);
@@ -631,13 +659,7 @@ export default function Auth() {
           <div className="h-full max-w-[1400px] mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <img src={logo} alt="$ongChainn" className="w-8 h-8 rounded-md object-contain" />
-              <button
-                type="button"
-                onClick={handleBrowseWithoutAuthModal}
-                className="hidden md:flex items-center rounded-full border border-primary/25 bg-primary/10 hover:bg-primary/15 px-4 h-10 text-xs font-medium tracking-wide text-primary/90 min-w-[320px] text-left transition-colors"
-              >
-                Powered by Create on Base
-              </button>
+              <span className="font-heading font-semibold text-foreground text-lg hidden sm:inline">$ongChainn</span>
             </div>
             <div className="hidden lg:flex items-center gap-6 text-sm text-muted-foreground">
               <button type="button" onClick={() => scrollToSection('about-songchainn')} className="hover:text-foreground transition-colors">About</button>
@@ -687,7 +709,7 @@ export default function Auth() {
               <Flame className="w-4 h-4 text-primary" />
             </div>
             <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
-              {hotTodaySongs.slice(0, 8).map(({ song, playsToday }) => (
+              {hotTodaySongs.slice(0, 10).map(({ song, playsToday }, index) => (
                 <button
                   key={`sidebar-hot-${song.id}`}
                   type="button"
@@ -712,11 +734,11 @@ export default function Auth() {
                       <p className="text-[11px] text-muted-foreground truncate">{song.artist}</p>
                     </div>
                   </div>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <p className="text-[10px] text-primary">{playsToday.toLocaleString()} plays today</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {!user && guestLockedSongIds.has(song.id) ? 'Sign in to replay' : 'Free preview'}
-                    </p>
+                  <div className="mt-1 flex items-center justify-between gap-1.5">
+                    <span className="text-[10px] text-primary font-semibold">#{index + 1}</span>
+                    {coinAddressBySongId.has(song.id) && (
+                      <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" />
+                    )}
                   </div>
                 </button>
               ))}
@@ -732,7 +754,7 @@ export default function Auth() {
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {hotTodaySongs.slice(0, 6).map(({ song, playsToday }) => (
+                {hotTodaySongs.slice(0, 10).map(({ song, playsToday }, index) => (
                   <button
                     key={`mobile-hot-${song.id}`}
                     type="button"
@@ -753,11 +775,11 @@ export default function Auth() {
                     </div>
                     <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                    <div className="mt-1 flex items-center justify-between gap-2">
-                      <p className="text-[11px] text-primary">{playsToday.toLocaleString()} plays today</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {!user && guestLockedSongIds.has(song.id) ? 'Sign in to replay' : 'Free preview'}
-                      </p>
+                    <div className="mt-1 flex items-center justify-between gap-1.5">
+                      <span className="text-[11px] text-primary font-semibold">#{index + 1}</span>
+                      {coinAddressBySongId.has(song.id) && (
+                        <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" />
+                      )}
                     </div>
                   </button>
                 ))}
@@ -804,17 +826,13 @@ export default function Auth() {
                       About $ongChainn
                     </div>
                     <h2 className="font-heading text-2xl md:text-3xl text-foreground mb-3">
-                      Understand $ongChainn better
+                      This is $ongChainn. Come have some fun.
                     </h2>
-                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-4">
-                      $ongChainn is a music-first onchain platform where listening is not passive. People discover songs,
-                      build taste, join community and help reveal which sounds are truly moving culture.
-                    </p>
                     <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-5">
-                      You can preview the vibe first. When you are ready, you can create an account to save
-                      your profile, unlock more playback and step into deeper community and ownership features.
+                      Press play, hang out in The Room, back your favorite in a WaveWarz Africa battle, or just let
+                      DJ $huffle and Mo$ha keep you company. Preview it all right now, no account needed.
                     </p>
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                       {ABOUT_HIGHLIGHTS.map(({ title, description, icon: Icon, accent, surface }) => (
                         <div key={title} className="rounded-2xl border border-border/40 bg-background/70 p-4">
                           <div className={`inline-flex rounded-xl p-2 ${surface} mb-3`}>
@@ -824,6 +842,28 @@ export default function Auth() {
                           <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
                         </div>
                       ))}
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <Mic className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Make music?</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Submit your music to $ongChainn and get discovered by early listeners.
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full border-primary/30 text-primary hover:bg-primary/10 shrink-0"
+                        onClick={() => navigate('/about#artist-submission')}
+                      >
+                        Submit Your Music
+                        <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                      </Button>
                     </div>
                   </div>
 
@@ -845,9 +885,9 @@ export default function Auth() {
                     </div>
 
                     <div className="rounded-2xl border border-border/40 bg-background/80 p-4 md:p-5">
-                      <p className="text-sm font-semibold text-foreground mb-2">Why it feels different</p>
+                      <p className="text-sm font-semibold text-foreground mb-2">Ready to jump in?</p>
                       <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                        Imagine trading music as an actual onchain asset. What does this mean? Sign up to learn more.
+                        Create a free account and unlock the full experience, The Room, DJ $huffle, Mo$ha and more.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <Button
@@ -889,14 +929,19 @@ export default function Auth() {
                     key={catalog.id}
                     type="button"
                     onClick={handleBrowseWithoutAuthModal}
-                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-colors p-2.5"
+                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group"
                   >
-                    <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                    <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                       {catalog.coverImage ? (
                         <img src={catalog.coverImage} alt={catalog.title} className="w-full h-full object-cover" />
                       ) : (
                         <img src={logo} alt={catalog.title} className="w-16 h-16 object-contain opacity-80" />
                       )}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center shadow-glow">
+                          <Play className="w-5 h-5 text-primary-foreground ml-0.5" fill="currentColor" />
+                        </div>
+                      </div>
                     </div>
                     <p className="text-sm font-medium text-foreground truncate">{catalog.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{catalog.artist}</p>
@@ -916,7 +961,7 @@ export default function Auth() {
                     Just Dropped
                   </span>
                 </div>
-                <button type="button" onClick={handleNewMusicPlayAttempt} className="text-sm text-muted-foreground hover:text-foreground">Sign in to play</button>
+                <button type="button" onClick={handleNewMusicPlayAttempt} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                 {newMusicSongs.map((song) => (
@@ -924,7 +969,7 @@ export default function Auth() {
                     key={song.id}
                     type="button"
                     onClick={handleNewMusicPlayAttempt}
-                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-colors p-2.5 group"
+                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group"
                   >
                     <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                       {song.coverImage ? (
@@ -933,12 +978,16 @@ export default function Auth() {
                         <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
                       )}
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play className="w-8 h-8 text-white" />
+                        <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center shadow-glow">
+                          <Play className="w-5 h-5 text-primary-foreground ml-0.5" fill="currentColor" />
+                        </div>
                       </div>
                     </div>
                     <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                    <p className="text-[11px] text-primary mt-1">Sign in to play</p>
+                    {coinAddressBySongId.has(song.id) && (
+                      <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" className="mt-1.5" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -952,10 +1001,23 @@ export default function Auth() {
               </div>
               <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
                 {previewArtists.map((artist) => (
-                  <button key={artist.id} type="button" onClick={handleBrowseWithoutAuthModal} className="text-center">
-                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-secondary/40 border border-border/40 mx-auto mb-2 flex items-center justify-center">
+                  <button key={artist.id} type="button" onClick={handleBrowseWithoutAuthModal} className="text-center group">
+                    <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-secondary/40 border border-border/40 mx-auto mb-2 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
                       {artist.profileImage ? (
-                        <img src={artist.profileImage} alt={artist.name} className="w-full h-full object-cover" />
+                        <>
+                          <img
+                            src={artist.profileImage}
+                            alt=""
+                            aria-hidden="true"
+                            className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
+                          />
+                          <img
+                            src={artist.profileImage}
+                            alt={artist.name}
+                            className="relative w-full h-full object-contain"
+                            loading="lazy"
+                          />
+                        </>
                       ) : (
                         <Users className="w-7 h-7 text-muted-foreground" />
                       )}
@@ -977,33 +1039,44 @@ export default function Auth() {
               <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                   {previewSongs.map((song) => (
-                    <button
+                    <div
                       key={song.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleSongPlayAttempt(song)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSongPlayAttempt(song); } }}
                       className={cn(
-                        "text-left rounded-xl transition-colors p-2.5",
+                        "text-left rounded-xl transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group cursor-pointer",
                         !user && guestLockedSongIds.has(song.id)
                           ? "bg-secondary/20 border border-primary/30"
                           : "bg-secondary/30 hover:bg-secondary/45"
                       )}
                     >
-                      <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                      <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                         {song.coverImage ? (
                           <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
                         ) : (
                           <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
                         )}
+                        {!user && guestLockedSongIds.has(song.id) ? (
+                          <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center">
+                            <Lock className="w-3 h-3 text-primary" />
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center shadow-glow">
+                              <Play className="w-5 h-5 text-primary-foreground ml-0.5" fill="currentColor" />
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <p className="text-sm text-foreground truncate">{song.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                      <div className="flex items-center justify-between mt-1 gap-2">
-                        <p className="text-[11px] text-muted-foreground truncate">{song.townSquare}</p>
-                        <p className="text-[11px] text-primary font-medium whitespace-nowrap">
-                          {!user && guestLockedSongIds.has(song.id) ? 'Locked' : 'Tap to play'}
-                        </p>
-                      </div>
-                    </button>
+                      <p className="text-[11px] text-muted-foreground truncate mt-1">{song.townSquare}</p>
+                      {coinAddressBySongId.has(song.id) && (
+                        <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" className="mt-1.5" />
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1459,6 +1532,16 @@ export default function Auth() {
                   >
                     {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : authMode === 'signup' ? 'Create new account' : 'Log in'}
                   </Button>
+
+                  {authMode === 'signup' && (
+                    <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+                      By creating an account you agree to the{' '}
+                      <Link to="/terms" className="text-primary underline-offset-2 hover:underline">
+                        $ongChainn Terms of Use and Privacy Notice
+                      </Link>
+                      , including how we handle your data.
+                    </p>
+                  )}
 
                   {authMode === 'signin' && (
                     <>
