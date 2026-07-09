@@ -821,6 +821,7 @@ export default function Auth() {
                 <h2 className="text-xl font-heading text-foreground">Hot Today</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
+              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
               <div className="grid grid-cols-2 gap-3">
                 {hotTodaySongs.slice(0, 10).map(({ song, playsToday }, index) => (
                   <button
@@ -851,6 +852,7 @@ export default function Auth() {
                     </div>
                   </button>
                 ))}
+              </div>
               </div>
             </section>
             )}
@@ -995,6 +997,7 @@ export default function Auth() {
                 <h2 className="text-xl font-heading text-foreground">Today’s Featured Catalogs</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
+              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                 {previewCatalogs.map((catalog) => (
                   <button
@@ -1020,6 +1023,7 @@ export default function Auth() {
                     <p className="text-[11px] text-muted-foreground mt-1">{catalog.trackCount} tracks • {catalog.totalPlays.toLocaleString()} plays</p>
                   </button>
                 ))}
+              </div>
               </div>
             </section>
 
@@ -1106,6 +1110,7 @@ export default function Auth() {
                 <h2 className="text-xl font-heading text-foreground">Trending Artists</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
+              <div className="max-h-[340px] overflow-y-auto pr-1 sm:pr-2">
               <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
                 {previewArtists.map((artist) => (
                   <button key={artist.id} type="button" onClick={handleBrowseWithoutAuthModal} className="text-center group">
@@ -1133,6 +1138,7 @@ export default function Auth() {
                     <p className="text-[11px] text-muted-foreground truncate">{artist.location}</p>
                   </button>
                 ))}
+              </div>
               </div>
             </section>
 
