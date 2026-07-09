@@ -201,8 +201,16 @@ export function NotificationDropdown() {
     }
   };
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    // Opening the tray clears the badge, matching standard app behavior
+    if (nextOpen && unreadCount > 0) {
+      void markAllAsRead();
+    }
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"

@@ -23,6 +23,9 @@ export interface BattleRow {
   scheduled_time: string | null;
   ended_time: string | null;
   x_space_url: string | null;
+  battle_type: string | null;
+  songs_a: Array<{ id: string; title: string }> | null;
+  songs_b: Array<{ id: string; title: string }> | null;
   created_at: string;
   updated_at: string;
 }
@@ -48,6 +51,10 @@ export interface Battle {
   round: number;
   totalRounds: number;
   xSpaceUrl?: string;
+  battleType: "quick" | "community";
+  songsA: Array<{ id: string; title: string }>;
+  songsB: Array<{ id: string; title: string }>;
+  createdAt: string;
 }
 
 function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Battle {
@@ -79,6 +86,10 @@ function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Bat
     round: row.round,
     totalRounds: row.total_rounds,
     xSpaceUrl: row.x_space_url || undefined,
+    battleType: row.battle_type === "community" ? "community" : "quick",
+    songsA: Array.isArray(row.songs_a) ? row.songs_a : [],
+    songsB: Array.isArray(row.songs_b) ? row.songs_b : [],
+    createdAt: row.created_at,
   };
 }
 

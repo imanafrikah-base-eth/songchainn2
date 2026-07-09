@@ -214,6 +214,7 @@ export type Database = {
           artist_b_image: string | null
           artist_b_name: string
           artist_b_region: string | null
+          battle_type: string
           co_hosts: string[] | null
           created_at: string
           ended_time: string | null
@@ -225,6 +226,8 @@ export type Database = {
           scheduled_time: string | null
           song_a: string
           song_b: string
+          songs_a: Json | null
+          songs_b: Json | null
           status: string
           title: string
           total_rounds: number
@@ -239,6 +242,7 @@ export type Database = {
           artist_b_image?: string | null
           artist_b_name: string
           artist_b_region?: string | null
+          battle_type?: string
           co_hosts?: string[] | null
           created_at?: string
           ended_time?: string | null
@@ -250,6 +254,8 @@ export type Database = {
           scheduled_time?: string | null
           song_a: string
           song_b: string
+          songs_a?: Json | null
+          songs_b?: Json | null
           status?: string
           title: string
           total_rounds?: number
@@ -264,6 +270,7 @@ export type Database = {
           artist_b_image?: string | null
           artist_b_name?: string
           artist_b_region?: string | null
+          battle_type?: string
           co_hosts?: string[] | null
           created_at?: string
           ended_time?: string | null
@@ -275,6 +282,8 @@ export type Database = {
           scheduled_time?: string | null
           song_a?: string
           song_b?: string
+          songs_a?: Json | null
+          songs_b?: Json | null
           status?: string
           title?: string
           total_rounds?: number

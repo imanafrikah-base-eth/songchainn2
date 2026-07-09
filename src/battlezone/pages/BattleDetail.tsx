@@ -138,8 +138,12 @@ const BattleDetail = () => {
         <div className="rounded-2xl border border-border bg-card/80 p-6 backdrop-blur">
           <h3 className="font-bold text-foreground mb-3">Battle Rules</h3>
           <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-            <li>3 rounds per battle</li>
-            <li>Audience votes live each round</li>
+            <li>
+              {battle.battleType === "community"
+                ? "Community battle: 3 rounds, one song from each artist per round"
+                : "Quick battle: one round, one song from each artist"}
+            </li>
+            <li>Audience votes live each round and can change their vote before the round ends</li>
             <li>Most total votes wins</li>
             <li>Host can end the battle early</li>
           </ul>

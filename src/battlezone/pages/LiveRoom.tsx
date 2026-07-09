@@ -96,6 +96,30 @@ const LiveRoom = () => {
     }
   }, [battle]);
 
+  // Restore this user's vote for the current round so a refresh doesn't
+  // pretend they haven't voted; also resets choice when the round advances.
+  useEffect(() => {
+    if (!user || !roomId) {
+      setVotedFor(null);
+      return;
+    }
+    let cancelled = false;
+    const loadMyVote = async () => {
+      const { data } = await supabase
+        .from("battle_votes")
+        .select("side")
+        .eq("battle_id", roomId)
+        .eq("user_id", user.id)
+        .eq("round", round)
+        .maybeSingle();
+      if (!cancelled) setVotedFor((data?.side as "A" | "B") ?? null);
+    };
+    void loadMyVote();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, roomId, round]);
+
   // Participant management is now handled by useBattleRoles hook
 
   // Real-time participant management is now handled by useBattleRoles hook
@@ -216,18 +240,35 @@ const LiveRoom = () => {
     setChatInput((prev) => prev + emoji);
   };
 
+  // Votes are editable while the round is open: one row per user per round,
+  // upserted so tapping the other artist switches the vote.
   const vote = async (side: "A" | "B") => {
-    if (votedFor || !user || !roomId) return;
+    if (!user || !roomId || votedFor === side) return;
+    const previous = votedFor;
     setVotedFor(side);
-    if (side === "A") setLocalVotesA((v) => v + 1);
-    else setLocalVotesB((v) => v + 1);
+    if (side === "A") {
+      setLocalVotesA((v) => v + 1);
+      if (previous === "B") setLocalVotesB((v) => Math.max(0, v - 1));
+    } else {
+      setLocalVotesB((v) => v + 1);
+      if (previous === "A") setLocalVotesA((v) => Math.max(0, v - 1));
+    }
 
-    await supabase.from("battle_votes").insert({
-      battle_id: roomId,
-      user_id: user.id,
-      side,
-      round,
-    });
+    const { error } = await supabase.from("battle_votes").upsert(
+      { battle_id: roomId, user_id: user.id, side, round },
+      { onConflict: "battle_id,user_id,round" }
+    );
+    if (error) {
+      setVotedFor(previous);
+      if (side === "A") {
+        setLocalVotesA((v) => Math.max(0, v - 1));
+        if (previous === "B") setLocalVotesB((v) => v + 1);
+      } else {
+        setLocalVotesB((v) => Math.max(0, v - 1));
+        if (previous === "A") setLocalVotesA((v) => v + 1);
+      }
+      toast({ title: "Vote not saved", description: "Please try again." });
+    }
   };
 
   // Publish host mixed audio (mic + song) to LiveKit room when state changes
@@ -547,7 +588,7 @@ const LiveRoom = () => {
                   />
                 )}
                 <span className="text-sm font-bold text-foreground">{battle.artistA.name}</span>
-                <span className="text-[10px] text-muted-foreground">{battle.songA}</span>
+                <span className="text-[10px] text-muted-foreground">{battle.songsA[round - 1]?.title || battle.songA}</span>
                 <a href="https://www.songchainn.xyz" target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
                   $ongChainn <ExternalLink className="h-2.5 w-2.5" />
                 </a>
@@ -568,7 +609,7 @@ const LiveRoom = () => {
                   />
                 )}
                 <span className="text-sm font-bold text-foreground">{battle.artistB.name}</span>
-                <span className="text-[10px] text-muted-foreground">{battle.songB}</span>
+                <span className="text-[10px] text-muted-foreground">{battle.songsB[round - 1]?.title || battle.songB}</span>
                 <a href="https://www.songchainn.xyz" target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
                   $ongChainn <ExternalLink className="h-2.5 w-2.5" />
                 </a>
@@ -581,12 +622,9 @@ const LiveRoom = () => {
               <div className={`flex ${isVerySmallMobile ? "flex-col" : "gap-3"}`}>
                 <button
                   onClick={() => vote("A")}
-                  disabled={!!votedFor}
                   className={`flex-1 rounded-2xl ${isVerySmallMobile ? "py-3 text-sm" : "py-4 text-base sm:text-lg"} font-bold transition-all duration-300 ${
                     votedFor === "A"
                       ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-[0_0_25px_hsl(var(--neon-green)/0.4)]"
-                      : votedFor
-                      ? "bg-muted text-muted-foreground opacity-40 cursor-not-allowed"
                       : "bg-primary/10 border-2 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50"
                   }`}
                 >
@@ -594,12 +632,9 @@ const LiveRoom = () => {
                 </button>
                 <button
                   onClick={() => vote("B")}
-                  disabled={!!votedFor}
                   className={`flex-1 rounded-2xl ${isVerySmallMobile ? "mt-2 py-3 text-sm" : "py-4 text-base sm:text-lg"} font-bold transition-all duration-300 ${
                     votedFor === "B"
                       ? "bg-gradient-to-br from-secondary to-secondary/80 text-secondary-foreground shadow-[0_0_25px_hsl(var(--cyan)/0.4)]"
-                      : votedFor
-                      ? "bg-muted text-muted-foreground opacity-40 cursor-not-allowed"
                       : "bg-secondary/10 border-2 border-secondary/30 text-secondary hover:bg-secondary/20 hover:border-secondary/50"
                   }`}
                 >
@@ -609,7 +644,7 @@ const LiveRoom = () => {
 
               {votedFor && (
                 <p className="text-center text-sm text-primary">
-                  You voted for {votedFor === "A" ? battle.artistA.name : battle.artistB.name}
+                  You voted for {votedFor === "A" ? battle.artistA.name : battle.artistB.name}. Tap the other artist to change your vote before the round ends.
                 </p>
               )}
 

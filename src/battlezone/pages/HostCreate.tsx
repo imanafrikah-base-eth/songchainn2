@@ -38,14 +38,13 @@ const HostCreate = () => {
   const [form, setForm] = useState({
     title: "",
     region: "Zambia",
+    battleType: "quick" as "quick" | "community",
     artistAId: "",
     artistBId: "",
     artistA: "",
     artistB: "",
-    songAId: "",
-    songBId: "",
-    songA: "",
-    songB: "",
+    songAIds: ["", "", ""],
+    songBIds: ["", "", ""],
     schedule: "",
     xSpaceUrl: "",
     notes: "",
@@ -57,7 +56,14 @@ const HostCreate = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const coHostDropdownRef = useRef<HTMLDivElement>(null);
   const { data: liveBattles = [] } = useBattles("live");
-  const liveBattlesCount = liveBattles.length;
+  // Battles stuck on 'live' for over a day are stale and must not brick the
+  // launch cap for new hosts
+  const liveBattlesCount = liveBattles.filter((battle) => {
+    const createdAt = new Date(battle.createdAt).getTime();
+    return !Number.isFinite(createdAt) || Date.now() - createdAt < 24 * 60 * 60 * 1000;
+  }).length;
+
+  const requiredSongs = form.battleType === "community" ? 3 : 1;
 
   const artistOptions = useMemo(
     () =>
@@ -98,31 +104,7 @@ const HostCreate = () => {
         .limit(500);
       
       if (!data || error) {
-        // Create mock users for testing if no real users
-        const mockUsers: SongchainUser[] = [
-          {
-            id: "mock1",
-            user_id: "mock1",
-            username: "jessi",
-            display_name: "Jessi",
-            avatar_url: null,
-          },
-          {
-            id: "mock2", 
-            user_id: "mock2",
-            username: "mosha",
-            display_name: "Mo$ha",
-            avatar_url: null,
-          },
-          {
-            id: "mock3",
-            user_id: "mock3", 
-            username: "testuser",
-            display_name: "Test User",
-            avatar_url: null,
-          }
-        ];
-        setUsers(mockUsers);
+        setUsers([]);
         return;
       }
 
@@ -246,8 +228,7 @@ const HostCreate = () => {
         ...prev,
         artistAId: artistId,
         artistA: selectedArtist?.name || "",
-        songAId: "",
-        songA: "",
+        songAIds: ["", "", ""],
       }));
       return;
     }
@@ -255,26 +236,33 @@ const HostCreate = () => {
       ...prev,
       artistBId: artistId,
       artistB: selectedArtist?.name || "",
-      songBId: "",
-      songB: "",
+      songBIds: ["", "", ""],
     }));
   };
 
-  const selectSong = (slot: "A" | "B", songId: string) => {
-    const song = SONGS.find((s) => s.id === songId);
-    if (slot === "A") {
-      setForm((prev) => ({
-        ...prev,
-        songAId: songId,
-        songA: song?.title || "",
-      }));
-      return;
-    }
-    setForm((prev) => ({
-      ...prev,
-      songBId: songId,
-      songB: song?.title || "",
-    }));
+  const selectSong = (slot: "A" | "B", index: number, songId: string) => {
+    setForm((prev) => {
+      const key = slot === "A" ? "songAIds" : "songBIds";
+      const next = [...prev[key]];
+      next[index] = songId;
+      return { ...prev, [key]: next };
+    });
+  };
+
+  const selectBattleType = (battleType: "quick" | "community") => {
+    setForm((prev) => ({ ...prev, battleType }));
+  };
+
+  // Songs chosen for a side, in round order, resolved to {id, title}
+  const pickedSongs = (slot: "A" | "B") => {
+    const ids = (slot === "A" ? form.songAIds : form.songBIds).slice(0, requiredSongs);
+    return ids
+      .filter(Boolean)
+      .map((id) => {
+        const song = SONGS.find((s) => s.id === id);
+        return { id, title: song?.title || "" };
+      })
+      .filter((s) => s.title);
   };
 
   const upsertHostInRoom = async (battleId: string, displayName: string) => {
@@ -310,34 +298,11 @@ const HostCreate = () => {
     }
   };
 
+  // Notifications for "battle is live" are fanned out by the notify_battle_live
+  // DB trigger the moment the battles row hits status 'live' — the client only
+  // posts to the feed here.
   const broadcastBattleLaunch = async (battleId: string, title: string) => {
     if (!user) return;
-    const { data: profiles } = await supabase
-      .from("audience_profiles")
-      .select("user_id")
-      .eq("onboarding_completed", true)
-      .not("user_id", "is", null)
-      .limit(5000);
-
-    const userIds = (profiles || [])
-      .map((p) => p.user_id)
-      .filter((id): id is string => typeof id === "string" && id.length > 0);
-
-    if (userIds.length) {
-      const payload = userIds
-        .filter((id) => id !== user.id)
-        .map((targetId) => ({
-          user_id: targetId,
-          type: "battle_live",
-          title: "New Live Battle",
-          message: `${title} is live now. Join the room and vote.`,
-          metadata: { battle_id: battleId, route: `/wavewarz-africa/entry/${battleId}` },
-        }));
-      if (payload.length) {
-        await supabase.from("notifications").insert(payload);
-      }
-    }
-
     await supabase.from("social_posts").insert({
       user_id: user.id,
       content: `Now Live on WaveWarz Africa: ${title}. Join battle room ${battleId} and vote.`,
@@ -377,6 +342,8 @@ const HostCreate = () => {
     try {
       const artistA = artistById.get(form.artistAId);
       const artistB = artistById.get(form.artistBId);
+      const songsA = pickedSongs("A");
+      const songsB = pickedSongs("B");
       const { error } = await supabase.from("battles").insert({
         title: form.title || "Untitled Battle",
         region: form.region || "Africa",
@@ -386,8 +353,11 @@ const HostCreate = () => {
         artist_b_image: artistB?.profileImage ?? null,
         artist_a_region: artistA?.location ?? form.region,
         artist_b_region: artistB?.location ?? form.region,
-        song_a: form.songA || "TBD",
-        song_b: form.songB || "TBD",
+        song_a: songsA[0]?.title || "TBD",
+        song_b: songsB[0]?.title || "TBD",
+        songs_a: songsA.length ? songsA : null,
+        songs_b: songsB.length ? songsB : null,
+        battle_type: form.battleType,
         host_user_id: user.id,
         host_name: profile?.display_name || profile?.username || (user as any).user_metadata?.display_name || (user as any).user_metadata?.username || (user.email || "").split("@")[0] || "Host",
         co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
@@ -395,7 +365,7 @@ const HostCreate = () => {
         x_space_url: normalizedSpaceUrl(),
         status: "upcoming",
         round: 1,
-        total_rounds: 3,
+        total_rounds: requiredSongs,
       });
       if (error) throw error;
       toast({ title: "Draft saved", description: "Battle draft saved. Find it in Upcoming to launch later." });
@@ -425,12 +395,18 @@ const HostCreate = () => {
       (user.email || "").split("@")[0] ||
       "Host";
 
+    const songsA = pickedSongs("A");
+    const songsB = pickedSongs("B");
     const missing: string[] = [];
     if (!form.title.trim()) missing.push("Battle title");
     if (!form.artistAId || !form.artistA.trim()) missing.push("Artist A");
     if (!form.artistBId || !form.artistB.trim()) missing.push("Artist B");
-    if (!form.songAId || !form.songA.trim()) missing.push("Song A");
-    if (!form.songBId || !form.songB.trim()) missing.push("Song B");
+    if (songsA.length < requiredSongs) {
+      missing.push(requiredSongs === 1 ? "Song for Artist A" : `${requiredSongs} songs for Artist A (${songsA.length}/${requiredSongs} picked)`);
+    }
+    if (songsB.length < requiredSongs) {
+      missing.push(requiredSongs === 1 ? "Song for Artist B" : `${requiredSongs} songs for Artist B (${songsB.length}/${requiredSongs} picked)`);
+    }
 
     if (missing.length) {
       toast({
@@ -475,8 +451,11 @@ const HostCreate = () => {
           artist_b_image: artistB?.profileImage ?? null,
           artist_a_region: artistA?.location ?? form.region,
           artist_b_region: artistB?.location ?? form.region,
-          song_a: form.songA || "TBD",
-          song_b: form.songB || "TBD",
+          song_a: songsA[0]?.title || "TBD",
+          song_b: songsB[0]?.title || "TBD",
+          songs_a: songsA,
+          songs_b: songsB,
+          battle_type: form.battleType,
           host_user_id: user.id,
           host_name: hostName,
           co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
@@ -484,7 +463,7 @@ const HostCreate = () => {
           x_space_url: normalizedSpaceUrl(),
           status,
           round: 1,
-          total_rounds: 3,
+          total_rounds: requiredSongs,
         })
         .select()
         .single();
@@ -558,6 +537,41 @@ const HostCreate = () => {
             </SelectWrapper>
           </div>
 
+          {/* Battle type */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Battle Type</label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => selectBattleType("quick")}
+                className={`rounded-xl border p-4 text-left transition-all ${
+                  form.battleType === "quick"
+                    ? "border-primary bg-primary/10 shadow-[0_0_20px_hsl(var(--neon-green)/0.15)]"
+                    : "border-border bg-card/80 hover:border-primary/30"
+                }`}
+              >
+                <p className="font-bold text-foreground flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-primary" /> Quick Battle
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">One song from each artist. Single round, winner takes it.</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => selectBattleType("community")}
+                className={`rounded-xl border p-4 text-left transition-all ${
+                  form.battleType === "community"
+                    ? "border-primary bg-primary/10 shadow-[0_0_20px_hsl(var(--neon-green)/0.15)]"
+                    : "border-border bg-card/80 hover:border-primary/30"
+                }`}
+              >
+                <p className="font-bold text-foreground flex items-center gap-2">
+                  <Music className="h-4 w-4 text-primary" /> Community Battle
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Three songs from each artist. One song per round across 3 rounds.</p>
+              </button>
+            </div>
+          </div>
+
           {/* Artist and song selection */}
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
@@ -596,43 +610,63 @@ const HostCreate = () => {
             </div>
           </div>
 
-          {/* Songs */}
+          {/* Songs (one select per round, per artist) */}
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Song A</label>
-              <SelectWrapper icon={Music}>
-                <select
-                  value={form.songAId}
-                  onChange={(e) => selectSong("A", e.target.value)}
-                  className={selectClass}
-                  disabled={!form.artistAId}
-                >
-                  <option value="">{form.artistAId ? "Select Song A" : "Select Artist A first"}</option>
-                  {(songsByArtist.get(form.artistAId) || []).map((song) => (
-                    <option key={song.id} value={song.id}>
-                      {song.title}
+              <label className="text-sm font-medium text-foreground">
+                {form.artistA ? `${form.artistA} Songs` : "Artist A Songs"}
+              </label>
+              {Array.from({ length: requiredSongs }).map((_, index) => (
+                <SelectWrapper key={`song-a-${index}`} icon={Music}>
+                  <select
+                    value={form.songAIds[index] || ""}
+                    onChange={(e) => selectSong("A", index, e.target.value)}
+                    className={selectClass}
+                    disabled={!form.artistAId}
+                  >
+                    <option value="">
+                      {form.artistAId
+                        ? requiredSongs === 1 ? "Select song" : `Select round ${index + 1} song`
+                        : "Select Artist A first"}
                     </option>
-                  ))}
-                </select>
-              </SelectWrapper>
+                    {(songsByArtist.get(form.artistAId) || [])
+                      .filter((song) => song.id === form.songAIds[index] || !form.songAIds.includes(song.id))
+                      .map((song) => (
+                        <option key={song.id} value={song.id}>
+                          {song.title}
+                        </option>
+                      ))}
+                  </select>
+                </SelectWrapper>
+              ))}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Song B</label>
-              <SelectWrapper icon={Music}>
-                <select
-                  value={form.songBId}
-                  onChange={(e) => selectSong("B", e.target.value)}
-                  className={selectClass}
-                  disabled={!form.artistBId}
-                >
-                  <option value="">{form.artistBId ? "Select Song B" : "Select Artist B first"}</option>
-                  {(songsByArtist.get(form.artistBId) || []).map((song) => (
-                    <option key={song.id} value={song.id}>
-                      {song.title}
+              <label className="text-sm font-medium text-foreground">
+                {form.artistB ? `${form.artistB} Songs` : "Artist B Songs"}
+              </label>
+              {Array.from({ length: requiredSongs }).map((_, index) => (
+                <SelectWrapper key={`song-b-${index}`} icon={Music}>
+                  <select
+                    value={form.songBIds[index] || ""}
+                    onChange={(e) => selectSong("B", index, e.target.value)}
+                    className={selectClass}
+                    disabled={!form.artistBId}
+                  >
+                    <option value="">
+                      {form.artistBId
+                        ? requiredSongs === 1 ? "Select song" : `Select round ${index + 1} song`
+                        : "Select Artist B first"}
                     </option>
-                  ))}
-                </select>
-              </SelectWrapper>
+                    {(songsByArtist.get(form.artistBId) || [])
+                      .filter((song) => song.id === form.songBIds[index] || !form.songBIds.includes(song.id))
+                      .map((song) => (
+                        <option key={song.id} value={song.id}>
+                          {song.title}
+                        </option>
+                      ))}
+                  </select>
+                </SelectWrapper>
+              ))}
             </div>
           </div>
 
