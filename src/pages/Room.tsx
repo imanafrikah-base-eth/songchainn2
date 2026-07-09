@@ -755,7 +755,9 @@ export default function Room() {
 
     let isActive = true;
     let heartbeatInterval: number | null = null;
-    const fallbackName = normalizeRoomName(roomNameRef.current || roomName || '') || 'Guest';
+    // Read the name through the ref at call time so name changes never
+    // tear down and rebuild presence (that caused the glitchy entry).
+    const getFallbackName = () => normalizeRoomName(roomNameRef.current || '') || 'Guest';
 
     const callRoomRpc = async (fn: 'join_room' | 'heartbeat_room' | 'leave_room') => {
       return (supabase as any).rpc(fn, { _room_id: ROOM_ID });
@@ -764,7 +766,7 @@ export default function Room() {
     const setOptimisticSelf = () => {
       const optimisticUser: RoomLiveUser = {
         user_id: user.id,
-        room_name: fallbackName,
+        room_name: getFallbackName(),
         joined_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),
       };
@@ -868,11 +870,13 @@ export default function Room() {
       isActive = false;
       if (heartbeatInterval) window.clearInterval(heartbeatInterval);
       supabase.removeChannel(profilesChannel);
-      void callRoomRpc('leave_room');
+      // Do NOT leave_room here: the user may have only hidden the room
+      // while still listening. RoomPresenceKeeper (app level) leaves the
+      // room when room mode actually ends, keeping the live count honest.
       setLiveUsers([]);
       setOnlineCount(0);
     };
-  }, [roomName, user]);
+  }, [user]);
 
   const mergeRecentMessages = useCallback((incoming: RoomMessage[]) => {
     setMessages(prev => {

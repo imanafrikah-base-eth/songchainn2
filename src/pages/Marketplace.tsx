@@ -288,6 +288,7 @@ type MarketTab = 'artists' | 'collection' | 'signal';
 export default function Marketplace() {
   const [tab, setTab] = useState<MarketTab>('artists');
   const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
+  const [justConnected, setJustConnected] = useState(false);
   const { data: songCoins } = useSongCoins();
   const { data: popularityData } = useSongPopularity();
   const { data: todayHotSongs = [] } = useTodayHotSongs(20);
@@ -483,6 +484,38 @@ export default function Marketplace() {
         </div>
       </div>
       
+      {/* Wallet gate: the Marketplace is on-chain territory. Connecting is
+          free - no gas, no signature, just picking a wallet. */}
+      {!hasWallet && !justConnected ? (
+        <div className="px-4 py-10">
+          <Card className="p-10 text-center glass-card max-w-lg mx-auto">
+            <Wallet className="w-14 h-14 mx-auto text-primary mb-4" />
+            <h3 className="text-xl font-heading font-bold text-foreground mb-2">
+              Connect to enter the Marketplace
+            </h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              Song coins live on Base, so the Marketplace needs a wallet to open.
+            </p>
+            <p className="text-xs text-muted-foreground mb-6">
+              Connecting is 100% free. No gas, no fees, nothing to sign. One tap.
+            </p>
+            <Button
+              onClick={async () => {
+                const address = await requestWalletConnection();
+                if (address) {
+                  setJustConnected(true);
+                  refetchOwned();
+                }
+              }}
+              className="rounded-full gradient-primary text-primary-foreground"
+            >
+              <Wallet className="w-4 h-4 mr-2" />
+              Connect wallet, it costs nothing
+            </Button>
+          </Card>
+        </div>
+      ) : (
+      <>
       {/* Tabs */}
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center gap-2">
@@ -716,6 +749,8 @@ export default function Marketplace() {
           )
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
