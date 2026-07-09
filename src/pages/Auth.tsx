@@ -25,6 +25,7 @@ import { useSongCoins } from '@/hooks/useSongCoins';
 import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
 import { WalletPicker } from '@/components/WalletPicker';
 import { useDiscoveredWallets } from '@/hooks/useDiscoveredWallets';
+import { GoogleSignIn } from '@/components/GoogleSignIn';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -1290,6 +1291,9 @@ export default function Auth() {
                     {!isFarcasterLoading && <span className="text-xs opacity-80">Tap if not auto-signed</span>}
                   </button>
                 )}
+
+                {/* Google sign-in: official button + One Tap auto prompt */}
+                <GoogleSignIn oneTap onError={setError} />
 
                 <button
                   onClick={() => {
