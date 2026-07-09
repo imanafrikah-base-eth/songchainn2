@@ -177,12 +177,46 @@ export default function Auth() {
     );
   }, [popularityBySongId]);
 
-  const newMusicSongs = useMemo(() => {
+  // New music grouped by release: catalog drops collapse into one catalog
+  // card (title + track count) while singles stand alone, pro-app style.
+  const newMusicReleases = useMemo(() => {
     const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 7;
-    return [...SONGS]
-      .filter((s) => !!s.addedAt && new Date(s.addedAt!).getTime() >= cutoff)
-      .sort((a, b) => new Date(b.addedAt!).getTime() - new Date(a.addedAt!).getTime())
-      .slice(0, 12);
+    type NewRelease =
+      | { kind: 'single'; song: Song; addedAt: number }
+      | { kind: 'catalog'; title: string; artist: string; coverImage?: string; songs: Song[]; addedAt: number };
+
+    const catalogsByKey = new Map<string, Extract<NewRelease, { kind: 'catalog' }>>();
+    const releases: NewRelease[] = [];
+
+    SONGS.forEach((song) => {
+      if (!song.addedAt) return;
+      const addedAt = new Date(song.addedAt).getTime();
+      if (addedAt < cutoff) return;
+
+      if (!song.volume || song.volume === 'Single') {
+        releases.push({ kind: 'single', song, addedAt });
+        return;
+      }
+      const key = `${song.artistId}-${song.volume}`;
+      const existing = catalogsByKey.get(key);
+      if (existing) {
+        existing.songs.push(song);
+        existing.addedAt = Math.max(existing.addedAt, addedAt);
+      } else {
+        const entry = {
+          kind: 'catalog' as const,
+          title: song.volume,
+          artist: song.artist,
+          coverImage: song.coverImage,
+          songs: [song],
+          addedAt,
+        };
+        catalogsByKey.set(key, entry);
+        releases.push(entry);
+      }
+    });
+
+    return releases.sort((a, b) => b.addedAt - a.addedAt).slice(0, 12);
   }, []);
 
   const coinAddressBySongId = useMemo(() => {
@@ -989,7 +1023,7 @@ export default function Auth() {
               </div>
             </section>
 
-            {newMusicSongs.length > 0 && (
+            {newMusicReleases.length > 0 && (
             <section id="new-music" className="mb-7">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -1001,33 +1035,68 @@ export default function Auth() {
                 </div>
                 <button type="button" onClick={handleNewMusicPlayAttempt} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                {newMusicSongs.map((song) => (
-                  <button
-                    key={song.id}
-                    type="button"
-                    onClick={handleNewMusicPlayAttempt}
-                    className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group"
-                  >
-                    <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
-                      {song.coverImage ? (
-                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
-                      )}
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center shadow-glow">
-                          <Play className="w-5 h-5 text-primary-foreground ml-0.5" fill="currentColor" />
+              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                  {newMusicReleases.map((release) => (
+                    release.kind === 'catalog' ? (
+                      <button
+                        key={`catalog-${release.artist}-${release.title}`}
+                        type="button"
+                        onClick={handleNewMusicPlayAttempt}
+                        className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 border border-primary/25 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group"
+                      >
+                        <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                          {release.coverImage ? (
+                            <img src={release.coverImage} alt={release.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={logo} alt={release.title} className="w-16 h-16 object-contain opacity-80" />
+                          )}
+                          <span className="absolute top-1.5 left-1.5 inline-flex items-center rounded-full bg-background/85 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-primary">
+                            Catalog
+                          </span>
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 pb-1.5 pt-4">
+                            <p className="text-[10px] font-medium text-white/90">{release.songs.length} tracks</p>
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center shadow-glow">
+                              <Play className="w-5 h-5 text-primary-foreground ml-0.5" fill="currentColor" />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                    {coinAddressBySongId.has(song.id) && (
-                      <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" className="mt-1.5" />
-                    )}
-                  </button>
-                ))}
+                        <p className="text-sm font-medium text-foreground truncate">{release.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{release.artist}</p>
+                      </button>
+                    ) : (
+                      <button
+                        key={release.song.id}
+                        type="button"
+                        onClick={handleNewMusicPlayAttempt}
+                        className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group"
+                      >
+                        <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
+                          {release.song.coverImage ? (
+                            <img src={release.song.coverImage} alt={release.song.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={logo} alt={release.song.title} className="w-16 h-16 object-contain opacity-80" />
+                          )}
+                          <span className="absolute top-1.5 left-1.5 inline-flex items-center rounded-full bg-background/85 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                            Single
+                          </span>
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center shadow-glow">
+                              <Play className="w-5 h-5 text-primary-foreground ml-0.5" fill="currentColor" />
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-sm font-medium text-foreground truncate">{release.song.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{release.song.artist}</p>
+                        {coinAddressBySongId.has(release.song.id) && (
+                          <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(release.song.id)!} size="sm" className="mt-1.5" />
+                        )}
+                      </button>
+                    )
+                  ))}
+                </div>
               </div>
             </section>
             )}

@@ -960,19 +960,6 @@ export default function ArtistDetail() {
             {isOwner ? 'My Music' : 'Discography'}
           </h2>
           {(() => {
-            const volumeOrder: Array<"ER'TING FLEX" | '3.0' | 'Lovers EP' | 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7'> = [
-              "ER'TING FLEX",
-              '3.0',
-              'Lovers EP',
-              'Vol7',
-              'Vol6',
-              'Vol5',
-              'Vol4',
-              'Vol3',
-              'Vol2',
-              'Vol1',
-            ];
-
             const sortByRecent = (songs: typeof artistSongs) =>
               [...songs].sort((a, b) => {
                 const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
@@ -983,23 +970,29 @@ export default function ArtistDetail() {
                 return idB - idA;
               });
 
-            const volumeSections: Array<{
-              label: (typeof volumeOrder)[number];
-              songs: typeof artistSongs;
-            } | null> = volumeOrder.map((volume) => {
-              const songs = sortByRecent(
-                artistSongs.filter((song) => {
-                  if (song.volume) return song.volume === volume;
-                  return volume === 'Vol1';
-                })
-              );
-              return songs.length ? { label: volume, songs } : null;
+            // Group dynamically by the song's volume so every catalog (past
+            // and future) gets its own section automatically; singles are
+            // gathered into one "Singles" section. Newest release first.
+            const groups = new Map<string, typeof artistSongs>();
+            artistSongs.forEach((song) => {
+              const label = song.volume
+                ? song.volume === 'Single' ? 'Singles' : song.volume
+                : 'Vol1';
+              const list = groups.get(label);
+              if (list) {
+                list.push(song);
+              } else {
+                groups.set(label, [song]);
+              }
             });
 
-            const sections = volumeSections.filter(
-              (section): section is { label: (typeof volumeOrder)[number]; songs: typeof artistSongs } =>
-                Boolean(section)
-            );
+            const sections = Array.from(groups.entries())
+              .map(([label, songs]) => ({ label, songs: sortByRecent(songs) }))
+              .sort((a, b) => {
+                const timeA = a.songs[0]?.addedAt ? new Date(a.songs[0].addedAt!).getTime() : 0;
+                const timeB = b.songs[0]?.addedAt ? new Date(b.songs[0].addedAt!).getTime() : 0;
+                return timeB - timeA;
+              });
 
             return sections.map((section) => (
               <div
