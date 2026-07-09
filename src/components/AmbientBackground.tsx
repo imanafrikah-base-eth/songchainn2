@@ -177,6 +177,27 @@ export const AmbientBackground = memo(function AmbientBackground({
   );
 });
 
+interface TileBackdropProps {
+  image: BgImage;
+  /** Image opacity; cards read well between 0.25 and 0.45 with the gradient */
+  opacity?: number;
+  className?: string;
+}
+
+/**
+ * Static photographic backdrop for a card (mockup style): one collage tile
+ * behind the content with a bottom-heavy dark gradient so text stays sharp.
+ * Parent needs "relative isolate overflow-hidden"; content sits above it.
+ */
+export function TileBackdrop({ image, opacity = 0.35, className }: TileBackdropProps) {
+  return (
+    <div aria-hidden className={cn('absolute inset-0 -z-10 pointer-events-none', className)}>
+      <div className="absolute inset-0" style={bgStyle(image, opacity)} />
+      <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/60 to-background/30" />
+    </div>
+  );
+}
+
 const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
   left: `${(i * 71) % 100}%`,
   size: 2 + ((i * 13) % 4),

@@ -131,3 +131,19 @@ export const backgroundPools = {
 } satisfies Record<string, BgImage[]>;
 
 export type BackgroundPoolName = keyof typeof backgroundPools;
+
+/**
+ * Named single tiles for card backdrops (mockup style: each feature card
+ * carries its own photograph behind the copy).
+ */
+export const CARD_TILES = {
+  theRoom: tile(1, 0), // live crowd, stage lights
+  waveWarz: tile(5, 1), // cypher circle, battle energy
+  djShuffle: tile(2, 2), // DJ deck
+  moSha: tile(2, 0), // singer with headphones
+  marketplace: tile(3, 3), // YOU OWN THIS TRACK
+  dailyMix: tile(1, 2), // headphones close-up
+  signupCrowd: tile(5, 0), // hands up crowd
+  makeMusic: tile(3, 2), // studio microphone
+  heroArtist: tile(6, 0), // artist portrait with chains
+} satisfies Record<string, BgImage>;

@@ -26,7 +26,8 @@ import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
 import { WalletPicker } from '@/components/WalletPicker';
 import { useDiscoveredWallets } from '@/hooks/useDiscoveredWallets';
 import { GoogleSignIn } from '@/components/GoogleSignIn';
-import { AmbientBackground } from '@/components/AmbientBackground';
+import { AmbientBackground, TileBackdrop } from '@/components/AmbientBackground';
+import { CARD_TILES } from '@/data/backgroundPools';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -44,6 +45,7 @@ const ABOUT_HIGHLIGHTS = [
     icon: Headphones,
     accent: 'text-primary',
     surface: 'bg-primary/10',
+    photo: CARD_TILES.theRoom,
   },
   {
     title: 'WaveWarz Africa',
@@ -51,6 +53,7 @@ const ABOUT_HIGHLIGHTS = [
     icon: Flame,
     accent: 'text-orange-400',
     surface: 'bg-orange-500/10',
+    photo: CARD_TILES.waveWarz,
   },
   {
     title: 'DJ $huffle',
@@ -58,6 +61,7 @@ const ABOUT_HIGHLIGHTS = [
     icon: Shuffle,
     accent: 'text-emerald-400',
     surface: 'bg-emerald-500/10',
+    photo: CARD_TILES.djShuffle,
   },
   {
     title: 'Mo$ha',
@@ -65,6 +69,7 @@ const ABOUT_HIGHLIGHTS = [
     icon: Bot,
     accent: 'text-purple-400',
     surface: 'bg-purple-500/10',
+    photo: CARD_TILES.moSha,
   },
   {
     title: 'Marketplace',
@@ -72,6 +77,7 @@ const ABOUT_HIGHLIGHTS = [
     icon: Store,
     accent: 'text-cyan-400',
     surface: 'bg-cyan-500/10',
+    photo: CARD_TILES.marketplace,
   },
 ] as const;
 
@@ -661,10 +667,9 @@ export default function Auth() {
       <AnimatedBackground variant="subtle" />
       <AmbientBackground
         pool="presigninHero"
-        opacity={0.38}
-        overlay="hero"
+        opacity={0.14}
+        overlay="text"
         zoom
-        particles
         glow
         className="fixed -z-10"
       />
@@ -761,6 +766,21 @@ export default function Auth() {
           )}
 
           <main className="rounded-xl border border-border/40 bg-background/80 backdrop-blur p-4 md:p-5">
+            {/* Landing hero */}
+            <section className="relative isolate overflow-hidden rounded-2xl mb-7 p-5 md:p-8 min-h-[13rem] flex flex-col justify-center">
+              <TileBackdrop image={CARD_TILES.heroArtist} opacity={0.55} />
+              <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground leading-[1.08]">
+                Discover.
+                <br />
+                Vibe.
+                <br />
+                Support.
+              </h1>
+              <p className="mt-3 text-sm md:text-base text-muted-foreground max-w-xs">
+                Real music. Real people. Real connection.
+              </p>
+            </section>
+
             {hotTodaySongs.length > 0 && (
             <section id="hot-today" className="mb-7 lg:hidden">
               <div className="flex items-center justify-between mb-3">
@@ -801,7 +821,8 @@ export default function Auth() {
             </section>
             )}
 
-            <div className="rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-primary/20 p-4 md:p-5 mb-6">
+            <div className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-primary/20 p-4 md:p-5 mb-6">
+              <TileBackdrop image={CARD_TILES.dailyMix} opacity={0.32} />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-primary font-semibold flex items-center gap-1.5 mb-1">
@@ -847,8 +868,9 @@ export default function Auth() {
                       DJ $huffle and Mo$ha keep you company. Preview it all right now, no account needed.
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                      {ABOUT_HIGHLIGHTS.map(({ title, description, icon: Icon, accent, surface }) => (
-                        <div key={title} className="rounded-2xl border border-border/40 bg-background/70 p-4">
+                      {ABOUT_HIGHLIGHTS.map(({ title, description, icon: Icon, accent, surface, photo }) => (
+                        <div key={title} className="relative isolate overflow-hidden rounded-2xl border border-border/40 bg-background/70 p-4">
+                          <TileBackdrop image={photo} opacity={0.38} />
                           <div className={`inline-flex rounded-xl p-2 ${surface} mb-3`}>
                             <Icon className={`w-4 h-4 ${accent}`} />
                           </div>
@@ -858,7 +880,8 @@ export default function Auth() {
                       ))}
                     </div>
 
-                    <div className="mt-4 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="relative isolate overflow-hidden mt-4 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <TileBackdrop image={CARD_TILES.makeMusic} opacity={0.28} />
                       <div className="flex items-start gap-2.5">
                         <Mic className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                         <div>
@@ -898,7 +921,8 @@ export default function Auth() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-border/40 bg-background/80 p-4 md:p-5">
+                    <div className="relative isolate overflow-hidden rounded-2xl border border-border/40 bg-background/80 p-4 md:p-5">
+                      <TileBackdrop image={CARD_TILES.signupCrowd} opacity={0.4} />
                       <p className="text-sm font-semibold text-foreground mb-2">Ready to jump in?</p>
                       <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                         Create a free account and unlock the full experience, The Room, DJ $huffle, Mo$ha and more.
@@ -1470,9 +1494,28 @@ export default function Auth() {
                 <h3 className="font-heading text-xl font-semibold text-foreground mb-1">
                   {authMode === 'signup' ? 'Create Account' : 'Sign In'}
                 </h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Connect a Base wallet later if you want on-chain features.
+                <p className="text-sm text-muted-foreground mb-5">
+                  {authMode === 'signup'
+                    ? 'Pick your way in: Google, Base wallet, or email.'
+                    : 'Welcome back. Google, Base wallet, or email.'}
                 </p>
+
+                {/* All sign-in options up front: Google + wallets first */}
+                <GoogleSignIn oneTap onError={setError} />
+
+                <WalletPicker
+                  onConnect={handleWalletSignIn}
+                  busy={isWalletLoading}
+                  busyContent={getButtonContent()}
+                />
+
+                <div className="flex items-center gap-3 my-5">
+                  <div className="flex-1 h-px bg-border/60" />
+                  <span className="text-xs text-muted-foreground">
+                    or {authMode === 'signup' ? 'sign up' : 'sign in'} with email
+                  </span>
+                  <div className="flex-1 h-px bg-border/60" />
+                </div>
 
                 <form onSubmit={handleEmailAuth} className="space-y-4">
                   <Input
@@ -1578,29 +1621,6 @@ export default function Auth() {
                     </>
                   )}
                 </form>
-
-                {/* Alternative sign-in methods: Google + Base wallets */}
-                <div className="flex items-center gap-3 my-5">
-                  <div className="flex-1 h-px bg-border/60" />
-                  <span className="text-xs text-muted-foreground">
-                    or {authMode === 'signup' ? 'sign up' : 'sign in'} with
-                  </span>
-                  <div className="flex-1 h-px bg-border/60" />
-                </div>
-
-                <GoogleSignIn oneTap onError={setError} />
-
-                <WalletPicker
-                  onConnect={handleWalletSignIn}
-                  busy={isWalletLoading}
-                  busyContent={getButtonContent()}
-                />
-
-                {!hasWallet && !isWalletDetected && (
-                  <p className="text-[11px] text-muted-foreground text-center">
-                    Have a Base wallet like MetaMask or Coinbase? Install it and it appears here.
-                  </p>
-                )}
               </motion.div>
             ) : authView === 'phone' ? (
               <motion.div key="phone" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
