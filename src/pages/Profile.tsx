@@ -1293,7 +1293,7 @@ export default function Profile() {
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">{song.title}</p>
-                    <p className="text-sm text-muted-foreground truncate">{song.townSquare}</p>
+                    <p className="text-sm text-muted-foreground truncate">{song.genre}</p>
                   </div>
                   <ListMusic className="w-4 h-4 text-muted-foreground" />
                 </Link>

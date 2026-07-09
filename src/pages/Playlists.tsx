@@ -72,7 +72,7 @@ export default function Playlists() {
                   Your Playlists
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Collect songs into playlists and share them with the town square.
+                  Collect songs into playlists and share them with the community.
                 </p>
               </div>
             </div>

@@ -147,7 +147,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
         artist: currentSong.artist,
-        album: currentSong.townSquare,
+        album: currentSong.volume || '$ongChainn',
         artwork: currentSong.coverImage
           ? [{ src: currentSong.coverImage, sizes: '512x512', type: 'image/jpeg' }]
           : [],

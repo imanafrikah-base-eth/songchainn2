@@ -60,7 +60,7 @@ export default function Admin() {
             Admin Dashboard
           </h1>
           <p className="text-muted-foreground mb-8">
-            Manage artists, songs, and Town Square content.
+            Manage artists, songs, and app content.
           </p>
 
           {/* Tabs */}
@@ -119,7 +119,7 @@ export default function Admin() {
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Artist</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Location</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Town Square</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Location</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Songs</th>
                       <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Actions</th>
                     </tr>
@@ -138,7 +138,7 @@ export default function Admin() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{artist.location}</td>
-                        <td className="px-4 py-3 text-muted-foreground text-sm">{artist.townSquare}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-sm">{artist.location}</td>
                         <td className="px-4 py-3 text-muted-foreground">{artist.songs.length}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">

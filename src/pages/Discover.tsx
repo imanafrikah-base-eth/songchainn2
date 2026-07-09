@@ -336,7 +336,7 @@ export default function Discover() {
                       </h2>
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                      Most played songs since midnight across the town square.
+                      Most played songs since midnight across $ongChainn.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -432,7 +432,7 @@ export default function Discover() {
                     <span>New Releases</span>
                   </h2>
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    Fresh catalogs landing in the town square.
+                    Fresh catalogs landing on $ongChainn.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-primary">

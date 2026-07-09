@@ -1185,7 +1185,7 @@ export default function Auth() {
                       </div>
                       <p className="text-sm text-foreground truncate">{song.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                      <p className="text-[11px] text-muted-foreground truncate mt-1">{song.townSquare}</p>
+                      <p className="text-[11px] text-muted-foreground truncate mt-1">{song.genre}</p>
                       {coinAddressBySongId.has(song.id) && (
                         <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" className="mt-1.5" />
                       )}

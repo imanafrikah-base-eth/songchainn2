@@ -603,7 +603,7 @@ export default function Home() {
                         New Releases
                       </h2>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        Fresh catalogs from the town square, just arrived on $ongChainn.
+                        Fresh catalogs, just arrived on $ongChainn.
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-primary">
@@ -669,7 +669,7 @@ export default function Home() {
                         Featured Catalogs
                       </h2>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        Signature collections surfacing from the town square.
+                        Signature collections from your favorite artists.
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-primary">

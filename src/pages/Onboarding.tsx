@@ -447,7 +447,7 @@ export default function Onboarding() {
                 />
               </div>
               <p className="text-xs text-muted-foreground max-w-xs">
-                Add a profile photo and cover so people can spot you in the town square.
+                Add a profile photo and cover so people can spot you in the community.
               </p>
             </div>
           </div>

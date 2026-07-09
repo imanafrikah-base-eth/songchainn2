@@ -126,7 +126,7 @@ export function AuthGate({ onLogin }: AuthGateProps) {
       {/* Footer */}
       <div className="p-4 text-center border-t border-border">
         <p className="text-xs text-muted-foreground">
-          Livingstone Town Square · Create On Base · Pioneer Town Square
+          Create On Base · Powered Onchain
         </p>
       </div>
     </div>

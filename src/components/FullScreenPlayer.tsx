@@ -182,7 +182,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
         artist: currentSong.artist,
-        album: currentSong.townSquare,
+        album: currentSong.volume || '$ongChainn',
         artwork: currentSong.coverImage
           ? [{ src: currentSong.coverImage, sizes: '512x512', type: 'image/jpeg' }]
           : [],
@@ -398,7 +398,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Now Playing</p>
                   <p className="text-sm font-medium text-foreground truncate max-w-[200px]">
-                    {currentSong.townSquare}
+                    {currentSong.genre}
                   </p>
                 </div>
               </div>

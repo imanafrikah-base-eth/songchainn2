@@ -497,7 +497,7 @@ export default function Community() {
               </div>
               <p className="text-sm sm:text-base text-muted-foreground">
                 Discover and connect with music lovers in the $ongChainn community.
-                Follow listeners, find town square regulars, and watch new profiles appear.
+                Follow listeners, find the regulars, and watch new profiles appear.
               </p>
             </div>
           </div>

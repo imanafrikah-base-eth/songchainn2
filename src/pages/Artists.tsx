@@ -228,9 +228,9 @@ export default function Artists() {
                         </div>
                       </div>
                       
-                      {/* Town Square Badge */}
+                      {/* Location Badge */}
                       <div className="px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs text-center font-medium truncate">
-                        {artist.townSquare}
+                        {artist.location}
                       </div>
                     </div>
                   </motion.div>
@@ -249,7 +249,7 @@ export default function Artists() {
         >
           <p className="text-sm text-muted-foreground">
             All music on $ongChainn is curated for quality, originality, and cultural value.
-            Only artists who are part of Create On Base Town Squares can be featured.
+            Only artists creating on Base can be featured.
           </p>
         </motion.div>
       </main>

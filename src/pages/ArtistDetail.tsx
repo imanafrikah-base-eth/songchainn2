@@ -909,9 +909,9 @@ export default function ArtistDetail() {
                 </div>
               </div>
 
-              {/* Town Square Badge */}
+              {/* Location Badge */}
               <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-                <span className="text-sm text-primary font-medium">{artist.townSquare}</span>
+                <span className="text-sm text-primary font-medium">{artist.location}</span>
               </div>
             </div>
           </div>

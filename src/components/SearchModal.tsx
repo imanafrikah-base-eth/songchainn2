@@ -100,7 +100,7 @@ function buildResults(query: string, songs: Song[], artists: Artist[], catalogs:
         kind: 'artist',
         id: artist.id,
         title: artist.name,
-        subtitle: artist.location || artist.townSquare,
+        subtitle: artist.location,
         image: artist.profileImage,
         score: score * 1.1,
       });

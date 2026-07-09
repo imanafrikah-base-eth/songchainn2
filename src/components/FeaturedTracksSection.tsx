@@ -67,7 +67,7 @@ export const FeaturedTracksSection = memo(function FeaturedTracksSection({ songs
               </h2>
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">Trending in Livingstone Town Square</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">Trending on $ongChainn</p>
           </div>
         </div>
 
