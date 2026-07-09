@@ -538,3 +538,49 @@
 .app-global-pulse--reduced {
   animation: global-pulse-glow 560ms ease-out;
 }
+
+/* Living-world ambient backgrounds (AmbientBackground.tsx) */
+@keyframes ambient-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
+}
+
+.animate-ambient-zoom {
+  animation: ambient-zoom 18s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes ambient-float {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-105vh) translateX(18px); opacity: 0; }
+}
+
+.animate-ambient-float {
+  animation-name: ambient-float;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes ambient-glow {
+  0%, 100% { opacity: 0.5; transform: translate3d(0, 0, 0) scale(1); }
+  50% { opacity: 1; transform: translate3d(24px, 16px, 0) scale(1.1); }
+}
+
+.animate-ambient-glow {
+  animation: ambient-glow 16s ease-in-out infinite;
+}
+
+.animate-ambient-glow-alt {
+  animation: ambient-glow 22s ease-in-out infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ambient-zoom,
+  .animate-ambient-float,
+  .animate-ambient-glow,
+  .animate-ambient-glow-alt {
+    animation: none;
+  }
+}

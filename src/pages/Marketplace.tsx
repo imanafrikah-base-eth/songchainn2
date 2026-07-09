@@ -28,6 +28,7 @@ import { OwnershipBadge } from '@/components/OwnershipBadge';
 import { usePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { requestWalletConnection } from '@/lib/walletGate';
+import { AmbientBackground } from '@/components/AmbientBackground';
 import { cn } from '@/lib/utils';
 
 // Component for individual marketplace song card
@@ -294,7 +295,14 @@ export default function Marketplace() {
   }, [songCoins]);
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative isolate">
+      <AmbientBackground
+        pool="onchainMarketplace"
+        opacity={0.16}
+        overlay="card"
+        glow
+        className="fixed -z-10"
+      />
       {/* Header */}
       <div className="sticky top-0 z-40 glass-card border-b border-border/50">
         <div className="px-4 py-4">

@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useEngagement } from '@/context/EngagementContext';
 import moshaAvatar from '@/assets/Mo$ha chat pop up.png';
+import { AmbientBackground } from '@/components/AmbientBackground';
 import { fcOpenUrl } from '@/lib/farcasterActions';
 
 type AgentMode = 'unset' | 'music' | 'chill' | 'turnup' | 'focus' | 'feelings' | 'explore';
@@ -559,8 +560,9 @@ export function VibeAgent() {
           initial={{ opacity: 0, y: 16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.98 }}
-          className="rounded-2xl border border-primary/30 bg-background/95 backdrop-blur shadow-2xl overflow-hidden"
+          className="relative isolate rounded-2xl border border-primary/30 bg-background/95 backdrop-blur shadow-2xl overflow-hidden"
         >
+          <AmbientBackground pool="moSha" opacity={0.1} overlay="text" className="-z-10" />
           <div className="grid grid-cols-[5.2rem_minmax(0,1fr)] sm:grid-cols-[6.4rem_minmax(0,1fr)]">
             <div className="relative border-r border-primary/25 bg-gradient-to-b from-black/45 to-black/20">
               <img

@@ -2,19 +2,20 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Flame, PlayCircle, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WaveWarzCountryJoinDialog } from '@/components/wavewarz/WaveWarzCountryJoinDialog';
-import { WAVEWARZ_AFRICA_ASSETS } from '@/data/wavewarzAfrica';
+import { AmbientBackground } from '@/components/AmbientBackground';
 
 export function WaveWarzHomeHero() {
   return (
     <section className="mb-6 sm:mb-10">
-      <div
-        className="overflow-hidden rounded-3xl border border-cyan-400/35 bg-black/70"
-        style={{
-          backgroundImage: `linear-gradient(120deg, rgba(0,0,0,0.88), rgba(0,0,0,0.45)), url(${WAVEWARZ_AFRICA_ASSETS.heroLogoWithBackground})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
+      <div className="relative isolate overflow-hidden rounded-3xl border border-cyan-400/35 bg-black/70">
+        <AmbientBackground
+          pool="waveWarz"
+          opacity={0.45}
+          overlay="hero"
+          zoom
+          glow
+          className="-z-10"
+        />
         <div className="grid gap-5 p-4 sm:p-6 lg:p-8">
           <div className="space-y-4">
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-100">

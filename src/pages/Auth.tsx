@@ -26,6 +26,7 @@ import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
 import { WalletPicker } from '@/components/WalletPicker';
 import { useDiscoveredWallets } from '@/hooks/useDiscoveredWallets';
 import { GoogleSignIn } from '@/components/GoogleSignIn';
+import { AmbientBackground } from '@/components/AmbientBackground';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -656,8 +657,17 @@ export default function Auth() {
   }, [isMoshaOpen, location.pathname, showMoshaTransient]);
 
   return (
-    <div className="min-h-screen bg-background relative overflow-x-hidden">
+    <div className="min-h-screen bg-background relative isolate overflow-x-hidden">
       <AnimatedBackground variant="subtle" />
+      <AmbientBackground
+        pool="presigninHero"
+        opacity={0.38}
+        overlay="hero"
+        zoom
+        particles
+        glow
+        className="fixed -z-10"
+      />
       <div className="relative z-10 min-h-screen pb-24">
         <div className="h-16 border-b border-border/40 bg-background/85 backdrop-blur sticky top-0 z-20 px-3 md:px-5">
           <div className="h-full max-w-[1400px] mx-auto flex items-center justify-between gap-3">

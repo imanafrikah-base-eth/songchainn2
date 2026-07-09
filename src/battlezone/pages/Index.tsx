@@ -10,6 +10,7 @@ import { useBattles } from "@/battlezone/hooks/useBattles";
 import wavewarzLogo from "@/battlezone/assets/wavewarz-logo-2.png";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
+import { AmbientBackground } from "@/components/AmbientBackground";
 
 const Index = () => {
   const { isEmbedded } = useEmbedMode();
@@ -22,7 +23,16 @@ const Index = () => {
       {isEmbedded ? <EmbedTopBar title="BattleZone Home" /> : <Navbar />}
 
       {/* Hero */}
-      <section className="relative overflow-hidden">
+      <section className="relative isolate overflow-hidden">
+        <AmbientBackground
+          pool="battleZones"
+          opacity={0.4}
+          overlay="hero"
+          zoom
+          particles
+          glow
+          className="-z-10"
+        />
         <div className="absolute inset-0 gradient-battle opacity-40" />
         <div className={`relative mx-auto max-w-7xl px-4 ${isEmbedded ? "py-10 md:py-14" : "py-20 md:py-28"} flex flex-col md:flex-row items-center gap-10`}>
           <div className="flex-1 text-center md:text-left">

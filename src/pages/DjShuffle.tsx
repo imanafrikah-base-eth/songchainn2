@@ -3,6 +3,7 @@ import { Music2, PauseCircle, PlayCircle, Shuffle, User2 } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
+import { AmbientBackground } from '@/components/AmbientBackground';
 import { Button } from '@/components/ui/button';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { ARTISTS, CATALOGS, SONGS, Song } from '@/data/musicData';
@@ -95,8 +96,17 @@ export default function DjShuffle() {
   };
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="min-h-screen bg-background relative isolate">
       <AnimatedBackground variant="default" />
+      <AmbientBackground
+        pool="djShuffle"
+        opacity={0.24}
+        overlay="card"
+        zoom
+        particles
+        glow
+        className="fixed -z-10"
+      />
       <Navigation />
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10 space-y-6">
         <section className="rounded-3xl border border-cyan-400/30 bg-black/65 overflow-hidden">

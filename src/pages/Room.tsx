@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
+import { AmbientBackground } from '@/components/AmbientBackground';
 import { toast } from 'sonner';
 
 type RoomMessage = {
@@ -1465,7 +1466,14 @@ export default function Room() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100">
+    <div className="min-h-screen bg-black text-zinc-100 relative isolate">
+      <AmbientBackground
+        pool="theRoom"
+        opacity={0.12}
+        overlay="text"
+        glow
+        className="fixed -z-10"
+      />
       <div className="sticky top-0 z-20 bg-black/60 backdrop-blur border-b border-white/10">
         <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
