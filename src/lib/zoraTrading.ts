@@ -137,3 +137,35 @@ export async function getCoinTokenBalance(coinAddress: Address, userAddress: Add
     return BigInt(0);
   }
 }
+
+/**
+ * Batched balance check across every song coin in ONE multicall round trip,
+ * so "My Collection" can list real on-chain holdings without hammering the
+ * RPC with hundreds of individual balanceOf calls.
+ */
+export async function getOwnedCoinBalances(
+  coins: Array<{ songId: string; coinAddress: Address }>,
+  userAddress: Address
+): Promise<Array<{ songId: string; balance: bigint }>> {
+  if (coins.length === 0) return [];
+  const publicClient = getPublicClient();
+  try {
+    const results = await (publicClient.multicall as any)({
+      contracts: coins.map((coin) => ({
+        address: coin.coinAddress,
+        abi: ERC20_BALANCE_OF_ABI,
+        functionName: 'balanceOf',
+        args: [userAddress],
+      })),
+      allowFailure: true,
+    });
+    return coins
+      .map((coin, i) => ({
+        songId: coin.songId,
+        balance: results[i]?.status === 'success' ? (results[i].result as bigint) : BigInt(0),
+      }))
+      .filter((entry) => entry.balance > BigInt(0));
+  } catch {
+    return [];
+  }
+}
