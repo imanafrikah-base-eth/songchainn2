@@ -23,6 +23,8 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { useRankedArtists, useSongPopularity, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useSongCoins } from '@/hooks/useSongCoins';
 import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
+import { WalletPicker } from '@/components/WalletPicker';
+import { useDiscoveredWallets } from '@/hooks/useDiscoveredWallets';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -185,15 +187,16 @@ export default function Auth() {
     return map;
   }, [songCoins]);
 
-  // Detect any wallet provider (MetaMask, Coinbase, Rainbow, etc.)
-  const hasWallet = typeof window !== 'undefined' && (() => {
+  // Detect installed wallets: EIP-6963 announcements plus legacy window.ethereum
+  const discoveredWallets = useDiscoveredWallets();
+  const hasWallet = discoveredWallets.length > 0 || (typeof window !== 'undefined' && (() => {
     const ethereum = (window as any).ethereum;
     return !!ethereum?.request;
-  })();
+  })());
 
   const fullPhoneNumber = `${selectedCountry.dialCode}${phoneNumber.replace(/\D/g, '')}`;
 
-  const handleWalletSignIn = useCallback(async () => {
+  const handleWalletSignIn = useCallback(async (walletRdns?: string) => {
     setError(null);
     setConnectionState('connecting');
 
@@ -201,7 +204,7 @@ export default function Auth() {
       await new Promise((resolve) => setTimeout(resolve, 100));
       setConnectionState('signing');
 
-      const result = await signInWithWallet();
+      const result = await signInWithWallet(walletRdns);
 
       if (result.error) {
         setError(result.error.message);
@@ -1217,13 +1220,11 @@ export default function Auth() {
                   </div>
                 )}
 
-                <button
-                  onClick={handleWalletSignIn}
-                  disabled={isWalletLoading}
-                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-[#0052FF] text-white font-semibold text-sm hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-60 mb-3"
-                >
-                  {getButtonContent()}
-                </button>
+                <WalletPicker
+                  onConnect={handleWalletSignIn}
+                  busy={isWalletLoading}
+                  busyContent={getButtonContent()}
+                />
 
                 {!hasWallet && !isWalletDetected && connectionState === 'idle' && (
                   <div className="text-center pt-4 mt-4 border-t border-border/50">
@@ -1348,13 +1349,11 @@ export default function Auth() {
                   </div>
                 )}
 
-                <button
-                  onClick={handleWalletSignIn}
-                  disabled={isWalletLoading}
-                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-[#0052FF] text-white font-semibold text-sm hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-60 mb-3"
-                >
-                  {getButtonContent()}
-                </button>
+                <WalletPicker
+                  onConnect={handleWalletSignIn}
+                  busy={isWalletLoading}
+                  busyContent={getButtonContent()}
+                />
 
                 {!hasWallet && !isWalletDetected && connectionState === 'idle' && (
                   <div className="text-center pt-4 mt-4 border-t border-border/50">

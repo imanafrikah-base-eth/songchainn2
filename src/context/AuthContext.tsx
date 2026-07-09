@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
-import { hasWalletProvider, connectWallet, getConnectedAccounts, signMessage, generateNonce } from '@/lib/baseWallet';
+import { hasWalletProvider, connectWallet, getConnectedAccounts, signMessage, generateNonce, selectWallet, subscribeWallets } from '@/lib/baseWallet';
 
 interface AuthContextType {
   user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null;
@@ -15,7 +15,7 @@ interface AuthContextType {
   needsOnboarding: boolean;
   walletAddress: string | null;
   isWalletDetected: boolean;
-  signInWithWallet: () => Promise<{ error: Error | null }>;
+  signInWithWallet: (walletRdns?: string) => Promise<{ error: Error | null }>;
   signInWithFarcasterToken: (token: string) => Promise<{ error: Error | null }>;
   signInWithFarcaster: (message: string, signature: string) => Promise<{ error: Error | null }>;
   signInWithFarcasterContext: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => Promise<{ error: Error | null }>;
@@ -155,10 +155,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener('focus', update);
     document.addEventListener('visibilitychange', update);
+    const unsubscribeWallets = subscribeWallets(update);
 
     return () => {
       window.removeEventListener('focus', update);
       document.removeEventListener('visibilitychange', update);
+      unsubscribeWallets();
     };
   }, []);
 
@@ -334,11 +336,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refreshProfile();
   }, [user, refreshProfile]);
 
-  const signInWithWallet = useCallback(async () => {
+  const signInWithWallet = useCallback(async (walletRdns?: string) => {
     try {
       if (!isSupabaseConfigured) {
         return { error: new Error('Supabase is not configured') };
       }
+
+      // Route all wallet calls to the wallet the user picked (EIP-6963);
+      // undefined falls back to window.ethereum.
+      selectWallet(walletRdns);
 
       if (!hasWalletProvider()) {
         return { error: new Error('No wallet detected. Please install a Base compatible wallet.') };
