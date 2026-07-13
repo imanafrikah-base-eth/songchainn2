@@ -27,22 +27,15 @@ interface SongPopularity {
 
 const numberOrZero = (value: number | null | undefined) => Number(value || 0);
 
-// Deterministic play baseline for songs with no real play data yet.
-function getSeedPlayBaseline(songId: string): number {
-  const n = parseInt(songId, 10) || 0;
-  return 180 + ((n * 41 + n * 7 + 23) % 520);
-}
-
-function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined, songs: Song[] = SONGS): SongPopularity[] {
+// Every count starts at zero and only real user actions recorded in the
+// database can raise it. No baselines, no seeds, no fabricated streams.
+function mergeSongPopularity(rows: SongPopularity[] | null | undefined, songs: Song[] = SONGS): SongPopularity[] {
   const merged = new Map<string, SongPopularity>();
 
-  // Seed play counts from static + published data only — NEVER seed likes (only real user actions count)
   songs.forEach((song) => {
-    const seedPlays = numberOrZero(song.plays);
-    const baseline = seedPlays === 0 ? getSeedPlayBaseline(song.id) : seedPlays;
     merged.set(song.id, {
       song_id: song.id,
-      play_count: baseline,
+      play_count: 0,
       like_count: 0,
       comment_count: 0,
       share_count: 0,
@@ -54,15 +47,11 @@ function mergeSongPopularityWithSeed(rows: SongPopularity[] | null | undefined, 
   (rows || []).forEach((row) => {
     const songId = String(row.song_id || '').trim();
     if (!songId) return;
-    const seed = merged.get(songId);
-    const seedPlays = numberOrZero(seed?.play_count);
-    const dbPlays = numberOrZero(row.play_count);
-    const dbLikes = numberOrZero(row.like_count);
 
     merged.set(songId, {
       song_id: songId,
-      play_count: seedPlays + dbPlays,   // seed = historical baseline; db = real new plays stacked on top
-      like_count: dbLikes,
+      play_count: numberOrZero(row.play_count),
+      like_count: numberOrZero(row.like_count),
       comment_count: numberOrZero(row.comment_count),
       share_count: numberOrZero(row.share_count),
       view_count: numberOrZero(row.view_count),
@@ -304,16 +293,16 @@ export function useSongPopularity() {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error) {
           canUseGetSongPopularityRpc = true;
-          return mergeSongPopularityWithSeed((data as SongPopularity[]) || [], songs);
+          return mergeSongPopularity((data as SongPopularity[]) || [], songs);
         }
         canUseGetSongPopularityRpc = false;
       }
 
-      return mergeSongPopularityWithSeed([] as SongPopularity[], songs);
+      return mergeSongPopularity([] as SongPopularity[], songs);
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,
-    placeholderData: () => mergeSongPopularityWithSeed([], songs),
+    placeholderData: () => mergeSongPopularity([], songs),
   });
 }
 
@@ -513,12 +502,12 @@ export function useArtistStreamTotals() {
   return useQuery({
     queryKey: ['artist-stream-totals', songs.length],
     queryFn: async () => {
-      let popularityData: SongPopularity[] = mergeSongPopularityWithSeed([], songs);
+      let popularityData: SongPopularity[] = mergeSongPopularity([], songs);
       if (canUseGetSongPopularityRpc !== false) {
         const { data, error } = await supabase.rpc('get_song_popularity');
         if (!error && data) {
           canUseGetSongPopularityRpc = true;
-          popularityData = mergeSongPopularityWithSeed(data as SongPopularity[], songs);
+          popularityData = mergeSongPopularity(data as SongPopularity[], songs);
         } else {
           canUseGetSongPopularityRpc = false;
         }
@@ -544,7 +533,7 @@ export function useArtistStreamTotals() {
     staleTime: 1000 * 10,
     refetchInterval: 10000,
     placeholderData: () => {
-      const seed = mergeSongPopularityWithSeed([], songs);
+      const seed = mergeSongPopularity([], songs);
       const songToArtist = new Map<string, string>(songs.map(s => [s.id, s.artistId]));
       const totals = new Map<string, number>();
       seed.forEach(row => {
