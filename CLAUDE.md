@@ -43,7 +43,7 @@ npm run lint         # eslint
 Copy `.env.example` to `.env.local` for local development. Required variables:
 
 ```
-VITE_SUPABASE_URL=https://nztccconvwmxpoyjwkrf.supabase.co
+VITE_SUPABASE_URL=https://wsjhbfmzbonxmxaaassu.supabase.co
 VITE_SUPABASE_ANON_KEY=<JWT anon key — must start with eyJ, NOT sb_publishable_...>
 VITE_LIVEKIT_WS_URL=wss://voice.songchainn.xyz
 VITE_LIVEKIT_TOKEN_ENDPOINT=http://127.0.0.1:7880/token
