@@ -306,6 +306,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = session?.user ?? null;
       if (u) {
         setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+        // A real Supabase session supersedes any synthetic fc-/fb- identity —
+        // drop the stored fallback so it can't shadow the session on next boot.
+        try { localStorage.removeItem(FC_USER_KEY); } catch { void 0; }
+        try { localStorage.removeItem(FB_USER_KEY); } catch { void 0; }
         // Supabase serializes auth operations with an internal lock while this
         // callback runs — awaiting another Supabase call (refreshRoles needs the
         // session token) synchronously here deadlocks the client until reload.
@@ -476,11 +480,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (fnError) return { error: new Error(fnError.message || 'Farcaster auth failed') };
 
-      const { email, otp, isNewUser } = data as { email: string; otp: string; isNewUser?: boolean };
+      const { otp, isNewUser } = data as { email: string; otp: string; isNewUser?: boolean };
 
+      // farcaster-auth returns generateLink's hashed_token — it MUST be verified
+      // as token_hash (verifying with email+token expects the plain 6-digit code
+      // and always fails with otp_expired).
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
+        token_hash: otp,
         type: 'magiclink',
       });
       if (otpError) return { error: otpError };
@@ -511,11 +517,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (fnError) return { error: new Error(fnError.message || 'Farcaster auth failed') };
 
-      const { email, otp, isNewUser } = data as { email: string; otp: string; isNewUser?: boolean };
+      const { otp, isNewUser } = data as { email: string; otp: string; isNewUser?: boolean };
 
+      // hashed_token → token_hash verification (see signInWithFarcasterToken)
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
+        token_hash: otp,
         type: 'magiclink',
       });
       if (otpError) return { error: otpError };
@@ -607,9 +613,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (fnError) throw new Error(fnError.message || 'Farcaster auth failed');
 
-      const { email, otp } = data as { email: string; otp: string };
+      const { otp } = data as { email: string; otp: string };
+      // hashed_token → token_hash verification (see signInWithFarcasterToken)
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-        email, token: otp, type: 'magiclink',
+        token_hash: otp, type: 'magiclink',
       });
       if (otpError) throw otpError;
 
@@ -670,8 +677,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             },
           });
           if (!authErr && authData?.otp) {
+            // hashed_token → token_hash verification (see signInWithFarcasterToken)
             const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-              email: authData.email, token: authData.otp, type: 'magiclink',
+              token_hash: authData.otp, type: 'magiclink',
             });
             if (!otpError && otpData?.user) {
               const u = otpData.user;
@@ -749,8 +757,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             },
           });
           if (!authErr && authData?.otp) {
+            // facebook-auth also returns generateLink's hashed_token → token_hash
             const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-              email: authData.email, token: authData.otp, type: 'magiclink',
+              token_hash: authData.otp, type: 'magiclink',
             });
             if (!otpError && otpData?.user) {
               const u = otpData.user;
