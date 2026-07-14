@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronUp, Headphones } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
-import { useEngagement } from '@/context/EngagementContext';
+import { useEngagement, PLAY_THRESHOLD_SECONDS } from '@/context/EngagementContext';
 import { Slider } from '@/components/ui/slider';
 import { FullScreenPlayer } from './FullScreenPlayer';
 import { SpinningSongArt } from './SpinningSongArt';
@@ -107,8 +107,6 @@ export const AudioPlayer = memo(function AudioPlayer() {
   const handleWalletConnected = useCallback((address: string) => {
     setWalletAddress(address);
   }, []);
-
-  const PLAY_THRESHOLD_SECONDS = 3;
 
   const nextSong = useMemo(() => {
     if (!currentSong || !queue || queue.length <= 1) return null;

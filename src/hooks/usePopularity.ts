@@ -27,15 +27,20 @@ interface SongPopularity {
 
 const numberOrZero = (value: number | null | undefined) => Number(value || 0);
 
-// Every count starts at zero and only real user actions recorded in the
-// database can raise it. No baselines, no seeds, no fabricated streams.
+// Plays = historical baseline + real plays. The baseline (song.plays, distributed
+// from ARTIST_STREAM_TARGETS) is the catalogue's carried-over stream history; every
+// row in song_analytics is a real listen recorded by the app and stacks on top.
+// Likes/comments/shares/views are NEVER seeded — only real user actions count.
 function mergeSongPopularity(rows: SongPopularity[] | null | undefined, songs: Song[] = SONGS): SongPopularity[] {
   const merged = new Map<string, SongPopularity>();
+  const baselineById = new Map<string, number>();
 
   songs.forEach((song) => {
+    const baseline = Math.max(0, numberOrZero(song.plays));
+    baselineById.set(song.id, baseline);
     merged.set(song.id, {
       song_id: song.id,
-      play_count: 0,
+      play_count: baseline,
       like_count: 0,
       comment_count: 0,
       share_count: 0,
@@ -48,9 +53,13 @@ function mergeSongPopularity(rows: SongPopularity[] | null | undefined, songs: S
     const songId = String(row.song_id || '').trim();
     if (!songId) return;
 
+    // Songs uploaded after the static catalogue have no baseline — they start at 0
+    // and count only real plays, which is what we want for every new release.
+    const baseline = baselineById.get(songId) ?? 0;
+
     merged.set(songId, {
       song_id: songId,
-      play_count: numberOrZero(row.play_count),
+      play_count: baseline + numberOrZero(row.play_count),
       like_count: numberOrZero(row.like_count),
       comment_count: numberOrZero(row.comment_count),
       share_count: numberOrZero(row.share_count),

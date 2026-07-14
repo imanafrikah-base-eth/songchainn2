@@ -3485,9 +3485,90 @@ const SONGS_RAW: Song[] = [
   },
 ];
 
-// Stream counts are never seeded or fabricated. Every play shown in the app
-// comes from real user play events recorded in song_analytics.
-export const SONGS: Song[] = SONGS_RAW.map((song): Song => ({
+// Historical stream baseline, carried over from before play events were recorded
+// in the database. This is a starting balance per artist, not a live number:
+// every real play (see PLAY_THRESHOLD_SECONDS in AudioPlayer) is counted in
+// song_analytics and stacked ON TOP of this in usePopularity.
+const ARTIST_STREAM_TARGETS: Record<string, number> = {
+  '3': 72400,  // IMan Afrikah (leader)
+  '1': 37100,  // 7ROO7H BASED
+  '7': 33000,  // Santana
+  '4': 29900,  // NDA
+  '5': 24500,  // PRP
+  '6': 20400,  // Sanchy
+  '2': 18550,  // DenaJah
+  '8': 10300,  // FAITH
+  '10': 8350,  // SAMMIE
+  '9': 7190,   // JMN
+  '11': 1450,  // NEMESISvsLADYRYN
+};
+
+// Stable hash so a song's share of its artist's baseline never changes between
+// loads or deploys (a random split would make counts jump around on refresh).
+function seededRandom(seed: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) % 1000000) / 1000000;
+}
+
+// Spread an artist's baseline across their songs with an uneven but deterministic
+// weighting, so some tracks read as hits and others as deep cuts.
+function distributeArtistStreams(songs: Song[], targetTotal: number): Map<string, number> {
+  const allocations = new Map<string, number>();
+  if (!songs.length) return allocations;
+
+  const safeTarget = Math.max(0, Math.floor(targetTotal));
+  const minPerSong = safeTarget >= songs.length ? 1 : 0;
+  const remaining = Math.max(0, safeTarget - minPerSong * songs.length);
+
+  const weighted = songs.map((song, index) => ({
+    song,
+    weight: 0.2 + seededRandom(`${song.artistId}:${song.id}:${index}:stream-weight`),
+  }));
+  const weightTotal = weighted.reduce((sum, w) => sum + w.weight, 0) || 1;
+
+  let allocated = 0;
+  weighted.forEach(({ song, weight }, index) => {
+    const isLast = index === weighted.length - 1;
+    // Give the last song the exact remainder so the per-song counts always sum
+    // to the artist total instead of drifting from rounding.
+    const share = isLast
+      ? remaining - allocated
+      : Math.floor((weight / weightTotal) * remaining);
+    allocated += share;
+    allocations.set(song.id, minPerSong + Math.max(0, share));
+  });
+
+  return allocations;
+}
+
+function applyArtistStreamDistribution(songs: Song[]): Song[] {
+  const byArtist = new Map<string, Song[]>();
+  songs.forEach((song) => {
+    const list = byArtist.get(song.artistId) ?? [];
+    list.push(song);
+    byArtist.set(song.artistId, list);
+  });
+
+  const allocatedBySongId = new Map<string, number>();
+  byArtist.forEach((artistSongs, artistId) => {
+    const target = ARTIST_STREAM_TARGETS[artistId];
+    if (target === undefined) return; // no baseline for this artist — starts at 0
+    distributeArtistStreams(artistSongs, target).forEach((plays, songId) => {
+      allocatedBySongId.set(songId, plays);
+    });
+  });
+
+  return songs.map((song) => ({
+    ...song,
+    plays: allocatedBySongId.get(song.id) ?? Math.max(0, Math.floor(song.plays || 0)),
+  }));
+}
+
+export const SONGS: Song[] = applyArtistStreamDistribution(SONGS_RAW).map((song): Song => ({
   ...song,
   coverImage: withStableCoverImage(song.coverImage, song.artist),
 }));
@@ -3592,7 +3673,7 @@ export const ARTISTS: Artist[] = [
     id: '11',
     name: 'NEMESISvsLADYRYN',
     bio: 'NemesisvsLadyryn is a Zambian singer-rapper weaving lofi haze with ethereal, raw vocals. Between whispered prayers and late-night truths, her sound lives where vulnerability meets defiance. From Lusaka to the world, music for souls who feel too much.making music for the over thinkers and overthinkers...',
-    location: 'Lusaka',
+    location: 'Zambia',
     townSquare: 'Lusaka Townsquare',
     profileImage: artistNemesisVsLadyryn,
     songs: ['212', '213', '214', '232'],

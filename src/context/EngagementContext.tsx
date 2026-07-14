@@ -61,6 +61,12 @@ const ENGAGEMENT_NOOP: EngagementContextType = {
 const POINTS_PER_PLAY = 2;
 const POINTS_PER_LIKE = 1;
 const STREAK_BONUS = 5;
+
+// A stream counts only after 30 seconds of real playback — the rule Spotify and
+// the other major DSPs use. Shared by the online player and the offline sync so
+// the two can't drift apart and let short plays in through the back door.
+export const PLAY_THRESHOLD_SECONDS = 30;
+
 const PLAY_DEDUPE_WINDOW_MS = 30_000;
 const PULSE_DEDUPE_WINDOW_MS = 500;
 const OFFLINE_PLAYS_KEY = 'songchainn_offline_plays_v1';
@@ -300,7 +306,9 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(OFFLINE_PLAYS_KEY);
       try {
         const payload = batch
-          .filter((p) => p.durationSeconds >= 3)
+          // Same 30s bar as online playback — an offline listen must be a real
+          // listen too, or syncing back would smuggle in uncounted short plays.
+          .filter((p) => p.durationSeconds >= PLAY_THRESHOLD_SECONDS)
           .map((p) => ({
             event_type: 'play',
             song_id: p.songId,
