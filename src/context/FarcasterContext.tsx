@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
-import { useFarcaster, requestFarcasterSignIn } from '@/hooks/useFarcaster';
+import { useFarcaster, requestFarcasterSignIn, requestFarcasterQuickAuthToken } from '@/hooks/useFarcaster';
 import { useAuth } from '@/context/AuthContext';
 import { fcAddMiniApp } from '@/lib/farcasterActions';
 import type { Context as FarcasterCoreContext } from '@farcaster/miniapp-core';
@@ -22,17 +22,33 @@ const FarcasterContext = createContext<FarcasterContextType>({
 
 export function FarcasterProvider({ children }: { children: ReactNode }) {
   const state = useFarcaster();
-  const { user, signInWithFarcasterMiniApp, signInWithFarcasterContext } = useAuth();
+  const { user, signInWithFarcasterMiniApp, signInWithFarcasterQuickAuth, signInWithFarcasterContext } = useAuth();
   const signedInRef = useRef(false);
   const [quickAuthFailed, setQuickAuthFailed] = useState(false);
-  // Holds the in-flight SIWF promise so the sign-in completion effect can await it.
+  // Holds the in-flight credential promises so the sign-in completion effect can
+  // await them. Both are started up-front so their round-trips overlap sdk.context.
+  const quickAuthPromiseRef = useRef<Promise<string | null> | null>(null);
   const siwfPromiseRef = useRef<Promise<{ message: string; signature: string } | null> | null>(null);
 
-  // Kick off SIWF as soon as we know we're in a Farcaster frame — runs in parallel
-  // with sdk.context so the two round-trips overlap instead of stacking.
+  // Kick off credential acquisition as soon as we know we're in a Farcaster frame.
+  // Quick Auth is the preferred credential (no signature prompt, verified against
+  // Farcaster's JWKS); SIWF is fetched in parallel as the fallback for hosts that
+  // don't support Quick Auth.
   useEffect(() => {
     const hasRealSession = user && !user.id?.startsWith('fc-');
-    if (!state.isInFarcaster || hasRealSession || siwfPromiseRef.current || signedInRef.current) return;
+    if (!state.isInFarcaster || hasRealSession || quickAuthPromiseRef.current || signedInRef.current) return;
+
+    quickAuthPromiseRef.current = (async () => {
+      try {
+        return await Promise.race([
+          requestFarcasterQuickAuthToken(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
+        ]);
+      } catch {
+        return null;
+      }
+    })();
+
     siwfPromiseRef.current = (async () => {
       try {
         return await Promise.race([
@@ -65,20 +81,32 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
     };
 
     const doSignIn = async () => {
-      // Await the already-in-progress SIWF (started in parallel with context fetch).
-      // If SIWF finished first this resolves instantly; if context was faster we wait here.
-      const siwf = siwfPromiseRef.current ? await siwfPromiseRef.current : null;
+      // 1. Quick Auth — preferred: no signature prompt, JWKS-verified server-side.
+      const token = quickAuthPromiseRef.current ? await quickAuthPromiseRef.current : null;
+      if (token) {
+        try {
+          const result = await signInWithFarcasterQuickAuth(fcData, token);
+          if (!result.error) return;
+        } catch {
+          // fall through to SIWF
+        }
+      }
 
+      // 2. SIWF — for hosts without Quick Auth. The edge function binds the
+      // signature to the FID on-chain, so the fid here cannot be forged.
+      const siwf = siwfPromiseRef.current ? await siwfPromiseRef.current : null;
       if (siwf) {
         try {
           const result = await signInWithFarcasterMiniApp(fcData, siwf.message, siwf.signature);
           if (!result.error) return;
         } catch {
-          // SIWF path failed — fall through to context-only
+          // fall through to context-only
         }
       }
 
-      // Fallback: context-only sign-in (writes fc-XXX to localStorage + farcaster_profiles)
+      // 3. Context-only — last resort. Local synthetic fc-XXX identity with NO
+      // Supabase session (unverified context can't be traded for one). The user
+      // can browse, but DB-backed actions stay gated behind a real sign-in.
       const result = await signInWithFarcasterContext(fcData);
       if (result?.error) {
         setQuickAuthFailed(true);
@@ -87,7 +115,7 @@ export function FarcasterProvider({ children }: { children: ReactNode }) {
     };
 
     void doSignIn();
-  }, [state.isInFarcaster, state.context, user, signInWithFarcasterMiniApp, signInWithFarcasterContext]);
+  }, [state.isInFarcaster, state.context, user, signInWithFarcasterQuickAuth, signInWithFarcasterMiniApp, signInWithFarcasterContext]);
 
   // If we're in Farcaster but context never resolved within ~3s, surface the
   // manual button so the user isn't stranded.

@@ -20,6 +20,7 @@ interface AuthContextType {
   signInWithFarcaster: (message: string, signature: string) => Promise<{ error: Error | null }>;
   signInWithFarcasterContext: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => Promise<{ error: Error | null }>;
   signInWithFarcasterMiniApp: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }, message: string, signature: string) => Promise<{ error: Error | null }>;
+  signInWithFarcasterQuickAuth: (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }, token: string) => Promise<{ error: Error | null }>;
   signInWithFacebook: (fb: { id: string; name: string; email?: string; picture_url?: string; access_token?: string }) => Promise<{ error: Error | null }>;
   signInWithFacebookContext: (fb: { id: string; name: string; email?: string; picture_url?: string }) => Promise<{ error: Error | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -587,9 +588,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id, refreshProfile]);
 
   /**
-   * Mini-app sign-in path: authenticates via SIWF then immediately creates/updates
-   * audience_profiles so the user appears everywhere in the app without going through
-   * onboarding. Falls back to local-only context sign-in if Supabase auth fails.
+   * Exchanges a farcaster-auth OTP for a real Supabase session, then immediately
+   * creates/updates audience_profiles from the mini-app context so the user appears
+   * everywhere in the app without ever seeing onboarding.
+   */
+  const completeFarcasterSession = useCallback(async (
+    otp: string,
+    fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string },
+  ) => {
+    // farcaster-auth returns generateLink's hashed_token → verify as token_hash.
+    const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+      token_hash: otp, type: 'magiclink',
+    });
+    if (otpError) throw otpError;
+
+    const u = otpData.user;
+    if (!u) throw new Error('Sign-in failed');
+
+    // Write the profile BEFORE setting needsOnboarding so there is no flash of
+    // the onboarding screen for mini-app users.
+    const profileName = fc.displayName || fc.username || `User ${fc.fid}`;
+    const profileData: Record<string, unknown> = {
+      user_id: u.id,
+      id: u.id,
+      display_name: profileName,
+      username: fc.username || null,
+      profile_name: profileName,
+      avatar_url: fc.pfpUrl || null,
+      profile_picture_url: fc.pfpUrl || null,
+      location: fc.location || null,
+      is_public: true,
+      onboarding_completed: true,
+    };
+
+    // Upsert profile and refresh roles in parallel — eliminates the extra SELECT
+    // round-trip and overlaps the roles query with the profile write.
+    await Promise.all([
+      (supabase as any).from('audience_profiles').upsert(profileData, { onConflict: 'user_id' }),
+      refreshRoles(u.id),
+    ]);
+
+    setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+    setIsArtist(false);
+    setArtistId(null);
+    setNeedsOnboarding(false);
+    try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
+  }, [refreshRoles]);
+
+  /**
+   * Preferred mini-app sign-in: a Quick Auth JWT, which farcaster-auth verifies
+   * against Farcaster's JWKS. Zero-tap (no signature prompt) and works on clients
+   * where sdk.actions.signIn is unavailable.
+   */
+  const signInWithFarcasterQuickAuth = useCallback(async (
+    fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string },
+    token: string,
+  ) => {
+    try {
+      if (!isSupabaseConfigured) throw new Error('Supabase not configured');
+
+      const { data, error: fnError } = await supabase.functions.invoke('farcaster-auth', {
+        body: { token },
+      });
+      if (fnError) throw new Error(fnError.message || 'Farcaster auth failed');
+
+      const { otp } = data as { email: string; otp: string };
+      await completeFarcasterSession(otp, fc);
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(err?.message || 'Quick Auth sign-in failed') };
+    }
+  }, [completeFarcasterSession]);
+
+  /**
+   * Fallback mini-app sign-in: SIWF. farcaster-auth verifies the signature against
+   * the FID's on-chain custody/auth addresses, so the claimed fid cannot be forged.
    */
   const signInWithFarcasterMiniApp = useCallback(async (
     fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string },
@@ -600,9 +673,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isSupabaseConfigured) throw new Error('Supabase not configured');
 
       const { data, error: fnError } = await supabase.functions.invoke('farcaster-auth', {
-        // Pass full FC profile so the edge function can enrich the auth.users metadata
+        // The fid is NOT trusted from the body — the edge function derives it from
+        // the verified signature. These fields only enrich auth.users metadata.
         body: {
-          fid: fc.fid,
           username: fc.username ?? null,
           displayName: fc.displayName ?? null,
           pfpUrl: fc.pfpUrl ?? null,
@@ -614,104 +687,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (fnError) throw new Error(fnError.message || 'Farcaster auth failed');
 
       const { otp } = data as { email: string; otp: string };
-      // hashed_token → token_hash verification (see signInWithFarcasterToken)
-      const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-        token_hash: otp, type: 'magiclink',
-      });
-      if (otpError) throw otpError;
-
-      const u = otpData.user;
-      if (!u) throw new Error('Sign-in failed');
-
-      // Immediately create/update the profile BEFORE setting needsOnboarding
-      // so there is no flash of the onboarding screen for mini-app users.
-      const profileName = fc.displayName || fc.username || `User ${fc.fid}`;
-      const profileData: Record<string, unknown> = {
-        user_id: u.id,
-        id: u.id,
-        display_name: profileName,
-        username: fc.username || null,
-        profile_name: profileName,
-        avatar_url: fc.pfpUrl || null,
-        profile_picture_url: fc.pfpUrl || null,
-        location: fc.location || null,
-        is_public: true,
-        onboarding_completed: true,
-      };
-
-      // Upsert profile and refresh roles in parallel — eliminates the extra SELECT
-      // round-trip and overlaps the roles query with the profile write.
-      await Promise.all([
-        (supabase as any).from('audience_profiles').upsert(profileData, { onConflict: 'user_id' }),
-        refreshRoles(u.id),
-      ]);
-
-      // Now set auth state — profile already exists so needsOnboarding stays false
-      setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-      setIsArtist(false);
-      setArtistId(null);
-      setNeedsOnboarding(false);
-      try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
-
+      await completeFarcasterSession(otp, fc);
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Mini-app sign-in failed') };
     }
-  }, [refreshRoles]);
+  }, [completeFarcasterSession]);
 
   const signInWithFarcasterContext = useCallback(async (fc: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => {
     try {
       if (!fc?.fid) return { error: new Error('Missing Farcaster fid') };
 
-      // Try edge function first — gives a real Supabase UUID so all social
-      // actions (follow, post, like) work. Falls back to local-only if unavailable.
-      if (isSupabaseConfigured) {
-        try {
-          const { data: authData, error: authErr } = await supabase.functions.invoke('farcaster-auth', {
-            body: {
-              fid: fc.fid,
-              username: fc.username ?? null,
-              displayName: fc.displayName ?? null,
-              pfpUrl: fc.pfpUrl ?? null,
-              location: fc.location ?? null,
-            },
-          });
-          if (!authErr && authData?.otp) {
-            // hashed_token → token_hash verification (see signInWithFarcasterToken)
-            const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-              token_hash: authData.otp, type: 'magiclink',
-            });
-            if (!otpError && otpData?.user) {
-              const u = otpData.user;
-              const profileName = fc.displayName || fc.username || `User ${fc.fid}`;
-              const profileData: Record<string, unknown> = {
-                user_id: u.id, id: u.id,
-                display_name: profileName, username: fc.username || null,
-                profile_name: profileName, avatar_url: fc.pfpUrl || null,
-                profile_picture_url: fc.pfpUrl || null, location: fc.location || null,
-                is_public: true, onboarding_completed: true,
-              };
-              const { data: existing } = await supabase.from('audience_profiles').select('id').eq('user_id', u.id).maybeSingle();
-              if (existing) {
-                await supabase.from('audience_profiles').update(profileData).eq('user_id', u.id);
-              } else {
-                await supabase.from('audience_profiles').insert(profileData as any);
-              }
-              setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
-              setAudienceProfile(profileData as any);
-              setIsAdmin(false); setIsArtist(false); setArtistId(null);
-              setNeedsOnboarding(false);
-              try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
-              // Also write to farcaster_profiles for community visibility
-              void supabase.from('farcaster_profiles' as any).upsert(
-                { fid: fc.fid, username: fc.username ?? null, display_name: profileName, pfp_url: fc.pfpUrl ?? null, location: fc.location ?? null, updated_at: new Date().toISOString() },
-                { onConflict: 'fid' }
-              ).then(() => {});
-              return { error: null };
-            }
-          }
-        } catch { /* edge function unavailable — fall through to local-only */ }
-      }
+      // NOTE: this path deliberately does NOT ask farcaster-auth for a session.
+      // sdk.context is client-supplied and carries no proof of FID ownership, so
+      // trading it for a real Supabase session would let anyone impersonate any
+      // Farcaster user. Real sessions come only from Quick Auth or SIWF, both of
+      // which are cryptographically verified server-side. This is the last-resort
+      // read-only identity when both of those are unavailable.
 
       // Local-only fallback: synthetic fc-xxx user (no Supabase writes)
       const { user: fcUser, profile } = buildFcUserAndProfile(fc);
@@ -854,6 +846,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithFarcaster,
       signInWithFarcasterContext,
       signInWithFarcasterMiniApp,
+      signInWithFarcasterQuickAuth,
       signInWithFacebook,
       signInWithFacebookContext,
       signUpWithEmail,
@@ -889,6 +882,7 @@ export function useAuth() {
       signInWithFarcaster: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcasterContext: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFarcasterMiniApp: async () => ({ error: new Error('AuthProvider missing') }),
+      signInWithFarcasterQuickAuth: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFacebook: async () => ({ error: new Error('AuthProvider missing') }),
       signInWithFacebookContext: async () => ({ error: new Error('AuthProvider missing') }),
       signUpWithEmail: async () => ({ error: new Error('AuthProvider missing') }),

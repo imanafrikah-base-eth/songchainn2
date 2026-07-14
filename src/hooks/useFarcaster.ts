@@ -71,3 +71,17 @@ export async function requestFarcasterSignIn(): Promise<{ message: string; signa
   const result = await sdk.actions.signIn({ nonce: generateNonce() });
   return { message: result.message, signature: result.signature };
 }
+
+// Fetches a Quick Auth JWT from the host. This is the preferred sign-in credential:
+// it needs no signature prompt and the server verifies it against Farcaster's JWKS.
+// Returns null when the host doesn't support Quick Auth (older clients).
+export async function requestFarcasterQuickAuthToken(): Promise<string | null> {
+  try {
+    const getToken = sdk.quickAuth?.getToken;
+    if (typeof getToken !== 'function') return null;
+    const result = await sdk.quickAuth.getToken();
+    return result?.token ?? null;
+  } catch {
+    return null;
+  }
+}

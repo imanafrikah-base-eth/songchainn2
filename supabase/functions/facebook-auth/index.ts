@@ -1,8 +1,10 @@
 // Facebook auth edge function
-// Accepts: { facebook_id, access_token?, name?, email?, picture_url?, location? }
-//   - With access_token: verifies with Facebook Graph API (secure path)
-//   - Without access_token: context-only fallback (same as Farcaster PATH 0)
-// Returns: { email, otp, isNewUser } for client to call supabase.auth.verifyOtp()
+// Accepts: { facebook_id, access_token, name?, email?, picture_url?, location? }
+// The access_token is REQUIRED and always verified against the Graph API, which
+// must report the same user id. There is deliberately no unauthenticated path:
+// issuing a session from a bare facebook_id would let anyone impersonate any user.
+// Returns: { email, otp, isNewUser } for client to call
+// supabase.auth.verifyOtp({ token_hash: otp, type: 'magiclink' }).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -97,23 +99,24 @@ Deno.serve(async (req) => {
       return json(origin, { error: 'facebook_id is required' }, 400);
     }
 
+    // An access_token is mandatory: it is the only thing proving the caller
+    // actually owns the facebook_id they are claiming.
+    if (typeof access_token !== 'string' || !access_token) {
+      return json(origin, { error: 'access_token is required' }, 401);
+    }
+
+    const { valid, error: tokenErr } = await verifyFacebookToken(access_token, facebook_id);
+    if (!valid) {
+      console.error('[facebook-auth] token verification failed:', tokenErr);
+      return json(origin, { error: tokenErr ?? 'Token verification failed' }, 401);
+    }
+
     const meta = {
       name: name ?? null,
       email: email ?? null,
       picture_url: picture_url ?? null,
       location: location ?? null,
     };
-
-    // Verified path: access_token provided — validate with Facebook Graph API
-    if (typeof access_token === 'string' && access_token) {
-      const { valid, error: tokenErr } = await verifyFacebookToken(access_token, facebook_id);
-      if (!valid) {
-        console.error('[facebook-auth] token verification failed:', tokenErr);
-        return json(origin, { error: tokenErr ?? 'Token verification failed' }, 401);
-      }
-    }
-    // Context-only fallback: no access_token — issue session without Graph API check
-    // (less secure; allows social features when token is unavailable)
 
     const result = await issueSupabaseSession(facebook_id, meta);
     return json(origin, result);

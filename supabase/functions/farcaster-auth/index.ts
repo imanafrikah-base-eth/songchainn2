@@ -1,9 +1,16 @@
-// Farcaster auth edge function — handles two paths:
-//   1. quickAuth JWT  { token }              — zero-tap, auto sign-in
-//   2. SIWF           { message, signature } — manual button fallback
+// Farcaster auth edge function — issues a Supabase session for a Farcaster user.
+// Two — and only two — paths, both of which cryptographically bind the request
+// to a specific FID:
+//   1. quickAuth JWT  { token }              — zero-tap; verified against Farcaster's JWKS
+//   2. SIWF           { message, signature } — verified via @farcaster/auth-client,
+//                                              which proves the signature belongs to
+//                                              the FID's custody/auth address on-chain
+//
+// There is deliberately NO unauthenticated `{ fid }` path: accepting a bare FID
+// would let anyone mint a session as any Farcaster user (impersonation).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { verifyMessage } from 'npm:viem';
 import { jwtVerify, createRemoteJWKSet } from 'https://esm.sh/jose@5.9.6';
+import { createAppClient, viemConnector } from 'npm:@farcaster/auth-client';
 
 // SIWE domain allowlist — limited to prod hosts by default. To enable local
 // development, set ALLOWED_SIWE_DOMAINS in the edge fn env (CSV, e.g.
@@ -13,15 +20,21 @@ const ALLOWED_DOMAINS = new Set<string>(
     .split(',').map((s) => s.trim()).filter(Boolean),
 );
 
-const ALLOWED_ORIGINS = new Set<string>(
-  (Deno.env.get('ALLOWED_ORIGINS') ?? 'https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz')
-    .split(',').map((s) => s.trim()).filter(Boolean),
-);
-
 // Extend sign-in window to 10 min — Farcaster clients can be slow
 const MAX_AGE_MS = 10 * 60 * 1000;
 
-const EXPECTED_AUDIENCE = Deno.env.get('FC_QUICKAUTH_AUDIENCE') ?? 'songchainn.xyz';
+// quickAuth JWTs carry the mini-app host as `aud`. The app runs on several
+// hostnames (apex, www, app), so accept any of them.
+const EXPECTED_AUDIENCES = (Deno.env.get('FC_QUICKAUTH_AUDIENCE') ?? 'songchainn.xyz,www.songchainn.xyz,app.songchainn.xyz')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+
+// @farcaster/auth-client reads the Farcaster ID/Key registries on Optimism to
+// resolve which addresses may sign for a given FID. A dedicated RPC avoids the
+// public endpoint's rate limits under load.
+const appClient = createAppClient({
+  relay: 'https://relay.farcaster.xyz',
+  ethereum: viemConnector({ rpcUrl: Deno.env.get('OP_RPC_URL') ?? 'https://mainnet.optimism.io' }),
+});
 
 function corsFor(_origin: string | null) {
   return {
@@ -47,7 +60,7 @@ async function handleQuickAuth(token: string): Promise<{ fid: number; error?: st
   try {
     const { payload } = await jwtVerify(token, FARCASTER_JWKS, {
       issuer: 'https://auth.farcaster.xyz',
-      audience: EXPECTED_AUDIENCE,
+      audience: EXPECTED_AUDIENCES,
     });
     // sub is the FID (numeric string)
     const fid = Number(payload['sub']);
@@ -61,21 +74,15 @@ async function handleQuickAuth(token: string): Promise<{ fid: number; error?: st
   }
 }
 
-function parseSiwe(message: string) {
-  // Normalize line endings so \r\n doesn't break regexes
+// Pull just the fields we need to gate the SIWF message before handing it to
+// auth-client for the (expensive) on-chain signature verification.
+function parseSiwePreamble(message: string) {
   const msg = message.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  // Address is on its own line right after the first blank line after the header
-  const address = (msg.match(/\n(0x[a-fA-F0-9]{40})\n/)?.[1] ?? '') as `0x${string}`;
   const domain = msg.match(/^(.+?) wants you to sign in/m)?.[1]?.trim() ?? '';
+  const nonce = msg.match(/^Nonce:\s*(.+)$/m)?.[1]?.trim() ?? '';
   const issuedAt = msg.match(/^Issued At:\s*(.+)$/m)?.[1]?.trim() ?? '';
   const expirationTime = msg.match(/^Expiration Time:\s*(.+)$/m)?.[1]?.trim() ?? '';
-
-  // FID is in Resources as "farcaster://fid/<fid>"
-  const fidMatch = msg.match(/farcaster:\/\/fid\/(\d+)/);
-  const fid = fidMatch ? parseInt(fidMatch[1], 10) : null;
-
-  return { address, domain, issuedAt, expirationTime, fid };
+  return { domain, nonce, issuedAt, expirationTime };
 }
 
 function checkTimestamps(issuedAt: string, expirationTime: string): string | null {
@@ -116,7 +123,8 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
     throw createErr;
   }
 
-  // Generate a one-time magic-link OTP the client verifies with verifyOtp({type:'magiclink'})
+  // Generate a one-time magic-link OTP the client verifies with
+  // verifyOtp({ token_hash, type: 'magiclink' }).
   const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email,
@@ -145,16 +153,6 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
 
-    // ── PATH 0: direct FID (context-only, no SIWF) ───────────────────────
-    // Used when sdk.actions.signIn is unavailable (older clients, context-only
-    // fallback). Less secure than SIWF but sufficient for social features.
-    if (typeof body.fid === 'number' && !body.message && !body.signature && !body.token) {
-      const { fid, username, displayName, pfpUrl, location } = body as Record<string, unknown>;
-      const meta = { farcaster_fid: fid, username: username ?? null, displayName: displayName ?? null, pfpUrl: pfpUrl ?? null, location: location ?? null };
-      const result = await issueSupabaseSession(fid as number, meta);
-      return json(origin, result);
-    }
-
     // ── PATH 1: quickAuth JWT ──────────────────────────────────────────────
     if (typeof body.token === 'string') {
       const { fid, error } = await handleQuickAuth(body.token);
@@ -170,27 +168,46 @@ Deno.serve(async (req) => {
       return json(origin, { error: 'Provide either { token } or { message, signature }' }, 400);
     }
 
-    const { address, domain, issuedAt, expirationTime, fid } = parseSiwe(message);
+    const { domain, nonce, issuedAt, expirationTime } = parseSiwePreamble(message);
 
     if (!ALLOWED_DOMAINS.has(domain)) {
       console.error('[farcaster-auth] Untrusted domain:', domain);
       return json(origin, { error: `Untrusted sign-in domain: ${domain}` }, 400);
     }
+    if (!nonce) {
+      return json(origin, { error: 'Nonce missing from SIWF message' }, 400);
+    }
 
     const timeErr = checkTimestamps(issuedAt, expirationTime);
     if (timeErr) return json(origin, { error: timeErr }, 400);
 
-    if (!address || !address.startsWith('0x')) {
-      return json(origin, { error: 'Ethereum address missing from SIWF message' }, 400);
+    // The critical check: verifySignInMessage resolves the FID's custody/auth
+    // addresses from the on-chain registries and confirms the signature came
+    // from one of them. This is what binds the signature to the claimed FID —
+    // a bare viem verifyMessage() would accept a signature from ANY key.
+    let verified: { success: boolean; fid?: number; error?: Error };
+    try {
+      verified = await appClient.verifySignInMessage({
+        nonce,
+        domain,
+        message,
+        signature: signature as `0x${string}`,
+        acceptAuthAddress: true,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[farcaster-auth] verifySignInMessage threw:', msg);
+      return json(origin, { error: 'Signature verification failed' }, 401);
     }
 
-    const valid = await verifyMessage({ address, message, signature: signature as `0x${string}` });
-    if (!valid) return json(origin, { error: 'Signature verification failed' }, 401);
+    if (!verified.success || !verified.fid) {
+      console.error('[farcaster-auth] SIWF verification rejected:', verified.error?.message);
+      return json(origin, { error: 'Signature verification failed' }, 401);
+    }
 
-    if (!fid || isNaN(fid)) return json(origin, { error: 'Farcaster FID missing from SIWF message' }, 400);
-
+    const fid = verified.fid;
     const { username, displayName, pfpUrl, location } = body as Record<string, unknown>;
-    const result = await issueSupabaseSession(fid, { farcaster_address: address, username: username ?? null, displayName: displayName ?? null, pfpUrl: pfpUrl ?? null, location: location ?? null });
+    const result = await issueSupabaseSession(fid, { username: username ?? null, displayName: displayName ?? null, pfpUrl: pfpUrl ?? null, location: location ?? null });
     return json(origin, result);
 
   } catch (err: unknown) {
