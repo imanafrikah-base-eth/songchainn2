@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Heart } from 'lucide-react';
+import { Play, Pause, Heart, Image as ImageIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Song } from '@/data/musicData';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
@@ -9,7 +9,6 @@ import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
 import { cn } from '@/lib/utils';
 import { SpinningSongArt } from './SpinningSongArt';
-import { AIArtwork } from './AIArtwork';
 import { ShareSongButton } from './ShareSongButton';
 import { OwnershipBadge } from './OwnershipBadge';
 import { OnchainVerifiedBadge } from './OnchainVerifiedBadge';
@@ -374,20 +373,23 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             <div className="absolute inset-0 gradient-glow" />
           </div>
 
-          {/* AI Artwork section */}
+          {/* Cover art */}
           <div className="relative aspect-[4/3] overflow-hidden">
             {isCurrentSong ? (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-cyan-400/10">
                 <SpinningSongArt isPlaying={isPlaying} size="xl" coverImage={song.coverImage} />
               </div>
-            ) : (
-              <AIArtwork
-                songTitle={song.title}
-                artistName={song.artist}
-                fallbackImage={song.coverImage}
-                className="w-full h-full rounded-none"
-                showGenerateButton={true}
+            ) : song.coverImage ? (
+              <img
+                src={song.coverImage}
+                alt={song.title}
+                loading="lazy"
+                className="w-full h-full object-contain"
               />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary/30 via-secondary to-cyan-400/20 flex items-center justify-center">
+                <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
+              </div>
             )}
             
             {/* Play button overlay */}
