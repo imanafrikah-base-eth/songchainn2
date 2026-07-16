@@ -62,7 +62,20 @@ function tidy(text: string, maxLen = 420): string {
   return cleaned.length > maxLen ? `${cleaned.slice(0, maxLen - 3).trimEnd()}...` : cleaned;
 }
 
-async function askLlm(system: string, user: string, maxTokens: number): Promise<string> {
+// The Gemini key lives in Vault (service-role-only RPC) because edge function
+// secrets need CLI auth to set; an env secret still wins if one is added later.
+let cachedGeminiKey: string | null | undefined;
+async function getGeminiKey(db: ReturnType<typeof admin>): Promise<string | null> {
+  const envKey = Deno.env.get("GEMINI_API_KEY");
+  if (envKey) return envKey;
+  if (cachedGeminiKey === undefined) {
+    const { data } = await db.rpc("get_hikulu_brain_key");
+    cachedGeminiKey = typeof data === "string" && data ? data : null;
+  }
+  return cachedGeminiKey;
+}
+
+async function askLlm(db: ReturnType<typeof admin>, system: string, user: string, maxTokens: number): Promise<string> {
   const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (anthropicKey) {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -84,29 +97,32 @@ async function askLlm(system: string, user: string, maxTokens: number): Promise<
     return data.content?.[0]?.text ?? "";
   }
 
-  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  const geminiKey = await getGeminiKey(db);
   if (geminiKey) {
-    const model = Deno.env.get("HIKULU_MODEL") || "gemini-2.5-flash";
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: { "x-goog-api-key": geminiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: [{ text: user }] }],
-          generationConfig: {
-            maxOutputTokens: maxTokens,
-            temperature: 0.8,
-            // Thinking off: it would silently consume the small output budget.
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      },
-    );
-    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-    const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+    const model = Deno.env.get("HIKULU_MODEL") || "gemini-3.5-flash";
+    // No maxOutputTokens: Gemini's internal thinking would eat a small budget
+    // and return an empty answer; tidy() bounds the visible length instead.
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts: [{ text: user }] }],
+      generationConfig: { temperature: 0.8 },
+    });
+    // The free tier throws temporary 429/503 "high demand" errors; retry twice.
+    let lastError = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 2500 * attempt));
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        { method: "POST", headers: { "x-goog-api-key": geminiKey, "Content-Type": "application/json" }, body },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+      }
+      lastError = `Gemini ${res.status}: ${await res.text()}`;
+      if (res.status !== 429 && res.status !== 503) break;
+    }
+    throw new Error(lastError);
   }
 
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -215,6 +231,7 @@ async function handleChat(db: ReturnType<typeof admin>, battle: BattleRow, messa
 
   const context = await battleContext(db, battle);
   const reply = await askLlm(
+    db,
     PERSONA,
     `${context}\n\nA listener named ${userName} just said to you in the room chat: "${message.slice(0, 500)}"\n\nReply to them in character as $HIKULU. One or two sentences, chat-message length, no preamble, no quotation marks around your reply.`,
     200,
@@ -244,6 +261,7 @@ async function handleVerdict(db: ReturnType<typeof admin>, battle: BattleRow) {
   try {
     const context = await battleContext(db, battle);
     const raw = await askLlm(
+      db,
       PERSONA,
       `${context}\n\nThe battle has ended. As $HIKULU, deliver your final verdict. Weigh how each side moved the crowd across the rounds. Award each side judge points from 0 to 10 (they cannot be equal). Respond with ONLY a JSON object, no markdown fences, in this exact shape:\n{"points_a": <0-10>, "points_b": <0-10>, "verdict": "<2 to 4 sentences naming both artists, what won you over and what fell flat>", "one_liner": "<one punchy sentence you would shout to the room>"}`,
       600,
