@@ -7,6 +7,8 @@ import { supabase } from "@/battlezone/integrations/supabase/client";
 export const HIKULU_USER_ID = "b0b00000-0000-4000-a000-000000000001";
 export const HIKULU_NAME = "$HIKULU";
 
+/* Pronounced "Shikulu": the $ stands in for the S, so "shikulu" (which
+   contains "hikulu") and bare "hikulu" both summon him. */
 export function mentionsHikulu(text: string): boolean {
   return /(\$|@)?hikulu/i.test(text);
 }
