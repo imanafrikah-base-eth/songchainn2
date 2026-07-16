@@ -91,6 +91,9 @@ const HowItWorks = () => {
 
       {/* CTA */}
       <div className="flex flex-wrap justify-center gap-4">
+        <AppLink to="/learn" className="rounded-xl border border-accent/50 bg-accent/10 px-6 py-3 font-bold text-accent hover:bg-accent/20 transition-colors">
+          Learn How to Battle
+        </AppLink>
         <AppLink to="/battles/live" className="rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-all">
           Browse Live Battles
         </AppLink>

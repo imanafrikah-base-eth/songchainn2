@@ -7,6 +7,7 @@ import { AuthProvider } from "@/battlezone/contexts/AuthContext";
 import { EmbedModeProvider } from "@/battlezone/contexts/EmbedModeContext";
 import Index from "@/battlezone/pages/Index";
 import HowItWorks from "@/battlezone/pages/HowItWorks";
+import Learn from "@/battlezone/pages/Learn";
 import LiveBattles from "@/battlezone/pages/LiveBattles";
 import UpcomingBattles from "@/battlezone/pages/UpcomingBattles";
 import Results from "@/battlezone/pages/Results";
@@ -31,6 +32,7 @@ export default function WaveWarzBattleZoneFeature() {
             <Routes>
               <Route index element={<Index />} />
               <Route path="how-it-works" element={<HowItWorks />} />
+              <Route path="learn" element={<Learn />} />
               <Route path="battles/live" element={<LiveBattles />} />
               <Route path="battles/upcoming" element={<UpcomingBattles />} />
               <Route path="battles/results" element={<Results />} />

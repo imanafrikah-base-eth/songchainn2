@@ -1,4 +1,4 @@
-import { Zap, Play, HelpCircle } from "lucide-react";
+import { Zap, Play, HelpCircle, GraduationCap } from "lucide-react";
 import AppLink from "@/battlezone/components/AppLink";
 import Navbar from "@/battlezone/components/Navbar";
 import Footer from "@/battlezone/components/Footer";
@@ -52,6 +52,9 @@ const Index = () => {
               </AppLink>
               <AppLink to="/host/create" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-bold text-foreground hover:bg-muted transition-colors">
                 <Zap className="h-4 w-4" /> Host a Battle
+              </AppLink>
+              <AppLink to="/learn" className="inline-flex items-center gap-2 rounded-xl border border-accent/50 bg-accent/10 px-6 py-3 font-bold text-accent hover:bg-accent/20 transition-all hover:shadow-[0_0_25px_hsl(var(--gold)/0.3)]">
+                <GraduationCap className="h-4 w-4" /> Learn How to Battle
               </AppLink>
               <AppLink to="/how-it-works" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-medium text-muted-foreground hover:bg-muted transition-colors">
                 <HelpCircle className="h-4 w-4" /> How It Works
