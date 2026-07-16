@@ -2,7 +2,8 @@
 // Two actions:
 //   { action: "chat", battleId, message }  -> in-character reply posted to the room chat
 //   { action: "verdict", battleId }        -> one-time post-battle verdict, awards judge points
-// Uses ANTHROPIC_API_KEY when set, otherwise falls back to the Lovable AI gateway.
+// Brain: ANTHROPIC_API_KEY, else GEMINI_API_KEY (free tier via Google AI Studio),
+// else LOVABLE_API_KEY (Lovable AI gateway).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -81,6 +82,31 @@ async function askLlm(system: string, user: string, maxTokens: number): Promise<
     if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
     const data = await res.json();
     return data.content?.[0]?.text ?? "";
+  }
+
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  if (geminiKey) {
+    const model = Deno.env.get("HIKULU_MODEL") || "gemini-2.5-flash";
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: { "x-goog-api-key": geminiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: user }] }],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            temperature: 0.8,
+            // Thinking off: it would silently consume the small output budget.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+      },
+    );
+    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
   }
 
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -301,7 +327,7 @@ Deno.serve(async (req) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[hikulu-judge]", message);
     if (message === "NO_LLM_KEY") {
-      return json({ error: "HIKULU is not configured: set ANTHROPIC_API_KEY or LOVABLE_API_KEY as an edge function secret" }, 503);
+      return json({ error: "HIKULU is not configured: set ANTHROPIC_API_KEY, GEMINI_API_KEY or LOVABLE_API_KEY as an edge function secret" }, 503);
     }
     return json({ error: "HIKULU lost his train of thought. Try again." }, 500);
   }
