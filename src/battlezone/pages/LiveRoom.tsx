@@ -22,6 +22,7 @@ import SpeakerManagement from "@/battlezone/components/SpeakerManagement";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
 import { useHostAudio } from "@/battlezone/hooks/useHostAudio";
 import { SONGS } from "@/data/musicData";
+import { HIKULU_USER_ID, HIKULU_NAME, mentionsHikulu, pingHikuluChat, requestHikuluVerdict } from "@/battlezone/lib/hikulu";
 
 interface ChatMessage {
   id: string;
@@ -29,6 +30,7 @@ interface ChatMessage {
   text: string;
   timestamp: Date;
   type: "message" | "system" | "reaction";
+  isHikulu?: boolean;
 }
 
 // RoomParticipant interface is now imported from useBattleRoles hook
@@ -162,11 +164,14 @@ const LiveRoom = () => {
       const nextMessages: ChatMessage[] = data.map((msg: RoomMessageRow) => ({
         id: msg.id,
         userName:
-          names.get(msg.user_id) ||
-          (msg.user_id === currentUser?.id ? currentProfile?.display_name || currentProfile?.username || "You" : "Listener"),
+          msg.user_id === HIKULU_USER_ID
+            ? HIKULU_NAME
+            : names.get(msg.user_id) ||
+              (msg.user_id === currentUser?.id ? currentProfile?.display_name || currentProfile?.username || "You" : "Listener"),
         text: msg.message,
         timestamp: new Date(msg.created_at),
         type: "message",
+        isHikulu: msg.user_id === HIKULU_USER_ID,
       }));
       setChatMessages(nextMessages);
     };
@@ -201,6 +206,12 @@ const LiveRoom = () => {
 
     if (error) {
       setChatInput(messageText);
+      return;
+    }
+
+    // Summon the AI judge when he is addressed.
+    if (mentionsHikulu(messageText)) {
+      pingHikuluChat(roomId, messageText, profile?.display_name || profile?.username || undefined);
     }
   };
 
@@ -233,6 +244,7 @@ const LiveRoom = () => {
       .from("battles")
       .update({ status: "ended", ended_time: new Date().toISOString() })
       .eq("id", roomId);
+    void requestHikuluVerdict(roomId);
     navigate("/wavewarz-africa");
   };
 
@@ -896,7 +908,16 @@ const LiveRoom = () => {
                   )}
                   {chatMessages.map((msg) => (
                     <div key={msg.id} className={`text-sm ${msg.type === "system" ? "text-center text-xs text-muted-foreground italic" : ""}`}>
-                      {msg.type === "message" && (
+                      {msg.type === "message" && msg.isHikulu && (
+                        <div className="rounded-lg border border-neon-gold/40 bg-neon-gold/10 px-2.5 py-1.5">
+                          <span className="font-semibold text-neon-gold flex items-center gap-1">
+                            <Crown className="h-3 w-3" /> {msg.userName}
+                            <span className="text-[10px] font-normal text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
+                          </span>
+                          <p className="text-foreground">{msg.text}</p>
+                        </div>
+                      )}
+                      {msg.type === "message" && !msg.isHikulu && (
                         <>
                           <span className={`font-semibold ${msg.userName === (profile?.display_name || profile?.username || "You") ? "text-primary" : "text-foreground"}`}>{msg.userName}</span>
                           <span className="text-[10px] text-muted-foreground/50 ml-1">{formatTime(msg.timestamp)}</span>

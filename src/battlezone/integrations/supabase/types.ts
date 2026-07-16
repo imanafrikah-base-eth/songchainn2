@@ -218,6 +218,10 @@ export type Database = {
           co_hosts: string[] | null
           created_at: string
           ended_time: string | null
+          hikulu_points_a: number
+          hikulu_points_b: number
+          hikulu_verdict: string | null
+          hikulu_verdict_at: string | null
           host_name: string
           host_user_id: string | null
           id: string
@@ -246,6 +250,10 @@ export type Database = {
           co_hosts?: string[] | null
           created_at?: string
           ended_time?: string | null
+          hikulu_points_a?: number
+          hikulu_points_b?: number
+          hikulu_verdict?: string | null
+          hikulu_verdict_at?: string | null
           host_name: string
           host_user_id?: string | null
           id?: string
@@ -274,6 +282,10 @@ export type Database = {
           co_hosts?: string[] | null
           created_at?: string
           ended_time?: string | null
+          hikulu_points_a?: number
+          hikulu_points_b?: number
+          hikulu_verdict?: string | null
+          hikulu_verdict_at?: string | null
           host_name?: string
           host_user_id?: string | null
           id?: string

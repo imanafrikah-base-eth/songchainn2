@@ -1,9 +1,12 @@
+import { useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Share2, Play, Trophy } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Users, Share2, Play, Trophy, Crown } from "lucide-react";
 import Navbar from "@/battlezone/components/Navbar";
 import Footer from "@/battlezone/components/Footer";
 import LiveBadge from "@/battlezone/components/LiveBadge";
 import { useBattle } from "@/battlezone/hooks/useBattles";
+import { requestHikuluVerdict } from "@/battlezone/lib/hikulu";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import AppLink from "@/battlezone/components/AppLink";
@@ -14,6 +17,17 @@ const BattleDetail = () => {
   const { battleId } = useParams();
   const navigate = useNavigate();
   const { data: battle, isLoading } = useBattle(battleId);
+  const queryClient = useQueryClient();
+  const verdictRequested = useRef(false);
+
+  // Self-heal: an ended battle without a verdict asks $HIKULU once, then refetches.
+  useEffect(() => {
+    if (!battle || battle.status !== "ended" || battle.hikuluVerdict || verdictRequested.current) return;
+    verdictRequested.current = true;
+    void requestHikuluVerdict(battle.id).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ["battle", battle.id] });
+    });
+  }, [battle, queryClient]);
 
   const handleVote = () => {
     if (!battle) return;
@@ -128,6 +142,37 @@ const BattleDetail = () => {
           </div>
         )}
 
+        {/* $HIKULU's verdict */}
+        {battle.status === "ended" && (
+          battle.hikuluVerdict ? (
+            <div className="rounded-2xl border-2 border-neon-gold/50 bg-gradient-to-b from-neon-gold/10 to-transparent p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-neon-gold" />
+                <h3 className="font-black text-neon-gold">$HIKULU's Verdict</h3>
+              </div>
+              <p className="text-sm italic text-foreground">"{battle.hikuluVerdict}"</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-center">
+                  <p className="font-bold text-foreground">{battle.artistA.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{battle.votesA.toLocaleString()} votes + {battle.hikuluPointsA} judge points</p>
+                  <p className="font-black text-primary text-lg">{(battle.votesA + battle.hikuluPointsA).toLocaleString()}</p>
+                </div>
+                <div className="rounded-xl border border-secondary/30 bg-secondary/5 p-3 text-center">
+                  <p className="font-bold text-foreground">{battle.artistB.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{battle.votesB.toLocaleString()} votes + {battle.hikuluPointsB} judge points</p>
+                  <p className="font-black text-secondary text-lg">{(battle.votesB + battle.hikuluPointsB).toLocaleString()}</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground text-center">Final score: crowd votes + $HIKULU judge points</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-neon-gold/30 bg-neon-gold/5 p-5 flex items-center gap-3">
+              <Crown className="h-5 w-5 text-neon-gold shrink-0" />
+              <p className="text-sm text-muted-foreground">$HIKULU is weighing his verdict on this battle. Check back in a moment.</p>
+            </div>
+          )
+        )}
+
         <div className="rounded-2xl border border-border bg-card/80 p-6 space-y-2 text-sm text-muted-foreground backdrop-blur">
           <p><Users className="inline h-4 w-4 mr-1" /> {battle.listeners.toLocaleString()} listeners</p>
           <p>Host: <span className="text-foreground font-medium">{battle.host}</span></p>
@@ -144,7 +189,7 @@ const BattleDetail = () => {
                 : "Quick battle: one round, one song from each artist"}
             </li>
             <li>Audience votes live each round and can change their vote before the round ends</li>
-            <li>Most total votes wins</li>
+            <li>Crowd votes plus $HIKULU judge points decide the final score</li>
             <li>Host can end the battle early</li>
           </ul>
         </div>

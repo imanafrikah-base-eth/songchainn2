@@ -7,6 +7,7 @@ import Navbar from "@/battlezone/components/Navbar";
 import { useBattle } from "@/battlezone/hooks/useBattles";
 import { supabase } from "@/battlezone/integrations/supabase/client";
 import { fetchSongchainUserIdSet } from "@/battlezone/lib/songchain";
+import { requestHikuluVerdict } from "@/battlezone/lib/hikulu";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 
@@ -72,6 +73,7 @@ const HostControl = () => {
       .from("battles")
       .update({ status: "ended", winner, ended_time: new Date().toISOString() })
       .eq("id", roomId);
+    void requestHikuluVerdict(roomId);
     setEnded(true);
     setIsLive(false);
   };
@@ -82,6 +84,7 @@ const HostControl = () => {
       .from("battles")
       .update({ status: "ended", ended_time: new Date().toISOString() })
       .eq("id", roomId);
+    void requestHikuluVerdict(roomId);
     setEnded(true);
     setIsLive(false);
     navigate("/wavewarz-africa");

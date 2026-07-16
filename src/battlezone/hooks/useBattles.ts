@@ -26,6 +26,9 @@ export interface BattleRow {
   battle_type: string | null;
   songs_a: Array<{ id: string; title: string }> | null;
   songs_b: Array<{ id: string; title: string }> | null;
+  hikulu_points_a: number;
+  hikulu_points_b: number;
+  hikulu_verdict: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -54,6 +57,9 @@ export interface Battle {
   battleType: "quick" | "community";
   songsA: Array<{ id: string; title: string }>;
   songsB: Array<{ id: string; title: string }>;
+  hikuluPointsA: number;
+  hikuluPointsB: number;
+  hikuluVerdict?: string;
   createdAt: string;
 }
 
@@ -89,6 +95,9 @@ function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Bat
     battleType: row.battle_type === "community" ? "community" : "quick",
     songsA: Array.isArray(row.songs_a) ? row.songs_a : [],
     songsB: Array.isArray(row.songs_b) ? row.songs_b : [],
+    hikuluPointsA: row.hikulu_points_a || 0,
+    hikuluPointsB: row.hikulu_points_b || 0,
+    hikuluVerdict: row.hikulu_verdict || undefined,
     createdAt: row.created_at,
   };
 }
