@@ -28,7 +28,7 @@ import { useDiscoveredWallets } from '@/hooks/useDiscoveredWallets';
 import { GoogleSignIn } from '@/components/GoogleSignIn';
 import { AmbientBackground, TileBackdrop } from '@/components/AmbientBackground';
 import { CARD_TILES } from '@/data/backgroundPools';
-import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
+import { ZabalGamezSection } from '@/components/ZabalGamezSection';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -755,7 +755,9 @@ export default function Auth() {
           </div>
         </div>
 
-        <ZabalGamezPromo variant="strip" />
+        <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-3 md:pt-4">
+          <ZabalGamezSection source="auth" />
+        </div>
 
         <div className={`max-w-[1400px] mx-auto p-3 md:p-4${hotTodaySongs.length > 0 ? ' lg:grid lg:grid-cols-[280px_1fr] lg:gap-4' : ''}`}>
           {hotTodaySongs.length > 0 && (

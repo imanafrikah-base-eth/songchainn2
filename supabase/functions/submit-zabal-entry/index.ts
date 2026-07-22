@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const NOTIFY_TO = "songchaindao@gmail.com";
+const NOTIFY_TO = ["songchaindao@gmail.com", "music.imanafrikah@gmail.com"];
 // MO$HA service account (created in migration mosha_service_account) —
 // authors the auto feed post announcing each entry.
 const MOSHA_USER_ID = "0e2f6d3a-8b1c-4f7e-9a5d-3c4b2a1f0e9d";
@@ -101,6 +101,11 @@ serve(async (req) => {
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (RESEND_API_KEY) {
       try {
+        // Running totals for the notification
+        const [{ count: totalEntries }, { count: totalDownloads }] = await Promise.all([
+          admin.from("zabal_gamez_entries").select("id", { count: "exact", head: true }),
+          admin.from("zabal_gamez_beat_downloads").select("id", { count: "exact", head: true }),
+        ]);
         let fromAddress = "$ongChainn Zabal Gamez <onboarding@resend.dev>";
         try {
           const domainsRes = await fetch("https://api.resend.com/domains", {
@@ -129,16 +134,17 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             from: fromAddress,
-            to: [NOTIFY_TO],
+            to: NOTIFY_TO,
             reply_to: cleanEmail ?? undefined,
-            subject: `New Zabal Gamez entry: ${artistName.trim()}`,
-            text: `New Zabal Gamez musician-track entry\n\nArtist: ${artistName.trim()}\n${cleanEmail ? `Contact: ${cleanEmail}\n` : ""}${cleanAudio ? `Verse audio: ${cleanAudio}\n` : ""}${cleanTiktok ? `TikTok video: ${cleanTiktok}\n` : ""}\nThis entry is now live on the Zabal Gamez wall on $ongChainn.`,
+            subject: `New Zabal Gamez entry: ${artistName.trim()} (entry #${totalEntries ?? "?"})`,
+            text: `New Zabal Gamez musician-track entry\n\nArtist: ${artistName.trim()}\n${cleanEmail ? `Contact: ${cleanEmail}\n` : ""}${cleanAudio ? `Verse audio: ${cleanAudio}\n` : ""}${cleanTiktok ? `TikTok video: ${cleanTiktok}\n` : ""}\nTotals so far:\n- Entries: ${totalEntries ?? "unknown"}\n- Beat downloads: ${totalDownloads ?? "unknown"}\n\nThis entry is now live on the Zabal Gamez wall on $ongChainn.`,
             html: `
               <h2>New Zabal Gamez entry</h2>
               <p><strong>Artist:</strong> ${safeArtist}</p>
               ${safeEmail ? `<p><strong>Contact:</strong> ${safeEmail}</p>` : ""}
               ${cleanAudio ? `<p><strong>Verse audio:</strong> <a href="${cleanAudio}">Download / listen</a></p>` : ""}
               ${cleanTiktok ? `<p><strong>TikTok video:</strong> <a href="${cleanTiktok}">${escapeHtml(cleanTiktok)}</a></p>` : ""}
+              <p><strong>Totals so far:</strong> ${totalEntries ?? "?"} entries &middot; ${totalDownloads ?? "?"} beat downloads</p>
               <p style="color:#888;font-size:12px;">This entry is now live on the Zabal Gamez wall on $ongChainn.</p>
             `,
           }),
