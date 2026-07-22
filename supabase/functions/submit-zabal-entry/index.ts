@@ -7,6 +7,9 @@ const corsHeaders = {
 };
 
 const NOTIFY_TO = "songchaindao@gmail.com";
+// MO$HA service account (created in migration mosha_service_account) —
+// authors the auto feed post announcing each entry.
+const MOSHA_USER_ID = "0e2f6d3a-8b1c-4f7e-9a5d-3c4b2a1f0e9d";
 
 function escapeHtml(value: string): string {
   return value
@@ -73,6 +76,25 @@ serve(async (req) => {
         JSON.stringify({ error: "Could not save your entry" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // MO$HA announces the entry on the feed (best effort — entry already saved).
+    try {
+      const { error: postErr } = await admin.from("social_posts").insert({
+        user_id: MOSHA_USER_ID,
+        post_type: "text",
+        content: `${artistName.trim()} just submitted for Zabal Gamez! Grab the cypher beat on the About page and enter the Musician Track.`,
+        metadata: {
+          source: "zabal_gamez",
+          entry_id: inserted?.id ?? null,
+          ...(cleanAudio ? { verse_audio_url: cleanAudio } : {}),
+          ...(cleanTiktok ? { tiktok_url: cleanTiktok } : {}),
+        },
+        visibility: "public",
+      });
+      if (postErr) console.error("MO$HA feed post failed:", postErr);
+    } catch (postErr) {
+      console.error("MO$HA feed post failed:", postErr);
     }
 
     // Fire the notification email (best effort — the row is already saved).
