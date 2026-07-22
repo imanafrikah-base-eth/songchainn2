@@ -26,6 +26,7 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
+import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -279,6 +280,35 @@ export default function Home() {
     }
   }, [user?.id]);
 
+  // One-time Mo$ha plug for the Zabal Gamez Artist Track. Delayed so it never
+  // collides with the welcome/tour prompt above, and never repeats once shown.
+  useEffect(() => {
+    if (!user?.id) return;
+    const zabalKey = `songchainn:zabal-gamez-mosha-prompt:v1:${user.id}`;
+    try {
+      if (localStorage.getItem(zabalKey) === 'shown') return;
+    } catch {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(zabalKey, 'shown');
+      } catch {
+        void 0;
+      }
+      window.dispatchEvent(
+        new CustomEvent('songchainn:mosha-prompt', {
+          detail: {
+            text: 'Yo, quick one: are you a musician? The Zabal Gamez Artist Track is open, free entry. Grab the cypher beat, drop your verse, and get on the wall.',
+            ctaLabel: 'Join the Artist Track',
+            ctaPath: '/about#zabal-gamez',
+          },
+        }),
+      );
+    }, 30000);
+    return () => window.clearTimeout(timer);
+  }, [user?.id]);
+
   const handleToggleSongSelection = (songId: string) => {
     setSelectedSongIds((prev) =>
       prev.includes(songId) ? prev.filter((id) => id !== songId) : [...prev, songId],
@@ -459,6 +489,8 @@ export default function Home() {
             })}
           </div>
         </section>
+
+        <ZabalGamezPromo variant="card" />
 
         <div className="my-4 sm:my-6 flex items-center gap-2">
           <Button
