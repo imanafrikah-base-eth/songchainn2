@@ -6,10 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Until a Resend domain is verified, the sandbox can only deliver to the
-// Resend account owner (songchaindao@gmail.com) — send to both individually
-// so the admin address starts working the moment a domain is verified.
-const NOTIFY_TO = ["music.imanafrikah@gmail.com", "songchaindao@gmail.com"];
+const NOTIFY_TO = ["songchaindao@gmail.com"];
+// IMan Afrikah's $ongChainn account (music.imanafrikah@gmail.com) — notified
+// via the in-app Inbox (Mo$ha DM) instead of email, which the Resend sandbox
+// cannot deliver to that address.
+const IMAN_USER_ID = "0482bf5e-4b37-4367-a433-e213ef3cc50c";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -50,7 +51,21 @@ serve(async (req) => {
       admin.from("zabal_gamez_entries").select("id", { count: "exact", head: true }),
     ]);
 
-    // Notify the admin (best effort — the download is already recorded).
+    // IMan Afrikah gets the alert in the $ongChainn Inbox (Mo$ha DM).
+    let dmStatus: string = "not attempted";
+    try {
+      const { error: dmErr } = await admin.rpc("send_mosha_message", {
+        _user_id: IMAN_USER_ID,
+        _message_text: `Zabal Gamez: cypher beat downloaded (#${downloads ?? "?"})${source ? ` from the ${source} page` : ""}. Totals so far: ${downloads ?? "?"} beat downloads, ${entries ?? "?"} entries.`,
+      });
+      dmStatus = dmErr ? `error: ${dmErr.message}` : "sent";
+      if (dmErr) console.error("Inbox DM to IMan Afrikah failed:", dmErr);
+    } catch (dmErr) {
+      dmStatus = `error: ${dmErr instanceof Error ? dmErr.message : String(dmErr)}`;
+      console.error("Inbox DM to IMan Afrikah failed:", dmErr);
+    }
+
+    // Notify the admin by email too (best effort — download already recorded).
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (RESEND_API_KEY) {
       try {
@@ -103,7 +118,7 @@ serve(async (req) => {
         success: true,
         downloads: downloads ?? null,
         entries: entries ?? null,
-        ...(debug ? { emailStatus } : {}),
+        ...(debug ? { emailStatus, dmStatus } : {}),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

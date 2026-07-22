@@ -6,7 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const NOTIFY_TO = ["songchaindao@gmail.com", "music.imanafrikah@gmail.com"];
+const NOTIFY_TO = ["songchaindao@gmail.com"];
+// IMan Afrikah's $ongChainn account (music.imanafrikah@gmail.com) — notified
+// via the in-app Inbox (Mo$ha DM) instead of email, which the Resend sandbox
+// cannot deliver to that address.
+const IMAN_USER_ID = "0482bf5e-4b37-4367-a433-e213ef3cc50c";
 // MO$HA service account (created in migration mosha_service_account) —
 // authors the auto feed post announcing each entry.
 const MOSHA_USER_ID = "0e2f6d3a-8b1c-4f7e-9a5d-3c4b2a1f0e9d";
@@ -97,17 +101,38 @@ serve(async (req) => {
       console.error("MO$HA feed post failed:", postErr);
     }
 
+    // Running totals for the notifications
+    const [{ count: totalEntries }, { count: totalDownloads }] = await Promise.all([
+      admin.from("zabal_gamez_entries").select("id", { count: "exact", head: true }),
+      admin.from("zabal_gamez_beat_downloads").select("id", { count: "exact", head: true }),
+    ]);
+
+    // IMan Afrikah gets the notification in the $ongChainn Inbox (Mo$ha DM).
+    let dmStatus: string = "not attempted";
+    try {
+      const dmText =
+        `New Zabal Gamez entry #${totalEntries ?? "?"}: ${artistName.trim()}.` +
+        (cleanEmail ? ` Contact: ${cleanEmail}.` : "") +
+        (cleanAudio ? ` Verse audio: ${cleanAudio}` : "") +
+        (cleanTiktok ? ` TikTok: ${cleanTiktok}` : "") +
+        ` Totals so far: ${totalEntries ?? "?"} entries, ${totalDownloads ?? "?"} beat downloads.`;
+      const { error: dmErr } = await admin.rpc("send_mosha_message", {
+        _user_id: IMAN_USER_ID,
+        _message_text: dmText,
+      });
+      dmStatus = dmErr ? `error: ${dmErr.message}` : "sent";
+      if (dmErr) console.error("Inbox DM to IMan Afrikah failed:", dmErr);
+    } catch (dmErr) {
+      dmStatus = `error: ${dmErr instanceof Error ? dmErr.message : String(dmErr)}`;
+      console.error("Inbox DM to IMan Afrikah failed:", dmErr);
+    }
+
     // Fire the notification emails (best effort — the row is already saved).
     // One send per recipient so a rejected address never blocks the others.
     const emailResults: Record<string, number | string> = {};
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (RESEND_API_KEY) {
       try {
-        // Running totals for the notification
-        const [{ count: totalEntries }, { count: totalDownloads }] = await Promise.all([
-          admin.from("zabal_gamez_entries").select("id", { count: "exact", head: true }),
-          admin.from("zabal_gamez_beat_downloads").select("id", { count: "exact", head: true }),
-        ]);
         let fromAddress = "$ongChainn Zabal Gamez <onboarding@resend.dev>";
         try {
           const domainsRes = await fetch("https://api.resend.com/domains", {
@@ -168,7 +193,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, entry: inserted, ...(debug === true ? { emailResults } : {}) }),
+      JSON.stringify({ success: true, entry: inserted, ...(debug === true ? { emailResults, dmStatus } : {}) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
