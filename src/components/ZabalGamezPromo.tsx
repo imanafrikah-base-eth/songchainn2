@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trophy, ArrowRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import zabalLogo from '@/assets/zabal/zabal gamez logo.jpg';
+import zabalLogo from '@/assets/zabal/zabal-gamez-logo.jpg';
 
 const DISMISS_KEY = 'songchainn_zabal_promo_dismissed_v1';
 

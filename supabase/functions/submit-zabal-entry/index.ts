@@ -29,7 +29,7 @@ serve(async (req) => {
   }
 
   try {
-    const { artistName, contactEmail, verseAudioUrl, tiktokUrl } = await req.json();
+    const { artistName, contactEmail, verseAudioUrl, tiktokUrl, debug } = await req.json();
 
     if (typeof artistName !== "string" || !artistName.trim()) {
       return new Response(
@@ -97,7 +97,9 @@ serve(async (req) => {
       console.error("MO$HA feed post failed:", postErr);
     }
 
-    // Fire the notification email (best effort — the row is already saved).
+    // Fire the notification emails (best effort — the row is already saved).
+    // One send per recipient so a rejected address never blocks the others.
+    const emailResults: Record<string, number | string> = {};
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (RESEND_API_KEY) {
       try {
@@ -126,7 +128,8 @@ serve(async (req) => {
         const safeArtist = escapeHtml(artistName.trim());
         const safeEmail = cleanEmail ? escapeHtml(cleanEmail) : null;
 
-        await fetch("https://api.resend.com/emails", {
+        for (const recipient of NOTIFY_TO) {
+        const emailRes = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${RESEND_API_KEY}`,
@@ -134,7 +137,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             from: fromAddress,
-            to: NOTIFY_TO,
+            to: [recipient],
             reply_to: cleanEmail ?? undefined,
             subject: `New Zabal Gamez entry: ${artistName.trim()} (entry #${totalEntries ?? "?"})`,
             text: `New Zabal Gamez musician-track entry\n\nArtist: ${artistName.trim()}\n${cleanEmail ? `Contact: ${cleanEmail}\n` : ""}${cleanAudio ? `Verse audio: ${cleanAudio}\n` : ""}${cleanTiktok ? `TikTok video: ${cleanTiktok}\n` : ""}\nTotals so far:\n- Entries: ${totalEntries ?? "unknown"}\n- Beat downloads: ${totalDownloads ?? "unknown"}\n\nThis entry is now live on the Zabal Gamez wall on $ongChainn.`,
@@ -149,6 +152,14 @@ serve(async (req) => {
             `,
           }),
         });
+        const emailBody = await emailRes.text();
+        emailResults[recipient] = emailRes.ok ? emailRes.status : `${emailRes.status}: ${emailBody.slice(0, 200)}`;
+        if (!emailRes.ok) {
+          console.error(`Resend rejected entry email to ${recipient}:`, emailRes.status, emailBody);
+        } else {
+          console.log(`Entry email accepted for ${recipient}:`, emailRes.status, emailBody);
+        }
+        }
       } catch (mailErr) {
         console.error("Zabal Gamez notify email failed:", mailErr);
       }
@@ -157,7 +168,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, entry: inserted }),
+      JSON.stringify({ success: true, entry: inserted, ...(debug === true ? { emailResults } : {}) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {

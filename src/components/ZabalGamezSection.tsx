@@ -9,7 +9,11 @@ import { uploadZabalVerse } from '@/lib/storage';
 import { TileBackdrop } from '@/components/AmbientBackground';
 import { CARD_TILES } from '@/data/backgroundPools';
 import { toast } from 'sonner';
-import zabalLogo from '@/assets/zabal/zabal gamez logo.jpg';
+import zabalLogo from '@/assets/zabal/zabal-gamez-logo.jpg';
+
+// Stats (beat downloads / entry counts) are internal numbers — only these
+// accounts see them in the UI, and RLS enforces the same on the API side.
+const ADMIN_EMAILS = ['songchaindao@gmail.com', 'music.imanafrikah@gmail.com', 'info@thezao.com'];
 
 const CYPHER_BEAT_URL = '/zabal-gamez-cypher-beat.mp3';
 const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB, matches the zabal-gamez bucket limit
@@ -27,6 +31,7 @@ const isAudioFile = (file: File) =>
 
 export function ZabalGamezSection({ source = 'app' }: { source?: string }) {
   const { user } = useAuth();
+  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
   const [artistName, setArtistName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [verseFile, setVerseFile] = useState<File | null>(null);
@@ -58,8 +63,8 @@ export function ZabalGamezSection({ source = 'app' }: { source?: string }) {
 
   useEffect(() => {
     loadEntries();
-    loadDownloadCount();
-  }, [loadEntries, loadDownloadCount]);
+    if (isAdmin) loadDownloadCount();
+  }, [loadEntries, loadDownloadCount, isAdmin]);
 
   const handleBeatDownload = () => {
     // Fire and forget: record the download + notify the admin. The <a download>
@@ -163,14 +168,18 @@ export function ZabalGamezSection({ source = 'app' }: { source?: string }) {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 border border-orange-500/30 text-[11px] sm:text-xs text-orange-400 font-medium">
-            <Flame className="w-3.5 h-3.5" />
-            {downloadCount === null ? 'Beat downloads loading...' : `${downloadCount} beat download${downloadCount === 1 ? '' : 's'}`}
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 border border-primary/30 text-[11px] sm:text-xs text-primary font-medium">
-            <Users className="w-3.5 h-3.5" />
-            {`${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} on the wall`}
-          </span>
+          {isAdmin && (
+            <>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 border border-orange-500/30 text-[11px] sm:text-xs text-orange-400 font-medium">
+                <Flame className="w-3.5 h-3.5" />
+                {downloadCount === null ? 'Beat downloads loading...' : `${downloadCount} beat download${downloadCount === 1 ? '' : 's'}`}
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 border border-primary/30 text-[11px] sm:text-xs text-primary font-medium">
+                <Users className="w-3.5 h-3.5" />
+                {`${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} on the wall`}
+              </span>
+            </>
+          )}
           <a
             href="https://zabalgamez.com"
             target="_blank"

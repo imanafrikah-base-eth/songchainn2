@@ -6,7 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ADMIN_TO = "music.imanafrikah@gmail.com";
+// Until a Resend domain is verified, the sandbox can only deliver to the
+// Resend account owner (songchaindao@gmail.com) — send to both individually
+// so the admin address starts working the moment a domain is verified.
+const NOTIFY_TO = ["music.imanafrikah@gmail.com", "songchaindao@gmail.com"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,12 +18,15 @@ serve(async (req) => {
 
   try {
     let source: string | null = null;
+    let debug = false;
     try {
       const body = await req.json();
       if (typeof body?.source === "string" && body.source.trim()) {
         source = body.source.trim().slice(0, 40);
       }
+      debug = body?.debug === true;
     } catch (_e) { /* empty body is fine */ }
+    const emailStatus: Record<string, number | string> = {};
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -65,26 +71,40 @@ serve(async (req) => {
           }
         } catch (_e) { /* fall back to sandbox sender */ }
 
-        await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: fromAddress,
-            to: [ADMIN_TO],
-            subject: `Zabal Gamez: cypher beat downloaded (#${downloads ?? "?"})`,
-            text: `Someone downloaded the Zabal Gamez cypher beat${source ? ` from the ${source} page` : ""}.\n\nTotals so far:\n- Beat downloads: ${downloads ?? "unknown"}\n- Entries: ${entries ?? "unknown"}`,
-          }),
-        });
+        for (const recipient of NOTIFY_TO) {
+          const emailRes = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: fromAddress,
+              to: [recipient],
+              subject: `Zabal Gamez: cypher beat downloaded (#${downloads ?? "?"})`,
+              text: `Someone downloaded the Zabal Gamez cypher beat${source ? ` from the ${source} page` : ""}.\n\nTotals so far:\n- Beat downloads: ${downloads ?? "unknown"}\n- Entries: ${entries ?? "unknown"}`,
+            }),
+          });
+          const emailBody = await emailRes.text();
+          emailStatus[recipient] = emailRes.ok ? emailRes.status : `${emailRes.status}: ${emailBody.slice(0, 200)}`;
+          if (!emailRes.ok) {
+            console.error(`Resend rejected download email to ${recipient}:`, emailRes.status, emailBody);
+          } else {
+            console.log(`Download email accepted for ${recipient}:`, emailRes.status, emailBody);
+          }
+        }
       } catch (mailErr) {
         console.error("Beat download notify email failed:", mailErr);
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, downloads: downloads ?? null, entries: entries ?? null }),
+      JSON.stringify({
+        success: true,
+        downloads: downloads ?? null,
+        entries: entries ?? null,
+        ...(debug ? { emailStatus } : {}),
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
