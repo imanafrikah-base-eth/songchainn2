@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Trophy, Mic, ArrowRight, X } from 'lucide-react';
+import { Trophy, ArrowRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import zabalLogo from '@/assets/zabal/zabal gamez logo.jpg';
 
 const DISMISS_KEY = 'songchainn_zabal_promo_dismissed_v1';
 
@@ -60,10 +61,13 @@ export function ZabalGamezPromo({ variant }: { variant: 'strip' | 'card' }) {
         <X className="w-4 h-4" />
       </button>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pr-6">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/15 shrink-0">
-            <Mic className="h-5 w-5 text-orange-400" />
-          </span>
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <img
+            src={zabalLogo}
+            alt="Zabal Gamez"
+            className="h-14 w-14 rounded-xl object-cover border border-orange-500/30 shrink-0"
+            loading="lazy"
+          />
           <div className="min-w-0">
             <p className="text-sm sm:text-base font-semibold text-foreground">
               Are you a musician? Zabal Gamez is open.

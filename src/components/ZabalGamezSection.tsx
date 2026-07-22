@@ -9,6 +9,7 @@ import { uploadZabalVerse } from '@/lib/storage';
 import { TileBackdrop } from '@/components/AmbientBackground';
 import { CARD_TILES } from '@/data/backgroundPools';
 import { toast } from 'sonner';
+import zabalLogo from '@/assets/zabal/zabal gamez logo.jpg';
 
 const CYPHER_BEAT_URL = '/zabal-gamez-cypher-beat.mp3';
 const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB, matches the zabal-gamez bucket limit
@@ -135,23 +136,33 @@ export function ZabalGamezSection({ source = 'app' }: { source?: string }) {
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden shine-overlay scroll-mt-24">
-      {/* Hero header with cypher-circle backdrop */}
-      <div className="relative isolate overflow-hidden p-5 sm:p-7 min-h-[11rem] flex flex-col justify-end">
+      {/* Hero header with cypher-circle backdrop + official logo */}
+      <div className="relative isolate overflow-hidden p-5 sm:p-7 min-h-[11rem]">
         <TileBackdrop image={CARD_TILES.waveWarz} opacity={0.5} />
-        <div className="flex items-center gap-2 mb-2">
-          <div className="p-2 rounded-xl bg-orange-500/20 backdrop-blur-sm">
-            <Trophy className="w-5 h-5 text-orange-400" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+          <img
+            src={zabalLogo}
+            alt="Zabal Gamez"
+            className="w-40 sm:w-52 md:w-60 rounded-2xl border border-orange-500/30 shadow-[0_0_30px_rgba(249,115,22,0.25)] mx-auto sm:mx-0 shrink-0"
+            loading="lazy"
+          />
+          <div className="min-w-0 flex flex-col justify-center">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 rounded-xl bg-orange-500/20 backdrop-blur-sm">
+                <Trophy className="w-5 h-5 text-orange-400" />
+              </div>
+              <h2 className="font-heading text-lg sm:text-2xl font-bold text-foreground">
+                Zabal Gamez, Musician Track
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-2xl">
+              A free build-a-thon by THE ZAO, the onchain community behind Surfboard Onchain and
+              $ongChainn. Open to every artist, any skill level, no fees. Grab the cypher beat, lay
+              your verse, and enter.
+            </p>
           </div>
-          <h2 className="font-heading text-lg sm:text-2xl font-bold text-foreground">
-            Zabal Gamez, Musician Track
-          </h2>
         </div>
-        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-2xl">
-          A free build-a-thon by THE ZAO, the onchain community behind Surfboard Onchain and
-          $ongChainn. Open to every artist, any skill level, no fees. Grab the cypher beat, lay
-          your verse, and enter.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 border border-orange-500/30 text-[11px] sm:text-xs text-orange-400 font-medium">
             <Flame className="w-3.5 h-3.5" />
             {downloadCount === null ? 'Beat downloads loading...' : `${downloadCount} beat download${downloadCount === 1 ? '' : 's'}`}
