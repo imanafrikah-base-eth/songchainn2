@@ -1,7 +1,8 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound } from 'lucide-react';
 import { ARTISTS, SONGS, getRelatedArtists } from '@/data/musicData';
+import { getWorldByArtistId } from '@/worlds/registry';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { SongCard } from '@/components/SongCard';
 import { ArtistCard } from '@/components/ArtistCard';
@@ -746,6 +747,21 @@ export default function ArtistDetail() {
                   <p className="text-sm text-muted-foreground mt-2">{artistPresenceLabel}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {(() => {
+                    const world = getWorldByArtistId(artist?.id);
+                    if (!world) return null;
+                    return (
+                      <Button
+                        asChild
+                        className="bg-amber-400 text-black hover:bg-amber-300 font-bold"
+                      >
+                        <Link to={`/world/${world.slug}`}>
+                          <KeyRound className="w-4 h-4 mr-2" />
+                          Enter World
+                        </Link>
+                      </Button>
+                    );
+                  })()}
                   {user && (
                     <Button
                       onClick={handleToggleFollow}

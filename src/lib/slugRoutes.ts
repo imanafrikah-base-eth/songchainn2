@@ -36,7 +36,7 @@ const RESERVED: Set<string> = new Set([
   'about','artists','artist','catalog','song','playlist','playlists','discover',
   'social','room','community','profile','marketplace','inbox','dj-shuffle',
   'admin','audience','post','share','install','reset-password','bettercallzaal',
-  'wavewarz-africa','auth','api','node_modules',
+  'wavewarz-africa','auth','api','node_modules','world',
 ]);
 
 export function isKnownArtistSlug(slug: string): boolean {

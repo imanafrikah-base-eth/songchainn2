@@ -54,6 +54,7 @@ const DjShuffle = lazy(() => import("./pages/DjShuffle"));
 const Inbox = lazy(() => import("./pages/Inbox"));
 const BetterCallZaal = lazy(() => import("./pages/BetterCallZaal"));
 const SlugResolver = lazy(() => import("./pages/SlugResolver"));
+const World = lazy(() => import("./pages/World"));
 
 
 // Loading spinner component
@@ -91,7 +92,9 @@ function AppShell() {
   const hideChrome = location.pathname.startsWith('/room');
   const isWaveWarzEmbedRoute =
     location.pathname === '/wavewarz-africa/results';
-  const hideFloatingChrome = hideChrome || isWaveWarzEmbedRoute;
+  // Artist Worlds are a full-screen immersive layer with their own chrome
+  const isWorldRoute = location.pathname.startsWith('/world/');
+  const hideFloatingChrome = hideChrome || isWaveWarzEmbedRoute || isWorldRoute;
   const [isGlobalPulsing, setIsGlobalPulsing] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const pulseTimeoutRef = useRef<number | null>(null);
@@ -184,6 +187,8 @@ function AppShell() {
                 <Route path="/room" element={<Room />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/bettercallzaal" element={<BetterCallZaal />} />
+                <Route path="/world/:worldSlug" element={<World />} />
+                <Route path="/world/:worldSlug/:roomSlug" element={<World />} />
                 <Route path="/auth" element={<Navigate to="/" replace />} />
                 <Route path="/not-found" element={<NotFound />} />
                 {/* Vanity slug routes — must be after all specific routes */}
@@ -210,6 +215,7 @@ function AppShell() {
 const PUBLIC_PATTERNS = [
   '/about', '/artists', '/artist/:id', '/catalog/:id', '/song/:id',
   '/wavewarz-africa', '/wavewarz-africa/*', '/install', '/reset-password', '/bettercallzaal',
+  '/world/:worldSlug', '/world/:worldSlug/:roomSlug',
 ];
 
 function isPublicRoute(pathname: string) {
@@ -241,6 +247,8 @@ function AppContent() {
                 <Route path="/install" element={<Install />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/bettercallzaal" element={<BetterCallZaal />} />
+                <Route path="/world/:worldSlug" element={<World />} />
+                <Route path="/world/:worldSlug/:roomSlug" element={<World />} />
                 <Route path="*" element={<PageLoader />} />
               </Routes>
             </Suspense>
@@ -280,6 +288,8 @@ function AppContent() {
                   <Route path="/install" element={<Install />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/bettercallzaal" element={<BetterCallZaal />} />
+                  <Route path="/world/:worldSlug" element={<World />} />
+                  <Route path="/world/:worldSlug/:roomSlug" element={<World />} />
                   {/* Known auth-required routes → landing */}
                   <Route path="/" element={<Auth />} />
                   <Route path="/discover" element={<Auth />} />
