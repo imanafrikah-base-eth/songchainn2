@@ -53,6 +53,9 @@ const ASM = `${R2B}/Sammie%20Song%20ART.png`;
 const ANM = `${R2C}/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20LIKE%20COMMENT%20SUBSCRIBE%20ARTWORK.jpg`;
 const AHB = `${R2C}/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20HIGH-BRED%20ARTWORK.jpg`;
 const ASHD = `${R2C}/NEMESIS%20VS%20LADYRYN/grey/SHADOW/SHADOW%20ARTWORK.jpg`;
+const R2E = "https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev";
+const ACHILL = `${R2E}/n3m/NEW%20RAP%20EP/N3M3SIS%20-%20CHILL%20N3M%20artwork.jpg`;
+const ACALL = `${R2E}/n3m/NEW%20RAP%20EP/N3M3SIS%20-%20THE%20CALL%20OUT%20artwork.jpg`;
 
 interface SongMeta { t: string; a: string; img: string }
 const SONG_META: Record<string, SongMeta> = {
@@ -306,10 +309,10 @@ const SONG_META: Record<string, SongMeta> = {
   "97": { t: "NOBODY", a: "SAMMIE", img: ASM },
   "98": { t: "THE ONE", a: "SAMMIE", img: ASM },
   "99": { t: "LOVE", a: "SAMMIE", img: ASM },
-  // NEMESISvsLADYRYN
-  "212": { t: "Block is Hot", a: "NEMESISvsLADYRYN", img: ANM },
-  "213": { t: "Vib3", a: "NEMESISvsLADYRYN", img: ANM },
-  "214": { t: "Gr3Y", a: "NEMESISvsLADYRYN", img: ANM },
+  // N3M3SIS
+  "212": { t: "Block is Hot", a: "N3M3SIS", img: ANM },
+  "213": { t: "Vib3", a: "N3M3SIS", img: ANM },
+  "214": { t: "Gr3Y", a: "N3M3SIS", img: ANM },
   // IMAN AFRIKAH HIGH-BRED
   "225": { t: "10 10", a: "IMAN AFRIKAH", img: AHB },
   "226": { t: "BUILD A BETTER WORLD", a: "IMAN AFRIKAH", img: AHB },
@@ -318,8 +321,11 @@ const SONG_META: Record<string, SongMeta> = {
   "229": { t: "IYA PEOPLE SONG", a: "IMAN AFRIKAH", img: AHB },
   "230": { t: "LATELY ALOT", a: "IMAN AFRIKAH", img: AHB },
   "231": { t: "THE BIGMAN CALL", a: "IMAN AFRIKAH", img: AHB },
-  // NEMESISvsLADYRYN SHADOW single
-  "232": { t: "SHADOW", a: "NEMESISvsLADYRYN", img: ASHD },
+  // N3M3SIS SHADOW single
+  "232": { t: "SHADOW", a: "N3M3SIS", img: ASHD },
+  // N3M3SIS NEW RAP EP singles
+  "233": { t: "CHILL N3M", a: "N3M3SIS", img: ACHILL },
+  "234": { t: "THE CALL OUT", a: "N3M3SIS", img: ACALL },
 };
 
 export default async function handler(req: any, res: any) {

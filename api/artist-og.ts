@@ -21,7 +21,7 @@ const ARTIST_META: Record<string, ArtistMeta> = {
   "8": { name: "FAITH", img: `${R2B}/FAITH/Faith%20(2).png` },
   "9": { name: "JMN", img: `${R2B}/JMN.png` },
   "10": { name: "SAMMIE", img: `${R2B}/Sammie.png` },
-  "11": { name: "NEMESISvsLADYRYN", img: `${R2C}/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20PFP.jpg` },
+  "11": { name: "N3M3SIS", img: `${R2C}/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20PFP.jpg` },
 };
 
 export default async function handler(req: any, res: any) {

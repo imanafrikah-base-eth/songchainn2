@@ -196,6 +196,8 @@ const ARTWORK_BY_ARTIST: Record<string, string> = {
   FAITH: artistCover1,
   JMN: artistCover2,
   SAMMIE: artistCover3,
+  'N3M3SIS': artistNemesisVsLadyryn,
+  // legacy aliases so older data / share links still resolve to the same artwork
   'NEMESISvsLADYRYN': artistNemesisVsLadyryn,
   'NEMESIS VS LADYRYN': artistNemesisVsLadyryn,
 };
@@ -2929,7 +2931,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '212',
     title: 'Block is Hot',
-    artist: 'NEMESISvsLADYRYN',
+    artist: 'N3M3SIS',
     artistId: '11',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20Block%20is%20Hot.mp3',
@@ -2944,7 +2946,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '213',
     title: 'Vib3',
-    artist: 'NEMESISvsLADYRYN',
+    artist: 'N3M3SIS',
     artistId: '11',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20Vib3.mp3',
@@ -2959,7 +2961,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '214',
     title: 'Gr3Y',
-    artist: 'NEMESISvsLADYRYN',
+    artist: 'N3M3SIS',
     artistId: '11',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20-%20Gr3Y.mp3',
@@ -3470,7 +3472,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '232',
     title: 'SHADOW',
-    artist: 'NEMESISvsLADYRYN',
+    artist: 'N3M3SIS',
     artistId: '11',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/NEMESIS%20VS%20LADYRYN/grey/SHADOW/NEMESISvsLADYRN%20-%20SHADOW.mp3',
@@ -3481,6 +3483,38 @@ const SONGS_RAW: Song[] = [
     townSquare: 'Lusaka Townsquare',
     genre: 'Hiphop/Soul',
     addedAt: '2026-07-09T00:00:00.000Z',
+    volume: 'Single',
+  },
+  {
+    id: '233',
+    title: 'CHILL N3M',
+    artist: 'N3M3SIS',
+    artistId: '11',
+    audioUrl:
+      'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/n3m/NEW%20RAP%20EP/N3M3SIS%20-%20CHILL%20N3M.mp3',
+    coverImage:
+      'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/n3m/NEW%20RAP%20EP/N3M3SIS%20-%20CHILL%20N3M%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Lusaka Townsquare',
+    genre: 'Hiphop/Soul',
+    addedAt: '2026-07-21T00:00:00.000Z',
+    volume: 'Single',
+  },
+  {
+    id: '234',
+    title: 'THE CALL OUT',
+    artist: 'N3M3SIS',
+    artistId: '11',
+    audioUrl:
+      'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/n3m/NEW%20RAP%20EP/N3M3SIS%20-%20THE%20CALL%20OUT.mp3',
+    coverImage:
+      'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/n3m/NEW%20RAP%20EP/N3M3SIS%20-%20THE%20CALL%20OUT%20artwork.jpg',
+    plays: 0,
+    likes: 0,
+    townSquare: 'Lusaka Townsquare',
+    genre: 'Hiphop/Soul',
+    addedAt: '2026-07-21T00:00:00.000Z',
     volume: 'Single',
   },
 ];
@@ -3500,7 +3534,7 @@ const ARTIST_STREAM_TARGETS: Record<string, number> = {
   '8': 10300,  // FAITH
   '10': 8350,  // SAMMIE
   '9': 7190,   // JMN
-  '11': 1450,  // NEMESISvsLADYRYN
+  '11': 1450,  // N3M3SIS
 };
 
 // Stable hash so a song's share of its artist's baseline never changes between
@@ -3671,12 +3705,12 @@ export const ARTISTS: Artist[] = [
   },
   {
     id: '11',
-    name: 'NEMESISvsLADYRYN',
-    bio: 'NemesisvsLadyryn is a Zambian singer-rapper weaving lofi haze with ethereal, raw vocals. Between whispered prayers and late-night truths, her sound lives where vulnerability meets defiance. From Lusaka to the world, music for souls who feel too much.making music for the over thinkers and overthinkers...',
+    name: 'N3M3SIS',
+    bio: 'N3M3SIS is a Zambian singer-rapper weaving lofi haze with ethereal, raw vocals. Between whispered prayers and late-night truths, her sound lives where vulnerability meets defiance. From Lusaka to the world, music for souls who feel too much.making music for the over thinkers and overthinkers...',
     location: 'Zambia',
     townSquare: 'Lusaka Townsquare',
     profileImage: artistNemesisVsLadyryn,
-    songs: ['212', '213', '214', '232'],
+    songs: ['212', '213', '214', '232', '233', '234'],
     addedAt: '2026-05-11T00:00:00.000Z',
   },
 ];
