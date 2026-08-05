@@ -3,10 +3,65 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+// Pathname of the entry script this running session was booted from
+// (e.g. /assets/index-VHTG525f.js). A deploy changes the hash, so comparing
+// against the server's current index.html detects new versions even though
+// sw.js itself never changes between deploys.
+function getRunningEntryPath(): string | null {
+  const el = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/assets/index-"]');
+  if (!el?.src) return null;
+  try {
+    return new URL(el.src, window.location.origin).pathname;
+  } catch {
+    return null;
+  }
+}
+
 export function UpdateAvailableBanner() {
   const [showUpdate, setShowUpdate] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Deploy detection: ask the server (bypassing every cache) which entry
+  // bundle it currently serves and compare with the one we're running.
+  useEffect(() => {
+    let cancelled = false;
+    const runningEntry = getRunningEntryPath();
+    if (!runningEntry) return;
+
+    const checkForNewDeploy = async () => {
+      if (document.visibilityState === 'hidden') return;
+      try {
+        const res = await fetch('/', {
+          cache: 'no-store',
+          headers: { accept: 'text/html' },
+        });
+        if (!res.ok || cancelled) return;
+        const html = await res.text();
+        const match = html.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/);
+        if (match && match[0] !== runningEntry && !cancelled) {
+          setShowUpdate(true);
+        }
+      } catch {
+        // Offline or flaky network — try again on the next trigger.
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void checkForNewDeploy();
+    };
+
+    const startTimer = window.setTimeout(() => void checkForNewDeploy(), 15_000);
+    const interval = window.setInterval(() => void checkForNewDeploy(), 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
@@ -60,12 +115,17 @@ export function UpdateAvailableBanner() {
   }, []);
 
   const handleUpdate = () => {
-    if (!waitingWorker) return;
-    
     setIsUpdating(true);
-    
-    // Tell the waiting worker to skip waiting
-    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+
+    if (waitingWorker) {
+      // Tell the waiting worker to skip waiting; controllerchange reloads.
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      return;
+    }
+
+    // New deploy detected: a plain reload is enough — index.html always
+    // revalidates and the new HTML pulls the new hashed bundles.
+    window.location.reload();
   };
 
   const handleDismiss = () => {

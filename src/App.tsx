@@ -13,6 +13,7 @@ import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { ConnectWalletModal } from "@/components/ConnectWalletModal";
+import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { PointsMilestones } from "@/components/PointsMilestones";
 import { RoomPresenceKeeper } from "@/components/RoomPresenceKeeper";
 import { NotificationBanner } from "@/components/NotificationBanner";
@@ -204,6 +205,7 @@ function AppShell() {
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><BehaviorCtaPopups /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><PhaseTwoAnnouncement /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
+      <ErrorBoundary fallback={null}><UpdateAvailableBanner /></ErrorBoundary>
       <ErrorBoundary fallback={null}><ConnectWalletModal /></ErrorBoundary>
       <ErrorBoundary fallback={null}><PointsMilestones /></ErrorBoundary>
       <ErrorBoundary fallback={null}><RoomPresenceKeeper /></ErrorBoundary>

@@ -25,7 +25,6 @@ import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
-import { UpdateAvailableBanner } from '@/components/UpdateAvailableBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
 import { Button } from '@/components/ui/button';
@@ -399,7 +398,6 @@ export default function Home() {
       <AnimatedBackground variant="default" />
       <OfflineIndicator />
       <Navigation />
-      <UpdateAvailableBanner />
       <DownloadAppBanner />
 
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
