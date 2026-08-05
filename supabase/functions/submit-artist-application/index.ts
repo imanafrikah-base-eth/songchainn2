@@ -33,12 +33,13 @@ serve(async (req) => {
   try {
     const { realName, artistName, location, reason, contactEmail, walletAddress, songs } = await req.json();
 
+    const wallet = typeof walletAddress === "string" && walletAddress.trim() ? walletAddress.trim() : null;
+
     if (
       typeof realName !== "string" || !realName.trim() ||
       typeof artistName !== "string" || !artistName.trim() ||
       typeof location !== "string" || !location.trim() ||
-      typeof reason !== "string" || !reason.trim() ||
-      typeof walletAddress !== "string" || !walletAddress.trim()
+      typeof reason !== "string" || !reason.trim()
     ) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
@@ -93,7 +94,7 @@ serve(async (req) => {
       location: location.trim(),
       reason: reason.trim(),
       contact_email: typeof contactEmail === "string" && contactEmail.trim() ? contactEmail.trim() : null,
-      wallet_address: walletAddress.trim(),
+      wallet_address: wallet,
       songs: cleanSongs.map((s) => ({
         title: s.title,
         audio_path: s.audioPath,
@@ -126,7 +127,7 @@ serve(async (req) => {
     const safeArtistName = escapeHtml(artistName.trim());
     const safeLocation = escapeHtml(location.trim());
     const safeReason = escapeHtml(reason.trim()).replace(/\n/g, "<br/>");
-    const safeWallet = escapeHtml(walletAddress.trim());
+    const safeWallet = wallet ? escapeHtml(wallet) : "Not provided (will connect a Base wallet in app)";
     const safeContactEmail = typeof contactEmail === "string" && contactEmail.trim()
       ? escapeHtml(contactEmail.trim())
       : null;
@@ -173,7 +174,7 @@ serve(async (req) => {
         to: [NOTIFY_TO],
         reply_to: safeContactEmail ? contactEmail.trim() : undefined,
         subject: `New artist submission: ${artistName.trim()} (${cleanSongs.length} song${cleanSongs.length === 1 ? "" : "s"})`,
-        text: `New artist submission\n\nReal name: ${realName.trim()}\nArtist name: ${artistName.trim()}\nLocation: ${location.trim()}\n${safeContactEmail ? `Contact email: ${contactEmail.trim()}\n` : ""}Wallet: ${walletAddress.trim()}\n\nWhy:\n${reason.trim()}\n\nSongs (${cleanSongs.length}):\n${songsText}\n\nDownload links expire in 30 days.`,
+        text: `New artist submission\n\nReal name: ${realName.trim()}\nArtist name: ${artistName.trim()}\nLocation: ${location.trim()}\n${safeContactEmail ? `Contact email: ${contactEmail.trim()}\n` : ""}Wallet: ${wallet ?? "Not provided"}\n\nWhy:\n${reason.trim()}\n\nSongs (${cleanSongs.length}):\n${songsText}\n\nDownload links expire in 30 days.`,
         html: `
           <h2>New artist submission</h2>
           <p><strong>Real name:</strong> ${safeRealName}</p>

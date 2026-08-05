@@ -60,13 +60,13 @@ export function ArtistSubmissionForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!realName.trim() || !artistName.trim() || !location.trim() || !reason.trim() || !walletAddress.trim()) {
+    if (!realName.trim() || !artistName.trim() || !location.trim() || !reason.trim()) {
       toast.error('Please fill in every field.');
       return;
     }
 
-    if (!WALLET_PATTERN.test(walletAddress.trim())) {
-      toast.error('Enter a valid wallet address (0x...) or .eth name.');
+    if (walletAddress.trim() && !WALLET_PATTERN.test(walletAddress.trim())) {
+      toast.error('That wallet address looks off. Use 0x... or a .eth name, or leave it blank.');
       return;
     }
 
@@ -129,7 +129,7 @@ export function ArtistSubmissionForm() {
           location: location.trim(),
           reason: reason.trim(),
           contactEmail: user?.email || null,
-          walletAddress: walletAddress.trim(),
+          walletAddress: walletAddress.trim() || null,
           songs: uploadedSongs,
         },
       });
@@ -192,7 +192,7 @@ export function ArtistSubmissionForm() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="artist-wallet">Preferred wallet address</Label>
+          <Label htmlFor="artist-wallet">Preferred wallet address (optional)</Label>
           <Input
             id="artist-wallet"
             value={walletAddress}
@@ -200,6 +200,9 @@ export function ArtistSubmissionForm() {
             placeholder="0x... or you.eth"
             disabled={isSubmitting}
           />
+          <p className="text-xs text-muted-foreground">
+            No wallet yet? No problem. You can connect any Base network wallet later.
+          </p>
         </div>
       </div>
 

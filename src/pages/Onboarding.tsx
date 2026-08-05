@@ -18,9 +18,19 @@ const profileSchema = z.object({
   profileName: z.string().trim().min(1, 'Profile name is required').max(50, 'Profile name must be less than 50 characters'),
   bio: z.string().max(500, 'Bio must be less than 500 characters').optional(),
   location: z.string().trim().max(100, 'Location must be less than 100 characters').optional().or(z.literal('')),
-  xProfileLink: z.string().url('Invalid URL').optional().or(z.literal('')),
-  baseProfileLink: z.string().max(200, 'Link too long').optional(),
+  xProfileLink: z.string().trim().max(200, 'Link must be less than 200 characters').optional().or(z.literal('')),
 });
+
+// Accepts a full URL, a bare domain path, or an @handle and returns a usable URL.
+const normalizeXLink = (raw: string): string | null => {
+  const value = raw.trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('@')) return `https://x.com/${value.slice(1)}`;
+  if (/^(x\.com|twitter\.com)\//i.test(value)) return `https://${value}`;
+  if (/^[A-Za-z0-9_]{1,15}$/.test(value)) return `https://x.com/${value}`;
+  return `https://${value}`;
+};
 
 export default function Onboarding() {
   const { user, refreshProfile, signOut } = useAuth();
@@ -33,7 +43,6 @@ export default function Onboarding() {
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [xProfileLink, setXProfileLink] = useState('');
-  const [baseProfileLink, setBaseProfileLink] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
@@ -129,7 +138,6 @@ export default function Onboarding() {
       bio: bio || undefined,
       location,
       xProfileLink: xProfileLink || undefined,
-      baseProfileLink: baseProfileLink || undefined,
     });
 
     if (!validationResult.success) {
@@ -183,8 +191,7 @@ export default function Onboarding() {
         display_name: profileName.trim(),
         bio: bio.trim() || null,
         location: location.trim() || null,
-        x_profile_link: xProfileLink.trim() || null,
-        base_profile_link: baseProfileLink.trim() || null,
+        x_profile_link: normalizeXLink(xProfileLink),
         onboarding_completed: true,
         terms_accepted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -520,28 +527,28 @@ export default function Onboarding() {
             <div className="space-y-3">
               <div>
                 <Label htmlFor="xLink" className="text-xs text-muted-foreground">
-                  X (Twitter) Profile
+                  X (Twitter) Profile <span className="text-muted-foreground">(optional)</span>
                 </Label>
                 <Input
                   id="xLink"
                   value={xProfileLink}
                   onChange={(e) => setXProfileLink(e.target.value)}
-                  placeholder="https://x.com/yourhandle"
+                  placeholder="@yourhandle or https://x.com/yourhandle"
+                  className={errors.xProfileLink ? 'border-destructive' : ''}
                 />
-              </div>
-              
-              <div>
-                <Label htmlFor="baseLink" className="text-xs text-muted-foreground">
-                  Base Profile / Wallet
-                </Label>
-                <Input
-                  id="baseLink"
-                  value={baseProfileLink}
-                  onChange={(e) => setBaseProfileLink(e.target.value)}
-                  placeholder="https://base.app/yourprofile or 0x..."
-                />
+                {errors.xProfileLink && (
+                  <p className="text-xs text-destructive mt-1">{errors.xProfileLink}</p>
+                )}
               </div>
             </div>
+          </div>
+
+          {/* Wallet note */}
+          <div className="rounded-2xl border border-border/60 bg-secondary/20 p-4">
+            <p className="text-sm text-foreground font-medium mb-1">No wallet needed to join</p>
+            <p className="text-xs text-muted-foreground">
+              You can connect any wallet that supports the Base network, like Base App, Coinbase Wallet, MetaMask, or Rainbow, whenever you want to collect songs.
+            </p>
           </div>
 
           {/* Submit Button */}
