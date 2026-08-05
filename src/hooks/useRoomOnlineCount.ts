@@ -38,14 +38,16 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
 
     const fetchCount = async () => {
       try {
-        // Prefer room_live_users (most accurate — unique user count)
+        // Prefer room_live_users (a view over room_profiles filtered to users
+        // seen in the last 90s). An empty result IS the answer — zero people
+        // live — so never fall through to stale sources on success.
         const liveUsersRes = await (supabase as any)
           .from('room_live_users')
           .select('user_id')
           .eq('room_id', roomId);
 
         if (!isActive) return;
-        if (!liveUsersRes?.error && Array.isArray(liveUsersRes?.data) && liveUsersRes.data.length > 0) {
+        if (!liveUsersRes?.error && Array.isArray(liveUsersRes?.data)) {
           const uniqueUsers = new Set(
             (liveUsersRes.data as Array<{ user_id?: string | null }>)
               .map((row) => (typeof row?.user_id === 'string' ? row.user_id : ''))
@@ -55,7 +57,7 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
           return;
         }
 
-        // Fallback: room_live_counts aggregate row
+        // Fallback (view query errored): room_live_counts aggregate row
         const { data: countData, error: countError } = await (supabase as any)
           .from('room_live_counts')
           .select('*')
@@ -63,17 +65,21 @@ export function useRoomOnlineCount(params?: { roomId?: string; viewerUserId?: st
           .maybeSingle();
 
         if (!isActive) return;
-        if (!countError && countData) {
-          const nextCount = resolveLiveCount(countData as RoomLiveCountRow);
-          if (nextCount > 0) { setCount(nextCount); return; }
+        if (!countError) {
+          setCount(countData ? resolveLiveCount(countData as RoomLiveCountRow) : 0);
+          return;
         }
 
-        // Fallback: count active room_profiles rows
+        // Last resort: count room_profiles rows, but only ones with a fresh
+        // heartbeat — is_active alone lingers forever when a user closes the
+        // app without a clean leave_room.
+        const freshCutoff = new Date(Date.now() - 90 * 1000).toISOString();
         const profilesRes = await (supabase as any)
           .from('room_profiles')
           .select('user_id', { count: 'exact', head: true })
           .eq('room_id', roomId)
-          .eq('is_active', true);
+          .eq('is_active', true)
+          .gte('last_seen_at', freshCutoff);
 
         if (!isActive) return;
         if (!profilesRes?.error) {

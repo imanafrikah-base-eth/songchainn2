@@ -500,6 +500,40 @@ export function useAudienceInteractions() {
     toast({ title: 'Song added to playlist!' });
   }, [user, toast]);
 
+  // Bulk-add songs to a playlist in one insert. No per-song toasts — callers
+  // show a single summary toast. Returns how many songs were actually added.
+  const addSongsToPlaylist = useCallback(async (playlistId: string, songIds: string[]): Promise<number> => {
+    if (!user || songIds.length === 0) return 0;
+    const uniqueIds = Array.from(new Set(songIds));
+    if (!isSupabaseConfigured) {
+      const existing = getLocalPlaylistSongs(playlistId);
+      const fresh = uniqueIds.filter((id) => !existing.includes(id));
+      if (fresh.length === 0) return 0;
+      setPlaylistSongs(playlistId, [...existing, ...fresh]);
+      return fresh.length;
+    }
+
+    const { data: existing } = await supabase
+      .from('playlist_songs')
+      .select('song_id')
+      .eq('playlist_id', playlistId);
+    const current = (existing || []).map((r: any) => r.song_id).filter(Boolean);
+    const fresh = uniqueIds.filter((id) => !current.includes(id));
+    if (fresh.length === 0) return 0;
+
+    const rows = fresh.map((songId, index) => ({
+      playlist_id: playlistId,
+      song_id: songId,
+      position: current.length + index,
+    }));
+    const { error } = await supabase.from('playlist_songs').insert(rows as any);
+    if (error) {
+      toast({ title: 'Could not add songs to playlist', variant: 'destructive' });
+      return 0;
+    }
+    return fresh.length;
+  }, [user, toast]);
+
   // Remove Song from Playlist
   const removeSongFromPlaylist = useCallback(async (playlistId: string, songId: string) => {
     if (!user) return;
@@ -654,6 +688,7 @@ export function useAudienceInteractions() {
     createPlaylist,
     deletePlaylist,
     addSongToPlaylist,
+    addSongsToPlaylist,
     removeSongFromPlaylist,
     getPlaylistSongs,
     reorderPlaylistSongs,

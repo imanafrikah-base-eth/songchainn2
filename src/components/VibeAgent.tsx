@@ -9,6 +9,7 @@ import { ARTISTS, CATALOGS, SONGS, Song } from '@/data/musicData';
 import { supabase } from '@/integrations/supabase/client';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useEngagement } from '@/context/EngagementContext';
+import { useToast } from '@/hooks/use-toast';
 import moshaAvatar from '@/assets/Mo$ha chat pop up.png';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { fcOpenUrl } from '@/lib/farcasterActions';
@@ -148,7 +149,7 @@ export function VibeAgent() {
   const { currentSong, isPlaying } = usePlayerState();
   const { currentTime } = usePlayerTime();
   const { playSong } = usePlayerActions();
-  const { likedSongs, playlists, createPlaylist, addSongToPlaylist, updatePlaylistVisibility } = useAudienceInteractions();
+  const { likedSongs, playlists, createPlaylist, addSongsToPlaylist, updatePlaylistVisibility } = useAudienceInteractions();
   const { engagementPoints, currentStreak } = useEngagement();
 
   const [mode, setMode] = useState<AgentMode>('unset');
@@ -159,6 +160,8 @@ export function VibeAgent() {
   const dismissedUntilRef = useRef(0);
   useEffect(() => { dismissedUntilRef.current = dismissedUntil; }, [dismissedUntil]);
   const [lanePlaylistId, setLanePlaylistId] = useState<string | null>(null);
+  const [isBuildingLane, setIsBuildingLane] = useState(false);
+  const { toast } = useToast();
   const [discoveryArtistName, setDiscoveryArtistName] = useState<string | null>(null);
   const [sessionStartAt, setSessionStartAt] = useState<number>(Date.now());
   const [externalPrompt, setExternalPrompt] = useState<ExternalPrompt | null>(null);
@@ -497,37 +500,45 @@ export function VibeAgent() {
   }, [mode]);
 
   const makeLanePlaylist = useCallback(async () => {
-    const laneSongs = [...SONGS]
-      .sort((a, b) => {
-        const genreScoreA = signalRef.current.genreStarts[a.genre] || 0;
-        const genreScoreB = signalRef.current.genreStarts[b.genre] || 0;
-        const artistScoreA = signalRef.current.artistStarts[a.artistId] || 0;
-        const artistScoreB = signalRef.current.artistStarts[b.artistId] || 0;
-        const scoreA = genreScoreA * 4 + artistScoreA * 3 + Math.log10((a.plays || 0) + 1);
-        const scoreB = genreScoreB * 4 + artistScoreB * 3 + Math.log10((b.plays || 0) + 1);
-        return scoreB - scoreA;
-      })
-      .slice(0, 12);
-
-    const playlist = await createPlaylist(
-      `${tasteLane} session`,
-      `Agent-generated lane for ${displayName}`,
-      false,
-      modeLabel(mode),
-      tasteLane
-    );
-    if (!playlist) return;
-
-    for (const song of laneSongs) {
-      await addSongToPlaylist(playlist.id, song.id);
-    }
-    setLanePlaylistId(playlist.id);
+    if (isBuildingLane) return;
+    setIsBuildingLane(true);
     try {
-      localStorage.setItem(STORAGE_LANE_PLAYLIST_ID_KEY, playlist.id);
-    } catch {
-      void 0;
+      const laneSongs = [...SONGS]
+        .sort((a, b) => {
+          const genreScoreA = signalRef.current.genreStarts[a.genre] || 0;
+          const genreScoreB = signalRef.current.genreStarts[b.genre] || 0;
+          const artistScoreA = signalRef.current.artistStarts[a.artistId] || 0;
+          const artistScoreB = signalRef.current.artistStarts[b.artistId] || 0;
+          const scoreA = genreScoreA * 4 + artistScoreA * 3 + Math.log10((a.plays || 0) + 1);
+          const scoreB = genreScoreB * 4 + artistScoreB * 3 + Math.log10((b.plays || 0) + 1);
+          return scoreB - scoreA;
+        })
+        .slice(0, 12);
+
+      const playlist = await createPlaylist(
+        `${tasteLane} session`,
+        `Agent-generated lane for ${displayName}`,
+        false,
+        modeLabel(mode),
+        tasteLane
+      );
+      if (!playlist) return;
+
+      const addedCount = await addSongsToPlaylist(playlist.id, laneSongs.map((song) => song.id));
+      setLanePlaylistId(playlist.id);
+      try {
+        localStorage.setItem(STORAGE_LANE_PLAYLIST_ID_KEY, playlist.id);
+      } catch {
+        void 0;
+      }
+      toast({
+        title: 'Playlist ready!',
+        description: `${addedCount} songs in your ${tasteLane} session.`,
+      });
+    } finally {
+      setIsBuildingLane(false);
     }
-  }, [addSongToPlaylist, createPlaylist, displayName, mode, tasteLane]);
+  }, [addSongsToPlaylist, createPlaylist, displayName, isBuildingLane, mode, tasteLane, toast]);
 
   if (!step) {
     if (mode === 'unset') {
@@ -702,8 +713,8 @@ export function VibeAgent() {
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" className="h-8 text-xs" onClick={makeLanePlaylist}>
-                  Build playlist
+                <Button type="button" className="h-8 text-xs" onClick={makeLanePlaylist} disabled={isBuildingLane}>
+                  {isBuildingLane ? 'Building...' : 'Build playlist'}
                 </Button>
                 {lanePlaylist ? (
                   <Button

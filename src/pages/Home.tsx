@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 import { usePlayerActions, useSafePlayerState } from '@/context/PlayerContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useToast } from '@/hooks/use-toast';
 import { useSocial } from '@/hooks/useSocial';
 import { useNotifications } from '@/hooks/useNotifications';
 import { supabase } from '@/integrations/supabase/client';
@@ -82,7 +83,8 @@ export default function Home() {
   const { rankedArtists } = useRankedArtists();
   const { audienceProfile, refreshProfile, user } = useAuth();
   const { data: todayHotSongs = [] } = useTodayHotSongs(10);
-  const { playlists, createPlaylist, addSongToPlaylist, likedArtists } = useAudienceInteractions();
+  const { playlists, createPlaylist, addSongsToPlaylist, likedArtists } = useAudienceInteractions();
+  const { toast } = useToast();
   const { createPost } = useSocial();
   const { createNotification } = useNotifications();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -329,10 +331,12 @@ export default function Home() {
       if (!playlist) return;
 
       if (selectedSongIds.length > 0) {
-        for (const songId of selectedSongIds) {
-          await addSongToPlaylist(playlist.id, songId);
-        }
+        await addSongsToPlaylist(playlist.id, selectedSongIds);
       }
+      toast({
+        title: 'Playlist created!',
+        description: selectedSongIds.length > 0 ? `${playlist.name} with ${selectedSongIds.length} songs.` : playlist.name,
+      });
 
       if (newPlaylistIsPublic) {
         const moodPart = newPlaylistMood.trim();

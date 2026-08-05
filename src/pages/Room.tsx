@@ -809,11 +809,15 @@ export default function Room() {
       addRows(Array.isArray(liveRes?.data) ? liveRes.data : []);
 
       if (byUserId.size === 0) {
+        // Only trust room_profiles rows with a fresh heartbeat — is_active
+        // alone lingers when a user closes the app without leave_room.
+        const freshCutoff = new Date(Date.now() - 90 * 1000).toISOString();
         const profileRes = await (supabase as any)
           .from('room_profiles')
           .select('*')
           .eq('room_id', ROOM_ID)
-          .eq('is_active', true);
+          .eq('is_active', true)
+          .gte('last_seen_at', freshCutoff);
         if (!isActive) return;
         addRows(Array.isArray(profileRes?.data) ? profileRes.data : []);
       }
