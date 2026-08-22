@@ -27,6 +27,7 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
+import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -284,6 +285,7 @@ export default function Home() {
   // One-time Mo$ha plug for the Zabal Gamez Artist Track. Delayed so it never
   // collides with the welcome/tour prompt above, and never repeats once shown.
   useEffect(() => {
+    if (!ZABAL_GAMEZ_ENABLED) return;
     if (!user?.id) return;
     const zabalKey = `songchainn:zabal-gamez-mosha-prompt:v1:${user.id}`;
     try {
@@ -492,7 +494,7 @@ export default function Home() {
           </div>
         </section>
 
-        <ZabalGamezPromo variant="card" />
+        {ZABAL_GAMEZ_ENABLED && <ZabalGamezPromo variant="card" />}
 
         <div className="my-4 sm:my-6 flex items-center gap-2">
           <Button

@@ -1,0 +1,490 @@
+<title>The SONGCHAINN Standard</title>
+<style>
+  /* ---- tokens: light is the base, both dark paths redefine only tokens ---- */
+  :root {
+    --ground:      #F2F5F4;
+    --panel:       #FFFFFF;
+    --panel-2:     #E9EEED;
+    --line:        #D2DCDA;
+    --line-strong: #A8B8B5;
+    --ink:         #0C1817;
+    --ink-2:       #334744;
+    --muted:       #5F7371;
+    --accent:      #0B6E6A;
+    --accent-soft: #CDE4E2;
+    --ok:          #2E7D4F;
+    --ok-soft:     #D3E7DA;
+    --warn:        #9A6400;
+    --warn-soft:   #F2E3C4;
+    --bad:         #A83224;
+    --bad-soft:    #F2D6D1;
+    --shadow:      0 1px 2px rgba(12,24,23,.06), 0 8px 24px rgba(12,24,23,.05);
+
+    --display: "Helvetica Neue", "Inter Tight", Helvetica, Arial, sans-serif;
+    --prose:   "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono:    ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0B1211;
+      --panel:       #121C1B;
+      --panel-2:     #182423;
+      --line:        #253634;
+      --line-strong: #3C5350;
+      --ink:         #E4EDEB;
+      --ink-2:       #B6C7C4;
+      --muted:       #8497944D;
+      --muted:       #869996;
+      --accent:      #46BFB4;
+      --accent-soft: #14312F;
+      --ok:          #5FBE86;
+      --ok-soft:     #14301F;
+      --warn:        #D8A23D;
+      --warn-soft:   #322512;
+      --bad:         #E2705F;
+      --bad-soft:    #34190F;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0B1211;
+    --panel:       #121C1B;
+    --panel-2:     #182423;
+    --line:        #253634;
+    --line-strong: #3C5350;
+    --ink:         #E4EDEB;
+    --ink-2:       #B6C7C4;
+    --muted:       #869996;
+    --accent:      #46BFB4;
+    --accent-soft: #14312F;
+    --ok:          #5FBE86;
+    --ok-soft:     #14301F;
+    --warn:        #D8A23D;
+    --warn-soft:   #322512;
+    --bad:         #E2705F;
+    --bad-soft:    #34190F;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--prose);
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  .prose { max-width: 66ch; }
+
+  h1, h2, h3, .lbl, .metric-name, th, .stat-v, .num { font-family: var(--display); }
+  h1 {
+    font-size: clamp(2.1rem, 5.2vw, 3.3rem);
+    line-height: 1.02;
+    letter-spacing: -.032em;
+    font-weight: 700;
+    text-wrap: balance;
+    margin: 0 0 .5rem;
+  }
+  h2 {
+    font-size: 1.42rem; letter-spacing: -.018em; font-weight: 700;
+    margin: 0; text-wrap: balance;
+  }
+  h3 {
+    font-size: 1.02rem; letter-spacing: -.008em; font-weight: 700;
+    margin: 0 0 .1rem;
+  }
+  p { margin: 0; }
+  .prose p + p { margin-top: .85rem; }
+  strong { font-weight: 700; color: var(--ink); }
+  code, .mono { font-family: var(--mono); font-size: .9em; font-variant-numeric: tabular-nums; }
+
+  .lbl {
+    font-size: .69rem; text-transform: uppercase; letter-spacing: .12em;
+    font-weight: 700; color: var(--muted);
+  }
+
+  /* ---- layout rhythm: gaps, not margins ---- */
+  .stack   { display: flex; flex-direction: column; gap: 1rem; }
+  .stack-l { display: flex; flex-direction: column; gap: 2.9rem; }
+  section  { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  header {
+    padding: 4.2rem 0 2.2rem;
+    display: flex; flex-direction: column; gap: 1.1rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow { display: flex; align-items: baseline; gap: .7rem; flex-wrap: wrap; }
+  .rule-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .deck { font-size: 1.18rem; color: var(--ink-2); max-width: 60ch; text-wrap: pretty; }
+
+  .head-rule {
+    display: flex; align-items: center; gap: .8rem;
+    padding-top: 1.4rem; border-top: 1px solid var(--line);
+  }
+  .head-rule .lbl { white-space: nowrap; }
+  .head-rule .fill { flex: 1; height: 1px; background: var(--line); }
+
+  /* ---- verdict ---- */
+  .verdict {
+    background: var(--panel); border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px; padding: 1.5rem 1.6rem;
+    display: flex; flex-direction: column; gap: .7rem;
+    box-shadow: var(--shadow);
+  }
+  .verdict .big {
+    font-family: var(--display); font-size: 1.3rem; font-weight: 700;
+    letter-spacing: -.016em; line-height: 1.32; text-wrap: balance;
+  }
+
+  /* ---- stat strip ---- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px,1fr)); gap: 1px;
+           background: var(--line); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .stat { background: var(--panel); padding: 1rem 1.05rem; display: flex; flex-direction: column; gap: .18rem; }
+  .stat-v { font-size: 1.72rem; font-weight: 700; letter-spacing: -.028em; font-variant-numeric: tabular-nums; line-height: 1.06; }
+  .stat-k { font-size: .78rem; color: var(--muted); font-family: var(--display); line-height: 1.3; }
+  .stat.is-bad  .stat-v { color: var(--bad); }
+  .stat.is-ok   .stat-v { color: var(--ok); }
+  .stat.is-warn .stat-v { color: var(--warn); }
+
+  /* ---- meter rows: the structural device. bar = p5..p95 spread, tick = median ---- */
+  .meters { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line);
+            border-radius: 3px; overflow: hidden; background: var(--panel); }
+  .meter-head, .meter {
+    display: grid; grid-template-columns: 168px 1fr 132px; align-items: center;
+    gap: 1rem; padding: .62rem 1.05rem;
+  }
+  .meter-head { background: var(--panel-2); border-bottom: 1px solid var(--line); padding-top: .5rem; padding-bottom: .5rem; }
+  .meter + .meter { border-top: 1px solid var(--line); }
+  .metric-name { font-size: .87rem; font-weight: 600; line-height: 1.25; }
+  .metric-name span { display: block; color: var(--muted); font-weight: 400; font-size: .76rem; }
+  .track { position: relative; height: 26px; }
+  .track::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px;
+    transform: translateY(-50%); background: var(--line); border-radius: 2px;
+  }
+  .span-bar {
+    position: absolute; top: 50%; transform: translateY(-50%); height: 10px;
+    border-radius: 2px; background: var(--accent-soft); border: 1px solid var(--accent);
+  }
+  .span-bar.wide { background: var(--panel-2); border-color: var(--line-strong); }
+  .tick {
+    position: absolute; top: 50%; transform: translate(-50%,-50%);
+    width: 2px; height: 22px; background: var(--accent); border-radius: 1px;
+  }
+  .tick.wide { background: var(--line-strong); }
+  .gate {
+    position: absolute; top: 50%; transform: translate(-50%,-50%);
+    width: 0; height: 26px; border-left: 2px dashed var(--bad);
+  }
+  .readout { font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums;
+             text-align: right; color: var(--ink-2); white-space: nowrap; }
+  .legend { display: flex; gap: 1.3rem; flex-wrap: wrap; font-family: var(--display); font-size: .76rem; color: var(--muted); }
+  .legend i { display: inline-block; width: 22px; height: 8px; border-radius: 2px; vertical-align: middle; margin-right: .4rem; }
+  .legend .l1 i { background: var(--accent-soft); border: 1px solid var(--accent); }
+  .legend .l2 i { background: var(--panel-2); border: 1px solid var(--line-strong); }
+  .legend .l3 i { width: 0; height: 14px; border: 0; border-left: 2px dashed var(--bad); margin-right: .6rem; }
+
+  /* ---- tables ---- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: .87rem; min-width: 520px; }
+  th {
+    font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700;
+    color: var(--muted); text-align: left; padding: .68rem .9rem;
+    background: var(--panel-2); border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  td { padding: .62rem .9rem; border-bottom: 1px solid var(--line); vertical-align: top; font-family: var(--display); }
+  tr:last-child td { border-bottom: 0; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  td.t { font-family: var(--prose); }
+  .pill {
+    display: inline-block; font-family: var(--display); font-size: .68rem; font-weight: 700;
+    letter-spacing: .05em; text-transform: uppercase; padding: .18rem .48rem; border-radius: 2px; white-space: nowrap;
+  }
+  .p-bad  { background: var(--bad-soft);  color: var(--bad); }
+  .p-warn { background: var(--warn-soft); color: var(--warn); }
+  .p-ok   { background: var(--ok-soft);   color: var(--ok); }
+
+  /* ---- findings ---- */
+  .finds { display: flex; flex-direction: column; gap: 1px; background: var(--line);
+           border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .find { background: var(--panel); padding: 1.05rem 1.15rem; display: grid;
+          grid-template-columns: 92px 1fr; gap: 1.1rem; align-items: start; }
+  .find .sev { padding-top: .12rem; }
+  .find .body { display: flex; flex-direction: column; gap: .3rem; }
+  .find p { font-size: .93rem; color: var(--ink-2); }
+
+  .note {
+    border: 1px dashed var(--line-strong); border-radius: 3px;
+    padding: 1.05rem 1.2rem; background: transparent;
+    display: flex; flex-direction: column; gap: .45rem;
+  }
+  .note p { font-size: .93rem; color: var(--ink-2); }
+
+  ul.clean { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: .42rem; }
+  ul.clean li { font-size: .95rem; color: var(--ink-2); }
+  ul.clean li strong { color: var(--ink); }
+
+  footer { border-top: 1px solid var(--line); padding-top: 1.3rem; color: var(--muted); font-size: .84rem; }
+  footer .lbl { display: block; margin-bottom: .35rem; }
+
+  @media (max-width: 700px) {
+    .meter-head, .meter { grid-template-columns: 1fr; gap: .45rem; padding: .85rem 1rem; }
+    .meter-head { display: none; }
+    .readout { text-align: left; }
+    .track { height: 22px; }
+    .find { grid-template-columns: 1fr; gap: .55rem; }
+  }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">
+    <span class="rule-dot"></span>
+    <span class="lbl">Catalog measurement &middot; 230 tracks &middot; 16 August 2026</span>
+  </div>
+  <h1>The SONGCHAINN Standard</h1>
+  <p class="deck">Every track in the catalog, measured to ITU-R BS.1770-4, to answer one question: what is the production standard that the app already holds, expressed as numbers instead of one person&rsquo;s ear?</p>
+</header>
+
+<div class="stack-l" style="padding-top: 2.6rem;">
+
+<section>
+  <div class="verdict">
+    <span class="lbl">The finding</span>
+    <p class="big">Your catalog is not one standard. It is two, and only 56 of the 230 tracks are the standard you think you are protecting.</p>
+    <div class="prose">
+      <p>The lossless half is disciplined and consistent: it never once passes &minus;2.4&nbsp;dBTP. The other half runs roughly 5&nbsp;LU louder, was rendered from lossy sources, and clips. Calibrating a gate on the catalog as a whole would average those two together and produce a threshold that protects neither.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="head-rule"><span class="lbl">What was measured</span><span class="fill"></span></div>
+  <div class="stats">
+    <div class="stat"><span class="stat-v">230</span><span class="stat-k">tracks measured, zero failures</span></div>
+    <div class="stat"><span class="stat-v">104<span style="font-size:.8rem;color:var(--muted)"> / 126</span></span><span class="stat-k">WAV / MP3 sources</span></div>
+    <div class="stat is-ok"><span class="stat-v">56</span><span class="stat-k">true lossless masters</span></div>
+    <div class="stat is-bad"><span class="stat-v">56%</span><span class="stat-k">of catalog peaks above 0&nbsp;dBTP</span></div>
+    <div class="stat is-bad"><span class="stat-v">75%</span><span class="stat-k">from a lossy-encoded source</span></div>
+  </div>
+  <div class="prose">
+    <p>Loudness follows ITU-R BS.1770-4 with K-weighting derived per sample rate and gated 400&nbsp;ms blocks. Before it touched your music the implementation was checked against the <strong>EBU Tech 3341 conformance case, reading &minus;22.99&nbsp;LUFS where the standard requires &minus;23.0&nbsp;&plusmn;0.1</strong>, and its filter coefficients match the values tabulated in the spec to nine decimal places. True peak uses 4&times; oversampling and resolves the textbook intersample case to within 0.11&nbsp;dB. Twenty-six checks in total, all passing.</p>
+  </div>
+</section>
+
+<section>
+  <div class="head-rule"><span class="lbl">The two populations</span><span class="fill"></span></div>
+  <div class="prose">
+    <p>Split the catalog by delivery format and the gap is not subtle. These are two different mastering eras sitting in one library.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Median</th><th style="text-align:right">WAV &middot; 104</th><th style="text-align:right">MP3 &middot; 126</th><th style="text-align:right">Gap</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Integrated loudness</td><td class="n">&minus;14.8 LUFS</td><td class="n">&minus;10.0 LUFS</td><td class="n">4.8 LU louder</td></tr>
+        <tr><td>True peak</td><td class="n">&minus;3.79 dBTP</td><td class="n">+0.78 dBTP</td><td class="n">4.6 dB hotter</td></tr>
+        <tr><td>Crest factor</td><td class="n">13.8 dB</td><td class="n">12.3 dB</td><td class="n">1.5 dB flatter</td></tr>
+        <tr><td>Loudness range</td><td class="n">5.4 LU</td><td class="n">3.4 LU</td><td class="n">2.0 LU flatter</td></tr>
+        <tr><td>Cutoff cliff steepness</td><td class="n">16.2 dB</td><td class="n">65.1 dB</td><td class="n">brick wall</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <span class="lbl">A correction worth stating</span>
+    <p>My first pass reported that 89% of the catalog was band-limited and 40% was &ldquo;lossy in a WAV wrapper.&rdquo; That was wrong, and I threw the number out. Energy rolloff cannot detect lossy encoding, because treble carries a tiny share of total energy, so a 99.9%-energy rolloff sits near 14&nbsp;kHz on <em>any</em> healthy master. The figures here come from a different test: a genuine brick wall, meaning the spectrum falls off a cliff at a fixed frequency and stays at the floor above it. A clean 7ROO7H BASED master reads a 22,043&nbsp;Hz cutoff with a 0.1&nbsp;dB slope. A flagged one reads 20,180&nbsp;Hz with a 54&nbsp;dB cliff. That separation is not ambiguous.</p>
+  </div>
+</section>
+
+<section>
+  <div class="head-rule"><span class="lbl">The standard, isolated</span><span class="fill"></span></div>
+  <div class="prose">
+    <p>Filter to the tracks that are genuinely lossless (WAV, full spectrum, no encoder wall) and <strong>56 tracks</strong> remain. This is the real SONGCHAINN standard, and it is tight enough to gate on.</p>
+  </div>
+
+  <div class="meters">
+    <div class="meter-head">
+      <span class="lbl">Metric</span><span class="lbl">Range</span><span class="lbl" style="text-align:right">p5 &middot; median &middot; p95</span>
+    </div>
+
+    <div class="meter">
+      <span class="metric-name">Integrated loudness<span>LUFS &middot; scale &minus;22 to &minus;6</span></span>
+      <span class="track">
+        <span class="span-bar wide" style="left:22.5%;width:52.5%"></span><span class="tick wide" style="left:40.6%"></span>
+        <span class="span-bar" style="left:25.6%;width:27.5%"></span><span class="tick" style="left:46.3%"></span>
+      </span>
+      <span class="readout">&minus;17.9 &middot; <strong>&minus;14.6</strong> &middot; &minus;13.5</span>
+    </div>
+
+    <div class="meter">
+      <span class="metric-name">True peak<span>dBTP &middot; scale &minus;7 to +4</span></span>
+      <span class="track">
+        <span class="span-bar wide" style="left:12.1%;width:73.6%"></span><span class="tick wide" style="left:65.3%"></span>
+        <span class="span-bar" style="left:18.2%;width:23.6%"></span><span class="tick" style="left:29.9%"></span>
+        <span class="gate" style="left:63.6%"></span>
+      </span>
+      <span class="readout">&minus;5.00 &middot; <strong>&minus;3.71</strong> &middot; &minus;2.40</span>
+    </div>
+
+    <div class="meter">
+      <span class="metric-name">Crest factor<span>dB &middot; scale 8 to 18</span></span>
+      <span class="track">
+        <span class="span-bar wide" style="left:24.0%;width:59.0%"></span><span class="tick wide" style="left:52.0%"></span>
+        <span class="span-bar" style="left:35.0%;width:39.0%"></span><span class="tick" style="left:51.0%"></span>
+      </span>
+      <span class="readout">11.5 &middot; <strong>13.1</strong> &middot; 15.4</span>
+    </div>
+
+    <div class="meter">
+      <span class="metric-name">Loudness range<span>LU &middot; scale 0 to 10</span></span>
+      <span class="track">
+        <span class="span-bar wide" style="left:22.0%;width:63.0%"></span><span class="tick wide" style="left:42.0%"></span>
+        <span class="span-bar" style="left:31.0%;width:49.0%"></span><span class="tick" style="left:46.0%"></span>
+      </span>
+      <span class="readout">3.1 &middot; <strong>4.6</strong> &middot; 8.0</span>
+    </div>
+
+    <div class="meter">
+      <span class="metric-name">Stereo correlation<span>&minus;1 to +1 &middot; scale 0.5 to 1.0</span></span>
+      <span class="track">
+        <span class="span-bar wide" style="left:25.2%;width:71.6%"></span><span class="tick wide" style="left:75.2%"></span>
+        <span class="span-bar" style="left:54.8%;width:37.0%"></span><span class="tick" style="left:78.4%"></span>
+      </span>
+      <span class="readout">0.774 &middot; <strong>0.892</strong> &middot; 0.959</span>
+    </div>
+
+    <div class="meter">
+      <span class="metric-name">Spectral cutoff<span>Hz &middot; scale 17k to 22.1k</span></span>
+      <span class="track">
+        <span class="span-bar wide" style="left:21.5%;width:78.5%"></span><span class="tick wide" style="left:62.5%"></span>
+        <span class="span-bar" style="left:63.5%;width:35.4%"></span><span class="tick" style="left:98.9%"></span>
+      </span>
+      <span class="readout">20,238 &middot; <strong>22,043</strong> &middot; 22,043</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="l1"><i></i>56 lossless masters (p5&ndash;p95, tick = median)</span>
+    <span class="l2"><i></i>All 230 tracks</span>
+    <span class="l3"><i></i>0 dBTP</span>
+  </div>
+</section>
+
+<section>
+  <div class="head-rule"><span class="lbl">What is wrong with the catalog today</span><span class="fill"></span></div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Condition</th><th style="text-align:right">Tracks</th><th style="text-align:right">Share</th><th>Severity</th></tr></thead>
+      <tbody>
+        <tr><td>Brick wall in spectrum (lossy-encoded source)</td><td class="n">173</td><td class="n">75%</td><td><span class="pill p-bad">Critical</span></td></tr>
+        <tr><td>&hellip;of those, delivered to you as WAV</td><td class="n">48</td><td class="n">21%</td><td><span class="pill p-bad">Critical</span></td></tr>
+        <tr><td>True peak above 0.0 dBTP</td><td class="n">129</td><td class="n">56%</td><td><span class="pill p-bad">Critical</span></td></tr>
+        <tr><td>Samples driven past full scale</td><td class="n">110</td><td class="n">48%</td><td><span class="pill p-warn">Warning</span></td></tr>
+        <tr><td>Sustained clipped runs</td><td class="n">29</td><td class="n">13%</td><td><span class="pill p-warn">Warning</span></td></tr>
+        <tr><td>Loudness range under 3 LU (very flat)</td><td class="n">53</td><td class="n">23%</td><td><span class="pill p-warn">Warning</span></td></tr>
+        <tr><td>Effectively mono</td><td class="n">2</td><td class="n">1%</td><td><span class="pill p-warn">Warning</span></td></tr>
+        <tr><td>Crest factor under 8 dB (squashed)</td><td class="n">0</td><td class="n">0%</td><td><span class="pill p-ok">Clean</span></td></tr>
+        <tr><td>DC offset</td><td class="n">0</td><td class="n">0%</td><td><span class="pill p-ok">Clean</span></td></tr>
+        <tr><td>L/R imbalance beyond 1 dB</td><td class="n">0</td><td class="n">0%</td><td><span class="pill p-ok">Clean</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="prose">
+    <p>The clean rows matter as much as the bad ones. Nothing is squashed, nothing has DC offset, nothing is channel-imbalanced. The engineering discipline is real. What went wrong went wrong at delivery, not at the mix.</p>
+    <p>The worst offenders are concentrated rather than spread. NDA&rsquo;s <em>married to the grind</em> reaches <strong>+3.6&nbsp;dBTP with 1,719 sustained clipped runs</strong>; <em>ELEMENT</em> reaches +3.38&nbsp;dBTP with 2,238. On a per-artist basis, 52 of the 55 tracks in the loud IMan Afrikah batch peak above 0&nbsp;dBTP, against 1 of 28 in the earlier batch.</p>
+  </div>
+</section>
+
+<section>
+  <div class="head-rule"><span class="lbl">Proposed audition gate</span><span class="fill"></span></div>
+  <div class="prose">
+    <p>Derived from the 56 lossless masters, loosened where the strict envelope would be pedantic. This is the threshold $HIKULU and NAKULU would enforce on upload, before any AI opinion is involved.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Test</th><th>Pass</th><th>Reject</th><th>Why this line</th></tr></thead>
+      <tbody>
+        <tr><td>True peak</td><td class="n">&le; &minus;1.0 dBTP</td><td class="n">&gt; 0.0 dBTP</td><td class="t">The 56 masters never exceed &minus;2.4. Above 0 it audibly distorts once encoded for streaming.</td></tr>
+        <tr><td>Spectral cutoff</td><td class="n">&ge; 20.6 kHz</td><td class="n">&lt; 19 kHz</td><td class="t">Catches a lossy file re-wrapped as WAV, which is the single most common defect here.</td></tr>
+        <tr><td>Crest factor</td><td class="n">&ge; 10 dB</td><td class="n">&lt; 8 dB</td><td class="t">Below 10 is outside every master you made.</td></tr>
+        <tr><td>Loudness range</td><td class="n">&ge; 3.0 LU</td><td class="n">&lt; 2.0 LU</td><td class="t">Flags a record with no dynamic life left.</td></tr>
+        <tr><td>Integrated loudness</td><td class="n">&minus;16 to &minus;9 LUFS</td><td class="n">&mdash;</td><td class="t">Advisory only. Loudness is taste; the platform can normalize it. Do not reject on this.</td></tr>
+        <tr><td>Stereo correlation</td><td class="n">0.2 to 0.99</td><td class="n">&lt; 0</td><td class="t">Negative correlation means the track partially cancels in mono.</td></tr>
+        <tr><td>DC offset</td><td class="n">&lt; 0.001</td><td class="n">&ge; 0.003</td><td class="t">Free to check, always a mistake, never intentional.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">The decision this forces</span>
+    <p><strong>Applied honestly, this gate rejects most of your existing catalog.</strong> 129 tracks fail on true peak alone and 173 fail the lossy-source test. That is not a reason to soften the numbers, it is the actual finding: the bar you are protecting in conversation is higher than the bar the library currently meets. You have three options, and it is your call, not the analyser&rsquo;s. Grandfather the existing catalog and hold new uploads to the standard. Or re-master and re-deliver the affected tracks from source, which is real work but permanently fixes the shelf. Or set the launch gate at reject-above-0&nbsp;dBTP only, which most of the catalog does pass, and tighten later.</p>
+  </div>
+</section>
+
+<section>
+  <div class="head-rule"><span class="lbl">Catalog defects found along the way</span><span class="fill"></span></div>
+  <div class="finds">
+    <div class="find">
+      <span class="sev"><span class="pill p-bad">Live bug</span></span>
+      <span class="body">
+        <h3>Two songs return 404</h3>
+        <p><em>NO APOLOGY</em> and <em>1 OF 1</em> are listed in <code>musicData.ts</code> and shipping to users, but their audio URLs are dead on R2. A listener who taps them gets nothing.</p>
+      </span>
+    </div>
+    <div class="find">
+      <span class="sev"><span class="pill p-warn">Data</span></span>
+      <span class="body">
+        <h3>&ldquo;Eve&rsquo;s Daughter&rdquo; and its alt mix are the same file</h3>
+        <p>Song ids 1 and 49 point at one audio URL. The alt mix was either never uploaded or the entry is a duplicate. Right now choosing the alt mix plays the original.</p>
+      </span>
+    </div>
+    <div class="find">
+      <span class="sev"><span class="pill p-warn">Data</span></span>
+      <span class="body">
+        <h3>&ldquo;LIKKU MISS&rdquo; is on two catalogs</h3>
+        <p>Listed under both <em>3.0</em> and <em>Lovers EP</em>, sharing one file. Possibly deliberate, worth confirming it is not a paste error.</p>
+      </span>
+    </div>
+    <div class="find">
+      <span class="sev"><span class="pill p-ok">Fixed</span></span>
+      <span class="body">
+        <h3>IMan Afrikah was split across two spellings</h3>
+        <p>56 tracks read &ldquo;IMAN AFRIKAH&rdquo; and 28 read &ldquo;IMan Afrikah&rdquo;. Grouping was never broken because <code>artistId</code> was &lsquo;3&rsquo; on both, but the displayed name was inconsistent across the library. Normalized in <code>musicData.ts</code> and in the production database, 79 rows.</p>
+      </span>
+    </div>
+    <div class="find">
+      <span class="sev"><span class="pill p-warn">Schema</span></span>
+      <span class="body">
+        <h3><code>artist_id</code> is NULL on all 230 database rows</h3>
+        <p>The static catalog has artist ids; the database does not. Any grouping done from the database has only the name string to work with, which is exactly how the spelling split became invisible. Worth its own cleanup.</p>
+      </span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="head-rule"><span class="lbl">Also delivered</span><span class="fill"></span></div>
+  <div class="prose">
+    <p>The full catalog is archived to <code>E:\$ONGCHAINN</code>, organized by artist, then by catalog, with artwork in place: 232 audio files and 58 images, every one size-verified against its source. Measurement and download ran as a single pass, so the 3.9&nbsp;GB crossed your connection once rather than twice.</p>
+  </div>
+  <ul class="clean">
+    <li><strong>Per-track data</strong> for all 230 tracks in <code>results-local.jsonl</code>, 38 metrics each.</li>
+    <li><strong>Distribution report</strong> and machine-readable percentiles in <code>report.txt</code> and <code>stats.json</code>.</li>
+    <li><strong>The analyser itself</strong> in <code>core.mjs</code>, with <code>validate.mjs</code> as its 26-check conformance suite. This is the code that becomes the <code>audition</code> action inside <code>hikulu-judge</code>.</li>
+  </ul>
+</section>
+
+<footer>
+  <span class="lbl">Method</span>
+  Integrated loudness, loudness range and gating per ITU-R BS.1770-4 and EBU R128, K-weighting coefficients derived at each file&rsquo;s native sample rate rather than resampling. True peak by 4&times; polyphase oversampling, measured near peaks only and not reported below &minus;12&nbsp;dBFS. Spectral figures from 4096-point Hann-windowed FFT averaged across each track. Final numbers were re-measured from the local archive so no network variance is present in them.
+</footer>
+
+</div>
+</div>

@@ -8,6 +8,7 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { Button } from '@/components/ui/button';
 import { ArtistSubmissionForm } from '@/components/ArtistSubmissionForm';
 import { ZabalGamezSection } from '@/components/ZabalGamezSection';
+import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -189,14 +190,18 @@ export default function About() {
                 >
                   Artists
                 </button>
-                <span className="opacity-50">•</span>
-                <button
-                  type="button"
-                  className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors"
-                  onClick={() => scrollTo('zabal-gamez')}
-                >
-                  Zabal Gamez
-                </button>
+                {ZABAL_GAMEZ_ENABLED && (
+                  <>
+                    <span className="opacity-50">•</span>
+                    <button
+                      type="button"
+                      className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors"
+                      onClick={() => scrollTo('zabal-gamez')}
+                    >
+                      Zabal Gamez
+                    </button>
+                  </>
+                )}
               </motion.div>
 
               <motion.div
@@ -420,9 +425,11 @@ export default function About() {
             <ArtistSubmissionForm />
           </motion.div>
 
-          <motion.div id="zabal-gamez" variants={itemVariants}>
-            <ZabalGamezSection />
-          </motion.div>
+          {ZABAL_GAMEZ_ENABLED && (
+            <motion.div id="zabal-gamez" variants={itemVariants}>
+              <ZabalGamezSection />
+            </motion.div>
+          )}
         </motion.section>
 
         <motion.footer

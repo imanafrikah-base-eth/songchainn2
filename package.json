@@ -15,6 +15,13 @@
     "test:e2e:list": "playwright test --list"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.8",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/browser": "^7.0.5",
+    "@capacitor/core": "^7.6.8",
+    "@capacitor/network": "^7.0.4",
+    "@capacitor/splash-screen": "^7.0.5",
+    "@capacitor/status-bar": "^7.0.6",
     "@farcaster/miniapp-sdk": "^0.3.0",
     "@hookform/resolvers": "^3.10.0",
     "@livekit/components-react": "^2.9.20",
@@ -62,6 +69,7 @@
     "livekit-client": "^2.15.6",
     "livekit-server-sdk": "^2.15.1",
     "lucide-react": "^0.462.0",
+    "mpg123-decoder": "^1.0.3",
     "next-themes": "^0.3.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
@@ -79,6 +87,8 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.6.8",
     "@eslint/js": "^9.32.0",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/typography": "^0.5.16",

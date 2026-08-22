@@ -1,0 +1,232 @@
+SONGCHAINN CATALOG STANDARD
+230 tracks measured, 0 failed  (104 wav, 126 mp3)
+Loudness per ITU-R BS.1770-4, validated against EBU Tech 3341 (-22.99 vs -23.0 required).
+
+codecs:       mp3:126  pcm_s16:104
+sample rates: 48000:130  44100:100
+channels:     2:230
+bit depth:    16:104 (wav only)
+
+WHOLE CATALOG                          p5      p10     p25     med     p75     p90     p95    mean
+--------------------------------------------------------------------------------------------------
+Integrated loudness (LUFS)             -18.4   -17.1   -14.7   -11.6    -9.8    -8.9    -8.5   -12.5
+True peak (dBTP)                       -5.67   -4.74   -3.63    0.18    0.84    1.62    2.43   -1.05
+Sample peak (dBFS)                     -5.69   -4.85   -3.67    0.00    0.26    1.39    2.42   -1.28
+Loudness range (LRA) (LU)                2.2     2.4     3.1     4.2     5.7     7.6     8.5     4.6
+Crest factor (dB)                       10.4    11.0    12.0    13.2    14.4    15.8    16.3    13.3
+Peak to loudness (PSR) (dB)              9.1     9.8    10.2    11.1    12.6    13.7    14.2    11.4
+RMS (dBFS)                             -20.3   -19.6   -16.8   -13.8   -11.9   -10.9   -10.1   -14.5
+Quietest 5% of 100ms blocks (dBFS)     -37.4   -35.5   -30.9   -25.5   -21.9   -19.7   -18.8   -26.9
+Quietest single 100ms block (dBFS)    -177.3  -133.1  -125.8   -92.8   -63.9   -46.8   -41.0  -100.6
+Stereo correlation                     0.763   0.808   0.857   0.911   0.950   0.971   0.981   0.891
+Side vs mid (dB)                       -20.1   -18.2   -15.9   -13.3   -11.2    -9.8    -8.8   -13.7
+Mono-sum level change (dB)             -0.54   -0.44   -0.32   -0.20   -0.11   -0.06   -0.04   -0.24
+L/R balance (dB)                       -0.32   -0.23   -0.11   -0.03    0.08    0.36    0.60    0.01
+Spectral centroid (Hz)                   394     480     600     708     935    1234    1371     802
+Spectral tilt (highs vs lows) (dB)     -18.0   -16.2   -14.5   -12.9   -10.8    -8.7    -7.9   -12.6
+Rolloff 99% (Hz)                        6504    7594    8590   10218   11348   12188   12926    9950
+Rolloff 99.9% (Hz)                     11941   12457   13184   14018   15082   16430   17449   14199
+Spectral cutoff (brick wall) (Hz)      18196   18249   20080   20187   20438   22043   22043   20232
+Cutoff cliff steepness (dB)             -0.2     0.2    25.5    55.7    66.8    75.2    79.1    45.0
+Duration (s)                              97     110     131     156     183     208     224     160
+
+WAV MASTERS vs MP3 MASTERS  (median, and p5..p95 spread)
+--------------------------------------------------------------------------------------------------
+                                        WAV median         WAV p5..p95    MP3 median         MP3 p5..p95
+Integrated loudness (LUFS)                   -14.8        -18.5..-13.1         -10.0         -12.3..-8.1
+True peak (dBTP)                             -3.79         -6.22..0.04          0.78          0.03..2.69
+Sample peak (dBFS)                           -3.90         -6.22..0.00          0.22         -0.17..2.66
+Loudness range (LRA) (LU)                      5.4            3.0..8.7           3.4            2.0..6.8
+Crest factor (dB)                             13.8          11.6..16.7          12.3          10.1..15.5
+Peak to loudness (PSR) (dB)                   11.8           9.8..14.2          10.6           8.9..13.9
+RMS (dBFS)                                   -16.8        -21.1..-15.3         -12.0         -14.0..-9.8
+Quietest 5% of 100ms blocks (dBFS)           -30.6        -39.1..-23.9         -22.5        -30.9..-17.6
+Quietest single 100ms block (dBFS)           -91.2       -133.1..-41.3         -93.8       -260.9..-40.1
+Stereo correlation                           0.876        0.626..0.969         0.926        0.823..0.982
+Side vs mid (dB)                             -11.8         -18.0..-6.4         -14.1        -20.3..-10.2
+Mono-sum level change (dB)                   -0.28        -0.90..-0.07         -0.17        -0.40..-0.04
+L/R balance (dB)                              0.00         -0.30..0.33         -0.04         -0.32..0.62
+Spectral centroid (Hz)                         655            399..951           838           387..1607
+Spectral tilt (highs vs lows) (dB)           -14.1        -18.6..-10.7         -11.6         -16.2..-6.7
+Rolloff 99% (Hz)                              8836         5168..11918         10971         8387..13566
+Rolloff 99.9% (Hz)                           13277        11836..16758         14449        12737..17485
+Spectral cutoff (brick wall) (Hz)            20602        20133..22043         20090        18109..20262
+Cutoff cliff steepness (dB)                   16.2          -0.5..56.8          65.1          50.4..81.9
+Duration (s)                                   156            108..221           156             83..237
+
+SPECTRAL BALANCE  (dB relative to that track total energy)
+BAND                                      p5     p25     med     p75     p95
+--------------------------------------------------------------------------------------------------
+sub                                    -10.0    -7.2    -5.3    -4.1    -2.7
+bass                                    -7.4    -5.9    -5.1    -4.3    -3.5
+lowMid                                 -13.4   -11.5    -9.8    -8.5    -6.5
+mid                                    -11.2    -8.8    -7.5    -6.1    -4.7
+highMid                                -18.3   -15.6   -13.8   -12.4   -10.1
+presence                               -20.2   -17.5   -15.5   -13.7   -11.0
+top                                    -29.8   -27.0   -24.0   -21.4   -17.3
+
+HYGIENE
+--------------------------------------------------------------------------------------------------
+clipped runs (>=4 consecutive full-scale samples)               29 / 230   13%
+any sample above full scale                                    110 / 230   48%
+true peak above -1.0 dBTP                                      142 / 230   62%
+true peak above  0.0 dBTP (distorts on lossy encode)           129 / 230   56%
+effectively mono (correlation > 0.995)                           2 / 230    1%
+phase risk (correlation < 0.2)                                   1 / 230    0%
+mono-sum loss worse than -1 dB                                   2 / 230    1%
+L/R imbalance worse than 1 dB                                    0 / 230    0%
+DC offset above 0.001                                            0 / 230    0%
+brick wall in spectrum (lossy-encoded source)                  173 / 230   75%
+  ...of those, delivered as WAV (lossy master in a wav wrapper)  48 / 230   21%
+spectral cutoff below 17 kHz                                     1 / 230    0%
+crest factor below 8 dB (heavily squashed)                       0 / 230    0%
+LRA below 3 LU (very flat dynamics)                             53 / 230   23%
+
+LOUDEST 12
+  N3M3SIS            Vib3                           mp3    n/a LUFS  TP   n/a  crest   n/a
+  IMAN AFRIKAH       REACTIVE                       mp3  -7.8 LUFS  TP 0.79  crest 10.8
+  IMAN AFRIKAH ft SA THROUGH YOU                    mp3  -7.8 LUFS  TP 0.98  crest 10.7
+  IMAN AFRIKAH       FINALLY THEY PUT ME ON         mp3  -7.8 LUFS  TP 0.30  crest 8.7
+  IMAN AFRIKAH       CAME A LONG WAY                mp3  -7.9 LUFS  TP 0.27  crest 9.2
+  IMAN AFRIKAH       TAKE IT HOW YOU WANT           mp3  -8.1 LUFS  TP 1.24  crest 10.5
+  IMAN AFRIKAH       JIGGY WITH ME (ft TRACEY LOVE) mp3  -8.1 LUFS  TP 0.43  crest 10.4
+  N3M3SIS            CHILL N3M                      mp3  -8.1 LUFS  TP 0.59  crest 11.3
+  IMAN AFRIKAH       BIG MOVES                      mp3  -8.2 LUFS  TP 1.65  crest 10.2
+  7ROO7H BASED       THE FLOWER                     mp3  -8.2 LUFS  TP 1.31  crest 9.7
+  IMAN AFRIKAH       IYA PEOPLE SONG                mp3  -8.4 LUFS  TP 0.49  crest 11.0
+  N3M3SIS            THE CALL OUT                   mp3  -8.4 LUFS  TP 1.37  crest 12.2
+
+QUIETEST 12
+  NDA                CALM                           wav  -19.8 LUFS  TP -6.01  crest 16.2
+  JMN                LATE NIGHT                     wav  -19.6 LUFS  TP -6.25  crest 15.8
+  7ROO7H BASED       THE RISING HOPE                mp3  -19.6 LUFS  TP -3.80  crest 23.0
+  FAITH              NO SEATS                       wav  -19.3 LUFS  TP -5.81  crest 15.8
+  JMN                PARTY                          wav  -18.9 LUFS  TP -6.77  crest 14.4
+  IMan Afrikah       SHE TIRED                      wav  -18.8 LUFS  TP -6.22  crest 14.8
+  FAITH              RISE                           wav  -18.5 LUFS  TP -4.82  crest 16.7
+  7ROO7H BASED       I TRY                          wav  -18.5 LUFS  TP -4.88  crest 15.4
+  7ROO7H BASED       SUPER BASED                    wav  -18.5 LUFS  TP -6.33  crest 13.8
+  IMan Afrikah       SHOTS ON ME (KILLER)           wav  -18.4 LUFS  TP -5.67  crest 14.6
+  IMan Afrikah       NOTICE YOU                     wav  -18.4 LUFS  TP -6.72  crest 13.6
+  FAITH              UNTAMED                        wav  -18.4 LUFS  TP -4.09  crest 17.2
+
+HOTTEST TRUE PEAKS
+  NDA                married to the grind           mp3  3.60 dBTP  1719 clip runs  -10.0 LUFS
+  NDA                ELEMENT                        mp3  3.38 dBTP  2238 clip runs  -11.0 LUFS
+  NDA                REAL ONE                       mp3  3.37 dBTP  721 clip runs  -9.4 LUFS
+  NDA                ACE                            mp3  3.04 dBTP  483 clip runs  -10.3 LUFS
+  NDA                ROACHES AND RATS               mp3  3.02 dBTP  682 clip runs  -10.8 LUFS
+  NDA                Gbona                          mp3  2.97 dBTP  1991 clip runs  -9.7 LUFS
+  NDA                FROZE                          mp3  2.69 dBTP  430 clip runs  -10.9 LUFS
+  NDA                BACK ON MY SHIT                mp3  2.64 dBTP  40 clip runs  -10.0 LUFS
+  NDA                DO YOU DIGG                    mp3  2.64 dBTP  167 clip runs  -9.4 LUFS
+  NDA                BIEH                           mp3  2.56 dBTP  142 clip runs  -11.4 LUFS
+  NDA                2.22                           mp3  2.46 dBTP  65 clip runs  -11.1 LUFS
+  NDA                3AM                            mp3  2.43 dBTP  139 clip runs  -10.4 LUFS
+
+MOST CLIPPED
+  NDA                ELEMENT                        mp3  2238 runs  41726 samples (0.2036%)  TP 3.38
+  NDA                Gbona                          mp3  1991 runs  37625 samples (0.2140%)  TP 2.97
+  NDA                married to the grind           mp3  1719 runs  28866 samples (0.1527%)  TP 3.60
+  NDA                REAL ONE                       mp3  721 runs  13919 samples (0.1098%)  TP 3.37
+  NDA                ROACHES AND RATS               mp3  682 runs  12933 samples (0.0862%)  TP 3.02
+  NDA                ACE                            mp3  483 runs  8270 samples (0.0529%)  TP 3.04
+  NDA                FROZE                          mp3  430 runs  7063 samples (0.0718%)  TP 2.69
+  NDA                GiRL FROM LTC                  mp3  329 runs  7090 samples (0.0517%)  TP 2.19
+  NDA                POUR UP                        mp3  247 runs  5239 samples (0.0428%)  TP 2.39
+  NDA                BITTERSWEET ESCAPE             mp3  185 runs  2887 samples (0.0197%)  TP 2.33
+  NDA                DO YOU DIGG                    mp3  167 runs  3605 samples (0.0388%)  TP 2.64
+  NDA                CLEAN                          mp3  165 runs  3103 samples (0.0231%)  TP 2.15
+
+MOST SQUASHED (lowest crest)
+  N3M3SIS            Vib3                           mp3  crest   n/a  LRA   n/a    n/a LUFS
+  IMAN AFRIKAH       FINALLY THEY PUT ME ON         mp3  crest 8.7  LRA 2.9  -7.8 LUFS
+  IMAN AFRIKAH       CAME A LONG WAY                mp3  crest 9.2  LRA 2.2  -7.9 LUFS
+  IMAN AFRIKAH       BUILD A BETTER WORLD           mp3  crest 9.4  LRA 2.9  -8.5 LUFS
+  7ROO7H BASED       THE FLOWER                     mp3  crest 9.7  LRA 6.3  -8.2 LUFS
+  IMAN AFRIKAH       10 10                          mp3  crest 9.7  LRA 4.4  -9.6 LUFS
+  7ROO7H BASED       NO PLAYSTATION                 mp3  crest 10.0  LRA 2.9  -8.9 LUFS
+  IMAN AFRIKAH       LATELY ALOT                    mp3  crest 10.1  LRA 3.0  -8.7 LUFS
+  IMAN AFRIKAH       BIG MOVES                      mp3  crest 10.2  LRA 2.6  -8.2 LUFS
+  7ROO7H BASED       MATCH MADE IN HEAVEN           mp3  crest 10.3  LRA 1.9  -9.5 LUFS
+  7ROO7H BASED       FADA                           mp3  crest 10.4  LRA 3.8  -8.9 LUFS
+  IMAN AFRIKAH       I Miss You Bad                 mp3  crest 10.4  LRA 3.6  -9.8 LUFS
+
+LOWEST SPECTRAL CUTOFF (brick-wall candidates)
+  N3M3SIS            Vib3                           mp3  cutoff 0 Hz  cliff 0.0 dB  natural rolloff  (320kbps)
+  SANTANA x RVSSIAN  ISLAND VILLA RIDDIM FREESTYLE  mp3  cutoff 17894 Hz  cliff 65.5 dB  LOSSY-LIKE  (320kbps)
+  N3M3SIS            SHADOW                         mp3  cutoff 17980 Hz  cliff 32.5 dB  LOSSY-LIKE  (320kbps)
+  7ROO7H BASED       INFORMA                        mp3  cutoff 18066 Hz  cliff 58.7 dB  LOSSY-LIKE  (320kbps)
+  IMAN AFRIKAH x RVS TOPIER (ISLAND VILLA RIDDIM)   mp3  cutoff 18066 Hz  cliff 82.4 dB  LOSSY-LIKE  (320kbps)
+  7ROO7H BASED       SELF ADVICE                    mp3  cutoff 18088 Hz  cliff 55.6 dB  LOSSY-LIKE  (320kbps)
+  7ROO7H BASED       THE GARDEN                     mp3  cutoff 18109 Hz  cliff 54.3 dB  LOSSY-LIKE  (320kbps)
+  7ROO7H BASED       MATCH MADE IN HEAVEN           mp3  cutoff 18120 Hz  cliff 67.2 dB  LOSSY-LIKE  (320kbps)
+  7ROO7H BASED       NO PLAYSTATION                 mp3  cutoff 18142 Hz  cliff 66.8 dB  LOSSY-LIKE  (320kbps)
+  7ROO7H BASED       THE LIGHT HOUSE                mp3  cutoff 18142 Hz  cliff 63.5 dB  LOSSY-LIKE  (320kbps)
+  7ROO7H BASED       MY OWN                         mp3  cutoff 18185 Hz  cliff 62.2 dB  LOSSY-LIKE  (320kbps)
+  7ROO7H BASED       THE WIRECABLE                  mp3  cutoff 18196 Hz  cliff 63.4 dB  LOSSY-LIKE  (320kbps)
+
+WIDEST / PHASE RISK
+  N3M3SIS            Vib3                           mp3  corr 0.000  side/mid   n/a dB  mono sum   n/a dB
+  IMan Afrikah       LOVE IT                        wav  corr 0.583  side/mid -5.8 dB  mono sum -1.02 dB
+  NDA                CALM                           wav  corr 0.584  side/mid -5.8 dB  mono sum -1.01 dB
+  IMan Afrikah       Endless                        wav  corr 0.602  side/mid -6.0 dB  mono sum -0.96 dB
+  PRP                MAMI RHODA                     wav  corr 0.609  side/mid -6.1 dB  mono sum -0.95 dB
+  IMan Afrikah       GRAVITY GIRLS                  wav  corr 0.620  side/mid -6.3 dB  mono sum -0.92 dB
+  FAITH              RADIANT                        wav  corr 0.626  side/mid -6.4 dB  mono sum -0.90 dB
+  DenaJah            EMPRESS                        wav  corr 0.684  side/mid -7.3 dB  mono sum -0.75 dB
+  DenaJah            COME CLOSER                    wav  corr 0.742  side/mid -8.3 dB  mono sum -0.60 dB
+  PRP                EVEN ME                        wav  corr 0.758  side/mid -8.6 dB  mono sum -0.56 dB
+  N3M3SIS            Gr3Y                           mp3  corr 0.762  side/mid -8.7 dB  mono sum -0.55 dB
+  IMan Afrikah       Mirror Talk                    wav  corr 0.763  side/mid -8.7 dB  mono sum -0.55 dB
+
+NARROWEST STEREO
+  IMAN AFRIKAH       CAN'T LET YOU GO               mp3  corr 0.999  side/mid -31.6 dB
+  FAITH              CROWN UP                       wav  corr 0.997  side/mid -27.9 dB
+  IMAN AFRIKAH       BRA! BRA!                      mp3  corr 0.994  side/mid -25.4 dB
+  NDA                CAN'T MATCH                    wav  corr 0.993  side/mid -24.5 dB
+  IMAN AFRIKAH       REACTIVE                       mp3  corr 0.989  side/mid -22.6 dB
+  IMAN AFRIKAH       KEPT IT PUSHING                mp3  corr 0.987  side/mid -21.6 dB
+  7ROO7H BASED       MATCH MADE IN HEAVEN           mp3  corr 0.983  side/mid -20.6 dB
+  7ROO7H BASED       MY OWN                         mp3  corr 0.982  side/mid -20.4 dB
+  7ROO7H BASED       NO PLAYSTATION                 mp3  corr 0.982  side/mid -20.3 dB
+  IMAN AFRIKAH       WGE                            mp3  corr 0.981  side/mid -20.3 dB
+  7ROO7H BASED       THE FLOWER                     mp3  corr 0.981  side/mid -20.2 dB
+  IMAN AFRIKAH       BIG MOVES                      mp3  corr 0.981  side/mid -20.1 dB
+
+HIGHEST QUIET-FLOOR (never drops out)
+  N3M3SIS            Vib3                           mp3  min block   n/a dBFS  LRA   n/a
+  IMan Afrikah       GRAVITY GIRLS                  wav  min block -34.7 dBFS  LRA 2.6
+  SANTANA x RVSSIAN  ISLAND VILLA RIDDIM FREESTYLE  mp3  min block -37.5 dBFS  LRA 2.7
+  IMAN AFRIKAH       NO B.S                         mp3  min block -37.9 dBFS  LRA 2.7
+  7ROO7H BASED       THE DIAMOND PATH               mp3  min block -39.2 dBFS  LRA 11.6
+  7ROO7H BASED       THE GARDEN                     mp3  min block -39.3 dBFS  LRA 7.9
+  NDA                COPPER BLOOD                   wav  min block -39.8 dBFS  LRA 2.5
+  Santana            GNB                            mp3  min block -40.0 dBFS  LRA 2.3
+  IMAN AFRIKAH       10 10                          mp3  min block -40.0 dBFS  LRA 4.4
+  IMAN AFRIKAH       FINALLY THEY PUT ME ON         mp3  min block -40.1 dBFS  LRA 2.9
+  NDA                VENOM VIRTUE                   wav  min block -40.6 dBFS  LRA 4.4
+  7ROO7H BASED       ALREADY LOST                   wav  min block -40.7 dBFS  LRA 5.9
+
+==================================================================================================
+THE SONGCHAINN ENVELOPE  —  central 90% of the catalog (p5..p95)
+This is the standard, expressed as numbers rather than as one person's ear.
+==================================================================================================
+Integrated loudness (LUFS)                       -18.4  to       -8.5      (median -11.6)
+True peak (dBTP)                                 -5.67  to       2.43      (median 0.18)
+Crest factor (dB)                                 10.4  to       16.3      (median 13.2)
+Peak to loudness (dB)                              9.1  to       14.2      (median 11.1)
+Loudness range (LU)                                2.2  to        8.5      (median 4.2)
+Stereo correlation                               0.763  to      0.981      (median 0.911)
+Mono-sum level change (dB)                       -0.54  to      -0.04      (median -0.20)
+Spectral centroid (Hz)                             394  to       1371      (median 708)
+Spectral tilt (dB)                               -18.0  to       -7.9      (median -12.9)
+Rolloff 99.9% (Hz)                               11941  to      17449      (median 14018)
+
+  band sub                                        -10.0  to       -2.7      (median -5.3)
+  band bass                                        -7.4  to       -3.5      (median -5.1)
+  band lowMid                                     -13.4  to       -6.5      (median -9.8)
+  band mid                                        -11.2  to       -4.7      (median -7.5)
+  band highMid                                    -18.3  to      -10.1      (median -13.8)
+  band presence                                   -20.2  to      -11.0      (median -15.5)
+  band top                                        -29.8  to      -17.3      (median -24.0)
