@@ -406,12 +406,23 @@ export default function Auth() {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) {
-        setError(error.message || 'Failed to send reset email');
+        const lower = String(error.message || '').toLowerCase();
+        if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('security purposes')) {
+          setError('We can only send a few reset emails at a time. Give it a minute, then try again.');
+        } else if (lower.includes('invalid email') || lower.includes('unable to validate')) {
+          setError('That email address does not look right.');
+        } else {
+          setError(error.message || 'We could not send the reset email.');
+        }
         return;
       }
-      toast.success('Password reset email sent. Check your inbox.');
+      // Deliberately not "if that address exists": people read that as failure.
+      // Supabase does not reveal whether the account exists either way.
+      toast.success('Reset link sent', {
+        description: 'Check your inbox, and your spam folder. The link only works once, so open it as soon as it lands.',
+      });
     } catch (err: any) {
-      setError(err?.message || 'Failed to send reset email');
+      setError(err?.message || 'We could not send the reset email.');
     } finally {
       setIsLoading(false);
     }
@@ -1742,14 +1753,21 @@ export default function Auth() {
                           Email me a sign-in link
                         </Button>
                       )}
-                      <button
+                      {/* Forgetting a password is one of the two reasons people
+                          fail to get in, so this is a real control, not a
+                          hairline link buried under the form. */}
+                      <Button
                         type="button"
+                        variant="outline"
                         disabled={isLoading}
                         onClick={handleForgotPassword}
-                        className="w-full text-xs text-muted-foreground hover:text-foreground mt-2 underline-offset-2 hover:underline"
+                        className="w-full h-12 rounded-xl border-border/50 hover:bg-secondary/30 text-foreground font-medium"
                       >
-                        Forgot password?
-                      </button>
+                        Email me a reset link
+                      </Button>
+                      <p className="mt-2 text-center text-xs text-muted-foreground">
+                        Put your email in above first, and we will send the link there.
+                      </p>
                     </>
                   )}
                 </form>
