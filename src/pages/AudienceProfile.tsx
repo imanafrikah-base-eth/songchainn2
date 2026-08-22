@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Navigation } from '@/components/Navigation';
 import { PostCard } from '@/components/social/PostCard';
 import { useSocial } from '@/hooks/useSocial';
+import { MusicActivity } from '@/components/MusicActivity';
 import { useAuth } from '@/context/AuthContext';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { AudienceProfile as AudienceProfileType } from '@/types/database';
@@ -491,10 +492,11 @@ export default function AudienceProfile() {
           </TabsContent>
 
           <TabsContent value="music" className="mt-6">
-            <div className="text-center py-12">
-              <Music className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Music activity coming soon</p>
-            </div>
+            <MusicActivity
+              userId={userId}
+              isOwnProfile={isOwnProfile}
+              displayName={profile?.profile_name}
+            />
           </TabsContent>
 
           <TabsContent value="likes" className="mt-6">
