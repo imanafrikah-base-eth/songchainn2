@@ -26,5 +26,9 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  // These tests belong to the BattleZone standalone app, which has its own
+  // vitest and its own tsconfig. The main app has no vitest, so type-checking
+  // them here can only ever fail.
+  "exclude": ["src/battlezone/test"]
 }

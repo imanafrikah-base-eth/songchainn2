@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      artist_accounts: {
+        Row: {
+          artist_id: string
+          claimed_at: string | null
+          created_at: string
+          is_verified: boolean
+          profile_theme: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          artist_id: string
+          claimed_at?: string | null
+          created_at?: string
+          is_verified?: boolean
+          profile_theme?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          artist_id?: string
+          claimed_at?: string | null
+          created_at?: string
+          is_verified?: boolean
+          profile_theme?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       artist_applications: {
         Row: {
           artist_name: string
@@ -24,7 +54,7 @@ export type Database = {
           real_name: string
           reason: string
           songs: Json
-          wallet_address: string
+          wallet_address: string | null
         }
         Insert: {
           artist_name: string
@@ -35,7 +65,7 @@ export type Database = {
           real_name: string
           reason: string
           songs?: Json
-          wallet_address: string
+          wallet_address?: string | null
         }
         Update: {
           artist_name?: string
@@ -46,7 +76,40 @@ export type Database = {
           real_name?: string
           reason?: string
           songs?: Json
-          wallet_address?: string
+          wallet_address?: string | null
+        }
+        Relationships: []
+      }
+      artist_claims: {
+        Row: {
+          artist_id: string
+          created_at: string
+          id: string
+          message: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -306,17 +369,25 @@ export type Database = {
           artist_b_image: string | null
           artist_b_name: string
           artist_b_region: string | null
+          battle_type: string
           co_hosts: string[] | null
           created_at: string
           created_by: string | null
           ended_at: string | null
           ended_time: string | null
           feed_post_id: string | null
+          hikulu_points_a: number
+          hikulu_points_b: number
+          hikulu_verdict: string | null
+          hikulu_verdict_at: string | null
           host_name: string
           host_user_id: string | null
           id: string
           launch_mode: string
           launched_at: string | null
+          nakulu_points_a: number
+          nakulu_points_b: number
+          nakulu_verdict: string | null
           region: string
           room_id: string | null
           round: number
@@ -324,10 +395,13 @@ export type Database = {
           scheduled_time: string | null
           song_a: string
           song_b: string
+          songs_a: Json | null
+          songs_b: Json | null
           status: string
           title: string
           total_rounds: number
           updated_at: string
+          voting_open: boolean
           winner: string | null
           x_space_url: string | null
         }
@@ -338,17 +412,25 @@ export type Database = {
           artist_b_image?: string | null
           artist_b_name: string
           artist_b_region?: string | null
+          battle_type?: string
           co_hosts?: string[] | null
           created_at?: string
           created_by?: string | null
           ended_at?: string | null
           ended_time?: string | null
           feed_post_id?: string | null
+          hikulu_points_a?: number
+          hikulu_points_b?: number
+          hikulu_verdict?: string | null
+          hikulu_verdict_at?: string | null
           host_name: string
           host_user_id?: string | null
           id?: string
           launch_mode?: string
           launched_at?: string | null
+          nakulu_points_a?: number
+          nakulu_points_b?: number
+          nakulu_verdict?: string | null
           region?: string
           room_id?: string | null
           round?: number
@@ -356,10 +438,13 @@ export type Database = {
           scheduled_time?: string | null
           song_a: string
           song_b: string
+          songs_a?: Json | null
+          songs_b?: Json | null
           status?: string
           title: string
           total_rounds?: number
           updated_at?: string
+          voting_open?: boolean
           winner?: string | null
           x_space_url?: string | null
         }
@@ -370,17 +455,25 @@ export type Database = {
           artist_b_image?: string | null
           artist_b_name?: string
           artist_b_region?: string | null
+          battle_type?: string
           co_hosts?: string[] | null
           created_at?: string
           created_by?: string | null
           ended_at?: string | null
           ended_time?: string | null
           feed_post_id?: string | null
+          hikulu_points_a?: number
+          hikulu_points_b?: number
+          hikulu_verdict?: string | null
+          hikulu_verdict_at?: string | null
           host_name?: string
           host_user_id?: string | null
           id?: string
           launch_mode?: string
           launched_at?: string | null
+          nakulu_points_a?: number
+          nakulu_points_b?: number
+          nakulu_verdict?: string | null
           region?: string
           room_id?: string | null
           round?: number
@@ -388,10 +481,13 @@ export type Database = {
           scheduled_time?: string | null
           song_a?: string
           song_b?: string
+          songs_a?: Json | null
+          songs_b?: Json | null
           status?: string
           title?: string
           total_rounds?: number
           updated_at?: string
+          voting_open?: boolean
           winner?: string | null
           x_space_url?: string | null
         }
@@ -748,6 +844,30 @@ export type Database = {
           status?: string
           subject?: string
           to_email?: string
+        }
+        Relationships: []
+      }
+      phase_two_beta_reports: {
+        Row: {
+          created_at: string
+          id: string
+          rating: number
+          report: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          rating: number
+          report: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          rating?: number
+          report?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1136,11 +1256,18 @@ export type Database = {
           artist_image_url: string | null
           artist_name: string | null
           audio_url: string | null
+          audition: Json | null
           cover_art_url: string | null
           created_at: string | null
+          duration_seconds: number | null
+          file_bytes: number | null
           genre: string | null
           id: string
           is_published: boolean | null
+          owner_id: string | null
+          published_at: string | null
+          status: string
+          storage_key: string | null
           title: string | null
           town_square: string | null
         }
@@ -1149,11 +1276,18 @@ export type Database = {
           artist_image_url?: string | null
           artist_name?: string | null
           audio_url?: string | null
+          audition?: Json | null
           cover_art_url?: string | null
           created_at?: string | null
+          duration_seconds?: number | null
+          file_bytes?: number | null
           genre?: string | null
           id?: string
           is_published?: boolean | null
+          owner_id?: string | null
+          published_at?: string | null
+          status?: string
+          storage_key?: string | null
           title?: string | null
           town_square?: string | null
         }
@@ -1162,11 +1296,18 @@ export type Database = {
           artist_image_url?: string | null
           artist_name?: string | null
           audio_url?: string | null
+          audition?: Json | null
           cover_art_url?: string | null
           created_at?: string | null
+          duration_seconds?: number | null
+          file_bytes?: number | null
           genre?: string | null
           id?: string
           is_published?: boolean | null
+          owner_id?: string | null
+          published_at?: string | null
+          status?: string
+          storage_key?: string | null
           title?: string | null
           town_square?: string | null
         }
@@ -1247,6 +1388,54 @@ export type Database = {
         }
         Relationships: []
       }
+      user_points: {
+        Row: {
+          is_og: boolean
+          legacy_claimed: boolean
+          lifetime_points: number
+          points: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          is_og?: boolean
+          legacy_claimed?: boolean
+          lifetime_points?: number
+          points?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          is_og?: boolean
+          legacy_claimed?: boolean
+          lifetime_points?: number
+          points?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_points_daily: {
+        Row: {
+          day: string
+          earned: number
+          kind: string
+          user_id: string
+        }
+        Insert: {
+          day?: string
+          earned?: number
+          kind: string
+          user_id: string
+        }
+        Update: {
+          day?: string
+          earned?: number
+          kind?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1265,6 +1454,54 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      zabal_gamez_beat_downloads: {
+        Row: {
+          created_at: string
+          id: string
+          source: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          source?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          source?: string | null
+        }
+        Relationships: []
+      }
+      zabal_gamez_entries: {
+        Row: {
+          artist_name: string
+          contact_email: string | null
+          created_at: string
+          id: string
+          is_hidden: boolean
+          tiktok_url: string | null
+          verse_audio_url: string | null
+        }
+        Insert: {
+          artist_name: string
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          is_hidden?: boolean
+          tiktok_url?: string | null
+          verse_audio_url?: string | null
+        }
+        Update: {
+          artist_name?: string
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          is_hidden?: boolean
+          tiktok_url?: string | null
+          verse_audio_url?: string | null
         }
         Relationships: []
       }
@@ -1486,9 +1723,53 @@ export type Database = {
       }
     }
     Functions: {
+      _award_points: {
+        Args: { _amount: number; _user_id: string }
+        Returns: undefined
+      }
+      _award_points_capped: {
+        Args: {
+          _amount: number
+          _daily_cap: number
+          _kind: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       add_battle_cohost: {
         Args: { _battle_id: string; _display_name: string; _user_id: string }
         Returns: undefined
+      }
+      approve_artist_claim: {
+        Args: { p_claim_id: string; p_verify?: boolean }
+        Returns: {
+          artist_id: string
+          claimed_at: string | null
+          created_at: string
+          is_verified: boolean
+          profile_theme: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "artist_accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      artist_upload_count: {
+        Args: { p_since: string; p_user: string }
+        Returns: number
+      }
+      claim_legacy_points: {
+        Args: { _amount: number }
+        Returns: {
+          is_og: boolean
+          lifetime_points: number
+          points: number
+          tier: string
+        }[]
       }
       create_songchainn_system_post: {
         Args: { _playlist_id?: string; _song_id?: string; _text: string }
@@ -1519,6 +1800,19 @@ export type Database = {
           updated_at: string
           user_id: string
           username: string
+        }[]
+      }
+      get_hikulu_brain_key: { Args: never; Returns: string }
+      get_points_leaderboard: {
+        Args: { _limit?: number }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          is_og: boolean
+          lifetime_points: number
+          rank: number
+          tier: string
+          user_id: string
         }[]
       }
       get_pulse_counts: {
@@ -1558,16 +1852,14 @@ export type Database = {
       leave_battle_room: { Args: { _battle_id: string }; Returns: undefined }
       leave_room: { Args: { _room_id: string }; Returns: undefined }
       mark_dm_thread_read: { Args: { _thread_id: string }; Returns: undefined }
+      points_tier: { Args: { _lifetime: number }; Returns: string }
+      reject_artist_claim: { Args: { p_claim_id: string }; Returns: undefined }
       send_mosha_message: {
         Args: { _message_text: string; _user_id: string }
         Returns: string
       }
       switch_battle_room: {
         Args: { _new_battle_id: string }
-        Returns: undefined
-      }
-      sync_battle_listener_count: {
-        Args: { _battle_id: string }
         Returns: undefined
       }
     }
