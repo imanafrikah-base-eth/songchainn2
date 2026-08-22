@@ -6,6 +6,8 @@ import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { SongCard } from '@/components/SongCard';
 import { ArtistCard } from '@/components/ArtistCard';
 import { Navigation } from '@/components/Navigation';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -739,13 +741,16 @@ export default function ArtistDetail() {
                             NEW
                           </span>
                         )}
-                        {isVerified && <CheckCircle2 className="w-5 h-5 text-yellow-400" />}
+                        {isVerified && <VerifiedBadge size={22} tone="gold" />}
                       </span>
                     </h1>
                   )}
                   <p className="text-sm text-muted-foreground mt-2">{artistPresenceLabel}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {id && !ownerUserId && (
+                    <ClaimArtistPage artistId={id} artistName={artist?.name ?? 'this page'} isClaimed={!!ownerUserId} />
+                  )}
                   {user && (
                     <Button
                       onClick={handleToggleFollow}

@@ -30,6 +30,7 @@ import { AmbientBackground, TileBackdrop } from '@/components/AmbientBackground'
 import { CARD_TILES } from '@/data/backgroundPools';
 import { ZabalGamezSection } from '@/components/ZabalGamezSection';
 import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
+import { MusicianCta } from '@/components/MusicianCta';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -754,6 +755,16 @@ export default function Auth() {
               </Button>
             </div>
           </div>
+        </div>
+
+        <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-4 md:pt-6">
+          <MusicianCta
+            onSignUp={() => {
+              setAuthMode('signup');
+              setAuthView('email');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         </div>
 
         {ZABAL_GAMEZ_ENABLED && (

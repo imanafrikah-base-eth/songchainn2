@@ -2,6 +2,7 @@ import { useState, type SyntheticEvent } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
 import { SONGS, ARTISTS } from '@/data/musicData';
@@ -144,9 +145,7 @@ export function PostCard({
                 <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-muted'}`} />
                 {displayName}
               </button>
-              {isArtistPost && isVerifiedArtist && (
-                <CheckCircle2 className="w-4 h-4 text-yellow-400" />
-              )}
+              {isArtistPost && isVerifiedArtist && <VerifiedBadge size={17} tone="gold" />}
               {!isOwnPost && (
                 isArtistPost ? (
                   <Button

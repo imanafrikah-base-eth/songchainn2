@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, type SyntheticEvent } from 'react
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Heart, MoreHorizontal, Reply, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -249,9 +250,7 @@ export function CommentSheet({
                                 <span className="inline-flex items-center gap-1">
                                   <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(comment.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                                   <span>{displayName}</span>
-                                  {isArtistComment && isVerifiedArtist && (
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-yellow-400" />
-                                  )}
+                                  {isArtistComment && isVerifiedArtist && <VerifiedBadge size={15} tone="gold" />}
                                 </span>
                               </button>
                               <span className="text-xs text-muted-foreground ml-2">
