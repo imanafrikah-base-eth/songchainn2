@@ -61,6 +61,17 @@ const ALLOWED_TYPES: Record<string, string> = {
   "audio/vnd.wave": "wav",
 };
 
+// Cover art. A release with no artwork looks broken next to the catalog, so the
+// Studio offers it on the same screen as the audio and it rides the same
+// presigned-PUT path into the same bucket.
+const MAX_COVER_BYTES = 8 * 1024 * 1024;
+const COVER_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
 /* ------------------------------------------------- AWS SigV4 presign --- */
 
 const enc = new TextEncoder();
@@ -256,6 +267,23 @@ Deno.serve(async (req) => {
     }, 413);
   }
 
+  // Cover art is optional, but if they sent one it has to be sane before we
+  // create anything.
+  const coverType = str(body.coverContentType, 100).toLowerCase();
+  const coverBytes = Number(body.coverBytes);
+  let coverExt: string | null = null;
+  if (coverType) {
+    coverExt = COVER_TYPES[coverType] ?? null;
+    if (!coverExt) {
+      return json(origin, { error: "Cover art must be a JPG, PNG or WEBP." }, 415);
+    }
+    if (!Number.isFinite(coverBytes) || coverBytes <= 0 || coverBytes > MAX_COVER_BYTES) {
+      return json(origin, {
+        error: `Cover art must be under ${MAX_COVER_BYTES / (1024 * 1024)} MB.`,
+      }, 413);
+    }
+  }
+
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
   // Abuse cap. Generous enough that a real artist never meets it.
@@ -273,6 +301,35 @@ Deno.serve(async (req) => {
     }, 429);
   }
 
+  // Which artist do these releases belong to?
+  //
+  // This matters more than it looks: usePublishedCatalog filters on
+  // `.not('artist_id', 'is', null)`, so a song with no artist_id is invisible
+  // everywhere in the app no matter what its status says. Leaving it null would
+  // mean an artist uploads, passes the audition, is told they are live, and
+  // nobody can ever find the track.
+  //
+  // If they own a claimed catalog page, releases go to that page. Otherwise
+  // they get a stable id of their own; usePublishedCatalog builds an artist
+  // entry for any id it does not already know, so their page appears by itself.
+  const { data: account } = await db
+    .from("artist_accounts")
+    .select("artist_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const artistId = (account as { artist_id?: string } | null)?.artist_id ?? `u-${user.id}`;
+
+  // Their own profile picture doubles as the artist image on that page.
+  const { data: profile } = await db
+    .from("audience_profiles")
+    .select("profile_picture_url, avatar_url, location")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const prof = profile as
+    | { profile_picture_url?: string | null; avatar_url?: string | null; location?: string | null }
+    | null;
+
   // Reserve the row first so the storage key is ours to choose, not the
   // client's. status 'uploading' keeps it invisible everywhere until the
   // audition moves it on.
@@ -289,11 +346,17 @@ Deno.serve(async (req) => {
     title,
     artist_name: artistName,
     genre,
+    artist_id: artistId,
+    artist_image_url: prof?.profile_picture_url ?? prof?.avatar_url ?? null,
+    town_square: prof?.location ?? null,
     owner_id: user.id,
     status: "uploading",
     storage_key: key,
     file_bytes: Math.round(fileBytes),
     audio_url: `${publicBase}/${key}`,
+    // Left null on purpose. The browser sets it only after the cover actually
+    // lands in the bucket, so we never point at artwork that was not uploaded.
+    cover_art_url: null,
   });
   if (insertErr) {
     console.error("upload-url insert failed:", insertErr);
@@ -304,11 +367,25 @@ Deno.serve(async (req) => {
     accountId, accessKeyId, secretAccessKey, bucket, key, expiresIn: PRESIGN_TTL,
   });
 
+  // Optional second door, for the artwork. Validated up front, before the row
+  // exists, so a bad cover can never leave an orphaned song behind.
+  let coverUploadUrl: string | null = null;
+  let coverPublicUrl: string | null = null;
+  if (coverExt) {
+    const coverKey = ["uploads", user.id, songId, `cover.${coverExt}`].join("/");
+    coverUploadUrl = await presignPut({
+      accountId, accessKeyId, secretAccessKey, bucket, key: coverKey, expiresIn: PRESIGN_TTL,
+    });
+    coverPublicUrl = `${publicBase}/${coverKey}`;
+  }
+
   return json(origin, {
     songId,
     uploadUrl,
     storageKey: key,
     publicUrl: `${publicBase}/${key}`,
+    coverUploadUrl,
+    coverPublicUrl,
     expiresIn: PRESIGN_TTL,
   });
 });

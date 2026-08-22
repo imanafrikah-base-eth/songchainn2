@@ -87,7 +87,10 @@ export function useTrackUpload() {
   const reset = useCallback(() => setState(IDLE), []);
 
   const upload = useCallback(
-    async (file: File, meta: { title: string; artistName: string; genre?: string }) => {
+    async (
+      file: File,
+      meta: { title: string; artistName: string; genre?: string; cover?: File | null },
+    ) => {
       if (!user) {
         setState({ ...IDLE, phase: 'error', error: 'Sign in to upload.' });
         return;
@@ -98,6 +101,7 @@ export function useTrackUpload() {
       try {
         // 1. Ask for a short-lived door into our own storage. The row is
         //    reserved server-side so the artist never picks the storage key.
+        const cover = meta.cover ?? null;
         const { data: ticket, error: ticketError } = await supabase.functions.invoke('upload-url', {
           body: {
             title: meta.title,
@@ -106,6 +110,7 @@ export function useTrackUpload() {
             fileName: file.name,
             contentType: file.type,
             fileBytes: file.size,
+            ...(cover ? { coverContentType: cover.type, coverBytes: cover.size } : {}),
           },
         });
 
@@ -124,6 +129,22 @@ export function useTrackUpload() {
         await putWithProgress(ticket.uploadUrl, file, (progress) =>
           setState((s) => (s.phase === 'uploading' ? { ...s, progress } : s)),
         );
+
+        // 2b. Artwork, if they gave us any. Only once it is genuinely in the
+        //     bucket do we point the song row at it, so a failed cover upload
+        //     leaves no broken image behind. It is never fatal: a release with
+        //     no artwork still beats no release.
+        if (cover && ticket.coverUploadUrl && ticket.coverPublicUrl) {
+          try {
+            await putWithProgress(ticket.coverUploadUrl, cover, () => undefined);
+            await supabase
+              .from('songs')
+              .update({ cover_art_url: ticket.coverPublicUrl })
+              .eq('id', ticket.songId);
+          } catch (coverErr) {
+            console.error('Cover art upload failed, continuing without it', coverErr);
+          }
+        }
 
         // 3. The audition. Measured, then put into words by $HIKULU and NAKULU.
         setState((s) => ({ ...s, phase: 'auditioning', progress: 100 }));

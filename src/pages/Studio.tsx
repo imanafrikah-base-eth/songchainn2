@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, UploadCloud, Loader2, CheckCircle2, Wrench, Music4, Wallet, Coins, AlertCircle,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -49,6 +50,9 @@ const Studio = () => {
   const [title, setTitle] = useState('');
   const [artistName, setArtistName] = useState('');
   const [genre, setGenre] = useState('');
+  const [cover, setCover] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!artistName && profile) {
@@ -70,7 +74,12 @@ const Studio = () => {
 
   const submit = async () => {
     if (!file || !canSubmit) return;
-    await upload(file, { title: title.trim(), artistName: artistName.trim(), genre: genre.trim() || undefined });
+    await upload(file, {
+      title: title.trim(),
+      artistName: artistName.trim(),
+      genre: genre.trim() || undefined,
+      cover,
+    });
   };
 
   const startOver = () => {
@@ -78,7 +87,13 @@ const Studio = () => {
     setFile(null);
     setTitle('');
     setGenre('');
+    setCover(null);
+    setCoverPreview((url) => {
+      if (url) URL.revokeObjectURL(url);
+      return null;
+    });
     if (fileRef.current) fileRef.current.value = '';
+    if (coverRef.current) coverRef.current.value = '';
   };
 
   if (!user) {
@@ -167,6 +182,35 @@ const Studio = () => {
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
                 />
               </label>
+              <label className="block sm:col-span-2">
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cover art <span className="normal-case font-normal">(optional, but it should not be)</span></span>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
+                    {coverPreview
+                      ? <img src={coverPreview} alt="" className="h-full w-full object-cover" />
+                      : <ImageIcon className="h-5 w-5 text-muted-foreground" />}
+                  </div>
+                  <input
+                    ref={coverRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={busy}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      setCover(f);
+                      setCoverPreview((old) => {
+                        if (old) URL.revokeObjectURL(old);
+                        return f ? URL.createObjectURL(f) : null;
+                      });
+                    }}
+                    className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-foreground"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Square JPG, PNG or WEBP, under 8 MB. Without it your record shows up blank next to everyone else.
+                </p>
+              </label>
+
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Genre <span className="normal-case font-normal">(optional)</span></span>
                 <input
