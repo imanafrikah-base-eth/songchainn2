@@ -20,7 +20,7 @@ import { CatalogGrid } from '@/components/CatalogGrid';
 import { SongCard } from '@/components/SongCard';
 import { EngagementPanel } from '@/components/EngagementPanel';
 import { ZoneShortcuts } from '@/components/ZoneShortcuts';
-import { PhaseTwoBetaPanel } from '@/components/PhaseTwoBetaPanel';
+import { WhatsLive } from '@/components/WhatsLive';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
@@ -266,7 +266,7 @@ export default function Home() {
       window.setTimeout(() => {
         const promptText = hasSeenNewUserPrompt
           ? 'Yo welcome back fam. Quick heads up: WaveWarz Africa battles now run right here in $ongChainn -- watch live, vote, and speak in the room.'
-          : 'Welcome to $ongChainn. We are live in Phase Two: The Music Marketplace, where songs are real tradeable coins on Base. WaveWarz Africa battles now run right here too -- watch live, vote, and speak in the room.';
+          : 'Welcome to $ongChainn. Songs here are real tradeable coins on Base, artists release straight to you, and WaveWarz Africa battles run right here. All of it is live.';
         window.dispatchEvent(
           new CustomEvent('songchainn:mosha-prompt', {
             detail: {
@@ -556,7 +556,7 @@ export default function Home() {
 
         <ZoneShortcuts />
 
-        <PhaseTwoBetaPanel />
+        <WhatsLive />
 
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-8">
           {/* Main Content */}
@@ -1083,9 +1083,9 @@ export default function Home() {
               </div>
             </Link>
 
-            {/* Phase Info */}
+            {/* What is live */}
             <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 shine-overlay">
-              <h3 className="font-heading font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Phase Two</h3>
+              <h3 className="font-heading font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Live now</h3>
               <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-5 leading-relaxed">
                 Songs are now real, tradeable coins on Base. Buy them, sell them,
                 and back the artists you love directly, on-chain.

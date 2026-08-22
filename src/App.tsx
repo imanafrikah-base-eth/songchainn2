@@ -22,7 +22,6 @@ import { GlobalAmbientLayer } from "@/components/GlobalAmbientLayer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 const VibeAgent = lazy(() => import("@/components/VibeAgent").then(m => ({ default: m.VibeAgent })));
 const BehaviorCtaPopups = lazy(() => import("@/components/BehaviorCtaPopups").then(m => ({ default: m.BehaviorCtaPopups })));
-const PhaseTwoAnnouncement = lazy(() => import("@/components/PhaseTwoAnnouncement").then(m => ({ default: m.PhaseTwoAnnouncement })));
 import { useUserPresence } from "@/hooks/useUserPresence";
 import { FarcasterProvider, useFarcasterContext } from "@/context/FarcasterContext";
 import { FacebookProvider } from "@/context/FacebookContext";
@@ -210,7 +209,8 @@ function AppShell() {
       </div>
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><VibeAgent /></Suspense></ErrorBoundary>}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><BehaviorCtaPopups /></Suspense></ErrorBoundary>}
-      {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><PhaseTwoAnnouncement /></Suspense></ErrorBoundary>}
+      {/* The Phase Two launch announcement has served its purpose. Nothing is
+          in beta or in a phase any more; WhatsLive on Home says what is here. */}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
       <ErrorBoundary fallback={null}><UpdateAvailableBanner /></ErrorBoundary>
       <ErrorBoundary fallback={null}><ConnectWalletModal /></ErrorBoundary>

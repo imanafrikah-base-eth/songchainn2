@@ -31,6 +31,7 @@ import { CARD_TILES } from '@/data/backgroundPools';
 import { ZabalGamezSection } from '@/components/ZabalGamezSection';
 import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
 import { MusicianCta } from '@/components/MusicianCta';
+import { AUTH_PROVIDERS } from '@/lib/features';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -335,7 +336,6 @@ export default function Auth() {
       if (authMode === 'signup') {
         const result = await signUpWithEmail(email, password);
         if (result.error) throw result.error;
-        toast.success('Account created!');
         localStorage.setItem('songchainn_needs_onboarding', '1');
         try {
           localStorage.setItem('songchainn_show_profile_photo_hint', '1');
@@ -343,7 +343,19 @@ export default function Auth() {
           void 0;
         }
         setPendingWalletConnection(false);
-        setAuthMode('signin');
+
+        // The project has mailer_autoconfirm on, so a new account is usable
+        // straight away. Send them into the app. Only if a session genuinely
+        // did not come back (confirmations turned on later) do we ask them to
+        // check their email, instead of silently dropping them on a login form.
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session) {
+          toast.success('Welcome to SONGCHAINN');
+          navigate('/', { replace: true });
+        } else {
+          toast.success('Account created. Check your email to confirm it, then sign in.');
+          setAuthMode('signin');
+        }
       } else {
         const result = await signInWithEmail(email, password);
         if (result.error) throw result.error;
@@ -355,13 +367,23 @@ export default function Auth() {
       const msg = String(err?.message || '');
       const lower = msg.toLowerCase();
       if (authMode === 'signup' && (lower.includes('user already registered') || lower.includes('already exists'))) {
-        setError('Account already exists. Please Sign In or Reset Password.');
+        setError('You already have an account with this email. Sign in instead, or reset your password.');
         setAuthMode('signin');
         setAuthView('email');
       } else if (lower.includes('invalid login credentials')) {
-        setError('Invalid email or password');
+        setError('That email and password do not match. Check them, or reset your password below.');
+      } else if (lower.includes('email not confirmed')) {
+        setError('Your email is not confirmed yet. Check your inbox, and your spam folder.');
+      } else if (lower.includes('password') && (lower.includes('short') || lower.includes('least') || lower.includes('weak'))) {
+        setError('Use at least 6 characters for your password.');
+      } else if (lower.includes('rate limit') || lower.includes('too many')) {
+        setError('Too many tries. Wait a minute and go again.');
+      } else if (lower.includes('invalid email') || lower.includes('unable to validate email')) {
+        setError('That email address does not look right.');
+      } else if (lower.includes('failed to fetch') || lower.includes('network')) {
+        setError('We could not reach the server. Check your connection and try again.');
       } else {
-        setError(msg || 'Authentication failed');
+        setError(msg || 'Something went wrong. Try again.');
       }
     } finally {
       setIsLoading(false);
@@ -1420,8 +1442,9 @@ export default function Auth() {
                   </button>
                 )}
 
-                {/* Google sign-in: official button + One Tap auto prompt */}
-                <GoogleSignIn oneTap onError={setError} />
+                {/* Google is hidden until it has an OAuth secret in Supabase.
+                    See AUTH_PROVIDERS in src/lib/features.ts. */}
+                {AUTH_PROVIDERS.google && <GoogleSignIn oneTap onError={setError} />}
 
                 <button
                   onClick={() => {
@@ -1532,16 +1555,24 @@ export default function Auth() {
                         className="overflow-hidden"
                       >
                         <div className="pt-4 space-y-3">
-                          <p className="text-xs text-center text-muted-foreground mb-3">
-                            Phone sign-in works without a wallet. You can connect one later.
-                          </p>
-                          <button
-                            onClick={() => setAuthView('phone')}
-                            className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect"
-                          >
-                            <Phone className="w-5 h-5 text-muted-foreground" />
-                            <span className="text-foreground font-medium">Continue with Phone</span>
-                          </button>
+                          {AUTH_PROVIDERS.phone ? (
+                            <>
+                              <p className="text-xs text-center text-muted-foreground mb-3">
+                                Phone sign-in works without a wallet. You can connect one later.
+                              </p>
+                              <button
+                                onClick={() => setAuthView('phone')}
+                                className="w-full flex items-center gap-3 p-3 rounded-xl glass hover:bg-secondary/50 transition-colors press-effect"
+                              >
+                                <Phone className="w-5 h-5 text-muted-foreground" />
+                                <span className="text-foreground font-medium">Continue with Phone</span>
+                              </button>
+                            </>
+                          ) : (
+                            <p className="text-xs text-center text-muted-foreground">
+                              You do not need a wallet to join. Email and a password is enough, and you can connect a wallet later.
+                            </p>
+                          )}
                         </div>
                       </motion.div>
                     )}
@@ -1590,12 +1621,12 @@ export default function Auth() {
                 </h3>
                 <p className="text-sm text-muted-foreground mb-5">
                   {authMode === 'signup'
-                    ? 'Pick your way in: Google, Base wallet, or email.'
-                    : 'Welcome back. Google, Base wallet, or email.'}
+                    ? 'Email and a password is all it takes. A Base wallet is optional.'
+                    : 'Welcome back. Sign in with your email, or your Base wallet.'}
                 </p>
 
-                {/* All sign-in options up front: Google + wallets first */}
-                <GoogleSignIn oneTap onError={setError} />
+                {/* All sign-in options up front. Google only when configured. */}
+                {AUTH_PROVIDERS.google && <GoogleSignIn oneTap onError={setError} />}
 
                 <WalletPicker
                   onConnect={handleWalletSignIn}
@@ -1603,13 +1634,18 @@ export default function Auth() {
                   busyContent={getButtonContent()}
                 />
 
-                <div className="flex items-center gap-3 my-5">
-                  <div className="flex-1 h-px bg-border/60" />
-                  <span className="text-xs text-muted-foreground">
-                    or {authMode === 'signup' ? 'sign up' : 'sign in'} with email
-                  </span>
-                  <div className="flex-1 h-px bg-border/60" />
-                </div>
+                {/* Only divide if there is actually something above to divide
+                    from. With Google off and no wallet installed, the email
+                    form is the whole screen and a stray "or" reads as a bug. */}
+                {(AUTH_PROVIDERS.google || isWalletDetected) && (
+                  <div className="flex items-center gap-3 my-5">
+                    <div className="flex-1 h-px bg-border/60" />
+                    <span className="text-xs text-muted-foreground">
+                      or {authMode === 'signup' ? 'sign up' : 'sign in'} with email
+                    </span>
+                    <div className="flex-1 h-px bg-border/60" />
+                  </div>
+                )}
 
                 <form onSubmit={handleEmailAuth} className="space-y-4">
                   <Input
@@ -1695,15 +1731,17 @@ export default function Auth() {
 
                   {authMode === 'signin' && (
                     <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={isLoading}
-                        onClick={handleSendEmailLink}
-                        className="w-full h-12 rounded-xl border-border/50 hover:bg-secondary/30 text-foreground font-medium"
-                      >
-                        Email me a sign-in link
-                      </Button>
+                      {AUTH_PROVIDERS.emailLink && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isLoading}
+                          onClick={handleSendEmailLink}
+                          className="w-full h-12 rounded-xl border-border/50 hover:bg-secondary/30 text-foreground font-medium"
+                        >
+                          Email me a sign-in link
+                        </Button>
+                      )}
                       <button
                         type="button"
                         disabled={isLoading}

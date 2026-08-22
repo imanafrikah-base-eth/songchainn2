@@ -15,7 +15,7 @@ const MILESTONE_MESSAGES: Record<number, string> = {
   150: '150 points! You are becoming a regular.',
   400: '400 points! Silver tier energy.',
   1000: '1,000 points! Real ones remember who showed up early.',
-  2500: '2,500 points! GOLD TIER. Phase Two Beta is yours.',
+  2500: '2,500 points! GOLD TIER. First look at every new drop is yours.',
   5000: '5,000 points! Top-tier listener status.',
   10000: '10,000 points! PLATINUM. You are $ongChainn royalty.',
   25000: '25,000 points! Legend. There is no one above you.',

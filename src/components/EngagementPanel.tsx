@@ -82,7 +82,7 @@ export function EngagementPanel() {
         </div>
       </div>
 
-      {/* Leaderboard link + Phase Two promise */}
+      {/* Leaderboard link + what points are for */}
       <Link
         to="/leaderboard"
         className="mt-4 sm:mt-6 flex items-center justify-center gap-2 rounded-lg sm:rounded-xl bg-primary/10 border border-primary/20 py-2.5 text-xs sm:text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
@@ -91,7 +91,7 @@ export function EngagementPanel() {
       </Link>
       <div className="mt-3 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-primary/5 border border-primary/10">
         <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
-          Your points are your head start in Phase Two: top fans get early access to new song coins and battle rewards. Keep listening.
+          Points come from real listening, so they cannot be faked. Top fans get first look at new song coins and battle rewards. Keep listening.
         </p>
       </div>
     </motion.div>

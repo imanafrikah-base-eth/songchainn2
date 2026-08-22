@@ -82,10 +82,10 @@ function buildMoshaReply(text: string, history: DirectMessage[]) {
     contextualQuery.includes('zora') ||
     ((contextualQuery.includes('buy') || contextualQuery.includes('sell') || contextualQuery.includes('trade') || contextualQuery.includes('own')) && contextualQuery.includes('song'))
   ) {
-    return 'That is Phase Two: The Music Marketplace. Real songs are now tradeable coins on Base -- buy in to support an artist, or sell back for ETH anytime. Open the Marketplace to try it.\nCTA::Explore Marketplace::/marketplace';
+    return 'That is the Music Marketplace, and it is live. Real songs are tradeable coins on Base: buy in to back an artist, or sell back for ETH anytime. Open the Marketplace to try it.\nCTA::Explore Marketplace::/marketplace';
   }
-  if (query.includes('phase') || query.includes('audience first') || query.includes('phase two') || query.includes('phase 2')) {
-    return '$ongChainn started with Phase One: Audience First -- your preferences and listening behavior shaped discovery. We are now live in Phase Two: The Music Marketplace, where songs are real tradeable coins on Base.\nCTA::Explore Marketplace::/marketplace';
+  if (query.includes('phase') || query.includes('audience first') || query.includes('what is live') || query.includes('whats live')) {
+    return 'Everything is live, there is no waiting list and nothing is in beta. Songs are real tradeable coins on Base, artists release straight from the Studio, WaveWarz Africa battles run here, and your points decide the leaderboard.\nCTA::Explore Marketplace::/marketplace';
   }
   if (contextualQuery.includes('playlist') || contextualQuery.includes('catalog')) {
     return 'For follow-up discovery, start from your favorite catalog, then branch by artist and room reactions to find the next best songs.';
@@ -94,7 +94,7 @@ function buildMoshaReply(text: string, history: DirectMessage[]) {
 }
 
 const SEED_TEXT =
-  'Hey fam, Mo$ha here. Welcome to your $ongChainn message center. WaveWarz Africa battles now run right here in $ongChainn -- watch live, vote, and speak in the room. Also -- Phase Two just launched: the Music Marketplace, where songs are real tradeable coins on Base. Ask me about either anytime.';
+  'Hey fam, Mo$ha here. Welcome to your $ongChainn message center. Everything here is live: the Music Marketplace where songs are real coins on Base, WaveWarz Africa battles you can watch and vote in, and artists releasing straight to you. Ask me about any of it anytime.';
 
 export default function Inbox() {
   const { user } = useAuth();
