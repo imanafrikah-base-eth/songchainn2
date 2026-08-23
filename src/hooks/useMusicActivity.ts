@@ -37,6 +37,64 @@ export interface RankedArtist {
   plays: number;
 }
 
+/**
+ * What someone likes: songs and artists.
+ *
+ * Readable on anybody's profile since the public_likes migration. Adding and
+ * removing a like is still strictly owner-only, so nothing here lets one person
+ * touch another person's taste.
+ */
+export function useLikedActivity(userId: string | undefined) {
+  const { songs: publishedSongs } = usePublishedCatalog();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['liked-activity', userId],
+    enabled: !!userId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const [songsRes, artistsRes] = await Promise.all([
+        supabase
+          .from('liked_songs')
+          .select('song_id, created_at')
+          .eq('user_id', userId!)
+          .order('created_at', { ascending: false })
+          .limit(200),
+        supabase
+          .from('liked_artists')
+          .select('artist_id, created_at')
+          .eq('user_id', userId!)
+          .order('created_at', { ascending: false })
+          .limit(100),
+      ]);
+      return {
+        songs: (songsRes.data ?? []) as Array<{ song_id: string; created_at: string }>,
+        artists: (artistsRes.data ?? []) as Array<{ artist_id: string; created_at: string }>,
+      };
+    },
+  });
+
+  return useMemo(() => {
+    const byId = new Map<string, Song>();
+    for (const s of [...SONGS, ...publishedSongs]) byId.set(s.id, s);
+
+    const songs = (data?.songs ?? [])
+      .map((r) => ({ song: byId.get(r.song_id), at: r.created_at }))
+      .filter((r): r is { song: Song; at: string } => !!r.song);
+
+    const artists = (data?.artists ?? [])
+      .map((r) => {
+        const artist = ARTISTS.find((x) => x.id === r.artist_id);
+        const fromSong = [...byId.values()].find((s) => s.artistId === r.artist_id);
+        const name = artist?.name ?? fromSong?.artist;
+        if (!name) return null;
+        return { artistId: r.artist_id, name, image: artist?.profileImage, at: r.created_at };
+      })
+      .filter((a): a is { artistId: string; name: string; image: string | undefined; at: string } => !!a);
+
+    return { isLoading, songs, artists, hasAny: songs.length > 0 || artists.length > 0 };
+  }, [data, isLoading, publishedSongs]);
+}
+
 export function useMusicActivity(userId: string | undefined) {
   const { songs: publishedSongs } = usePublishedCatalog();
 
