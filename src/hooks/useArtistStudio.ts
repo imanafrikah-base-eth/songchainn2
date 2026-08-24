@@ -13,6 +13,26 @@ import { useAuth } from '@/context/AuthContext';
 
 export type ReleaseStatus = 'uploading' | 'auditioning' | 'published' | 'workshop';
 
+/**
+ * Which rung of the standard a released track landed on.
+ *
+ * The standard is a ladder, not a door. Almost everything publishes; the rung
+ * decides what a track is eligible for, not whether it exists.
+ *
+ *   master   meets the full SONGCHAINN standard, the bar the founding catalog
+ *            set. Carries the mark.
+ *   release  clean professional delivery. Eligible for featured placement.
+ *   raw      out and playable, but short of clean delivery. Not pushed into
+ *            hero slots, editorial or coining until it is tightened.
+ */
+export type ReleaseTier = 'master' | 'release' | 'raw';
+
+export const TIER_LABEL: Record<ReleaseTier, string> = {
+  master: 'Mastered to standard',
+  release: 'Release ready',
+  raw: 'Room to tighten',
+};
+
 export interface AuditionNote {
   code: string;
   metric?: string;
@@ -28,8 +48,12 @@ export interface AuditionResult {
   at?: string;
   stage?: string;
   plain?: string;
+  tier?: ReleaseTier;
+  tierLabel?: string;
   failures?: AuditionNote[];
   advisories?: AuditionNote[];
+  /** Exactly what stands between this track and the rung above it. */
+  shortfalls?: AuditionNote[];
   hikulu?: string | null;
   nakulu?: string | null;
   metrics?: Record<string, number | string | null>;

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CATALOGS, SONGS, GENRES, Genre, type Catalog, buildCatalogs } from '@/data/musicData';
 import { useTodayHotSongs } from '@/hooks/usePopularity';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+import { catalogEarnedPlacement, indexSongs } from '@/lib/placement';
 import { CatalogCard } from '@/components/CatalogCard';
 import { CatalogGrid } from '@/components/CatalogGrid';
 import { SongCard } from '@/components/SongCard';
@@ -74,6 +75,7 @@ export default function Discover() {
   });
   const { songs: publishedSongs } = usePublishedCatalog();
   const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
+  const songById = useMemo(() => indexSongs(allSongs), [allSongs]);
   const catalogs = useMemo(
     () => (publishedSongs.length ? buildCatalogs(allSongs) : CATALOGS),
     [allSongs, publishedSongs.length],
@@ -141,16 +143,20 @@ export default function Discover() {
     return scores;
   }, [todayHotSongs, catalogBySongId]);
 
+  // Featured is a push, not a shelf: only catalogs that earned placement reach
+  // it. New Releases below still carries every release, on any rung.
   const recommendedCatalogs = useMemo(() => {
+    const placeable = catalogs.filter((catalog) => catalogEarnedPlacement(catalog, songById));
+
     if (preferredGenres.length === 0) {
-      return [...catalogs]
+      return [...placeable]
         .sort((a, b) => (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0))
         .slice(0, 6);
     }
 
     const catalogSet = new Map<string, Catalog>();
     preferredGenres.forEach((genre) => {
-      catalogs
+      placeable
         .filter((catalog) => catalog.genre === genre)
         .forEach((catalog) => catalogSet.set(catalog.id, catalog));
     });
@@ -158,7 +164,7 @@ export default function Discover() {
     return Array.from(catalogSet.values())
       .sort((a, b) => (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0))
       .slice(0, 6);
-  }, [catalogs, preferredGenres, hotScoreByCatalog]);
+  }, [catalogs, preferredGenres, hotScoreByCatalog, songById]);
 
   const filteredCatalogs = useMemo(() => {
     if (selectedGenre === 'all') return catalogs;

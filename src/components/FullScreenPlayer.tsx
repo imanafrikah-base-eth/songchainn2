@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
 import { OwnershipBadge } from '@/components/OwnershipBadge';
 import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
+import { earnedPlacement } from '@/lib/placement';
 import { UnlockSongModal } from '@/components/UnlockSongModal';
 import { ShareSongButton } from '@/components/ShareSongButton';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
@@ -454,7 +455,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                     )}
                   </div>
                 )}
-                {coinAddress && (
+                {coinAddress && currentSong && earnedPlacement(currentSong) && (
                   <div className="mt-2 flex items-center justify-center">
                     <OnchainVerifiedBadge coinAddress={coinAddress} size="md" />
                   </div>

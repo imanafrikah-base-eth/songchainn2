@@ -6,6 +6,7 @@ import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon
 import { CATALOGS, ARTISTS, SONGS, type Catalog, type Song, buildCatalogs } from '@/data/musicData';
 import { useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+import { catalogEarnedPlacement, earnedPlacement, indexSongs } from '@/lib/placement';
 import { useAuth } from '@/context/AuthContext';
 import { useRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 import { usePlayerActions, useSafePlayerState } from '@/context/PlayerContext';
@@ -107,6 +108,7 @@ export default function Home() {
 
   const { songs: publishedSongs } = usePublishedCatalog();
   const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
+  const songById = useMemo(() => indexSongs(allSongs), [allSongs]);
   const catalogs = useMemo(
     () => (publishedSongs.length ? buildCatalogs(allSongs) : CATALOGS),
     [allSongs, publishedSongs.length],
@@ -127,16 +129,19 @@ export default function Home() {
     }
     return scores;
   }, [todayHotSongs, catalogBySongId]);
+  // Featured is a push, not a shelf, so only catalogs that earned placement
+  // reach it. Everything else still sits in New Releases and All Catalogs.
   const featuredCatalogs = useMemo(
     () =>
-      [...catalogs]
+      catalogs
+        .filter((catalog) => catalogEarnedPlacement(catalog, songById))
         .sort((a, b) => {
           const scoreDelta = (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0);
           if (scoreDelta !== 0) return scoreDelta;
           return a.title.localeCompare(b.title);
         })
         .slice(0, 6),
-    [catalogs, hotScoreByCatalog],
+    [catalogs, hotScoreByCatalog, songById],
   );
   const allCatalogs = useMemo(
     () =>
@@ -155,6 +160,10 @@ export default function Home() {
     });
     return sorted.filter(isCatalogNew);
   }, [catalogs]);
+  const hotTodaySongs = useMemo(
+    () => todayHotSongs.filter(({ song }) => earnedPlacement(song)),
+    [todayHotSongs],
+  );
   const songsByCatalog = useMemo(
     () =>
       catalogs
@@ -199,9 +208,9 @@ export default function Home() {
   }, [allSongs]);
 
   const handlePlayAllHotToday = useCallback(() => {
-    const queueSongs = todayHotSongs.map((entry) => entry.song);
+    const queueSongs = hotTodaySongs.map((entry) => entry.song);
     if (queueSongs.length) playQueue(queueSongs);
-  }, [playQueue, todayHotSongs]);
+  }, [playQueue, hotTodaySongs]);
 
   const handlePlayAllNewReleases = useCallback(() => {
     const queueSongs = songsFromCatalogs(newReleases);
@@ -603,12 +612,12 @@ export default function Home() {
                     </div>
                     <div className="max-h-[420px] overflow-y-auto pr-2">
                       <div className="space-y-3">
-                        {todayHotSongs.length === 0 && (
+                        {hotTodaySongs.length === 0 && (
                           <p className="text-sm text-muted-foreground text-center py-6">
                             No streams yet today. Be the first to play a song!
                           </p>
                         )}
-                        {todayHotSongs.map(({ song }, index) => (
+                        {hotTodaySongs.map(({ song }, index) => (
                           <div key={song.id} className="space-y-1">
                             <SongCard song={song} index={index} variant="compact" />
                             <div className="text-[10px] sm:text-xs text-muted-foreground px-1 flex items-center gap-2">

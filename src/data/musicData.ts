@@ -58,7 +58,17 @@ export interface Song {
   artistWallet?: string;
   isTokenGated?: boolean;
   addedAt?: string;
-  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP' | 'LIKE,COMMENT,SUBSCRIBE' | '7USHIMI' | 'Single';
+  /**
+   * Which rung of the SONGCHAINN standard this record landed on when it was
+   * auditioned. Only set on tracks artists uploaded themselves; the founding
+   * catalog predates the audition and carries no rung.
+   *
+   *   master   meets the full standard the founding catalog set
+   *   release  clean professional delivery
+   *   raw      out and playable, still short of clean delivery
+   */
+  qualityTier?: 'master' | 'release' | 'raw';
+  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP' | 'LIKE,COMMENT,SUBSCRIBE' | '7USHIMI' | 'HIGH-BRED' | 'Single';
 }
 
 export interface Catalog {

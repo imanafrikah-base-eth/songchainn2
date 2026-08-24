@@ -12,6 +12,7 @@ import { SpinningSongArt } from './SpinningSongArt';
 import { ShareSongButton } from './ShareSongButton';
 import { OwnershipBadge } from './OwnershipBadge';
 import { OnchainVerifiedBadge } from './OnchainVerifiedBadge';
+import { earnedPlacement } from '@/lib/placement';
 import { UnlockSongModal } from './UnlockSongModal';
 import { useAuth } from '@/context/AuthContext';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
@@ -57,6 +58,10 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     unlockSong,
     coinAddress,
   } = useSongOwnership(song.id);
+
+  // The badge is a claim, not a fact about the wallet: it says this record is
+  // finished. A raw-tier track keeps its coin and loses the badge.
+  const showOnchainBadge = Boolean(coinAddress) && earnedPlacement(song);
   
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | undefined>(user?.user_metadata?.wallet_address);
@@ -310,7 +315,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   : 'Play once to keep this offline'}
             </span>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {coinAddress && <OnchainVerifiedBadge coinAddress={coinAddress} size="sm" />}
+              {showOnchainBadge && <OnchainVerifiedBadge coinAddress={coinAddress!} size="sm" />}
               <Button
                 variant="outline"
                 size="sm"
@@ -430,9 +435,9 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               >
                 {song.artist}
               </button>
-              {coinAddress && (
+              {showOnchainBadge && (
                 <div className="mt-1">
-                  <OnchainVerifiedBadge coinAddress={coinAddress} size="sm" />
+                  <OnchainVerifiedBadge coinAddress={coinAddress!} size="sm" />
                 </div>
               )}
             </div>
@@ -568,9 +573,9 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           {song.artist}
         </button>
 
-        {coinAddress && (
+        {showOnchainBadge && (
           <div className="mb-3">
-            <OnchainVerifiedBadge coinAddress={coinAddress} size="sm" />
+            <OnchainVerifiedBadge coinAddress={coinAddress!} size="sm" />
           </div>
         )}
 

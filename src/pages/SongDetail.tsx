@@ -15,6 +15,7 @@ import { SongCard } from '@/components/SongCard';
 import { SongComments } from '@/components/SongComments';
 import { ShareSongButton } from '@/components/ShareSongButton';
 import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
+import { earnedPlacement } from '@/lib/placement';
 import { useMemo, useEffect, useCallback, useState } from 'react';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -253,7 +254,7 @@ export default function SongDetail() {
                 </span>
               </Link>
 
-              {coinAddress && (
+              {coinAddress && earnedPlacement(song) && (
                 <div className="mb-6">
                   <OnchainVerifiedBadge coinAddress={coinAddress} size="md" />
                 </div>

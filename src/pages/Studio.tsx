@@ -9,11 +9,19 @@ import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useArtistReleases, useTrackUpload, type ArtistRelease } from '@/hooks/useArtistStudio';
+import {
+  useArtistReleases, useTrackUpload, TIER_LABEL, type ArtistRelease, type ReleaseTier,
+} from '@/hooks/useArtistStudio';
 
 // A WAV master runs about 10.6 MB a minute, so this has to be generous enough
 // that a full lossless record fits. Keep in step with MAX_BYTES in upload-url.
 const MAX_MB = 100;
+
+const TIER_CHIP: Record<ReleaseTier, string> = {
+  master: 'bg-primary/15 text-primary',
+  release: 'bg-emerald-500/15 text-emerald-500',
+  raw: 'bg-muted text-muted-foreground',
+};
 
 const STATUS_LABEL: Record<string, string> = {
   uploading: 'Upload started',
@@ -128,7 +136,7 @@ const Studio = () => {
           <h1 className="font-heading text-3xl font-bold text-foreground">Studio</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-8">
-          Send a finished record. $HIKULU and NAKULU listen to how it was mastered, and if it meets the standard it goes live to New Releases the same minute. Nobody approves it by hand.
+          Send a finished record. $HIKULU and NAKULU read how it was mastered and it goes live to New Releases the same minute. Only a broken file is held back. Everything else publishes, and how it was finished decides which rung it lands on: mastered to standard, release ready, or out with room to tighten. Nobody approves it by hand.
         </p>
 
         {/* ------------------------------------------------------ upload --- */}
@@ -273,9 +281,20 @@ const Studio = () => {
               {result.passed
                 ? <CheckCircle2 className="h-5 w-5 text-primary" />
                 : <Wrench className="h-5 w-5 text-amber-500" />}
-              <h2 className="font-heading text-lg font-bold text-foreground">
-                {result.passed ? 'It is live' : 'One more pass in the studio'}
-              </h2>
+              <div>
+                <h2 className="font-heading text-lg font-bold text-foreground">
+                  {result.passed ? 'It is live' : 'One more pass in the studio'}
+                </h2>
+                {result.passed && result.tier && (
+                  <p className="text-xs text-muted-foreground">
+                    {result.tier === 'master'
+                      ? 'It meets the full SONGCHAINN standard. That is the top rung and it is rare.'
+                      : result.tier === 'release'
+                        ? 'Clean delivery. It is out and it is eligible for featured placement.'
+                        : 'It is out and people can play it now. Tighten the notes below and it climbs.'}
+                  </p>
+                )}
+              </div>
             </div>
 
             {result.hikulu && (
@@ -291,7 +310,12 @@ const Studio = () => {
               </div>
             )}
 
-            <AuditionDetail failures={result.failures} advisories={result.advisories} />
+            <AuditionDetail
+              failures={result.failures}
+              advisories={result.advisories}
+              shortfalls={result.shortfalls}
+              published={result.passed}
+            />
 
             <button
               type="button"
@@ -335,7 +359,7 @@ const Studio = () => {
             {workshop.length > 0 && (
               <ReleaseGroup
                 title="Your workshop"
-                note="Only you can see this. Nobody else can browse it, and there is no limit on sending a track back once you have fixed it."
+                note="Only you can see this. Nothing lands here unless something on the file is actually broken, and there is no limit on sending a track back once you have fixed it."
                 items={workshop}
               />
             )}
@@ -362,7 +386,8 @@ function ReleaseGroup({ title, note, items }: { title: string; note?: string; it
 function ReleaseCard({ release }: { release: ArtistRelease }) {
   const [open, setOpen] = useState(false);
   const a = release.audition;
-  const hasNote = !!(a && (a.hikulu || a.nakulu || a.failures?.length || a.plain));
+  const tier = a?.tier;
+  const hasNote = !!(a && (a.hikulu || a.nakulu || a.failures?.length || a.shortfalls?.length || a.plain));
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -371,13 +396,20 @@ function ReleaseCard({ release }: { release: ArtistRelease }) {
           <p className="truncate font-semibold text-foreground">{release.title || 'Untitled'}</p>
           <p className="truncate text-xs text-muted-foreground">{release.artist_name}</p>
         </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-          release.status === 'published' ? 'bg-primary/15 text-primary'
-            : release.status === 'workshop' ? 'bg-amber-500/15 text-amber-500'
-            : 'bg-muted text-muted-foreground'
-        }`}>
-          {STATUS_LABEL[release.status] ?? release.status}
-        </span>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {tier && release.status === 'published' && (
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${TIER_CHIP[tier]}`}>
+              {TIER_LABEL[tier]}
+            </span>
+          )}
+          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+            release.status === 'published' ? 'bg-primary/15 text-primary'
+              : release.status === 'workshop' ? 'bg-amber-500/15 text-amber-500'
+              : 'bg-muted text-muted-foreground'
+          }`}>
+            {STATUS_LABEL[release.status] ?? release.status}
+          </span>
+        </div>
       </div>
 
       {hasNote && (
@@ -406,7 +438,12 @@ function ReleaseCard({ release }: { release: ArtistRelease }) {
                   <p className="text-sm text-foreground">{a.nakulu}</p>
                 </div>
               )}
-              <AuditionDetail failures={a?.failures} advisories={a?.advisories} />
+              <AuditionDetail
+                failures={a?.failures}
+                advisories={a?.advisories}
+                shortfalls={a?.shortfalls}
+                published={release.status === 'published'}
+              />
             </div>
           )}
         </>
@@ -418,13 +455,39 @@ function ReleaseCard({ release }: { release: ArtistRelease }) {
 function AuditionDetail({
   failures = [],
   advisories = [],
+  shortfalls = [],
+  published = false,
 }: {
   failures?: Array<{ code: string; plain: string }>;
   advisories?: Array<{ code: string; plain: string }>;
+  shortfalls?: Array<{ code: string; plain: string }>;
+  published?: boolean;
 }) {
-  if (!failures.length && !advisories.length) return null;
+  // On a published track the shortfalls are the interesting list, and they are
+  // already inside advisories. Showing both would say everything twice.
+  const climb = published ? shortfalls : [];
+  const notes = published
+    ? advisories.filter((a) => !climb.some((c) => c.code === a.code))
+    : advisories;
+
+  if (!failures.length && !notes.length && !climb.length) return null;
   return (
     <div className="space-y-3">
+      {climb.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            To climb the next rung
+          </p>
+          <ul className="space-y-1.5">
+            {climb.map((c) => (
+              <li key={c.code} className="flex gap-2 text-sm text-foreground">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-emerald-500" />
+                {c.plain}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {failures.length > 0 && (
         <div>
           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">What to fix</p>
@@ -438,11 +501,11 @@ function AuditionDetail({
           </ul>
         </div>
       )}
-      {advisories.length > 0 && (
+      {notes.length > 0 && (
         <div>
           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Worth knowing</p>
           <ul className="space-y-1.5">
-            {advisories.map((a) => (
+            {notes.map((a) => (
               <li key={a.code} className="flex gap-2 text-sm text-muted-foreground">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
                 {a.plain}

@@ -13,7 +13,25 @@ interface PublishedSongRow {
   town_square: string | null;
   artist_id: string | null;
   created_at: string | null;
+  // jsonb from the audition. The DB does not guarantee its shape, so it is
+  // read defensively rather than trusted.
+  audition: unknown;
 }
+
+const TIERS = ['master', 'release', 'raw'] as const;
+type QualityTier = (typeof TIERS)[number];
+
+/**
+ * The rung an uploaded track landed on. Undefined for anything that predates
+ * the audition, which is the entire founding catalog.
+ */
+function toTier(audition: unknown): QualityTier | undefined {
+  const t = (audition as { tier?: unknown } | null)?.tier;
+  return typeof t === 'string' && (TIERS as readonly string[]).includes(t) ? (t as QualityTier) : undefined;
+}
+
+// Whether a rung has earned a push lives in @/lib/placement, so the front
+// store and the song card both read that rule from one place.
 
 function toGenre(value: string | null): Genre {
   return (GENRES as string[]).includes(value ?? '') ? (value as Genre) : 'Afro';
@@ -31,7 +49,7 @@ export function usePublishedCatalog() {
     queryFn: async (): Promise<PublishedSongRow[]> => {
       const { data, error } = await supabase
         .from('songs')
-        .select('id, title, artist_name, audio_url, cover_art_url, artist_image_url, genre, town_square, artist_id, created_at')
+        .select('id, title, artist_name, audio_url, cover_art_url, artist_image_url, genre, town_square, artist_id, created_at, audition')
         .eq('is_published', true)
         .not('artist_id', 'is', null);
       if (error) throw error;
@@ -56,6 +74,7 @@ export function usePublishedCatalog() {
       townSquare: row.town_square ?? 'Livingstone Town Square',
       genre: toGenre(row.genre),
       addedAt: row.created_at ?? undefined,
+      qualityTier: toTier(row.audition),
       volume: 'Single',
     }));
 

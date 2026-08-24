@@ -1,21 +1,30 @@
-// audition — the gate.
+// audition — the ladder.
 //
 // An artist finishes their upload and calls this. It measures the actual audio
 // against the SONGCHAINN standard, then hands the numbers to $HIKULU and NAKULU
 // so a human being gets told what to fix in words instead of a table.
 //
-// Pass  -> the track publishes to New Releases the same minute. Nobody
-//          approves it. The founder is not in the loop.
-// Fail  -> the track goes to the artist's own private workshop with the note.
-//          There is no public reject bin. Nobody can browse who did not make
-//          it, and the artist can re-upload as many times as they like.
+// The standard is a ladder, not a door. Almost everything publishes:
+//
+//   published -> to New Releases the same minute, on one of three rungs.
+//                'master' meets the full standard, 'release' is clean
+//                delivery, 'raw' is out and playable but not yet tight. The
+//                rung decides eligibility for featured placement, editorial
+//                and coining. It never decides whether the record exists.
+//                Nobody approves it. The founder is not in the loop.
+//   workshop  -> only when the file is measurably BROKEN: audible clipping, a
+//                low bitrate rip, mono cancellation, DC offset, a snippet.
+//                It goes to the artist's own private workshop with the note.
+//                There is no public reject bin. Nobody can browse who did not
+//                make it, and the artist can re-upload as many times as they
+//                like.
 //
 // This is a production-standard gate, not a taste gate. It measures whether a
 // record was finished properly. It has no opinion on whether a song is good.
 
 import { createClient } from '@supabase/supabase-js';
 import { measure } from './_audio.mjs';
-import { judge, STANDARD, GATE } from './_standard.mjs';
+import { judge, STANDARD, DELIVERY, GATE, TIER_LABEL } from './_standard.mjs';
 
 const MAX_DOWNLOAD = 105 * 1024 * 1024; // a shade over the 100 MB upload cap
 
@@ -121,11 +130,19 @@ export default async function handler(req, res) {
   const audition = {
     ok: true,
     passed: verdict.passed,
+    // Which rung the record landed on: master | release | raw. Placement reads
+    // this. A 'raw' track is still published and still playable, it just does
+    // not get pushed into hero slots, editorial or coining until it is fixed.
+    tier: verdict.tier,
+    tierLabel: TIER_LABEL[verdict.tier],
     at: new Date().toISOString(),
     metrics,
     failures: verdict.failures,
     advisories: verdict.advisories,
+    // Exactly what stands between this track and the next rung up.
+    shortfalls: verdict.shortfalls,
     standard: STANDARD,
+    delivery: DELIVERY,
     gate: GATE,
     // Null when the judges could not be reached. The measured result still
     // stands on its own; the artist is never blocked on the AI being up.
@@ -146,8 +163,11 @@ export default async function handler(req, res) {
   return send(res, 200, {
     status: verdict.passed ? 'published' : 'workshop',
     passed: verdict.passed,
+    tier: verdict.tier,
+    tierLabel: TIER_LABEL[verdict.tier],
     failures: verdict.failures,
     advisories: verdict.advisories,
+    shortfalls: verdict.shortfalls,
     hikulu: audition.hikulu,
     nakulu: audition.nakulu,
     metrics,
