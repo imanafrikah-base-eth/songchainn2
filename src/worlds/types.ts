@@ -21,6 +21,42 @@ export interface WorldRoomDef {
   /** Tailwind color stem used for the door art (must exist in DOOR_HUES). */
   hue: string;
   order: number;
+  /**
+   * A key the artist put on this door specifically, which overrides the ring
+   * rules above. Holding the named song opens it, whatever ring the visitor is
+   * in. The artist sets this per street and can change it at any time.
+   */
+  songKey?: { songId: string; threshold: string; title?: string } | null;
+}
+
+/**
+ * A city is a KIND of content, not a place on a map. Music City holds the
+ * records, Canvas City the artwork, Motion City the video. The rooms that
+ * already exist become buildings standing inside whichever city they belong
+ * to, so nothing is thrown away: a room is still a room, it just has an
+ * address now.
+ *
+ * Music is deliberately not confined to Music City. The player lives above
+ * the router (PlayerProvider in App.tsx), so audio carries across every city
+ * a visitor walks into. Music is the township in all of them.
+ */
+export type CityContentKind = 'music' | 'canvas' | 'motion' | 'vault' | 'word';
+
+export interface WorldCityDef {
+  /** URL segment under /world/:worldSlug/. Must not collide with a room slug. */
+  slug: string;
+  name: string;
+  kind: CityContentKind;
+  tagline: string;
+  /** One line on the skyline plate: what a visitor finds here. */
+  teaser: string;
+  /** Shown instead of a count while the city has nothing standing in it yet. */
+  emptyLine: string;
+  /** Tailwind color stem, shared with DOOR_HUES. */
+  hue: string;
+  order: number;
+  /** Room slugs that stand as buildings in this city, in display order. */
+  buildings: string[];
 }
 
 export interface WorldConfig {
@@ -52,8 +88,52 @@ export interface WorldConfig {
    */
   featuredSongIds: string[];
   rooms: WorldRoomDef[];
+  /**
+   * The cities of this world, in skyline order. Rooms live inside them; any
+   * room no city claims stands in the town square instead.
+   */
+  cities: WorldCityDef[];
   /** Primary accent hue for world chrome (Tailwind color stem). */
   accent: string;
+  /** Large image behind the world map header. */
+  heroImage?: string;
+  /** Door and room art, keyed by room slug. Real artist imagery only. */
+  roomArt?: Record<string, string>;
+  /** Skyline art, keyed by city slug. Real artist imagery only. */
+  cityArt?: Record<string, string>;
+
+  // ---------------------------------------------------------------- motion
+  // Every art slot above is a still, and the still is what ships: these
+  // fields are additive. A world with no motion looks exactly as it did.
+  // Each loop is silent, seamless, and plays over its own still, which is
+  // also its poster frame, so nothing jumps when the video takes over and
+  // nothing is missing when it never does. WorldArt is the only consumer.
+
+  /** Silent loop behind the world map header. Poster is heroImage. */
+  heroVideo?: string;
+  /** Silent room loops, keyed by room slug. Posters come from roomArt. */
+  roomVideo?: Record<string, string>;
+  /** Silent city loops, keyed by city slug. Posters come from cityArt. */
+  cityVideo?: Record<string, string>;
+  /**
+   * The doors a visitor walks through on arrival. Portrait, under three
+   * seconds, played at most once a session and never for anyone who asked
+   * their system for less motion.
+   */
+  entrance?: { poster: string; video?: string };
+  /**
+   * Textures for the world with depth. Absent means the 3D city falls back
+   * to the flat colours it has always used, which is a valid world, just a
+   * barer one.
+   */
+  depth?: {
+    /** Equirectangular 2:1 night sky, wrapped around the whole scene. */
+    sky?: string;
+    /** Seamless tile wrapped on every tower, tinted to its city hue. */
+    facade?: string;
+    /** Seamless tile for the ground plane and the town square circle. */
+    ground?: string;
+  };
 }
 
 /**
@@ -71,6 +151,13 @@ export interface WorldRings {
   rank: number | null;
   /** False until the world's token contract is configured server-side. */
   tokenLive: boolean;
+  /**
+   * Song coin balances this visitor holds, keyed by song id, as decimal
+   * strings. Filled from the holder profile, which is written from Base by the
+   * song-holdings function, so a door locked with a song is checked against a
+   * balance that was actually read from the chain.
+   */
+  heldSongs?: Record<string, string>;
 }
 
 export type WorldDoorState = 'open' | 'locked' | 'no-wallet' | 'council' | 'event';
@@ -80,6 +167,15 @@ export function doorStateFor(
   rings: WorldRings | null,
   connected: boolean,
 ): WorldDoorState {
+  // A song key is the artist's own decision about this one door, so it is
+  // answered before the ring rules, and it can open a door the rings would shut.
+  if (room.songKey) {
+    const held = rings?.heldSongs?.[room.songKey.songId];
+    const need = room.songKey.threshold;
+    if (held !== undefined && BigInt(held || '0') >= BigInt(need || '1')) return 'open';
+    if (!connected) return 'no-wallet';
+    return 'locked';
+  }
   if (room.access === 'public') return 'open';
   if (room.access === 'event') return 'event';
   if (!connected) return 'no-wallet';

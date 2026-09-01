@@ -7,7 +7,7 @@ const AUDIO_CACHE_SIZE_LIMIT = 500 * 1024 * 1024;
 // Files to cache for offline use
 const STATIC_ASSETS = [
   '/',
-  '/favicon.png',
+  '/icon-192.png',
   '/manifest.json'
 ];
 
@@ -182,6 +182,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // Video, and anything else asking for a byte range, goes straight to the
+  // network. The world art loops are <video> elements: they fetch with a Range
+  // header and come back 206, which the Cache API cannot store, and handing a
+  // cached full 200 back to a video that asked for a range is what breaks
+  // playback and seeking. Returning without calling respondWith leaves the
+  // browser to handle it natively, which it does correctly. Repeat visits are
+  // covered by the cache header these files carry in vercel.json, not here.
+  if (destination === 'video' || request.headers.has('range')) {
+    return;
+  }
+
   // Cache-first for hashed Vite assets — content-addressed so always safe.
   // Cuts the repeat-visit network round-trip even when HTTP cache is cold.
   if (isImmutableAsset(url)) {
@@ -243,8 +254,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
       body: data.body || 'You have a new notification',
-      icon: '/favicon.png',
-      badge: '/favicon.png',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       vibrate: [100, 50, 100],
       data: {
         url: data.url || '/',

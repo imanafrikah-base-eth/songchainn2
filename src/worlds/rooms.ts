@@ -5,6 +5,29 @@
 
 import type { WorldRoomDef } from './types';
 
+/**
+ * The Parlour, where a citizen asks to meet the artist in person.
+ *
+ * Kept out of CLASSIC_NINE_ROOMS on purpose. The nine are the proven template
+ * every world clones; this one commits an artist to showing up for bookings,
+ * which is a promise only that artist can make. Worlds opt into it by
+ * composing it onto their room list, so no future world inherits an obligation
+ * its artist never agreed to.
+ *
+ * Fan-gated rather than public: the fee is not the gate, the key is. Someone
+ * who holds nothing can still watch, listen and walk every open street.
+ */
+export const THE_PARLOUR: WorldRoomDef = {
+  slug: 'parlour',
+  name: 'The Parlour',
+  ring: 1,
+  access: 'fan',
+  tagline: 'Ask him in person',
+  teaser: 'Book a private word, an appearance on your show, or a night at your venue.',
+  hue: 'rose',
+  order: 10,
+};
+
 export const CLASSIC_NINE_ROOMS: WorldRoomDef[] = [
   {
     slug: 'gate',

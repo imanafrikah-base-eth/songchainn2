@@ -62,7 +62,7 @@ export function StudioRoom({ world }: { world: WorldConfig }) {
 export function RequestDeskRoom({ world }: { world: WorldConfig }) {
   return (
     <div className="space-y-4">
-      <RoomNote icon={<ListOrdered className="h-5 w-5 text-orange-300" />} title="The request queue">
+      <RoomNote icon={<ListOrdered className="h-5 w-5 text-orange-300" />} title="Requests waiting">
         <p>
           Insiders submit song requests here and vote monthly on what {world.artistName} records next.
           The queue is public: everyone sees what is coming, insiders decide it.

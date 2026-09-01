@@ -1,0 +1,26 @@
+# core.autocrlf is true on the Windows machines this repo is worked on. Git
+# normally spots binaries by itself, but the world art is nine megabytes of
+# video and stills that would be silently corrupted if that heuristic ever
+# missed, and a mangled .mp4 does not announce itself: it just stops playing
+# for everyone. Say it outright instead of trusting detection.
+*.mp4 binary
+*.webm binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.avif binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.wav binary
+*.m4a binary
+*.ogg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.wasm binary
+*.keystore binary
+*.jks binary

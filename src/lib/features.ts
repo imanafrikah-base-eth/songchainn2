@@ -14,7 +14,17 @@
  * Turning this back on: set true. The world-gate edge function is the real
  * authority on access and is unaffected by this flag.
  */
-export const WORLDS_ENABLED = false;
+export const WORLDS_ENABLED = true;
+
+/**
+ * The Create World builder and the viewer for worlds built with it.
+ *
+ * Separate from WORLDS_ENABLED on purpose. That flag holds World #001 shut
+ * until its artist is ready to open it; this one lets other artists build and
+ * walk their own worlds in the meantime. Turning this on must never turn that
+ * one on.
+ */
+export const WORLD_BUILDER_ENABLED = true;
 
 /**
  * Zabal Gamez Artist Track (the About page section, the Auth page section, the

@@ -12,7 +12,7 @@
       "destination": "/api/song-og?id=:id"
     },
     {
-      "source": "/((?!.*\\.[a-zA-Z0-9]{1,6}(?:[?#]|$)).*)",
+      "source": "/((?!.*\\.(?:js|mjs|css|map|json|txt|xml|webmanifest|ico|png|jpg|jpeg|webp|avif|gif|svg|mp3|wav|m4a|ogg|mp4|webm|woff|woff2|ttf|otf|eot|pdf|wasm)(?:[?#]|$)).*)",
       "destination": "/index.html"
     }
   ],
@@ -43,6 +43,12 @@
     },
     {
       "source": "/(.*)\\.(png|jpg|jpeg|gif|webp|avif|svg|ico)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=2592000" }
+      ]
+    },
+    {
+      "source": "/world-assets/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=2592000" }
       ]

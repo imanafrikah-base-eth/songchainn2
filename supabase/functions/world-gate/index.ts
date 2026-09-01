@@ -51,8 +51,8 @@ const WORLD_TOKENS: Record<string, WorldTokenConfig> = {
     decimalsEnv: "IMAN_TOKEN_DECIMALS",
     fanEnv: "WORLD_FAN_THRESHOLD",
     insiderEnv: "WORLD_INSIDER_THRESHOLD",
-    defaultFan: 1_000,
-    defaultInsider: 10_000,
+    defaultFan: 500_000,
+    defaultInsider: 5_000_000,
   },
 };
 
