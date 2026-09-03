@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, DoorOpen, Glasses, Volume2, VolumeX } from 'lucide-react';
 import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
 import { Button } from '@/components/ui/button';
+import { isNativeApp } from '@/lib/native';
 
 /**
  * The doors, on a page that is not the world.
@@ -535,11 +536,14 @@ export function DoorwayCtaGuest({
           That was a look inside. Now come in.
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Sign up free and you can walk these streets and hear the records where they were
-          made. Hold {IMAN_AFRIKAH_WORLD.tokenSymbol}, his own creator coin, and the inner
-          rooms open too.
+          Sign up free and you can walk these streets, hear the records where they were
+          made, and get close enough to ask the artist a question yourself. The key to the
+          inner rooms is offered once you are in.
         </p>
       </div>
+      {/* A stranger is asked for one thing, an account. The key comes after,
+          from the signed-in card, because a coin offered to someone with no
+          account is a purchase with nowhere to land. */}
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={onSignUp} className="h-10 rounded-full px-6 text-sm font-semibold">
           Sign up free
@@ -552,13 +556,6 @@ export function DoorwayCtaGuest({
         >
           Log in
         </Button>
-        {IMAN_AFRIKAH_WORLD.swapUrl && (
-          <Button asChild variant="outline" className="h-10 rounded-full px-5 text-sm font-semibold">
-            <a href={IMAN_AFRIKAH_WORLD.swapUrl} target="_blank" rel="noopener noreferrer">
-              Get {IMAN_AFRIKAH_WORLD.tokenSymbol}
-            </a>
-          </Button>
-        )}
         <Link
           to={`/world/${IMAN_AFRIKAH_WORLD.slug}`}
           className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
@@ -607,12 +604,17 @@ export function DoorwayCtaMember() {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button asChild className="h-10 rounded-full px-6 text-sm font-semibold">
-          <a href={world.swapUrl} target="_blank" rel="noopener noreferrer">
-            Get {world.tokenSymbol}
-            <ArrowRight className="ml-1.5 h-4 w-4" />
-          </a>
-        </Button>
+        {/* No buy link inside the Android shell: Play reads "buy to unlock"
+            as selling access outside its billing. The words stay; the sale
+            happens in the person's own wallet. See ANDROID.md. */}
+        {world.swapUrl && !isNativeApp() && (
+          <Button asChild className="h-10 rounded-full px-6 text-sm font-semibold">
+            <a href={world.swapUrl} target="_blank" rel="noopener noreferrer">
+              Get {world.tokenSymbol}
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            </a>
+          </Button>
+        )}
         <Button
           asChild
           variant="outline"

@@ -62,6 +62,7 @@ const BuiltWorld = lazy(() => import("@/pages/BuiltWorld"));
 const Studio = lazy(() => import("./pages/Studio"));
 const Launch = lazy(() => import("./pages/Launch"));
 const Policy = lazy(() => import("./pages/Policy"));
+const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const Console = lazy(() => import("./pages/Console"));
 
 
@@ -194,6 +195,7 @@ function AppShell() {
                     terms page is titled "Terms of Use and Privacy Notice", so
                     /privacy is an alias onto it. */}
                 <Route path="/privacy" element={<Policy which="privacy" />} />
+                <Route path="/delete-account" element={<DeleteAccountPage />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/studio" element={<Studio />} />
                 <Route path="/launch" element={<Launch />} />
@@ -238,7 +240,7 @@ function AppShell() {
 
 // Routes that are visible to everyone — no auth gate, no auth spinner
 const PUBLIC_PATTERNS = [
-  '/about', '/artists', '/artist/:id', '/catalog/:id', '/song/:id',
+  '/about', '/artists', '/artist/:id', '/catalog/:id', '/song/:id', '/delete-account',
   '/wavewarz-africa', '/wavewarz-africa/*', '/install', '/reset-password', '/bettercallzaal',
   ...(WORLDS_ENABLED ? ['/world/:worldSlug', '/world/:worldSlug/:roomSlug'] : []),
   // A world an artist built and shared is the whole point of building one. It
@@ -269,6 +271,7 @@ function AppContent() {
                 <Route path="/terms" element={<Policy which="terms" />} />
                   <Route path="/guidelines" element={<Policy which="guidelines" />} />
                 <Route path="/privacy" element={<Policy which="privacy" />} />
+                <Route path="/delete-account" element={<DeleteAccountPage />} />
                 <Route path="/artists" element={<Artists />} />
                 <Route path="/artist/:id" element={<ArtistDetail />} />
                 <Route path="/catalog/:id" element={<CatalogDetail />} />
@@ -312,6 +315,7 @@ function AppContent() {
                   <Route path="/terms" element={<Policy which="terms" />} />
                   <Route path="/guidelines" element={<Policy which="guidelines" />} />
                   <Route path="/privacy" element={<Policy which="privacy" />} />
+                <Route path="/delete-account" element={<DeleteAccountPage />} />
                   <Route path="/artists" element={<Artists />} />
                   <Route path="/artist/:id" element={<ArtistDetail />} />
                   <Route path="/catalog/:id" element={<CatalogDetail />} />

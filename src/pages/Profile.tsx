@@ -22,6 +22,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { ChangePassword } from '@/components/ChangePassword';
+import { BlockedPeople } from '@/components/BlockedPeople';
+import { DeleteAccount } from '@/components/DeleteAccount';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
@@ -1484,6 +1486,8 @@ export default function Profile() {
             <NotificationSettings />
           </div>
           <ChangePassword />
+          <BlockedPeople />
+          <DeleteAccount />
           <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-foreground flex items-center gap-2">

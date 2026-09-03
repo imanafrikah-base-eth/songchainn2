@@ -215,11 +215,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data: profileData, error: profileError } = await supabase
-      .from('audience_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Same 8-second guard as bootstrap. Without it a profile read that stalls
+    // on a slow connection left the whole app on a spinner with no error and
+    // nothing to tap; with it, the cached profile takes over and the person
+    // keeps moving.
+    const { data: profileData, error: profileError } = await Promise.race([
+      supabase.from('audience_profiles').select('*').eq('user_id', user.id).maybeSingle(),
+      new Promise<{ data: null; error: Error }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: new Error('profile:timeout') }), 8000),
+      ),
+    ]);
     const fallbackName =
       (user.email ? user.email.split('@')[0] : null) ||
       (user.user_metadata?.full_name as string | undefined) ||

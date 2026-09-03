@@ -178,23 +178,30 @@ and both cause rejection.
 
 Any app with account creation must offer deletion of the account and its data
 **both in-app and via a publicly reachable web URL** listed on the store entry.
-There is currently no delete-account path anywhere in `src/`.
 
-Needs: a destructive action in Profile/Settings, an edge function that deletes
-the user's rows and their `auth.users` record, and a public web page that
-explains how to request it.
+Built 3 Sep 2026: `src/components/DeleteAccount.tsx` (Profile > Settings,
+type DELETE to confirm) calls the `delete-account` edge function
+(`supabase/functions/delete-account`), which removes every personal row and
+the `auth.users` record under the caller's own session. The public URL for the
+store listing is `https://www.songchainn.xyz/delete-account`
+(`src/pages/DeleteAccountPage.tsx`). Receipts, consent records, reports and
+anything on Base stay, as the Privacy Notice says. The function must be
+deployed: `supabase functions deploy delete-account`.
 
 ### 2. Report and block (Play "User Generated Content" policy)
 
 Apps hosting UGC must provide in-app reporting of objectionable content **and**
-a way to block other users. Reporting exists: `src/components/ReportDialog.tsx`
-writes to `content_reports` and is wired into posts (3 Sep 2026). Blocking does
-not exist yet: there is no `blocked_users` table and no block action anywhere
-in `src/`. `is_hidden` and the `moderate-comment` function cover the moderator
-side only.
+a way to block other users. Both exist as of 3 Sep 2026:
 
-Still needs: a `blocked_users` table filtered into feed and DM queries, plus a
-block action on profiles and DMs.
+- Report: `src/components/ReportDialog.tsx` writes to `content_reports` from
+  posts; `reportMessage` in the inbox writes to `message_reports`.
+- Block: the `user_blocks` table and `block_user` RPC; a Block button on every
+  profile (`src/components/social/BlockButton.tsx`) and in every chat; a
+  "Blocked people" list with Unblock under Profile > Settings
+  (`src/components/BlockedPeople.tsx`). Messages are refused across a block by
+  `send_direct_message` and `open_conversation`, and the migration
+  `20260903020000_blocks_hide_content_both_ways` hides posts and comments in
+  both directions at the database.
 
 ### 3. Watch the Play Billing line
 
@@ -213,8 +220,11 @@ browser. On the web that is fine. On Android, a button that sends someone to
 buy a token which then unlocks rooms is exactly the pattern Play reads as
 selling digital access outside Play Billing.
 
-Before any Android submission: hide the "Get the key" buttons when running
-inside Capacitor (`Capacitor.isNativePlatform()`), keep the balance read, and
-let the rooms open for anyone who already holds the coin. Token acquisition
-must happen in the user's own external wallet. This is also the reason to keep
+Done 3 Sep 2026: every "Get the key" link (`GetKeyCta`, the doorway's member
+card) is hidden when `isNativeApp()` is true; the balance read and the rooms
+still work for anyone who already holds the coin, and the copy says the key
+is a coin held in your own wallet. Token acquisition happens outside the app.
+Still to decide before submission: the song-coin purchase in
+`UnlockSongModal` is the same shape and needs the same treatment or a Play
+Billing ruling. This is also the reason to keep
 the Artizen `$10 Artifact = access` model off the Android build and on the web.

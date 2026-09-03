@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Navigation } from '@/components/Navigation';
 import { PostCard } from '@/components/social/PostCard';
+import { BlockButton } from '@/components/social/BlockButton';
 import { useSocial } from '@/hooks/useSocial';
 import { useConversations } from '@/hooks/useDirectMessages';
 import { MusicActivity } from '@/components/MusicActivity';
@@ -460,6 +461,7 @@ export default function AudienceProfile() {
                 <MessageCircle className="w-4 h-4 mr-2" />
                 {openingChat ? 'Opening...' : 'Message'}
               </Button>
+              {userId && <BlockButton userId={userId} displayName={profile?.display_name} />}
             </div>
           )}
 
