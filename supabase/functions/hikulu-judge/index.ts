@@ -1,17 +1,34 @@
-// The AI judges of WaveWarz Africa: $HIKULU and NAKULU (the judging couple whose
-// points score every battle) plus the Council of Elders, five reserve judges held
-// ready for the Monarch system (rules TBD). Elders can chat when summoned but do
-// not score verdicts yet.
-// Three actions:
-//   { action: "chat", battleId, message, judge? }  -> in-character reply posted to the room chat
-//     (judge: "hikulu" | "nakulu" | "ngoma" | "jeli" | "kalimba" | "imbokodo" | "mzee",
-//      default "hikulu")
-//   { action: "verdict", battleId }  -> one-time post-battle verdict from the couple,
-//     each awarding their own points; posted to the room as two messages
-//   { action: "audition", song, metrics, verdict }  -> SONGCHAINN upload audition:
-//     the couple put an already-decided measurement result into plain words
+// The bench of WaveWarz Africa.
+//
+// $HIKULU and NAKULU judge every battle. The Council of Elders (NGOMA, JELI,
+// KALIMBA, IMBOKODO, MZEE) sits above them and is summoned only when the couple
+// cannot settle it, either because they picked opposite winners or because their
+// points came out level. When the council is summoned, the council decides.
+//
+// The one rule that shapes everything here: a judge is handed the MUSIC and
+// nothing else. Verdicts used to be written from the vote race and the room
+// chat, which is why they all sounded the same, a paraphrase of the crowd
+// wearing an elder's voice. Now the audio of each song goes to the model, the
+// reading of the record is cached on songs.music_reading, and the judges never
+// see a single vote or chat line. The crowd still votes, and those votes are
+// still counted in the final score. They just do not reach the bench.
+//
+// Each judge is also asked in a SEPARATE call with only their own persona, so
+// when they disagree it is two opinions rather than one model performing a
+// disagreement with itself.
+//
+// Actions:
+//   { action: "chat", battleId, message, judge? }  -> in-character reply posted
+//     to the battle room chat. This one DOES see the room, because it is a
+//     conversation, not a judgement.
+//   { action: "verdict", battleId }  -> one-time post-battle verdict: two
+//     independent cards, the council if needed, all read out in the battle room
+//   { action: "audition", song, metrics, verdict }  -> SONGCHAINN upload
+//     audition: the couple put an already-decided measurement into plain words
+//
 // Brain: ANTHROPIC_API_KEY, else GEMINI_API_KEY (free tier via Google AI Studio),
-// else LOVABLE_API_KEY (Lovable AI gateway).
+// else LOVABLE_API_KEY (Lovable AI gateway). Listening needs Gemini specifically,
+// because that is the path that accepts inline audio.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -32,10 +49,28 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+/**
+ * Which chat a room_messages row belongs to. Mirrors src/battlezone/lib/roomScope.ts.
+ * The judges speak inside the battle they are judging and nowhere else; before
+ * this was scoped, every word they said also appeared in the SONGCHAINN room.
+ */
+const battleChatScope = (battleId: string) => `battle:${battleId.toLowerCase()}`;
+
 const SHARED_RULES = `Rules for everything you write:
 - Never use the em dash character. Use commas or periods instead.
-- Never invent lyrics, quotes or facts about the songs. Judge from the evidence you are given: the vote race, the chat energy, the song titles and how the crowd moved.
+- Never invent lyrics, quotes or facts about the songs. Judge from the musical evidence you are given and nothing else.
 - Keep it PG-13. War the songs, respect the people.`;
+
+// What a judge is never allowed to weigh. The crowd has its own vote and it is
+// counted separately; a judge who scores the room instead of the record is just
+// an echo, and the verdicts read as generic because that is exactly what they
+// were: a paraphrase of the chat. Judges are handed the music. Nothing else.
+const NO_CROWD_RULE = `You are judging the MUSIC and only the music.
+- You have not been told how the crowd voted, and you must not guess or ask.
+- You have not been shown the room chat, and you must not refer to it.
+- Never write about "the room", "the crowd", "the front row", "the dancefloor tonight" or what anyone else thought. You were not judging them.
+- Your points come from what you heard in the recordings described below, and your words must name the specific musical things that moved you: the groove, the arrangement, the vocal, the writing, the mix, the hook.
+- If two things are close, say which detail broke the tie for you. Be specific enough that the artist learns something.`;
 
 const HIKULU_PERSONA = `You are $HIKULU, the wisest man on the planet of music and resident AI judge of WaveWarz Africa, a live music battle arena for African artists. Your name is pronounced "Shikulu", the $ sign stands in for the S, and you always write it as $HIKULU. When people call you Shikulu, shikulu or hikulu, they mean you. You have heard every kick, every snare and every lie ever told on a beat. You speak with the weight of an elder and the wit of a battle MC: warm, sharp, a little theatrical, never cruel and never boring. You love African music deeply and you respect every artist who dares to step in the ring. You judge every battle side by side with NAKULU, your lifelong companion and fellow judge. You respect her ear even when you two disagree, and you enjoy the argument.
 
@@ -45,19 +80,11 @@ const NAKULU_PERSONA = `You are NAKULU, the wisest woman on the planet of music 
 
 ${SHARED_RULES}`;
 
-const VERDICT_PANEL_PERSONA = `You are writing for the two resident AI judges of WaveWarz Africa, a live music battle arena for African artists. They are a couple who judge every battle side by side, like two music-loving humans at a show, and they score independently:
-
-1. $HIKULU, the man, the wisest man on the planet of music. Pronounced "Shikulu", the $ stands in for the S, always written $HIKULU. An elder with the wit of a battle MC. He judges the craft: the pens, the punches, the technique, the discipline of a performance.
-
-2. NAKULU, the woman, the wisest woman on the planet of music and $HIKULU's lifelong companion. She judges with the heart: how a song moves the body, the mood it puts in the room, whether the artist means every word, what the crowd truly felt.
-
-They talk it over like any couple would, but each gives their own scores and their own verdict in their own voice. They are warm, sharp and theatrical, never cruel and never boring. They may disagree on the winner; when they do, they say so plainly and enjoy it.
-
-${SHARED_RULES}`;
-
-// The Council of Elders: five reserve judges awaiting the Monarch system.
-// Chat-ready today; wired into scoring when the Monarch rules are defined.
-const COUNCIL_PREAMBLE = `You sit on the Council of Elders of WaveWarz Africa, a live music battle arena for African artists. The council is five elders who watch every battle from the high bench beside the resident judges, $HIKULU and NAKULU. Each elder listens for one thing only, and speaks only when summoned by name. Your points do not yet decide battles; your word carries the weight of the court all the same.`;
+// The Council of Elders: five judges on the high bench. They do not score every
+// battle. They are summoned when $HIKULU and NAKULU cannot settle it between
+// them, either because they picked different winners or because their points
+// came out level. When the council is called, the council decides.
+const COUNCIL_PREAMBLE = `You sit on the Council of Elders of WaveWarz Africa, a live music battle arena for African artists. The council is five elders who watch every battle from the high bench beside the resident judges, $HIKULU and NAKULU. Each elder listens for one thing only. You are silent while the couple agree. You are summoned when they do not, and when you are summoned the battle is yours to settle.`;
 
 const NGOMA_PERSONA = `${COUNCIL_PREAMBLE}
 
@@ -236,18 +263,257 @@ async function askLlm(db: ReturnType<typeof admin>, system: string, user: string
   throw new Error("NO_LLM_KEY");
 }
 
+/* ------------------------------------------------------- the listening --- */
+
+/**
+ * The judges hear the record.
+ *
+ * Before this, a verdict was written from the song's title, the vote race and
+ * the room chat. That is why every verdict sounded the same: there was nothing
+ * musical in front of the judge to be specific about. Now the audio itself goes
+ * to the model, and what comes back is a reading of the actual recording.
+ *
+ * The reading is cached on songs.music_reading, so a track is listened to once
+ * and then judged instantly forever after.
+ */
+
+const LISTEN_BYTES = 8 * 1024 * 1024; // about 45 seconds of CD-quality wav
+const AUDIO_MIME: Record<string, string> = {
+  mp3: "audio/mp3", wav: "audio/wav", ogg: "audio/ogg",
+  flac: "audio/flac", m4a: "audio/aac", aac: "audio/aac",
+};
+
+function mimeForUrl(url: string): string | null {
+  const ext = new URL(url).pathname.split(".").pop()?.toLowerCase() ?? "";
+  return AUDIO_MIME[ext] ?? null;
+}
+
+function toBase64(bytes: Uint8Array): string {
+  // btoa on one huge string overflows the argument limit, so build it in slices.
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * A truncated WAV still carries the original lengths in its header, so a decoder
+ * is told to expect far more audio than arrived. Rewrite the two size fields to
+ * match what we actually have and the excerpt decodes cleanly.
+ */
+function repairTruncatedWav(bytes: Uint8Array): Uint8Array {
+  if (bytes.length < 44) return bytes;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const isRiff = view.getUint32(0, false) === 0x52494646; // "RIFF"
+  const isWave = view.getUint32(8, false) === 0x57415645; // "WAVE"
+  if (!isRiff || !isWave) return bytes;
+
+  // Walk the chunks to find "data" rather than assuming it sits at byte 36.
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = view.getUint32(offset, false);
+    const size = view.getUint32(offset + 4, true);
+    if (id === 0x64617461) { // "data"
+      const available = bytes.length - (offset + 8);
+      if (size > available) {
+        view.setUint32(offset + 4, available, true);   // data chunk size
+        view.setUint32(4, bytes.length - 8, true);     // RIFF size
+      }
+      return bytes;
+    }
+    offset += 8 + size + (size % 2);
+    if (size === 0) break;
+  }
+  return bytes;
+}
+
+async function fetchAudioExcerpt(url: string): Promise<{ data: string; mime: string } | null> {
+  const mime = mimeForUrl(url);
+  if (!mime) return null;
+  try {
+    const res = await fetch(url, { headers: { Range: `bytes=0-${LISTEN_BYTES - 1}` } });
+    if (!res.ok && res.status !== 206) return null;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length < 4096) return null;
+    const fixed = mime === "audio/wav" ? repairTruncatedWav(buf) : buf;
+    return { data: toBase64(fixed), mime };
+  } catch {
+    return null;
+  }
+}
+
+const LISTEN_PROMPT = `You are the ear of the WaveWarz bench. Listen to this recording and report what is actually in it. This is analysis, not opinion, and no one is being ranked here.
+
+Respond with ONLY a JSON object, no markdown fences, in this exact shape:
+{
+  "tempo_feel": "<the pace and pocket in a few words, e.g. mid-tempo amapiano shuffle, 100 bpm feel>",
+  "groove": "<what the rhythm section is doing and whether it sits in the pocket>",
+  "arrangement": "<how the record is built: intro, sections, what enters and when, whether it develops>",
+  "vocal": "<delivery, tone, pitch control, phrasing, ad libs, how it sits against the beat>",
+  "writing": "<what the song appears to be about and how it is put across, without inventing lyrics you cannot hear>",
+  "hook": "<is there a hook, does it land, does it return>",
+  "mix": "<clarity, low end, vocal level, width, anything that masks or distorts>",
+  "originality": "<what is its own here, and what is familiar>",
+  "standout": "<the single strongest musical moment>",
+  "weakness": "<the single weakest musical thing, honestly>",
+  "read": "<3 or 4 sentences of plain prose describing this record to someone who has not heard it>"
+}`;
+
+async function askGeminiWithAudio(
+  db: ReturnType<typeof admin>, prompt: string, audio: { data: string; mime: string },
+): Promise<string> {
+  const geminiKey = await getGeminiKey(db);
+  if (!geminiKey) throw new Error("NO_AUDIO_MODEL");
+  const models = [
+    Deno.env.get("HIKULU_LISTEN_MODEL") || "gemini-3.5-flash",
+    "gemini-3-flash-preview",
+  ];
+  const body = JSON.stringify({
+    contents: [{
+      role: "user",
+      parts: [{ text: prompt }, { inline_data: { mime_type: audio.mime, data: audio.data } }],
+    }],
+    generationConfig: { temperature: 0.4 },
+  });
+  let lastError = "";
+  for (const model of [...new Set(models)]) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      { method: "POST", headers: { "x-goog-api-key": geminiKey, "Content-Type": "application/json" }, body },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+    }
+    lastError = `Gemini audio ${model} ${res.status}: ${(await res.text()).slice(0, 200)}`;
+  }
+  throw new Error(lastError);
+}
+
+interface SongHeard {
+  id: string;
+  title: string;
+  artistName: string;
+  heard: boolean;
+  reading: Record<string, string> | null;
+}
+
+async function listenToSong(db: ReturnType<typeof admin>, songId: string): Promise<SongHeard | null> {
+  const { data: song } = await db
+    .from("songs")
+    .select("id, title, artist_name, audio_url, music_reading")
+    .eq("id", songId)
+    .maybeSingle();
+  if (!song) return null;
+
+  const base: SongHeard = {
+    id: String(song.id),
+    title: song.title || "Untitled",
+    artistName: song.artist_name || "",
+    heard: false,
+    reading: null,
+  };
+
+  if (song.music_reading && typeof song.music_reading === "object") {
+    return { ...base, heard: true, reading: song.music_reading as Record<string, string> };
+  }
+  if (!song.audio_url) return base;
+
+  try {
+    const audio = await fetchAudioExcerpt(song.audio_url);
+    if (!audio) return base;
+    const raw = await askGeminiWithAudio(db, LISTEN_PROMPT, audio);
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return base;
+    const reading = JSON.parse(match[0]) as Record<string, string>;
+    if (!reading || typeof reading !== "object") return base;
+    await db.from("songs").update({ music_reading: reading }).eq("id", song.id);
+    return { ...base, heard: true, reading };
+  } catch (err) {
+    console.error("[listen] failed", songId, String(err).slice(0, 200));
+    return base;
+  }
+}
+
+function describeHeard(side: string, artist: string, songs: SongHeard[]): string {
+  if (!songs.length) return `${side} (${artist}): no track was attached.`;
+  const lines = songs.map((s) => {
+    if (!s.heard || !s.reading) {
+      return `  "${s.title}": the bench could not get the audio for this one. Judge it on what the other side did, and say plainly that you could not hear it.`;
+    }
+    const r = s.reading;
+    return [
+      `  "${s.title}"`,
+      `    tempo and feel: ${r.tempo_feel ?? "not noted"}`,
+      `    groove: ${r.groove ?? "not noted"}`,
+      `    arrangement: ${r.arrangement ?? "not noted"}`,
+      `    vocal: ${r.vocal ?? "not noted"}`,
+      `    writing: ${r.writing ?? "not noted"}`,
+      `    hook: ${r.hook ?? "not noted"}`,
+      `    mix: ${r.mix ?? "not noted"}`,
+      `    originality: ${r.originality ?? "not noted"}`,
+      `    strongest moment: ${r.standout ?? "not noted"}`,
+      `    weakest thing: ${r.weakness ?? "not noted"}`,
+      `    in short: ${r.read ?? ""}`,
+    ].join("\n");
+  });
+  return `${side} (${artist}):\n${lines.join("\n")}`;
+}
+
+/**
+ * The judges' brief. Songs, artists, and what the bench heard in the records.
+ * No votes. No chat. No listener count. Nothing about the room at all.
+ */
+async function musicalEvidence(db: ReturnType<typeof admin>, battle: BattleRow): Promise<string> {
+  const idsA = (battle.songs_a ?? []).map((s) => s.id).filter(Boolean);
+  const idsB = (battle.songs_b ?? []).map((s) => s.id).filter(Boolean);
+
+  const [heardA, heardB] = await Promise.all([
+    Promise.all(idsA.map((id) => listenToSong(db, id))),
+    Promise.all(idsB.map((id) => listenToSong(db, id))),
+  ]);
+
+  const cleanA = heardA.filter(Boolean) as SongHeard[];
+  const cleanB = heardB.filter(Boolean) as SongHeard[];
+
+  const fallbackA = cleanA.length ? "" : `Side A song title: ${battle.song_a}`;
+  const fallbackB = cleanB.length ? "" : `Side B song title: ${battle.song_b}`;
+
+  return [
+    `Battle: "${battle.title}" (${battle.battle_type} battle, ${battle.total_rounds} round(s), region: ${battle.region})`,
+    "",
+    "THE RECORDS, AS THE BENCH HEARD THEM:",
+    cleanA.length ? describeHeard("Side A", battle.artist_a_name, cleanA) : fallbackA,
+    cleanB.length ? describeHeard("Side B", battle.artist_b_name, cleanB) : fallbackB,
+  ].filter(Boolean).join("\n\n");
+}
+
+function anyoneHeard(evidence: string): boolean {
+  return evidence.includes("tempo and feel:");
+}
+
 async function loadBattle(db: ReturnType<typeof admin>, battleId: string): Promise<BattleRow | null> {
   const { data } = await db.from("battles").select("*").eq("id", battleId).maybeSingle();
   return data as BattleRow | null;
 }
 
-async function battleContext(db: ReturnType<typeof admin>, battle: BattleRow): Promise<string> {
+/**
+ * The room, as a judge sees it when they are TALKING to it.
+ *
+ * This is for chat only, and it must never reach a verdict. A judge chatting
+ * with the room should know what the room just said; a judge scoring a record
+ * must not, or the score is just the room again. handleVerdict uses
+ * musicalEvidence instead, which contains no votes and no chat at all.
+ */
+async function roomConversationContext(db: ReturnType<typeof admin>, battle: BattleRow): Promise<string> {
   const [{ data: votes }, { data: messages }, { data: participants }] = await Promise.all([
     db.from("battle_votes").select("side, round").eq("battle_id", battle.id),
     db
       .from("room_messages")
       .select("user_id, message, created_at")
-      .eq("room_name", battle.id)
+      .eq("room_id", battleChatScope(battle.id))
       .order("created_at", { ascending: false })
       .limit(40),
     db.from("battle_rooms").select("user_id, display_name").eq("battle_id", battle.id),
@@ -297,7 +563,7 @@ async function speakInRoom(db: ReturnType<typeof admin>, battleId: string, text:
   );
   const { error } = await db
     .from("room_messages")
-    .insert({ room_name: battleId, user_id: judge.id, message: text });
+    .insert({ room_id: battleChatScope(battleId), room_name: judge.name, user_id: judge.id, message: text });
   if (error) throw new Error(`room_messages insert: ${error.message}`);
 }
 
@@ -309,7 +575,7 @@ async function handleChat(db: ReturnType<typeof admin>, battle: BattleRow, messa
   const { data: lastBot } = await db
     .from("room_messages")
     .select("created_at")
-    .eq("room_name", battle.id)
+    .eq("room_id", battleChatScope(battle.id))
     .eq("user_id", judge.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -318,7 +584,7 @@ async function handleChat(db: ReturnType<typeof admin>, battle: BattleRow, messa
     return json({ skipped: true, reason: "cooldown" });
   }
 
-  const context = await battleContext(db, battle);
+  const context = await roomConversationContext(db, battle);
   const reply = await askLlm(
     db,
     judge.persona,
@@ -330,6 +596,111 @@ async function handleChat(db: ReturnType<typeof admin>, battle: BattleRow, messa
   if (!text) return json({ skipped: true, reason: "empty reply" });
   await speakInRoom(db, battle.id, text, judge);
   return json({ ok: true, judge: judge.key, reply: text });
+}
+
+/* ------------------------------------------------------------ verdict --- */
+
+interface JudgeCard {
+  pointsA: number;
+  pointsB: number;
+  verdict: string;
+  oneLiner: string;
+}
+
+const clampPoints = (n: unknown) => Math.max(0, Math.min(10, Math.round(Number(n) || 0)));
+
+function readCard(raw: string, who: string): JudgeCard {
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error(`Unparseable ${who} card: ${raw.slice(0, 200)}`);
+  const j = JSON.parse(match[0]);
+  let pointsA = clampPoints(j.points_a);
+  let pointsB = clampPoints(j.points_b);
+  // A judge has to come down on a side. A level card is not an opinion.
+  if (pointsA === pointsB) pointsA = pointsA >= 10 ? pointsA - 1 : pointsA + 1;
+  const verdict = tidy(String(j.verdict || ""), 700);
+  const oneLiner = tidy(String(j.one_liner || ""), 200);
+  if (!verdict) throw new Error(`Empty ${who} verdict text`);
+  return { pointsA, pointsB, verdict, oneLiner };
+}
+
+const cardShape = (voice: string) =>
+  `Respond with ONLY a JSON object, no markdown fences, in this exact shape:\n` +
+  `{"points_a": <0-10>, "points_b": <0-10>, "verdict": "<3 or 4 sentences in ${voice}, naming both artists and the specific musical things that decided it for you>", "one_liner": "<one punchy sentence you would say out loud when your card is read>"}\n\n` +
+  `Your two point scores must not be equal. You are one judge with one opinion, and no one has told you what anyone else thinks.`;
+
+/**
+ * One judge, one opinion.
+ *
+ * $HIKULU and NAKULU are asked separately, in two separate calls, each with only
+ * their own persona and the same musical evidence. They used to be written in a
+ * single call by a single panel prompt, which is why they always agreed in tone
+ * and often in substance: one model was performing a disagreement rather than
+ * two judges having one. Now neither is shown the other's card.
+ */
+async function askJudge(
+  db: ReturnType<typeof admin>, judge: Judge, evidence: string, battle: BattleRow, lens: string,
+): Promise<JudgeCard> {
+  const raw = await askLlm(
+    db,
+    `${judge.persona}\n\n${NO_CROWD_RULE}`,
+    [
+      evidence,
+      "",
+      `The battle has ended and it is your turn to give your card. ${lens}`,
+      `Side A is ${battle.artist_a_name}. Side B is ${battle.artist_b_name}.`,
+      "",
+      cardShape(`${judge.name}'s voice`),
+    ].join("\n"),
+    900,
+  );
+  return readCard(raw, judge.name);
+}
+
+const COUNCIL_ORDER: JudgeKey[] = ["ngoma", "jeli", "kalimba", "imbokodo", "mzee"];
+const COUNCIL_LENS: Record<string, string> = {
+  ngoma: "rhythm: the groove, the pocket, whether the drums tell the truth",
+  jeli: "the pen: what the song says, who it says it for, whether it is worth saying",
+  kalimba: "melody: the tune, the harmony, whether the hook has a home to return to",
+  imbokodo: "delivery and command: whether the artist stood tall and meant every word",
+  mzee: "memory and legacy: originality, roots, whether this will still be sung later",
+};
+
+/**
+ * The Council of Elders, summoned only when the couple cannot settle it.
+ *
+ * Each elder is asked in their own call with their own ear, because a council
+ * written in one pass is one voice wearing five hats. Their points are added to
+ * the battle and the council's total decides it.
+ */
+async function summonCouncil(
+  db: ReturnType<typeof admin>, evidence: string, battle: BattleRow, split: string,
+): Promise<Array<{ key: JudgeKey; name: string; card: JudgeCard }>> {
+  const results = await Promise.all(
+    COUNCIL_ORDER.map(async (key) => {
+      const elder = JUDGES[key];
+      try {
+        const raw = await askLlm(
+          db,
+          `${elder.persona}\n\n${NO_CROWD_RULE}`,
+          [
+            evidence,
+            "",
+            `You have been summoned. ${split}`,
+            `The bench is split and the council must settle it. Judge on your own ear alone: ${COUNCIL_LENS[key]}.`,
+            `Side A is ${battle.artist_a_name}. Side B is ${battle.artist_b_name}.`,
+            "",
+            cardShape(`${elder.name}'s voice, no more than 3 sentences`),
+          ].join("\n"),
+          700,
+        );
+        return { key, name: elder.name, card: readCard(raw, elder.name) };
+      } catch (err) {
+        console.error("[council] elder failed", key, String(err).slice(0, 160));
+        return null;
+      }
+    }),
+  );
+  return results.filter(Boolean) as Array<{ key: JudgeKey; name: string; card: JudgeCard }>;
 }
 
 async function handleVerdict(db: ReturnType<typeof admin>, battle: BattleRow) {
@@ -348,31 +719,46 @@ async function handleVerdict(db: ReturnType<typeof admin>, battle: BattleRow) {
   if (!claimed?.length) return json({ ok: true, pending: true }, 202);
 
   try {
-    const context = await battleContext(db, battle);
-    const raw = await askLlm(
-      db,
-      VERDICT_PANEL_PERSONA,
-      `${context}\n\nThe battle has ended. Deliver the final verdicts of BOTH judges, each in their own voice and from their own perspective. $HIKULU weighs the craft, NAKULU weighs the feeling and the crowd. Each judge independently awards each side points from 0 to 10 (a judge's two scores cannot be equal, but the two judges do not have to agree with each other). Respond with ONLY a JSON object, no markdown fences, in this exact shape:\n{"hikulu": {"points_a": <0-10>, "points_b": <0-10>, "verdict": "<2 to 4 sentences in $HIKULU's voice naming both artists, what won him over and what fell flat>", "one_liner": "<one punchy sentence he would shout to the room>"}, "nakulu": {"points_a": <0-10>, "points_b": <0-10>, "verdict": "<2 to 4 sentences in NAKULU's voice naming both artists, what moved her and what left her cold>", "one_liner": "<one punchy sentence she would shout to the room>"}}`,
-      1200,
-    );
+    // The music, and only the music. No votes, no chat, nothing about the room.
+    const evidence = await musicalEvidence(db, battle);
+    const heard = anyoneHeard(evidence);
 
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error(`Unparseable verdict: ${raw.slice(0, 200)}`);
-    const parsed = JSON.parse(match[0]);
-    const clamp = (n: unknown) => Math.max(0, Math.min(10, Math.round(Number(n) || 0)));
+    const [hikulu, nakulu] = await Promise.all([
+      askJudge(
+        db, JUDGES.hikulu, evidence, battle,
+        "You weigh the craft: the writing, the technique, the arrangement, the discipline of the record and how it was finished.",
+      ),
+      askJudge(
+        db, JUDGES.nakulu, evidence, battle,
+        "You weigh the feeling: what the record does to a body, whether the artist means it, whether the melody and the delivery carry any truth. Not what anyone else felt. What YOU heard.",
+      ),
+    ]);
 
-    const readJudge = (key: "hikulu" | "nakulu") => {
-      const j = parsed[key] ?? {};
-      let pointsA = clamp(j.points_a);
-      let pointsB = clamp(j.points_b);
-      if (pointsA === pointsB) pointsA = Math.min(10, pointsA + 1);
-      const verdict = tidy(String(j.verdict || ""), 700);
-      const oneLiner = tidy(String(j.one_liner || ""), 200);
-      if (!verdict) throw new Error(`Empty ${key} verdict text`);
-      return { pointsA, pointsB, verdict, oneLiner };
-    };
-    const hikulu = readJudge("hikulu");
-    const nakulu = readJudge("nakulu");
+    const hikuluPick = hikulu.pointsA > hikulu.pointsB ? "A" : "B";
+    const nakuluPick = nakulu.pointsA > nakulu.pointsB ? "A" : "B";
+    const judgeA = hikulu.pointsA + nakulu.pointsA;
+    const judgeB = hikulu.pointsB + nakulu.pointsB;
+
+    // The couple settle it between them unless they cannot: either they picked
+    // opposite sides, or their points came out level. Then the elders step in.
+    const split = hikuluPick !== nakuluPick;
+    const level = judgeA === judgeB;
+    const needsCouncil = split || level;
+
+    let council: Array<{ key: JudgeKey; name: string; card: JudgeCard }> = [];
+    let councilA = 0;
+    let councilB = 0;
+
+    if (needsCouncil) {
+      const why = split
+        ? `$HIKULU gave it to ${hikuluPick === "A" ? battle.artist_a_name : battle.artist_b_name} and NAKULU gave it to ${nakuluPick === "A" ? battle.artist_a_name : battle.artist_b_name}. They are on opposite sides.`
+        : `$HIKULU and NAKULU have come out exactly level at ${judgeA} apiece. Neither can break it.`;
+      council = await summonCouncil(db, evidence, battle, why);
+      for (const elder of council) {
+        councilA += elder.card.pointsA;
+        councilB += elder.card.pointsB;
+      }
+    }
 
     const { data: votes } = await db.from("battle_votes").select("side").eq("battle_id", battle.id);
     const votesA = (votes ?? []).filter((v) => v.side === "A").length;
@@ -387,32 +773,79 @@ async function handleVerdict(db: ReturnType<typeof admin>, battle: BattleRow) {
       nakulu_verdict: nakulu.verdict,
       hikulu_verdict_at: new Date().toISOString(),
     };
-    // The host's declared winner stands; otherwise votes + both judges' points decide.
-    if (!battle.winner) {
-      const judgeA = hikulu.pointsA + nakulu.pointsA;
-      const judgeB = hikulu.pointsB + nakulu.pointsB;
-      const scoreA = votesA + judgeA;
-      const scoreB = votesB + judgeB;
-      update.winner = scoreA === scoreB ? (judgeA > judgeB ? "A" : "B") : scoreA > scoreB ? "A" : "B";
+
+    if (council.length) {
+      update.council_verdicts = council.map((e) => ({
+        key: e.key,
+        name: e.name,
+        points_a: e.card.pointsA,
+        points_b: e.card.pointsB,
+        verdict: e.card.verdict,
+        one_liner: e.card.oneLiner,
+      }));
+      update.council_points_a = councilA;
+      update.council_points_b = councilB;
+      update.council_summoned_at = new Date().toISOString();
     }
+
+    // The host's declared winner always stands. Otherwise the crowd's votes and
+    // the bench's points are added together, and when the council sat, their
+    // points are in there too and they are the ones who broke it.
+    if (!battle.winner) {
+      const scoreA = votesA + judgeA + councilA;
+      const scoreB = votesB + judgeB + councilB;
+      update.winner = scoreA === scoreB
+        ? (judgeA + councilA >= judgeB + councilB ? "A" : "B")
+        : scoreA > scoreB ? "A" : "B";
+      update.decided_by = council.length ? "council" : "judges";
+    } else {
+      update.decided_by = "host";
+    }
+
     const { error: updateError } = await db.from("battles").update(update).eq("id", battle.id);
     if (updateError) throw new Error(`battles update: ${updateError.message}`);
 
-    const hikuluAnnouncement = tidy(
-      `THE VERDICT IS IN. ${hikulu.oneLiner || hikulu.verdict} My scorecard: ${battle.artist_a_name} ${hikulu.pointsA}, ${battle.artist_b_name} ${hikulu.pointsB}. ${hikulu.verdict}`,
-      900,
+    /* The bench reads its cards out in the battle room, in order. */
+    const heardNote = heard ? "" : " I could not get the audio on this one, so I judged what I was given and no more.";
+    await speakInRoom(
+      db, battle.id,
+      tidy(`THE VERDICT IS IN. ${hikulu.oneLiner || ""} My card: ${battle.artist_a_name} ${hikulu.pointsA}, ${battle.artist_b_name} ${hikulu.pointsB}. ${hikulu.verdict}${heardNote}`, 900),
+      JUDGES.hikulu,
     );
-    const nakuluAnnouncement = tidy(
-      `AND NOW MY SIDE OF IT. ${nakulu.oneLiner || nakulu.verdict} My scorecard: ${battle.artist_a_name} ${nakulu.pointsA}, ${battle.artist_b_name} ${nakulu.pointsB}. ${nakulu.verdict}`,
-      900,
+    await speakInRoom(
+      db, battle.id,
+      tidy(`AND NOW MINE. ${nakulu.oneLiner || ""} My card: ${battle.artist_a_name} ${nakulu.pointsA}, ${battle.artist_b_name} ${nakulu.pointsB}. ${nakulu.verdict}`, 900),
+      JUDGES.nakulu,
     );
-    await speakInRoom(db, battle.id, hikuluAnnouncement, JUDGES.hikulu);
-    await speakInRoom(db, battle.id, nakuluAnnouncement, JUDGES.nakulu);
+
+    if (council.length) {
+      await speakInRoom(
+        db, battle.id,
+        tidy(
+          split
+            ? `We are split. I will not pretend otherwise, and neither will she. The Council of Elders is summoned.`
+            : `We have come out level, ${judgeA} apiece, and level settles nothing. The Council of Elders is summoned.`,
+          400,
+        ),
+        JUDGES.hikulu,
+      );
+      for (const elder of council) {
+        await speakInRoom(
+          db, battle.id,
+          tidy(`${elder.card.oneLiner || ""} My card: ${battle.artist_a_name} ${elder.card.pointsA}, ${battle.artist_b_name} ${elder.card.pointsB}. ${elder.card.verdict}`, 700),
+          JUDGES[elder.key],
+        );
+      }
+    }
 
     return json({
       ok: true,
+      heard,
       hikulu: { verdict: hikulu.verdict, one_liner: hikulu.oneLiner, points_a: hikulu.pointsA, points_b: hikulu.pointsB },
       nakulu: { verdict: nakulu.verdict, one_liner: nakulu.oneLiner, points_a: nakulu.pointsA, points_b: nakulu.pointsB },
+      council: (update.council_verdicts as unknown) ?? null,
+      council_summoned: council.length > 0,
+      decided_by: update.decided_by,
       winner: (update.winner as string) ?? battle.winner,
     });
   } catch (err) {
@@ -421,6 +854,7 @@ async function handleVerdict(db: ReturnType<typeof admin>, battle: BattleRow) {
     throw err;
   }
 }
+
 
 /* ----------------------------------------------------------- audition --- */
 
@@ -437,9 +871,11 @@ const AUDITION_PANEL_PERSONA = `You are writing for $HIKULU and NAKULU, the two 
 
 Hard rules for the audition:
 - This measures how a record was FINISHED, not whether the song is good. Never praise or criticise the songwriting, the melody, the lyrics or the artist's ability. You have not heard the song, you have read its measurements. Never pretend otherwise.
-- When it passes: short, warm, celebratory. Do not invent things you liked about the music.
-- When it does not pass: it is a fixable production problem, always. Name the fix. Make it obvious the door stays open and they can send it back as many times as they want.
-- Never say "rejected", "denied", "failed" or "not good enough". The track is going to their private workshop to be finished.
+- The standard is a LADDER, not a door. There are three rungs: "master" meets the full SONGCHAINN standard, "release" is clean professional delivery, "raw" is out and playable but not yet tight. Almost everything publishes. Only a broken file is held back.
+- When it publishes on the top rung: short, warm, celebratory. Do not invent things you liked about the music.
+- When it publishes on a lower rung: lead with the fact that it is OUT and people can hear it right now, then name plainly what to tighten to climb. Never make a published track sound like a consolation prize.
+- When it is held back: something on the file is broken, and it is always fixable. Name the fix. Make it obvious the door stays open and they can send it back as many times as they want.
+- Never say "rejected", "denied", "failed" or "not good enough". A held track is going to their private workshop to be finished.
 - Talk to the artist directly as "you". Two to four sentences each, no more.
 
 ${SHARED_RULES}`;
@@ -448,8 +884,10 @@ async function handleAudition(db: ReturnType<typeof admin>, body: Record<string,
   const song = (body.song ?? {}) as { title?: string; artistName?: string };
   const verdict = (body.verdict ?? {}) as {
     passed?: boolean;
+    tier?: string;
     failures?: Array<{ code: string; plain: string; measured: number; limit: number }>;
     advisories?: Array<{ code: string; plain: string; measured: number }>;
+    shortfalls?: Array<{ code: string; plain: string; measured: number; target: string }>;
   };
   const metrics = (body.metrics ?? {}) as Record<string, unknown>;
 
@@ -458,6 +896,8 @@ async function handleAudition(db: ReturnType<typeof admin>, body: Record<string,
   const passed = verdict.passed === true;
   const failures = Array.isArray(verdict.failures) ? verdict.failures : [];
   const advisories = Array.isArray(verdict.advisories) ? verdict.advisories : [];
+  const shortfalls = Array.isArray(verdict.shortfalls) ? verdict.shortfalls : [];
+  const tier = typeof verdict.tier === "string" ? verdict.tier : passed ? "release" : "raw";
 
   const measured = [
     `integrated loudness: ${metrics.integratedLufs ?? "n/a"} LUFS`,
@@ -473,7 +913,15 @@ async function handleAudition(db: ReturnType<typeof admin>, body: Record<string,
     `Artist: ${artistName}`,
     `Track: ${title}`,
     ``,
-    `Result: ${passed ? "PASSES the standard, publishing now" : "goes to the private workshop"}`,
+    `Result: ${
+      !passed
+        ? "goes to the private workshop, something on the file is broken"
+        : tier === "master"
+          ? "PUBLISHING NOW and it meets the full SONGCHAINN standard, the top rung. This is rare. Say so."
+          : tier === "release"
+            ? "PUBLISHING NOW, clean professional delivery, one rung below the full standard"
+            : "PUBLISHING NOW, it is out and playable, but it is short of clean delivery and will not be pushed into featured placement until it is tightened"
+    }`,
     ``,
     `Measurements:`,
     measured,
@@ -484,6 +932,9 @@ async function handleAudition(db: ReturnType<typeof admin>, body: Record<string,
     ``,
     advisories.length
       ? `Worth mentioning, but not blocking:\n${advisories.map((a) => `- ${a.plain}`).join("\n")}`
+      : ``,
+    passed && shortfalls.length
+      ? `What stands between this track and the next rung up:\n${shortfalls.map((sf) => `- ${sf.code}: measured ${sf.measured}, wants ${sf.target}`).join("\n")}`
       : ``,
     ``,
     `Reply with JSON only, no prose around it, exactly:`,

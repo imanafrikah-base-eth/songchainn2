@@ -42,10 +42,10 @@ export const FeaturedTracksSection = memo(function FeaturedTracksSection({ songs
       {/* Simplified background glow - reduced animations */}
       <div className="absolute inset-0 -z-10 overflow-hidden rounded-3xl">
         <div className="absolute -top-20 -left-20 w-[400px] h-[400px]">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/20 via-cyan-500/10 to-transparent blur-[80px]" />
+          {/* glow removed */}
         </div>
         <div className="absolute -bottom-10 -right-10 w-[300px] h-[300px]">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-tl from-cyan-400/15 via-primary/10 to-transparent blur-[60px]" />
+          {/* glow removed */}
         </div>
       </div>
 
@@ -54,7 +54,7 @@ export const FeaturedTracksSection = memo(function FeaturedTracksSection({ songs
         <div className="flex items-center gap-3 sm:gap-4">
           {/* Simplified icon container */}
           <div className="relative">
-            <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary to-cyan-400 blur-lg opacity-50" />
+            {/* icon halo removed */}
             <div className="relative p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary to-cyan-400 shadow-glow">
               <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
             </div>
@@ -90,7 +90,7 @@ export const FeaturedTracksSection = memo(function FeaturedTracksSection({ songs
       {/* Featured cards container */}
       <div className="relative">
         {/* Decorative elements - hidden on mobile */}
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full glass border border-primary/20">
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full glass border border-border">
           <Zap className="w-3 h-3 text-primary" />
           <span className="text-xs text-primary font-medium">Hot This Week</span>
           <Zap className="w-3 h-3 text-primary" />
@@ -112,7 +112,7 @@ export const FeaturedTracksSection = memo(function FeaturedTracksSection({ songs
               className="relative group"
             >
               {/* Card glow on hover */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/20 to-cyan-400/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
+              {/* hover glow removed */}
               
               {/* Rank badge */}
               <div className="absolute -top-2 -left-2 sm:-top-3 sm:-left-3 z-20">

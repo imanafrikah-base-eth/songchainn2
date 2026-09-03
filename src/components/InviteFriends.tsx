@@ -12,8 +12,8 @@ interface InviteFriendsProps {
 
 export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
   const { 
-    referralCode, 
-    points, 
+    referralCode,
+    pointsEarned,
     completedReferrals, 
     copyInviteLink, 
     shareInviteLink,
@@ -106,7 +106,7 @@ export function InviteFriends({ isOpen, onClose }: InviteFriendsProps) {
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Star className="w-4 h-4 text-primary" />
                     <span className="font-heading text-2xl font-bold text-foreground">
-                      {points?.total_points || 0}
+                      {pointsEarned}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">Total Points</p>

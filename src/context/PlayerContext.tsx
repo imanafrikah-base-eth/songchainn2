@@ -347,46 +347,67 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         ? options.startTime
         : 0;
 
-    if (startTime > 0) {
-      const waitForMetadata = () =>
-        new Promise<void>((resolve) => {
-          if (Number.isFinite(audio.duration) && audio.duration > 0) return resolve();
-          const onLoaded = () => {
-            audio.removeEventListener('loadedmetadata', onLoaded);
-            resolve();
-          };
-          audio.addEventListener('loadedmetadata', onLoaded);
-          window.setTimeout(() => {
-            audio.removeEventListener('loadedmetadata', onLoaded);
-            resolve();
-          }, 1500);
-        });
-
-      try {
-        audio.load();
-      } catch {
-        void 0;
+    const seekWhenReady = () => {
+      if (startTime <= 0) return;
+      const applySeek = () => {
+        try {
+          const clamped = Math.max(
+            0,
+            Math.min(startTime, Number.isFinite(audio.duration) ? Math.max(0, audio.duration - 0.25) : startTime),
+          );
+          audio.currentTime = clamped;
+          setCurrentTime(clamped);
+        } catch {
+          setCurrentTime(0);
+        }
+      };
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        applySeek();
+        return;
       }
+      const onLoaded = () => {
+        audio.removeEventListener('loadedmetadata', onLoaded);
+        applySeek();
+      };
+      audio.addEventListener('loadedmetadata', onLoaded);
+      window.setTimeout(() => audio.removeEventListener('loadedmetadata', onLoaded), 4000);
+    };
 
-      await waitForMetadata();
-      try {
-        const clamped = Math.max(0, Math.min(startTime, Number.isFinite(audio.duration) ? Math.max(0, audio.duration - 0.25) : startTime));
-        audio.currentTime = clamped;
-        setCurrentTime(clamped);
-      } catch {
-        setCurrentTime(0);
-      }
+    try {
+      audio.load();
+    } catch {
+      void 0;
     }
 
     if (options?.shouldPlay === false) {
+      seekWhenReady();
       audio.pause();
       nextAudioRef.current?.pause();
       setIsPlaying(false);
       return true;
     }
 
+    /*
+     * play() must be the first thing that happens after the tap, with no await
+     * in front of it.
+     *
+     * This used to wait for 'loadedmetadata' before playing, so it could seek to
+     * the room's current position first. That wait is a network round trip, and
+     * a browser only honours play() while the user's gesture is still live. By
+     * the time the metadata landed the gesture was spent, play() rejected with
+     * NotAllowedError, and the Room decided autoplay was blocked and showed
+     * "Tap once to start" again. Every tap took the same path and failed the
+     * same way, which is why the button never worked, no matter how many times
+     * it was pressed.
+     *
+     * So: start, then seek. The listener hears the opening moment for a fraction
+     * of a second before it jumps to where the room actually is, which is a far
+     * better trade than silence behind a button that does nothing.
+     */
     try {
-      await audio.play();
+      const started = audio.play();
+      seekWhenReady();
+      await started;
       setIsPlaying(true);
       return true;
     } catch {

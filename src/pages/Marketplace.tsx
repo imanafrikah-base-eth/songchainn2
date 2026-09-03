@@ -25,6 +25,8 @@ import { useSongPopularity, useTodayHotSongs } from '@/hooks/usePopularity';
 import { useOwnedSongs } from '@/hooks/useOwnedSongs';
 import { UnlockSongModal } from '@/components/UnlockSongModal';
 import { SellSongModal } from '@/components/SellSongModal';
+import { CopyPosition } from '@/components/CopyPosition';
+import { HolderStanding } from '@/components/HolderStanding';
 import { OwnershipBadge } from '@/components/OwnershipBadge';
 import { usePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
@@ -78,7 +80,7 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
   
   const statusConfig = {
     free: { label: 'Free', color: 'bg-green-500/20 text-green-400', icon: Unlock },
-    preview: { label: `${previewSecondsRemaining}s Preview`, color: 'bg-amber-500/20 text-amber-400', icon: Play },
+    preview: { label: 'Not held', color: 'bg-amber-500/20 text-amber-400', icon: Play },
     preview_used: { label: 'Locked', color: 'bg-destructive/20 text-destructive', icon: Lock },
     owned: { label: 'Owned', color: 'bg-primary/20 text-primary', icon: Unlock },
     offline_ready: { label: 'Offline Ready', color: 'bg-cyan-500/20 text-cyan-400', icon: Shield }
@@ -120,7 +122,7 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
           
           {/* On-Chain Badge */}
           <div className="absolute top-3 right-3">
-            <Badge variant="outline" className="bg-background/80 backdrop-blur-sm gap-1 border-primary/30">
+            <Badge variant="outline" className="bg-background/80 backdrop-blur-sm gap-1 border-border">
               <Coins size={12} className="text-primary" />
               On-Chain
             </Badge>
@@ -199,6 +201,14 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
             </div>
           )}
 
+          {/* What you own, in copies. A dollar is one copy. */}
+          <CopyPosition
+            songId={song.id}
+            coinAddress={coinAddress}
+            balance={balance}
+            walletAddress={walletAddress}
+          />
+
           {/* Action Button */}
           <div className="pt-2">
             {ownershipStatus === 'owned' || ownershipStatus === 'offline_ready' ? (
@@ -212,46 +222,54 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
                   Play Now
                 </Button>
                 <Button
-                  variant="outline"
-                  className="flex-1 gap-2 text-destructive hover:text-destructive"
-                  onClick={async () => {
-                    if (!walletAddress) {
-                      const address = await requestWalletConnection();
-                      if (!address) return;
-                      setWalletAddress(address);
-                    }
-                    setShowSellModal(true);
-                  }}
+                  className="flex-1 gap-2 gradient-primary"
+                  onClick={() => setShowUnlockModal(true)}
                 >
-                  Sell
+                  <Coins size={16} />
+                  Add a copy
                 </Button>
               </div>
             ) : ownershipStatus === 'preview' ? (
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="flex-1 gap-2"
                   onClick={handlePlay}
                 >
                   <Play size={16} />
                   Preview
                 </Button>
-                <Button 
+                <Button
                   className="flex-1 gap-2 gradient-primary"
                   onClick={() => setShowUnlockModal(true)}
                 >
-                  <Unlock size={16} />
-                  Unlock
+                  <Coins size={16} />
+                  Own a copy
                 </Button>
               </div>
             ) : (
-              <Button 
+              <Button
                 className="w-full gap-2 gradient-primary"
                 onClick={() => setShowUnlockModal(true)}
               >
-                <Unlock size={16} />
-                Unlock Song
+                <Coins size={16} />
+                Own a copy, $1
               </Button>
+            )}
+            {(ownershipStatus === 'owned' || ownershipStatus === 'offline_ready') && (
+              <button
+                onClick={async () => {
+                  if (!walletAddress) {
+                    const address = await requestWalletConnection();
+                    if (!address) return;
+                    setWalletAddress(address);
+                  }
+                  setShowSellModal(true);
+                }}
+                className="mt-2 w-full text-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Sell copies
+              </button>
             )}
           </div>
         </div>
@@ -384,7 +402,7 @@ export default function Marketplace() {
                   Music Marketplace
                 </h1>
                 <p className="text-xs text-muted-foreground">
-                  Own music on-chain • Stream forever
+                  Own the songs • Stream them all
                 </p>
               </div>
             </div>
@@ -413,17 +431,30 @@ export default function Marketplace() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center max-w-2xl mx-auto space-y-4"
           >
-            <Badge className="bg-primary/20 text-primary border-primary/30">
+            <Badge className="bg-primary/20 text-primary border-border">
               Powered by Base
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-heading font-bold text-foreground">
-              Own Your Music
+              A dollar owns a copy
             </h2>
+            {/*
+              This used to end "so the next person in pays a little more than you did", which is
+              a forecast about the price of a tradeable asset made by the people selling it. It
+              also described, in plain words, a mechanism where each buyer pays more than the
+              last. Both halves are gone. What a copy is stays true; which way it moves does not
+              get promised.
+            */}
             <p className="text-muted-foreground">
-              Purchase song tokens on Base blockchain. Unlock unlimited streaming, 
-              offline plays, and support artists directly with 95% going to creators.
+              One dollar buys one digital copy of a song. Underneath, a copy is a share of that
+              song's coin on Base, and its price moves with the market. It can be worth more than
+              you paid. It can be worth less, including nothing. What holding gets you here is
+              points, badges and doors that open in the artist's world.
             </p>
           </motion.div>
+
+          <div className="max-w-2xl mx-auto mt-6">
+            <HolderStanding />
+          </div>
           
           {/* Stats */}
           <motion.div
@@ -436,13 +467,20 @@ export default function Marketplace() {
               <div className="text-2xl font-bold text-primary">{tokenGatedSongs.length}</div>
               <div className="text-xs text-muted-foreground">Songs On-Chain</div>
             </Card>
+            {/*
+              These two used to read "95% To Artists" and "1000 Offline Plays".
+              Neither was true. The purchase is a pool swap with no split in it,
+              and the offline number was a constant written to localStorage that
+              nothing ever counted down. Both are replaced with figures the app
+              can actually stand behind.
+            */}
             <Card className="p-4 text-center glass-card">
-              <div className="text-2xl font-bold text-primary">95%</div>
-              <div className="text-xs text-muted-foreground">To Artists</div>
+              <div className="text-2xl font-bold text-primary whitespace-nowrap">$1</div>
+              <div className="text-xs text-muted-foreground">A copy</div>
             </Card>
             <Card className="p-4 text-center glass-card">
-              <div className="text-2xl font-bold text-primary">1000</div>
-              <div className="text-xs text-muted-foreground">Offline Plays</div>
+              <div className="text-2xl font-bold text-primary whitespace-nowrap">Base</div>
+              <div className="text-xs text-muted-foreground">Where it settles</div>
             </Card>
           </motion.div>
         </div>
@@ -469,7 +507,7 @@ export default function Marketplace() {
             </div>
             <h4 className="font-semibold text-foreground mb-1">2. Purchase</h4>
             <p className="text-sm text-muted-foreground">
-              Buy with ETH on Base. 95% goes directly to the artist's wallet.
+              Buy with ETH on Base, from your own wallet. The artist earns the creator share of every trade in their song's coin.
             </p>
           </Card>
           <Card className="p-4 glass-card">
@@ -478,7 +516,7 @@ export default function Marketplace() {
             </div>
             <h4 className="font-semibold text-foreground mb-1">3. Stream Forever</h4>
             <p className="text-sm text-muted-foreground">
-              Unlimited streaming plus 1,000 offline plays when you own $1+ worth.
+              Unlimited streaming once you own $1+ worth.
             </p>
           </Card>
         </div>
@@ -553,7 +591,7 @@ export default function Marketplace() {
             <Card className="p-12 text-center glass-card">
               <Coins className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No On-Chain Songs Yet</h3>
-              <p className="text-muted-foreground">Check back soon for new releases on the blockchain!</p>
+              <p className="text-muted-foreground">Nothing is up for sale yet. New releases land here first, so this is the page to watch.</p>
             </Card>
           ) : (
             <>
@@ -662,15 +700,15 @@ export default function Marketplace() {
             </Card>
           ) : ownedLoading ? (
             <Card className="p-10 text-center glass-card max-w-lg mx-auto">
-              <p className="text-sm text-muted-foreground">Checking your holdings on Base...</p>
+              <p className="text-sm text-muted-foreground">Checking what you own...</p>
             </Card>
           ) : ownedSongObjs.length === 0 ? (
             <Card className="p-10 text-center glass-card max-w-lg mx-auto">
               <Heart className="w-12 h-12 mx-auto text-primary mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">Nothing in your collection yet</h3>
               <p className="text-sm text-muted-foreground mb-5">
-                Own a song and it lives here forever: unlimited streaming, 1,000 offline plays,
-                and 95% of your support goes straight to the artist.
+                Own a song and it stays in your collection: unlimited streaming,
+                and the artist earns the creator share of every trade in their coin.
               </p>
               <Button onClick={() => setTab('artists')} className="rounded-full gradient-primary text-primary-foreground">
                 <Music className="w-4 h-4 mr-2" />

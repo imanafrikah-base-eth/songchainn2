@@ -3,11 +3,15 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, UploadCloud, Loader2, CheckCircle2, Wrench, Music4, Wallet, Coins, AlertCircle,
-  Image as ImageIcon,
+  Image as ImageIcon, Globe2,
 } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
+import { ConsentNotice } from '@/components/ConsentNotice';
+import { useCompliance } from '@/hooks/useCompliance';
+import { MediaManager } from '@/components/gallery/MediaManager';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { useAuth } from '@/context/AuthContext';
+import { WORLD_BUILDER_ENABLED } from '@/lib/features';
 import { supabase } from '@/integrations/supabase/client';
 import {
   useArtistReleases, useTrackUpload, TIER_LABEL, type ArtistRelease, type ReleaseTier,
@@ -48,10 +52,11 @@ function useMyProfile() {
 }
 
 const Studio = () => {
-  const { user } = useAuth();
+  const { user, isArtist } = useAuth();
   const { data: profile } = useMyProfile();
   const { data: releases = [], isLoading } = useArtistReleases();
   const { phase, progress, error, result, upload, reset } = useTrackUpload();
+  const { cannotUpload } = useCompliance();
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -78,7 +83,7 @@ const Studio = () => {
   }), [releases]);
 
   const tooBig = file ? file.size > MAX_MB * 1024 * 1024 : false;
-  const canSubmit = !!file && !tooBig && title.trim().length > 0 && artistName.trim().length > 0 && !busy;
+  const canSubmit = !!file && !tooBig && title.trim().length > 0 && artistName.trim().length > 0 && !busy && !cannotUpload;
 
   const submit = async () => {
     if (!file || !canSubmit) return;
@@ -138,6 +143,26 @@ const Studio = () => {
         <p className="text-sm text-muted-foreground mb-8">
           Send a finished record. $HIKULU and NAKULU read how it was mastered and it goes live to New Releases the same minute. Only a broken file is held back. Everything else publishes, and how it was finished decides which rung it lands on: mastered to standard, release ready, or out with room to tighten. Nobody approves it by hand.
         </p>
+
+        {/* ------------------------------------------------------- world --- */}
+
+        {WORLD_BUILDER_ENABLED && isArtist && (
+          <Link
+            to="/world-builder"
+            className="mb-8 flex items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/50"
+          >
+            <Globe2 className="mt-0.5 h-6 w-6 shrink-0 text-primary" />
+            <div>
+              <h2 className="font-heading text-lg font-bold text-foreground">Build your world</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                A profile shows people your music. A world lets you decide who gets in, what they
+                find when they do, and what it takes to reach the room behind the last door. Six
+                screens, and you can walk it as a stranger before anyone else sees it.
+              </p>
+              <span className="mt-2 inline-block text-sm font-semibold text-primary">Start building</span>
+            </div>
+          </Link>
+        )}
 
         {/* ------------------------------------------------------ upload --- */}
 
@@ -261,11 +286,24 @@ const Studio = () => {
               </div>
             )}
 
+            {/* The enforcement ladder was computed on every load and read by
+                nobody, so a no_upload restriction existed in the database and
+                stopped nothing. Now it stops the thing it names, and says why
+                rather than failing quietly at the server. */}
+            {cannotUpload && (
+              <p className="mt-6 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs leading-relaxed text-foreground">
+                Uploading is paused on your account. If you think that is wrong, you can appeal it
+                from your profile.
+              </p>
+            )}
+
+            <ConsentNotice which="upload_rights" className="mt-6" />
+
             <button
               type="button"
               onClick={submit}
               disabled={!canSubmit}
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
               {busy ? 'Working' : 'Send it in'}
@@ -343,6 +381,30 @@ const Studio = () => {
             </div>
           </div>
         )}
+
+        {/* --------------------------------------------------- launcher --- */}
+
+        <Link
+          to="/launch"
+          className="mb-8 flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+        >
+          <Coins className="h-5 w-5 shrink-0 text-primary" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground">
+              Put something on chain
+            </span>
+            <span className="block text-sm text-muted-foreground">
+              Your own token, deployed to a wallet you choose, through the SONGCHAINN launcher.
+            </span>
+          </span>
+          <Globe2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+
+        {/* ------------------------------------------------ visual work --- */}
+
+        <div className="mb-10 border-t border-border pt-8">
+          <MediaManager walletAddress={profile?.wallet_address ?? null} />
+        </div>
 
         {/* ---------------------------------------------------- releases --- */}
 

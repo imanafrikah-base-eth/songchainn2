@@ -1,24 +1,34 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Users, Share2, Play, Trophy, Crown } from "lucide-react";
+import { ArrowLeft, Users, Share2, Play, Trophy, Crown, Heart, Radio, SlidersHorizontal, Gavel } from "lucide-react";
 import Navbar from "@/battlezone/components/Navbar";
 import Footer from "@/battlezone/components/Footer";
 import LiveBadge from "@/battlezone/components/LiveBadge";
-import { useBattle } from "@/battlezone/hooks/useBattles";
+import { useBattle, useBattles } from "@/battlezone/hooks/useBattles";
+import { supabase } from "@/battlezone/integrations/supabase/client";
+import { useAuth } from "@/battlezone/contexts/AuthContext";
+import { useToast } from "@/battlezone/hooks/use-toast";
 import { requestHikuluVerdict } from "@/battlezone/lib/hikulu";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import AppLink from "@/battlezone/components/AppLink";
-import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
+import { BattleCountdown } from "@/battlezone/components/BattleCountdown";
+import { STAGES, buildClock } from "@/battlezone/lib/battleStages";
+import { SONGS } from "@/data/musicData";
 
 const BattleDetail = () => {
   const { isEmbedded, embedTo } = useEmbedMode();
   const { battleId } = useParams();
   const navigate = useNavigate();
   const { data: battle, isLoading } = useBattle(battleId);
+  const { data: liveBattles = [] } = useBattles("live");
+  const { user, profile } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const verdictRequested = useRef(false);
+  const [isGoingLive, setIsGoingLive] = useState(false);
 
   // Self-heal: an ended battle without a verdict asks $HIKULU once, then refetches.
   useEffect(() => {
@@ -32,8 +42,83 @@ const BattleDetail = () => {
   const handleVote = () => {
     if (!battle) return;
     if (battle.status === "live") {
-      navigate(embedTo(`/entry/${battle.id}`));
+      // Straight into the room. This page already knows the battle is live, so
+      // routing through /entry only added a second fetch before anything moved.
+      navigate(embedTo(`/room/${battle.id}`));
     }
+  };
+
+  // A battle saved as a draft or scheduled for later had no way to actually
+  // start: nothing flips status to 'live' on a schedule and no screen offered
+  // the host a launch control. This is that control.
+  const goLive = async () => {
+    if (!battle || !user || isGoingLive) return;
+
+    const stillLive = liveBattles.filter((b) => {
+      const startedAt = new Date(b.createdAt).getTime();
+      return Date.now() - startedAt < 24 * 60 * 60 * 1000;
+    });
+    if (stillLive.length >= 5) {
+      toast({
+        title: "Live capacity reached",
+        description: "BattleZone supports 5 concurrent live battles. End one first, then launch this one.",
+      });
+      return;
+    }
+
+    setIsGoingLive(true);
+    const displayName = profile?.display_name || profile?.username || battle.host;
+
+    /* The clock starts now, not when the battle was created, and it is written
+       as timestamps so every viewer counts down to the same instant rather than
+       to their own device. */
+    const clock = buildClock(
+      [...battle.songsA, ...battle.songsB].map(
+        (s) => SONGS.find((catalogue) => catalogue.id === s.id)?.duration,
+      ),
+    );
+    const startedAt = Date.now();
+
+    const { error } = await supabase
+      .from("battles")
+      .update({
+        status: "live",
+        voting_open: true,
+        round: battle.round || 1,
+        launched_at: new Date().toISOString(),
+        music_ends_at: new Date(startedAt + clock.musicEndsAt * 1000).toISOString(),
+        closes_at: new Date(startedAt + clock.closesAt * 1000).toISOString(),
+      })
+      .eq("id", battle.id);
+
+    if (error) {
+      setIsGoingLive(false);
+      // The Open Mic is charged in points at exactly this moment, so a refusal
+      // here is usually the database saying the host cannot afford it. Passing
+      // its own words on is more use than "please try again".
+      toast({
+        title: "Could not go live",
+        description: error.message?.includes("Open Mic")
+          ? error.message
+          : "Please try again.",
+      });
+      return;
+    }
+
+    // Seat the host in their own room, otherwise they enter as audience and
+    // the host controls never appear.
+    await supabase.from("battle_rooms").delete().eq("battle_id", battle.id).eq("user_id", user.id);
+    await supabase.from("battle_rooms").insert({
+      battle_id: battle.id,
+      user_id: user.id,
+      role: "host",
+      display_name: displayName,
+      is_muted: false,
+      is_speaking: true,
+    });
+
+    await queryClient.invalidateQueries({ queryKey: ["battle", battle.id] });
+    navigate(embedTo(`/room/${battle.id}`));
   };
 
   const handleShare = async () => {
@@ -71,6 +156,7 @@ const BattleDetail = () => {
 
   const totalVotes = battle.votesA + battle.votesB;
   const pctA = totalVotes ? Math.round((battle.votesA / totalVotes) * 100) : 50;
+  const isHost = !!user && !!battle.hostUserId && battle.hostUserId === user.id;
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,10 +170,38 @@ const BattleDetail = () => {
           {battle.status === "live" && <LiveBadge />}
           {battle.status === "ended" && <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">Ended</span>}
           {battle.status === "upcoming" && <span className="rounded-full bg-secondary/20 px-3 py-1 text-xs font-semibold text-secondary">Upcoming</span>}
+          <span className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground">
+            {STAGES[battle.stage].name}
+          </span>
           <span className="text-xs text-muted-foreground">{battle.region}</span>
         </div>
 
+        {battle.stage === "open_mic" && (
+          <p className="text-sm text-muted-foreground">
+            This one is on the Open Mic. The judges and the poll decide it exactly as they
+            do on the Main Stage, and nothing in it is worth money: there is no backing and
+            nobody is paid.
+          </p>
+        )}
+
+        {battle.status === "live" && battle.closesAt && (
+          <BattleCountdown
+            musicEndsAt={battle.musicEndsAt ?? null}
+            closesAt={battle.closesAt}
+          />
+        )}
+
         <h1 className="text-3xl font-display font-black text-foreground">{battle.title}</h1>
+
+        {isHost && battle.status === "upcoming" && (
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-muted-foreground">
+            You are the host of this battle.
+            {battle.scheduledTime
+              ? ` It is scheduled for ${new Date(battle.scheduledTime).toLocaleString()}, and it stays in Upcoming until you start it yourself.`
+              : " It stays in Upcoming until you start it."}{" "}
+            Hit Go Live Now when you are ready and the room opens for your audience.
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-6 items-center">
           <div className="flex flex-col items-center gap-3 text-center">
@@ -142,33 +256,90 @@ const BattleDetail = () => {
           </div>
         )}
 
-        {/* $HIKULU's verdict */}
+        {/* The judges' verdicts */}
         {battle.status === "ended" && (
           battle.hikuluVerdict ? (
-            <div className="rounded-2xl border-2 border-neon-gold/50 bg-gradient-to-b from-neon-gold/10 to-transparent p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <Crown className="h-5 w-5 text-neon-gold" />
-                <h3 className="font-black text-neon-gold">$HIKULU's Verdict</h3>
+            <div className="rounded-2xl border-2 border-amber-400/50 bg-gradient-to-b from-amber-400/10 to-transparent p-6 space-y-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-amber-400" />
+                  <h3 className="font-black text-amber-400">$HIKULU's Verdict</h3>
+                </div>
+                <p className="text-sm italic text-foreground">"{battle.hikuluVerdict}"</p>
               </div>
-              <p className="text-sm italic text-foreground">"{battle.hikuluVerdict}"</p>
+              {battle.nakuluVerdict && (
+                <div className="space-y-1 rounded-xl border border-rose-400/30 bg-rose-400/5 p-3">
+                  <div className="flex items-center gap-2">
+                    <Heart className="h-5 w-5 text-rose-400" />
+                    <h3 className="font-black text-rose-400">NAKULU's Verdict</h3>
+                  </div>
+                  <p className="text-sm italic text-foreground">"{battle.nakuluVerdict}"</p>
+                </div>
+              )}
+              {/*
+                The Council of Elders only appears when it actually sat, which
+                is when $HIKULU and NAKULU picked opposite winners or came out
+                level. When it sat, it decided.
+              */}
+              {battle.councilVerdicts.length > 0 && (
+                <div className="space-y-3 rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-3">
+                  <div className="flex items-center gap-2">
+                    <Gavel className="h-5 w-5 text-emerald-400" />
+                    <h3 className="font-black text-emerald-400">The Council of Elders was summoned</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    The bench was split, so the high council came down to settle it.
+                  </p>
+                  <div className="space-y-2">
+                    {battle.councilVerdicts.map((elder) => (
+                      <div key={elder.key} className="rounded-lg border border-border bg-background/40 p-2.5">
+                        <div className="flex items-baseline justify-between gap-2 mb-1">
+                          <span className="text-xs font-black text-foreground">{elder.name}</span>
+                          <span className="text-[10px] text-muted-foreground tabular-nums">
+                            {battle.artistA.name} {elder.points_a}, {battle.artistB.name} {elder.points_b}
+                          </span>
+                        </div>
+                        <p className="text-xs italic text-muted-foreground">"{elder.verdict}"</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-center">
                   <p className="font-bold text-foreground">{battle.artistA.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{battle.votesA.toLocaleString()} votes + {battle.hikuluPointsA} judge points</p>
-                  <p className="font-black text-primary text-lg">{(battle.votesA + battle.hikuluPointsA).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {battle.votesA.toLocaleString()} votes + {battle.hikuluPointsA} $HIKULU + {battle.nakuluPointsA} NAKULU
+                    {battle.councilPointsA > 0 ? ` + ${battle.councilPointsA} council` : ""}
+                  </p>
+                  <p className="font-black text-primary text-lg">
+                    {(battle.votesA + battle.hikuluPointsA + battle.nakuluPointsA + battle.councilPointsA).toLocaleString()}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-secondary/30 bg-secondary/5 p-3 text-center">
                   <p className="font-bold text-foreground">{battle.artistB.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{battle.votesB.toLocaleString()} votes + {battle.hikuluPointsB} judge points</p>
-                  <p className="font-black text-secondary text-lg">{(battle.votesB + battle.hikuluPointsB).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {battle.votesB.toLocaleString()} votes + {battle.hikuluPointsB} $HIKULU + {battle.nakuluPointsB} NAKULU
+                    {battle.councilPointsB > 0 ? ` + ${battle.councilPointsB} council` : ""}
+                  </p>
+                  <p className="font-black text-secondary text-lg">
+                    {(battle.votesB + battle.hikuluPointsB + battle.nakuluPointsB + battle.councilPointsB).toLocaleString()}
+                  </p>
                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground text-center">Final score: crowd votes + $HIKULU judge points</p>
+              <p className="text-[11px] text-muted-foreground text-center">
+                {battle.decidedBy === "council"
+                  ? "Settled by the Council of Elders. The judges heard the records, the crowd cast its own vote, and neither side of the bench could break it."
+                  : battle.decidedBy === "host"
+                    ? "Called by the host. Judge points and crowd votes are shown for the record."
+                    : "Final score: crowd votes plus judge points. The judges heard the records and never saw the votes."}
+              </p>
             </div>
           ) : (
-            <div className="rounded-2xl border border-neon-gold/30 bg-neon-gold/5 p-5 flex items-center gap-3">
-              <Crown className="h-5 w-5 text-neon-gold shrink-0" />
-              <p className="text-sm text-muted-foreground">$HIKULU is weighing his verdict on this battle. Check back in a moment.</p>
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 flex items-center gap-3">
+              <Crown className="h-5 w-5 text-amber-400 shrink-0" />
+              <p className="text-sm text-muted-foreground">$HIKULU and NAKULU are weighing their verdicts on this battle. Check back in a moment.</p>
             </div>
           )
         )}
@@ -189,14 +360,29 @@ const BattleDetail = () => {
                 : "Quick battle: one round, one song from each artist"}
             </li>
             <li>Audience votes live each round and can change their vote before the round ends</li>
-            <li>Crowd votes plus $HIKULU judge points decide the final score</li>
+            <li>Crowd votes plus judge points from $HIKULU and NAKULU decide the final score</li>
             <li>Host can end the battle early</li>
           </ul>
         </div>
 
         <div className="flex flex-wrap gap-4">
+          {isHost && battle.status === "upcoming" && (
+            <button
+              type="button"
+              onClick={() => void goLive()}
+              disabled={isGoingLive}
+              className="inline-flex items-center gap-2 rounded-xl bg-live px-6 py-3 font-bold text-white hover:bg-live/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Radio className="h-4 w-4" /> {isGoingLive ? "Going live..." : "Go Live Now"}
+            </button>
+          )}
+          {isHost && battle.status === "live" && (
+            <AppLink to={`/host/control/${battle.id}`} className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-6 py-3 font-bold text-primary hover:bg-primary/20 transition-colors">
+              <SlidersHorizontal className="h-4 w-4" /> Host Controls
+            </AppLink>
+          )}
           {battle.status === "live" && (
-            <AppLink to={`/entry/${battle.id}`} className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-all">
+            <AppLink to={`/room/${battle.id}`} className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-all">
               <Play className="h-4 w-4" /> Enter Room
             </AppLink>
           )}

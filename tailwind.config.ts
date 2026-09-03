@@ -55,6 +55,15 @@ export default {
           blue: "hsl(var(--glow-blue))",
           cyan: "hsl(var(--glow-cyan))",
         },
+        // WaveWarz Africa battle palette. Used all over src/battlezone/; without
+        // these entries Tailwind emits nothing for bg-live / text-neon-gold /
+        // border-neon-cyan and those surfaces render colourless.
+        neon: {
+          green: "hsl(var(--neon-green))",
+          cyan: "hsl(var(--cyan))",
+          gold: "hsl(var(--gold))",
+        },
+        live: "hsl(var(--live-red))",
         surface: {
           elevated: "hsl(var(--surface-elevated))",
           overlay: "hsl(var(--surface-overlay))",

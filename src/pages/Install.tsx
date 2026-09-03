@@ -101,7 +101,7 @@ export default function Install() {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         toast({
-          title: 'Installingâ€¦',
+          title: 'Installing...',
           description: 'If prompted, confirm to add the app to your home screen.',
         });
       }
@@ -138,7 +138,7 @@ export default function Install() {
       {
         icon: <Download className="w-6 h-6" />,
         title: 'Tap "Install App"',
-        description: 'Look for the install banner or tap the menu (â‹®)'
+        description: 'Look for the install banner, or open your browser menu'
       },
       {
         icon: <Check className="w-6 h-6" />,
@@ -206,7 +206,7 @@ export default function Install() {
                       <span className="text-primary font-bold text-sm">2</span>
                     </div>
                     <div>
-                      <p className="text-foreground text-sm font-medium">Tap â€œAdd to Home Screenâ€</p>
+                      <p className="text-foreground text-sm font-medium">Tap "Add to Home Screen"</p>
                       <p className="text-muted-foreground text-xs mt-1">Scroll down in the share menu to find it</p>
                     </div>
                   </div>
@@ -216,7 +216,7 @@ export default function Install() {
                       <span className="text-primary font-bold text-sm">3</span>
                     </div>
                     <div>
-                      <p className="text-foreground text-sm font-medium">Tap â€œAddâ€ to confirm</p>
+                      <p className="text-foreground text-sm font-medium">Tap "Add" to confirm</p>
                       <p className="text-muted-foreground text-xs mt-1">The app will appear on your home screen</p>
                     </div>
                   </div>
@@ -460,9 +460,9 @@ export default function Install() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { icon: 'ðŸš€', title: 'Faster Loading', desc: 'Instant access without browser delays' },
-              { icon: 'ðŸ“´', title: 'Offline Mode', desc: 'Listen to cached music anywhere' },
-              { icon: 'ðŸ””', title: 'Push Notifications', desc: 'Never miss new releases' }
+              { icon: '🚀', title: 'Faster loading', desc: 'Opens straight up, with no browser in the way' },
+              { icon: '📴', title: 'Works offline', desc: 'Listen to your saved music anywhere' },
+              { icon: '🔔', title: 'Told when it drops', desc: 'Never miss a new release' }
             ].map((feature, index) => (
               <div key={index} className="glass-card rounded-xl p-4 text-center border border-border">
                 <div className="text-3xl mb-2">{feature.icon}</div>

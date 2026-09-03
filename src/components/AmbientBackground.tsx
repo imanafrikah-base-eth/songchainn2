@@ -159,13 +159,13 @@ export const AmbientBackground = memo(function AmbientBackground({
         <>
           <div
             className={cn(
-              'absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl bg-blue-500/10',
+              'hidden',
               !prefersReducedMotion && 'animate-ambient-glow'
             )}
           />
           <div
             className={cn(
-              'absolute -bottom-32 -right-16 w-[28rem] h-[28rem] rounded-full blur-3xl bg-purple-500/10',
+              'hidden',
               !prefersReducedMotion && 'animate-ambient-glow-alt'
             )}
           />

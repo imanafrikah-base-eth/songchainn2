@@ -1,13 +1,15 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound } from 'lucide-react';
 import { ARTISTS, SONGS, getRelatedArtists } from '@/data/musicData';
+import { getWorldByArtistId } from '@/worlds/registry';
+import { ArtistCoinPanel } from '@/components/ArtistCoinPanel';
+import { WORLDS_ENABLED } from '@/lib/features';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { SongCard } from '@/components/SongCard';
 import { ArtistCard } from '@/components/ArtistCard';
 import { Navigation } from '@/components/Navigation';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
-import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +25,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { useSocial } from '@/hooks/useSocial';
 import { PostComposer } from '@/components/social/PostComposer';
 import { PostCard } from '@/components/social/PostCard';
+import { ArtistGallery } from '@/components/gallery/ArtistGallery';
+import { useArtistGallery } from '@/hooks/useArtistMedia';
 import type { SocialPostWithProfile } from '@/types/social';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import {
@@ -57,6 +61,7 @@ export default function ArtistDetail() {
     isFollowing: isFollowingUser,
     getPostComments,
     addComment,
+    untagSelf,
   } = useSocial();
   
   const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
@@ -89,6 +94,11 @@ export default function ArtistDetail() {
 
   useEffect(() => {
     if (!shouldAutoCreateArtistAccount) return;
+    // Wait for the read. Firing while it is still in flight means every artist
+    // opening their own page attempts a write that is already unnecessary, and
+    // artist_accounts has no insert policy for the artist by design, so it just
+    // returns 403 twice and logs an error on a page that is working fine.
+    if (isArtistAccountLoading) return;
     if (artistAccount?.user_id) return;
 
     let cancelled = false;
@@ -116,7 +126,7 @@ export default function ArtistDetail() {
     return () => {
       cancelled = true;
     };
-  }, [artistAccount?.user_id, id, queryClient, shouldAutoCreateArtistAccount, user?.id]);
+  }, [artistAccount?.user_id, id, isArtistAccountLoading, queryClient, shouldAutoCreateArtistAccount, user?.id]);
 
   const ownerUserId = useMemo(() => {
     if (artistAccount?.user_id) return artistAccount.user_id;
@@ -230,7 +240,7 @@ export default function ArtistDetail() {
       queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
       toast.success('Profile picture updated');
     } catch (err: any) {
-      toast.error('Failed to update profile picture', { description: err?.message });
+      toast.error('Could not update your profile picture', { description: 'Try a smaller image, or try again in a moment.' });
     } finally {
       setIsUploadingProfilePicture(false);
     }
@@ -278,7 +288,7 @@ export default function ArtistDetail() {
       queryClient.invalidateQueries({ queryKey: ['artist-public-profiles'] });
       toast.success('Cover photo updated');
     } catch (err: any) {
-      toast.error('Failed to update cover photo', { description: err?.message });
+      toast.error('Could not update your cover photo', { description: 'Try a smaller image, or try again in a moment.' });
     } finally {
       setIsUploadingCoverPhoto(false);
     }
@@ -336,7 +346,7 @@ export default function ArtistDetail() {
       return;
     }
     if (!file.type.startsWith('image/')) {
-      toast.error('Invalid file', { description: 'Please select an image file.' });
+      toast.error('That is not an image', { description: 'Pick a JPG, PNG or WebP.' });
       return;
     }
 
@@ -365,7 +375,7 @@ export default function ArtistDetail() {
     if (!ownerUserId) return;
     const nextName = profileNameDraft.trim();
     if (!nextName) {
-      toast.error('Name is required');
+      toast.error('Give the page a name first');
       return;
     }
 
@@ -393,7 +403,7 @@ export default function ArtistDetail() {
       setIsEditingProfile(false);
       toast.success('Artist page updated');
     } catch (err: any) {
-      toast.error('Failed to update artist page', { description: err?.message });
+      toast.error('Could not save your artist page', { description: 'Nothing was lost. Try again in a moment.' });
     } finally {
       setIsSavingProfile(false);
     }
@@ -407,7 +417,7 @@ export default function ArtistDetail() {
       .update({ profile_theme: nextTheme })
       .eq('artist_id', id);
     if (error) {
-      toast.error('Failed to update theme', { description: error.message });
+      toast.error('Could not save that theme', { description: 'Your page is unchanged. Try again in a moment.' });
       return;
     }
     queryClient.invalidateQueries({ queryKey: ['artist-account', id] });
@@ -631,7 +641,7 @@ export default function ArtistDetail() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-10"
         >
-          <div className="relative h-48 md:h-64 rounded-3xl overflow-hidden mb-8 bg-gradient-to-br from-primary/20 to-background">
+          <div className="relative h-48 md:h-64 rounded-3xl overflow-hidden mb-8 bg-secondary">
             <input
               ref={coverPhotoInputRef}
               type="file"
@@ -717,9 +727,9 @@ export default function ArtistDetail() {
             </div>
 
             {/* Info */}
-            <div className="flex-1">
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <div className="flex-1 min-w-0">
+            <div className="flex-1 w-full min-w-0">
+              <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap sm:gap-4 mb-2">
+                <div className="w-full min-w-0 sm:w-auto sm:flex-1">
                   {isOwner && isEditingProfile ? (
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${isArtistOnline ? 'bg-green-500' : 'bg-muted'}`} />
@@ -732,8 +742,8 @@ export default function ArtistDetail() {
                       />
                     </div>
                   ) : (
-                    <h1 className="font-heading text-4xl font-bold text-foreground">
-                      <span className="inline-flex items-center gap-2">
+                    <h1 className="font-heading text-3xl sm:text-4xl font-bold text-foreground min-w-0">
+                      <span className="inline-flex max-w-full min-w-0 items-center gap-2">
                         <span className={`w-2 h-2 rounded-full ${isArtistOnline ? 'bg-green-500' : 'bg-muted'}`} />
                         <span className="truncate">{displayName}</span>
                         {isNewArtist && (
@@ -741,17 +751,25 @@ export default function ArtistDetail() {
                             NEW
                           </span>
                         )}
-                        {isVerified && <VerifiedBadge size={22} tone="gold" />}
+                        {isVerified && <VerifiedBadge size={22} />}
                       </span>
                     </h1>
                   )}
                   <p className="text-sm text-muted-foreground mt-2">{artistPresenceLabel}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {id && !ownerUserId && (
-                    <ClaimArtistPage artistId={id} artistName={artist?.name ?? 'this page'} isClaimed={!!ownerUserId} />
-                  )}
-                  {user && (
+                  {/*
+                    The claim door is closed. "This is my page" showed on every
+                    artist to every visitor, which made ownership look like one
+                    tap away and put the burden of proof on a review queue that
+                    nobody worked. Artist accounts are now created by us and
+                    handed to the artist directly, so there is nothing to claim.
+                    See scripts/create-artist-accounts.mjs.
+                  */}
+                  {/* Not on your own page. Offering an artist a Follow button
+                      for themselves is the kind of small wrongness that makes
+                      a product feel unfinished. */}
+                  {user && !isOwner && (
                     <Button
                       onClick={handleToggleFollow}
                       variant={isFollowingArtist ? "secondary" : "default"}
@@ -842,21 +860,53 @@ export default function ArtistDetail() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+
+              {/* The way into an artist's world. It sits on its own line rather
+                  than in the button row, so on a narrow phone it cannot get
+                  squeezed off the edge next to Follow and Share. */}
+              {WORLDS_ENABLED && (() => {
+                const world = getWorldByArtistId(artist.id);
+                if (!world) return null;
+                return (
+                  <Link
+                    to={`/world/${world.slug}`}
+                    className="mb-4 flex w-full items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition-colors hover:bg-amber-400/20"
+                  >
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-400 text-black">
+                      <KeyRound className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-foreground">
+                        Enter {displayName || artist.name}'s World
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        A place this artist built. Step inside and look around.
+                      </span>
+                    </span>
+                  </Link>
+                );
+              })()}
               
-              <div className="flex items-center gap-4 mb-4">
-                <div className="flex items-center gap-1 text-muted-foreground">
+              {/* The artist's coin, folded away until somebody asks for it.
+                  Anyone who came here for the music is not shown a market. */}
+              <div className="mb-4">
+                <ArtistCoinPanel artistId={artist.id} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4">
+                <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
                   <MapPin className="w-4 h-4" />
                   <span>{artist.location}</span>
                 </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
+                <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
                   <Music className="w-4 h-4" />
                   <span>{artistSongs.length} songs</span>
                 </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
+                <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
                   <PlayCircle className="w-4 h-4" />
                   <span>{artistStats.totalPlays.toLocaleString()} streams</span>
                 </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
+                <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
                   <Users className="w-4 h-4" />
                   <span>{artistFollowers.toLocaleString()} followers</span>
                 </div>
@@ -915,19 +965,23 @@ export default function ArtistDetail() {
               </div>
 
               {/* Location Badge */}
-              <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+              <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-border">
                 <span className="text-sm text-primary font-medium">{artist.location}</span>
               </div>
             </div>
           </div>
         </motion.section>
 
+        {/* Their visual work. Hidden entirely when there is none, rather than
+            showing an empty shelf on somebody's page. */}
+        <ArtistGallerySection artistId={id} />
+
         <section className="mb-10">
           <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Timeline</h2>
           {isOwner && (
             <PostComposer
-              onPost={async (content, type, songId) => {
-                await createPost(content, type, songId);
+              onPost={async (content, type, songId, extras) => {
+                await createPost(content, type, songId, undefined, extras);
                 if (timelineUserId) {
                   queryClient.invalidateQueries({ queryKey: ['artist-timeline-posts', timelineUserId] });
                 }
@@ -954,6 +1008,7 @@ export default function ArtistDetail() {
                   isFollowing={timelineUserId ? isFollowingUser(timelineUserId) : false}
                   onGetComments={getPostComments}
                   onAddComment={addComment}
+                  onUntagSelf={untagSelf}
                 />
               ))
             )}
@@ -1002,9 +1057,9 @@ export default function ArtistDetail() {
             return sections.map((section) => (
               <div
                 key={section.label}
-                className="mb-6 last:mb-0 glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay relative overflow-hidden"
+                className="relative overflow-hidden"
               >
-                <div className="pointer-events-none absolute -inset-x-10 -top-16 h-20 bg-gradient-to-r from-primary/30 via-purple-500/25 to-cyan-400/30 blur-3xl opacity-60" />
+                {/* glow removed */}
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <div>
@@ -1053,5 +1108,23 @@ export default function ArtistDetail() {
 
       <AudioPlayer />
     </div>
+  );
+}
+
+/**
+ * The artist's visual work, above the timeline.
+ *
+ * Its own component so the query only runs where the section renders, and so
+ * the whole block disappears when the artist has published nothing. An empty
+ * "Gallery" heading on somebody's page reads as a feature they failed to use.
+ */
+function ArtistGallerySection({ artistId }: { artistId: string | undefined }) {
+  const { data: media = [] } = useArtistGallery(artistId);
+  if (!media.length) return null;
+  return (
+    <section className="mb-10">
+      <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Gallery</h2>
+      <ArtistGallery artistId={artistId} />
+    </section>
   );
 }

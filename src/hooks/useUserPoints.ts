@@ -11,6 +11,8 @@ export interface UserPoints {
   tier: PointsTier;
   isOg: boolean;
   legacyClaimed: boolean;
+  /** Consecutive days with activity, counted server-side from user_points_daily. */
+  streak: number;
 }
 
 const LEGACY_POINTS_KEY = 'songchainn_points';
@@ -39,11 +41,20 @@ export function useUserPoints() {
     enabled: !!user,
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await (supabase as any)
-        .from('user_points')
-        .select('points, lifetime_points, is_og, legacy_claimed')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // The streak rides along with the points because the two are shown
+      // together everywhere, and because until now the streak was a constant
+      // that never moved: it was initialised to 1 and never set again, so every
+      // user has been looking at "1" since the day they joined. It is counted
+      // from user_points_daily now, which is a real record of the days somebody
+      // showed up.
+      const [{ data }, { data: streak }] = await Promise.all([
+        (supabase as any)
+          .from('user_points')
+          .select('points, lifetime_points, is_og, legacy_claimed')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        (supabase as any).rpc('get_my_streak'),
+      ]);
       const lifetime = Number(data?.lifetime_points ?? 0);
       return {
         points: Number(data?.points ?? 0),
@@ -51,6 +62,7 @@ export function useUserPoints() {
         tier: tierFromLifetime(lifetime),
         isOg: Boolean(data?.is_og),
         legacyClaimed: Boolean(data?.legacy_claimed),
+        streak: Number(streak ?? 0),
       };
     },
     staleTime: 15_000,
@@ -81,6 +93,7 @@ export function useUserPoints() {
     lifetimePoints: query.data?.lifetimePoints ?? 0,
     tier: query.data?.tier ?? 'Bronze',
     isOg: query.data?.isOg ?? false,
+    streak: query.data?.streak ?? 0,
     isLoading: query.isLoading,
     refetch: query.refetch,
   };

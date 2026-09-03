@@ -120,8 +120,7 @@ export default function About() {
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background:
-                    'radial-gradient(circle, hsl(var(--primary) / 0.9) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(60px)',
                 }}
                 animate={{ scale: [1, 1.2, 1], x: [0, 20, 0], y: [0, -16, 0] }}
@@ -132,8 +131,7 @@ export default function About() {
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background:
-                    'radial-gradient(circle, hsl(200 100% 60% / 0.7) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(60px)',
                 }}
                 animate={{ scale: [1.1, 0.9, 1.1] }}
@@ -281,7 +279,7 @@ export default function About() {
                     <Link to="/community">
                       <Button
                         variant="outline"
-                        className="gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                        className="gap-2 border-border text-primary hover:bg-primary/10"
                       >
                         <Users className="w-4 h-4" />
                         <span>Explore Community</span>
@@ -443,7 +441,7 @@ export default function About() {
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: 'radial-gradient(circle, hsl(var(--primary) / 0.7) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(40px)',
                 }}
                 animate={{ scale: [1, 1.1, 1], x: [0, 8, 0], y: [0, -6, 0] }}
@@ -454,7 +452,7 @@ export default function About() {
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: 'radial-gradient(circle, hsl(200 100% 60% / 0.7) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(40px)',
                 }}
                 animate={{ scale: [1, 1.15, 1] }}
@@ -484,7 +482,7 @@ export default function About() {
                 <Link to="/discover">
                   <Button
                     variant="outline"
-                    className="w-full sm:w-auto gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                    className="w-full sm:w-auto gap-2 border-border text-primary hover:bg-primary/10"
                   >
                     <Users className="w-4 h-4" />
                     <span>Discover Music</span>

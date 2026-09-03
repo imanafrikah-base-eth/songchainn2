@@ -84,8 +84,9 @@ const FOR_ARTISTS: Item[] = [
   {
     icon: Globe2,
     title: 'Build your own World',
-    body: 'A space that is yours alone, with rooms only your people can walk into. The first one is being built now. Yours is next.',
-    soon: true,
+    body: 'A space that is yours alone, with rooms only your people can walk into. Six screens, no code, and free for the first 50 artists.',
+    to: '/world-builder',
+    cta: 'Start building',
   },
 ];
 
@@ -100,7 +101,7 @@ function Row({ item }: { item: Item }) {
         <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
           {title}
           {soon && (
-            <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+            <span className="rounded-full border border-border bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
               Coming soon
             </span>
           )}

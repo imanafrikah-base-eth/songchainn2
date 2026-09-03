@@ -1,0 +1,13 @@
+{
+  "name": "songchainn-empire-builder",
+  "private": true,
+  "type": "module",
+  "description": "Launch an artist token (Clanker v4) + Empire treasury on Base via Empire Builder",
+  "scripts": {
+    "launch:iman": "node launch-empire.mjs iman.config.json"
+  },
+  "dependencies": {
+    "clanker-sdk": "4.2.16",
+    "viem": "2.48.0"
+  }
+}

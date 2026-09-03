@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useInterruption } from '@/hooks/useInterruption';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Sparkles, UserPlus, X } from 'lucide-react';
@@ -80,7 +81,13 @@ export function BehaviorCtaPopups() {
   const { user } = useAuth();
   const { isArtistLiked, toggleLikeArtist } = useAudienceInteractions();
 
-  const [activeItem, setActiveItem] = useState<CtaItem | null>(null);
+  const [pendingItem, setActiveItem] = useState<CtaItem | null>(null);
+  // These CTAs already had their own cooldowns, but they did not know about the
+  // install banner, the Phase Two notice or Mo$ha. Now they all share one floor.
+  const { granted: ctaGranted } = useInterruption(
+    'behaviour-cta', pendingItem !== null, { priority: 'promo' }
+  );
+  const activeItem = ctaGranted ? pendingItem : null;
   const queueRef = useRef<CtaItem[]>([]);
   const recentPlaysByArtistRef = useRef<Record<string, Array<{ songId: string; at: number }>>>({});
   const recentGlobalPlaysRef = useRef<Array<{ songId: string; at: number }>>([]);
@@ -260,7 +267,7 @@ export function BehaviorCtaPopups() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.992 }}
             transition={shellTransition}
-            className="relative overflow-hidden rounded-2xl border border-primary/35 bg-background/95 backdrop-blur shadow-2xl p-3 sm:p-3.5"
+            className="relative overflow-hidden rounded-2xl border border-border bg-background/95 backdrop-blur shadow-2xl p-3 sm:p-3.5"
           >
             <motion.div
               key={`timer-${activeItem.id}`}

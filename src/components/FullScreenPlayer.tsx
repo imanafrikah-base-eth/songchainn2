@@ -370,7 +370,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   ref={pulseButtonRef}
                   type="button"
                   onClick={handlePulseButtonClick}
-                  className="relative w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center shadow-glow-artwork-intense"
+                  className="relative w-8 h-8 rounded-full bg-primary/10 border border-border flex items-center justify-center shadow-glow-artwork-intense"
                   animate={prefersReducedMotion ? {} : { scale: [1, 1.08, 1], boxShadow: [`0 0 0 0 rgba(${glowRgbTriplet},0.0)`, `0 0 18px 4px rgba(${glowRgbTriplet},0.5)`, `0 0 0 0 rgba(${glowRgbTriplet},0.0)`] }}
                   transition={prefersReducedMotion ? undefined : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                 >
@@ -468,7 +468,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                       "px-4 py-1.5 rounded-full text-xs font-medium border transition-colors",
                       isSaved
                         ? "border-primary/30 bg-primary/10 text-primary cursor-default"
-                        : "border-primary/40 bg-primary text-primary-foreground hover:bg-primary/90",
+                        : "border-border bg-primary text-primary-foreground hover:bg-primary/90",
                     )}
                   >
                     {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Keep this'}
@@ -664,7 +664,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
                     transition={{ duration: 0.3 }}
-                    className="px-3 py-1.5 rounded-full bg-background/80 text-[11px] text-muted-foreground border border-primary/20"
+                    className="px-3 py-1.5 rounded-full bg-background/80 text-[11px] text-muted-foreground border border-border"
                   >
                     Feeling this part? Send a Pulse.
                   </motion.div>
@@ -675,7 +675,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
                     transition={{ duration: 0.3 }}
-                    className="px-3 py-1.5 rounded-full bg-background/80 text-[11px] text-muted-foreground border border-primary/20"
+                    className="px-3 py-1.5 rounded-full bg-background/80 text-[11px] text-muted-foreground border border-border"
                   >
                     Send a Pulse
                   </motion.div>
@@ -686,7 +686,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
                     transition={{ duration: 0.3 }}
-                    className="px-3 py-1.5 rounded-full bg-background/90 text-[11px] text-foreground border border-primary/40"
+                    className="px-3 py-1.5 rounded-full bg-background/90 text-[11px] text-foreground border border-border"
                   >
                     Pulse sent. Others feel this too.
                   </motion.div>

@@ -1,12 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Home, Music, Users, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
-  const [secondsLeft, setSecondsLeft] = useState(5);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -14,20 +13,15 @@ const NotFound = () => {
     }
   }, [location.pathname]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setSecondsLeft((s) => Math.max(0, s - 1));
-    }, 1000);
-
-    const timeout = window.setTimeout(() => {
-      window.location.assign("/");
-    }, 5000);
-
-    return () => {
-      window.clearInterval(interval);
-      window.clearTimeout(timeout);
-    };
-  }, []);
+  /*
+   * No auto-redirect.
+   *
+   * This page used to bounce to the home page on a timer. Nobody reads a
+   * message, decides and taps a button in that window, so the buttons below
+   * were decorative, and somebody following a shared link got flung somewhere
+   * else before they understood what had happened. A 404 you cannot read is
+   * worse than a 404. The buttons are the way out.
+   */
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -54,7 +48,6 @@ const NotFound = () => {
           Looks like this track got lost in the mix. The page you're looking for doesn't exist or may have been moved.
         </p>
         <p className="text-xs text-muted-foreground mb-6">
-          Redirecting to home in {secondsLeft}s…
         </p>
 
         {/* Quick Links */}

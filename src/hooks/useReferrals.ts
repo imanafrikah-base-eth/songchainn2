@@ -1,183 +1,177 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-interface Referral {
-  id: string;
-  referral_code: string;
-  referred_user_id: string | null;
-  points_earned: number;
-  status: string;
-  created_at: string;
-  completed_at: string | null;
+/**
+ * Referrals.
+ *
+ * This used to be entirely localStorage: the code was minted on the referrer's
+ * own device, the points were a number in their own browser, and a friend who
+ * signed up with the code had no way to credit anyone, because the code did not
+ * exist anywhere but on that one phone. The screen said "Earn 100 points per
+ * friend" and nothing behind it was true.
+ *
+ * It now runs on `referral_codes` / `referrals` with two security-definer RPCs,
+ * and awards into the same points ledger everything else uses. One redemption
+ * per person, enforced by a unique constraint rather than by hope.
+ */
+
+const PENDING_CODE_KEY = 'songchainn:pending-referral-code';
+
+export interface ReferralStats {
+  code: string | null;
+  invited: number;
+  pointsEarned: number;
 }
 
-interface UserPoints {
-  total_points: number;
-}
-
-const REFERRAL_CODE_KEY = 'songchainn:referralCodesByUserId';
-const USER_POINTS_KEY = 'songchainn:userPointsByUserId';
-const REFERRALS_KEY = 'songchainn:referralsByReferrerId';
-
-function readJson<T>(key: string, fallback: T): T {
+/** Capture ?ref=CODE from the URL before sign-in, so it survives the round trip. */
+export function capturePendingReferralCode() {
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
+    const code = new URLSearchParams(window.location.search).get('ref');
+    if (code && code.trim()) {
+      localStorage.setItem(PENDING_CODE_KEY, code.trim().toUpperCase());
+    }
   } catch {
-    return fallback;
+    /* restricted storage: the code is simply not remembered */
   }
 }
 
-function writeJson<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
+function readPendingCode(): string | null {
+  try {
+    return localStorage.getItem(PENDING_CODE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingCode() {
+  try {
+    localStorage.removeItem(PENDING_CODE_KEY);
+  } catch {
+    /* nothing to clear */
+  }
 }
 
 export function useReferrals() {
   const { user } = useAuth();
-  const [referrals, setReferrals] = useState<Referral[]>([]);
-  const [points, setPoints] = useState<UserPoints | null>(null);
-  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [stats, setStats] = useState<ReferralStats>({ code: null, invited: 0, pointsEarned: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Generate a unique referral code
-  const generateReferralCode = useCallback(() => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = 'SC-';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  }, []);
-
-  // Fetch user's referral code or create one
-  const fetchOrCreateReferralCode = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      const map = readJson<Record<string, string>>(REFERRAL_CODE_KEY, {});
-      const existing = map[user.id];
-      if (existing) {
-        setReferralCode(existing);
-        return;
-      }
-
-      let next = generateReferralCode();
-      const used = new Set(Object.values(map));
-      for (let i = 0; i < 20 && used.has(next); i++) {
-        next = generateReferralCode();
-      }
-
-      map[user.id] = next;
-      writeJson(REFERRAL_CODE_KEY, map);
-      setReferralCode(next);
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error in fetchOrCreateReferralCode:', error);
-      }
-    }
-  }, [user, generateReferralCode]);
-
-  // Fetch user's referrals
-  const fetchReferrals = useCallback(async () => {
+  const refresh = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
-
     try {
-      const byReferrer = readJson<Record<string, Referral[]>>(REFERRALS_KEY, {});
-      const list = byReferrer[user.id] || [];
-      setReferrals([...list].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)));
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error in fetchReferrals:', error);
+      const { data, error } = await supabase.rpc('get_my_referral_stats');
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) {
+        setStats({
+          code: row.code ?? null,
+          invited: Number(row.invited ?? 0),
+          pointsEarned: Number(row.points_earned ?? 0),
+        });
       }
+    } catch {
+      // Never block the screen on this; the invite panel degrades to "unavailable".
+      setStats((prev) => prev);
     } finally {
       setIsLoading(false);
     }
   }, [user]);
 
-  // Fetch user's points
-  const fetchPoints = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      const map = readJson<Record<string, number>>(USER_POINTS_KEY, {});
-      setPoints({ total_points: map[user.id] || 0 });
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error in fetchPoints:', error);
+  /** Redeem a code. Returns true when points were actually awarded. */
+  const redeemCode = useCallback(
+    async (code: string, { silent = false }: { silent?: boolean } = {}) => {
+      if (!user) return false;
+      try {
+        const { data, error } = await supabase.rpc('redeem_referral_code', { _code: code });
+        if (error) throw error;
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row?.ok) {
+          toast({
+            title: 'Invite accepted',
+            description: `You picked up ${row.points_awarded} points to start.`,
+          });
+          void refresh();
+          return true;
+        }
+        if (!silent && row?.message) {
+          toast({ title: row.message, variant: 'destructive' });
+        }
+        return false;
+      } catch {
+        if (!silent) toast({ title: 'Could not apply that invite code', variant: 'destructive' });
+        return false;
       }
-    }
-  }, [user]);
+    },
+    [user, refresh],
+  );
 
-  // Get referral invite link
-  const getInviteLink = useCallback(() => {
-    if (!referralCode) return '';
-    return `${window.location.origin}/?ref=${referralCode}`;
-  }, [referralCode]);
+  const getInviteLink = useCallback(
+    () => (stats.code ? `${window.location.origin}/?ref=${stats.code}` : ''),
+    [stats.code],
+  );
 
-  // Copy invite link
   const copyInviteLink = useCallback(async () => {
     const link = getInviteLink();
     if (!link) {
-      toast({ title: 'No referral code available', variant: 'destructive' });
+      toast({ title: 'Invite link not ready yet', variant: 'destructive' });
       return false;
     }
-
     try {
       await navigator.clipboard.writeText(link);
-      toast({ title: 'Invite link copied!' });
+      toast({ title: 'Invite link copied' });
       return true;
     } catch {
-      toast({ title: 'Failed to copy link', variant: 'destructive' });
+      toast({ title: 'Could not copy the link', variant: 'destructive' });
       return false;
     }
   }, [getInviteLink]);
 
-  // Share invite link
   const shareInviteLink = useCallback(async () => {
     const link = getInviteLink();
     if (!link) {
-      toast({ title: 'No referral code available', variant: 'destructive' });
+      toast({ title: 'Invite link not ready yet', variant: 'destructive' });
       return false;
     }
-
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Join $ongChainn!',
-          text: 'Join me on $ongChainn and discover amazing music! Use my invite link to sign up and we both earn rewards.',
+          title: 'Join $ongChainn',
+          text: 'Music straight from the artists who made it. Use my invite and we both start with points.',
           url: link,
         });
         return true;
       } catch {
-        // User cancelled or error - fallback to copy
         return copyInviteLink();
       }
-    } else {
-      return copyInviteLink();
     }
+    return copyInviteLink();
   }, [getInviteLink, copyInviteLink]);
 
-  // Initialize
   useEffect(() => {
-    if (user) {
-      fetchOrCreateReferralCode();
-      fetchReferrals();
-      fetchPoints();
+    if (!user) return;
+    void refresh();
+    // A code captured before sign-up is redeemed the moment there is a session.
+    const pending = readPendingCode();
+    if (pending) {
+      void redeemCode(pending, { silent: true }).finally(clearPendingCode);
     }
-  }, [user, fetchOrCreateReferralCode, fetchReferrals, fetchPoints]);
+  }, [user, refresh, redeemCode]);
 
   return {
-    referrals,
-    points,
-    referralCode,
+    referralCode: stats.code,
+    invited: stats.invited,
+    pointsEarned: stats.pointsEarned,
     isLoading,
+    refresh,
+    redeemCode,
     getInviteLink,
     copyInviteLink,
     shareInviteLink,
-    completedReferrals: referrals.filter(r => r.status === 'completed').length,
-    totalPointsEarned: referrals.reduce((sum, r) => sum + r.points_earned, 0),
+    // Kept for the existing invite panel.
+    completedReferrals: stats.invited,
+    totalPointsEarned: stats.pointsEarned,
   };
 }

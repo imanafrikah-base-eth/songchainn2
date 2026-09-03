@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { SocialPostWithProfile, PostComment } from '@/types/social';
+import { SocialPostWithProfile, PostComment, TaggedPerson, SongCardData } from '@/types/social';
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
@@ -11,6 +11,11 @@ import type { Database } from '@/integrations/supabase/types';
 function isSyntheticId(id: string | null | undefined): boolean {
   return !!id && (id.startsWith('fc-') || id.startsWith('fb-'));
 }
+
+/* A process-wide counter, so two hooks mounting in the same tick cannot share a
+   channel name the way a millisecond timestamp let them. */
+let socialChannelSeq = 0;
+const nextSocialChannelId = () => ++socialChannelSeq;
 
 export function useSocial() {
   const { user } = useAuth();
@@ -101,7 +106,7 @@ export function useSocial() {
       ));
 
       // Single profile query covering both id and user_id columns, minimal columns only
-      const [profilesRes, likesRes, commentsRes, userLikesRes, playlistsRes] = await Promise.all([
+      const [profilesRes, likesRes, commentsRes, userLikesRes, playlistsRes, tagsRes] = await Promise.all([
         supabase
           .from('audience_profiles')
           .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
@@ -112,6 +117,7 @@ export function useSocial() {
         playlistIds.length > 0
           ? supabase.from('playlists').select('id,name').in('id', playlistIds)
           : Promise.resolve({ data: [] as any[] }),
+        supabase.from('post_tags' as never).select('post_id, tagged_user_id').in('post_id', postIds),
       ]);
 
       const playlistNamesMap = new Map<string, string>();
@@ -139,6 +145,38 @@ export function useSocial() {
 
       const userLikedPosts = new Set<string>((userLikesRes.data || []).map((l: any) => String(l.post_id)));
 
+      /* Who was tagged in what.
+         The people tagged are usually not the people who posted, so their
+         profiles were not in the first lookup. Fetch only the ones actually
+         missing rather than widening the query for every feed load. */
+      const tagRows = ((tagsRes as any)?.data || []) as { post_id: string; tagged_user_id: string }[];
+      const taggedIds = Array.from(new Set(tagRows.map((t) => String(t.tagged_user_id))));
+      const missingTagged = taggedIds.filter((id) => !profilesMap.has(id));
+      if (missingTagged.length) {
+        const { data: extra } = await supabase
+          .from('audience_profiles')
+          .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
+          .or(`id.in.(${missingTagged.join(',')}),user_id.in.(${missingTagged.join(',')})`);
+        ((extra || []) as any[]).forEach((p: any) => {
+          profilesMap.set(String(p.id), p as any);
+          if (p?.user_id) profilesMap.set(String(p.user_id), p as any);
+        });
+      }
+
+      const taggedByPost = new Map<string, TaggedPerson[]>();
+      tagRows.forEach((t) => {
+        const pid = String(t.post_id);
+        const prof = profilesMap.get(String(t.tagged_user_id)) as any;
+        const list = taggedByPost.get(pid) ?? [];
+        list.push({
+          user_id: String(t.tagged_user_id),
+          display_name: prof?.display_name || prof?.profile_name || prof?.username || 'Someone',
+          username: prof?.username ?? null,
+          avatar_url: prof?.profile_picture_url || prof?.avatar_url || null,
+        });
+        taggedByPost.set(pid, list);
+      });
+
       const enriched: SocialPostWithProfile[] = rows.map((post) => ({
         id: post.id,
         user_id: post.user_id,
@@ -149,6 +187,12 @@ export function useSocial() {
         playlist_id: post.playlist_id,
         image_url: (post as any).image_url ?? null,
         image_path: (post as any).image_path ?? null,
+        media_url: (post as any).media_url ?? null,
+        media_source: (post as any).media_source ?? null,
+        songcard: (post as any).songcard ?? null,
+        media_kind: (post as any).media_kind ?? null,
+        media_poster_url: (post as any).media_poster_url ?? null,
+        media_id: (post as any).media_id ?? null,
         post_type: post.post_type,
         activity_type: (post as any).activity_type ?? null,
         metadata: (post as any).metadata ?? null,
@@ -160,6 +204,7 @@ export function useSocial() {
         is_liked: userLikedPosts.has(String(post.id)),
         artist_is_verified: null,
         playlist_name: post.playlist_id ? playlistNamesMap.get(String(post.playlist_id)) ?? null : null,
+        tagged: taggedByPost.get(String(post.id)) ?? [],
       }));
 
       setPosts(enriched);
@@ -189,16 +234,56 @@ export function useSocial() {
     }
   }, [user?.id, fetchPosts]);
 
+  /**
+   * Tell people they were tagged.
+   *
+   * Row level security lets anyone notify anyone, but only as themselves, so
+   * from_user_id has to be the signed-in user or the insert is refused. Never
+   * let a failure here reach the person posting: they did their part.
+   */
+  const notifyTagged = useCallback(async (taggedIds: string[], postId: string, fromUserId: string) => {
+    try {
+      await supabase.from('notifications').insert(
+        taggedIds.map((id) => ({
+          user_id: id,
+          type: 'post_tag',
+          from_user_id: fromUserId,
+          post_id: postId,
+          message: 'tagged you in a post',
+        }))
+      );
+    } catch (e) {
+      console.error('tag notifications failed', e);
+    }
+  }, []);
+
   const createPost = useCallback(
     async (
       content: string,
       postType: 'text' | 'song_share' | 'playlist_share' | 'listening' = 'text',
       songId?: string,
-      playlistId?: string
+      playlistId?: string,
+      /**
+       * A picture or a clip, and the people in it.
+       *
+       * Optional and last, so every existing caller keeps working untouched.
+       * The media is already in the bucket by the time this runs; the composer
+       * uploads it first and hands over the finished URL.
+       */
+      extras?: {
+        mediaUrl?: string | null;
+        mediaKind?: 'image' | 'video' | null;
+        mediaPosterUrl?: string | null;
+        mediaId?: string | null;
+        /** 'upload' is a real file, artists only. 'songcard' carries no file. */
+        mediaSource?: 'upload' | 'songcard' | null;
+        songcard?: SongCardData | null;
+        tagUserIds?: string[];
+      }
     ): Promise<boolean> => {
       if (!isSupabaseConfigured) {
         toast({
-          title: 'Posting unavailable',
+          title: 'Cannot post right now',
           description: 'Connect a Supabase project to enable the social feed.',
           variant: 'destructive',
         });
@@ -222,13 +307,16 @@ export function useSocial() {
         const cleanContent = (content ?? '').trim();
         const cleanSongId = (songId ?? '').trim();
         const cleanPlaylistId = (playlistId ?? '').trim();
+        const mediaUrl = (extras?.mediaUrl ?? '').trim();
 
-        if (!cleanContent && !cleanSongId && !cleanPlaylistId) {
+        // A photograph on its own is a post. Requiring words alongside it would
+        // make this the one social app where you cannot just show something.
+        if (!cleanContent && !cleanSongId && !cleanPlaylistId && !mediaUrl && !extras?.songcard) {
           toast({ title: 'Post cannot be empty', variant: 'destructive' });
           return false;
         }
 
-        const sig = `${uid}|${postType}|${cleanContent}|${cleanSongId}|${cleanPlaylistId}`;
+        const sig = `${uid}|${postType}|${cleanContent}|${cleanSongId}|${cleanPlaylistId}|${mediaUrl}`;
         const now = Date.now();
         if (lastPostRef.current.sig === sig && now - lastPostRef.current.at < 5000) {
           // Identical post submitted again within 5s — treat as already shared
@@ -251,12 +339,58 @@ export function useSocial() {
           payload.playlist_id = cleanPlaylistId;
         }
 
+        if (mediaUrl) {
+          (payload as Record<string, unknown>).media_url = mediaUrl;
+          (payload as Record<string, unknown>).media_kind = extras?.mediaKind ?? null;
+          (payload as Record<string, unknown>).media_source = extras?.mediaSource ?? 'upload';
+          if (extras?.mediaPosterUrl) {
+            (payload as Record<string, unknown>).media_poster_url = extras.mediaPosterUrl;
+          }
+          if (extras?.mediaId) {
+            (payload as Record<string, unknown>).media_id = extras.mediaId;
+          }
+        }
+
+        // A song card is data, not a file, so it never touches media_url and
+        // anybody may post one.
+        if (extras?.songcard) {
+          (payload as Record<string, unknown>).songcard = extras.songcard;
+          (payload as Record<string, unknown>).media_source = 'songcard';
+        }
+
         payloadForLog = payload as any;
 
-        const { error } = await supabase.from('social_posts').insert(payload);
+        const { data: inserted, error } = await supabase
+          .from('social_posts')
+          .insert(payload)
+          .select('id')
+          .single();
         if (error) {
           console.error('social_posts insert failed', { error, payload: payloadForLog });
           throw error;
+        }
+
+        // The people in it. Tagging never blocks the post: the post is the
+        // thing that matters, and a tag that failed is recoverable by editing,
+        // whereas a post lost because a tag failed is just gone.
+        const tagIds = [...new Set(extras?.tagUserIds ?? [])].filter((id) => id && id !== uid);
+        if (inserted?.id && tagIds.length) {
+          const { error: tagError } = await supabase.from('post_tags' as never).insert(
+            tagIds.map((tagged) => ({
+              post_id: inserted.id,
+              tagged_user_id: tagged,
+              created_by: uid,
+            })) as never
+          );
+          if (tagError) {
+            console.error('post_tags insert failed', tagError);
+            toast({
+              title: 'Posted, but the tags did not save',
+              description: 'You can add them again from the post.',
+            });
+          } else {
+            void notifyTagged(tagIds, inserted.id, uid);
+          }
         }
 
         toast({ title: 'Post shared!' });
@@ -275,7 +409,7 @@ export function useSocial() {
         return false;
       }
     },
-    [toast, fetchPosts]
+    [toast, fetchPosts, notifyTagged]
   );
 
   const deletePost = useCallback(async (postId: string) => {
@@ -473,8 +607,9 @@ export function useSocial() {
       content,
     } as any);
     if (error) {
-      toast({ title: 'Failed to add comment', description: error.message, variant: 'destructive' });
-      return;
+      // Thrown, not swallowed: the caller shows the comment optimistically and
+      // needs to know to take it back down again.
+      throw new Error(error.message || 'Failed to add comment');
     }
 
     setPosts(prev => prev.map(p => 
@@ -497,9 +632,19 @@ export function useSocial() {
   useEffect(() => {
     const uid = user?.id;
     if (!uid) return;
-    // Append timestamp so a rapid unmount/remount cycle never reuses a
-    // channel name that Supabase still considers subscribed.
-    const channelName = `social-feed-${uid}-${Date.now()}`;
+    /*
+     * One channel per hook instance, and the name has to be genuinely unique.
+     *
+     * This used to append Date.now(), which is not unique: every instance that
+     * mounts in the same commit shares a millisecond, so they all resolved to
+     * ONE channel object. supabase.channel(topic) returns the existing channel
+     * on a topic match, so the second caller appended its bindings to a channel
+     * that had already subscribed, and the first component to unmount called
+     * removeChannel and took feed realtime down for every other holder.
+     *
+     * A counter cannot collide with itself, which a clock can.
+     */
+    const channelName = `social-feed-${uid}-${nextSocialChannelId()}`;
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => {
@@ -537,6 +682,41 @@ export function useSocial() {
     return fetchPosts(feedType);
   }, [fetchPosts]);
 
+  /**
+   * Take your own name off a post somebody else tagged you in.
+   *
+   * TagPeople told people they could do this ("they can take their own name off
+   * without asking the author") while post_tags only ever had a select and an
+   * insert, so the promise could not be kept and a named person had no way out
+   * of a post they never chose to be in. Being tagged is not consent to stay
+   * tagged, and that is exactly the sort of promise the Terms rest on.
+   *
+   * Scoped to your own row on purpose: this removes YOUR tag, never anyone
+   * else's, so the author cannot use it to quietly untag someone.
+   */
+  const untagSelf = useCallback(async (postId: string) => {
+    const uid = user?.id;
+    if (!uid) return false;
+
+    const { error } = await supabase
+      .from('post_tags' as never)
+      .delete()
+      .eq('post_id', postId)
+      .eq('tagged_user_id', uid);
+
+    if (error) {
+      toast({
+        title: 'Could not remove your tag',
+        description: 'Give it another go in a moment.',
+      });
+      return false;
+    }
+
+    toast({ title: 'Your name is off that post' });
+    await fetchPosts(feedTypeRef.current);
+    return true;
+  }, [user?.id, fetchPosts]);
+
   return {
     posts,
     isLoading,
@@ -549,6 +729,7 @@ export function useSocial() {
     isFollowing,
     getPostComments,
     addComment,
+    untagSelf,
     refetchPosts: fetchPostsTracked
   };
 }

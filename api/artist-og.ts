@@ -73,7 +73,7 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  const description = `Listen to ${name} on $ongChainn — Zambian music on Base`;
+  const description = `Listen to ${name} on $ongChainn. Music you can own, on Base`;
 
   const fcFrameJson = JSON.stringify({
     version: "next",

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useSongCoin } from '@/hooks/useSongCoins';
+import { useOwnedSongs } from '@/hooks/useOwnedSongs';
 import { buyCoinWithEth, sellCoinForEth, getCoinTokenBalance, type TradeResult } from '@/lib/zoraTrading';
 import {
   getOfflinePlays,
@@ -35,6 +36,7 @@ interface SongOwnership {
 export function useSongOwnership(songId: string): SongOwnership {
   const { user } = useAuth();
   const coin = useSongCoin(songId);
+  const batched = useOwnedSongs();
   const [balance, setBalance] = useState<bigint>(BigInt(0));
   const [offlinePlaysRemaining, setOfflinePlaysRemaining] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,10 +72,24 @@ export function useSongOwnership(songId: string): SongOwnership {
 
     setIsLoading(true);
     try {
-      const onChainBalance = await getCoinTokenBalance(
-        coinAddress as `0x${string}`,
-        userAddress as `0x${string}`
-      );
+      /*
+       * Prefer the shared multicall.
+       *
+       * useOwnedSongs already fetches every song coin balance for this wallet in
+       * ONE round trip, and this hook is mounted once per song card, so asking
+       * the chain again here meant 84 separate eth_calls to render one artist's
+       * catalogue. The public Base RPC throttles well below that, and a throttled
+       * call comes back as zero, so the page told people who own plenty that they
+       * own nothing. Falling back to a direct call only while the batch is still
+       * in flight, or when there is no wallet for it to batch.
+       */
+      const shared = batched.balancesLoaded ? batched.balanceBySongId : null;
+      const onChainBalance = shared
+        ? (shared.get(String(songId)) ?? BigInt(0))
+        : await getCoinTokenBalance(
+            coinAddress as `0x${string}`,
+            userAddress as `0x${string}`
+          );
       setBalance(onChainBalance);
 
       if (onChainBalance > BigInt(0)) {
@@ -92,7 +108,7 @@ export function useSongOwnership(songId: string): SongOwnership {
     } finally {
       setIsLoading(false);
     }
-  }, [isTokenGated, userAddress, songId, coinAddress]);
+  }, [isTokenGated, userAddress, songId, coinAddress, batched.balancesLoaded, batched.balanceBySongId]);
 
   useEffect(() => {
     if (isTokenGated) setOfflinePlaysRemaining(getOfflinePlays(songId));

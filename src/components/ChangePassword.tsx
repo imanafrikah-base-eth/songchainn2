@@ -108,7 +108,7 @@ export function ChangePassword() {
       </p>
 
       {done ? (
-        <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-primary/10 p-3">
           <Check className="h-4 w-4 shrink-0 text-primary" />
           <p className="text-sm text-foreground">Password changed.</p>
           <button

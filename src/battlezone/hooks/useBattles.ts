@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/battlezone/integrations/supabase/client";
+import type { BattleStage } from "@/battlezone/lib/battleStages";
 
 export interface BattleRow {
   id: string;
@@ -29,8 +30,29 @@ export interface BattleRow {
   hikulu_points_a: number;
   hikulu_points_b: number;
   hikulu_verdict: string | null;
+  nakulu_points_a: number;
+  nakulu_points_b: number;
+  nakulu_verdict: string | null;
+  council_verdicts: CouncilVerdict[] | null;
+  council_points_a: number | null;
+  council_points_b: number | null;
+  decided_by: string | null;
+  voting_open: boolean | null;
+  stage: string | null;
+  music_ends_at: string | null;
+  closes_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** One elder's card, written only when the couple could not settle the battle. */
+export interface CouncilVerdict {
+  key: string;
+  name: string;
+  points_a: number;
+  points_b: number;
+  verdict: string;
+  one_liner: string;
 }
 
 // Adapted Battle type for UI compatibility with BattleCard
@@ -43,6 +65,7 @@ export interface Battle {
   songA: string;
   songB: string;
   host: string;
+  hostUserId?: string;
   coHosts: string[];
   listeners: number;
   votesA: number;
@@ -60,6 +83,20 @@ export interface Battle {
   hikuluPointsA: number;
   hikuluPointsB: number;
   hikuluVerdict?: string;
+  nakuluPointsA: number;
+  nakuluPointsB: number;
+  nakuluVerdict?: string;
+  councilVerdicts: CouncilVerdict[];
+  councilPointsA: number;
+  councilPointsB: number;
+  decidedBy?: "host" | "judges" | "council";
+  votingOpen: boolean;
+  /** Which room this battle is in. Decides whether anything in it is worth money. */
+  stage: BattleStage;
+  /** When the last song is due to finish. Null on a battle that never went live. */
+  musicEndsAt?: string;
+  /** When the poll and the trading ground both close. */
+  closesAt?: string;
   createdAt: string;
 }
 
@@ -81,6 +118,7 @@ function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Bat
     songA: row.song_a,
     songB: row.song_b,
     host: row.host_name,
+    hostUserId: row.host_user_id || undefined,
     coHosts: row.co_hosts || [],
     listeners,
     votesA,
@@ -98,6 +136,19 @@ function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Bat
     hikuluPointsA: row.hikulu_points_a || 0,
     hikuluPointsB: row.hikulu_points_b || 0,
     hikuluVerdict: row.hikulu_verdict || undefined,
+    nakuluPointsA: row.nakulu_points_a || 0,
+    nakuluPointsB: row.nakulu_points_b || 0,
+    nakuluVerdict: row.nakulu_verdict || undefined,
+    councilVerdicts: Array.isArray(row.council_verdicts) ? row.council_verdicts : [],
+    councilPointsA: row.council_points_a || 0,
+    councilPointsB: row.council_points_b || 0,
+    decidedBy: (row.decided_by as Battle["decidedBy"]) || undefined,
+    votingOpen: row.voting_open !== false,
+    // Anything created before the split existed is a Main Stage battle, which
+    // is what the column default says too.
+    stage: row.stage === "open_mic" ? "open_mic" : "main_stage",
+    musicEndsAt: row.music_ends_at || undefined,
+    closesAt: row.closes_at || undefined,
     createdAt: row.created_at,
   };
 }
@@ -154,14 +205,35 @@ export function useBattles(status?: string) {
   });
 }
 
+async function fetchBattle(id: string): Promise<Battle | null> {
+  const { data: row, error } = await supabase
+    .from("battles")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) return null;
+
+  const [{ data: voteCounts }, { data: listenerCounts }] = await Promise.all([
+    supabase.from("battle_vote_counts").select("side, vote_count").eq("battle_id", id),
+    supabase.from("battle_listener_counts").select("listener_count").eq("battle_id", id),
+  ]);
+
+  const votesA = voteCounts?.find((v) => v.side === "A")?.vote_count ?? 0;
+  const votesB = voteCounts?.find((v) => v.side === "B")?.vote_count ?? 0;
+  const listeners = listenerCounts?.[0]?.listener_count ?? 0;
+
+  return rowToBattle(row as unknown as BattleRow, votesA, votesB, listeners);
+}
+
+// Polled, not one-shot: the live room reads round / status / winner / voting_open
+// off this row, so without a refetch the audience never sees the host advance a
+// round or end the battle -- they keep voting into a round that already closed.
 export function useBattle(id: string | undefined) {
   return useQuery({
     queryKey: ["battle", id],
-    queryFn: async () => {
-      if (!id) return null;
-      const battles = await fetchBattles();
-      return battles.find((b) => b.id === id) || null;
-    },
+    queryFn: () => (id ? fetchBattle(id) : Promise.resolve(null)),
     enabled: !!id,
+    refetchInterval: 5000,
   });
 }

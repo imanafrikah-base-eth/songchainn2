@@ -1,11 +1,11 @@
-import artist7roo7hBasedLocal from '@/assets/artist-7roo7h-based.png';
-import artistDenajahLocal from '@/assets/DenaJah/DenaJah.png';
-import artistImanAfrikahLocal from '@/assets/IMan Afrikah/IMan Afrikah (1).png';
-import artistNdaLocal from '@/assets/NDA/NDA (1).png';
-import artistPrpLocal from '@/assets/PRP/PRP.png';
-import artistSanchyLocal from '@/assets/Sanchy/Sanchy (1).png';
-import artistSantanaLocal from '@/assets/Santana/Santana (1).png';
-import artistCover1Local from '@/assets/FAITH/Faith (1).png';
+import artist7roo7hBasedLocal from '@/assets/artist-7roo7h-based.webp';
+import artistDenajahLocal from '@/assets/DenaJah/DenaJah.webp';
+import artistImanAfrikahLocal from '@/assets/IMan Afrikah/IMan Afrikah (1).webp';
+import artistNdaLocal from '@/assets/NDA/NDA (1).webp';
+import artistPrpLocal from '@/assets/PRP/PRP.webp';
+import artistSanchyLocal from '@/assets/Sanchy/Sanchy (1).webp';
+import artistSantanaLocal from '@/assets/Santana/Santana (1).webp';
+import artistCover1Local from '@/assets/FAITH/Faith (1).webp';
 const artistCover2Local = '/songchainn-logo.webp';
 const artistCover3Local = '/songchainn-logo.webp';
 
@@ -22,6 +22,7 @@ export type Genre =
   | 'Alternative'
   | 'Pop-Dancehall'
   | 'Hiphop/Soul'
+  | 'Afro-Fusion'
   | 'Trap/Dancehall Fusion';
 
 export const GENRES: Genre[] = [
@@ -37,6 +38,7 @@ export const GENRES: Genre[] = [
   'Alternative',
   'Pop-Dancehall',
   'Hiphop/Soul',
+  'Afro-Fusion',
   'Trap/Dancehall Fusion',
 ];
 
@@ -436,6 +438,7 @@ const SONGS_RAW: Song[] = [
     likes: 567,
     townSquare: 'Livingstone Town Square',
     genre: 'Trap',
+    volume: 'Vol1',
   },
   {
     id: '31',
@@ -448,6 +451,7 @@ const SONGS_RAW: Song[] = [
     likes: 0,
     townSquare: 'Livingstone Town Square',
     genre: 'Trap',
+    volume: 'Vol1',
   },
   {
     id: '32',
@@ -460,6 +464,7 @@ const SONGS_RAW: Song[] = [
     likes: 0,
     townSquare: 'Livingstone Town Square',
     genre: 'Trap',
+    volume: 'Vol1',
   },
   {
     id: '33',
@@ -472,6 +477,7 @@ const SONGS_RAW: Song[] = [
     likes: 0,
     townSquare: 'Livingstone Town Square',
     genre: 'Trap',
+    volume: 'Vol1',
   },
   {
     id: '34',
@@ -484,6 +490,7 @@ const SONGS_RAW: Song[] = [
     likes: 0,
     townSquare: 'Livingstone Town Square',
     genre: 'Trap',
+    volume: 'Vol1',
   },
   {
     id: '35',
@@ -496,6 +503,7 @@ const SONGS_RAW: Song[] = [
     likes: 0,
     townSquare: 'Livingstone Town Square',
     genre: 'Trap',
+    volume: 'Vol1',
   },
   {
     id: '36',
@@ -508,6 +516,7 @@ const SONGS_RAW: Song[] = [
     likes: 0,
     townSquare: 'Livingstone Town Square',
     genre: 'Trap',
+    volume: 'Vol1',
   },
   {
     id: '4',
@@ -1926,7 +1935,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '127',
     title: 'BIG MOVES',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20BIG%20MOVES.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol5.png',
@@ -1940,7 +1949,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '128',
     title: 'EASY',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20EASY.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol5.png',
@@ -1954,7 +1963,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '129',
     title: 'HIGHLY FAVOURED',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20HIGHLY%20FAVOURED.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol5.png',
@@ -1968,7 +1977,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '130',
     title: 'KEPT IT PUSHING',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20KEPT%20IT%20PUSHING.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol5.png',
@@ -1982,7 +1991,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '131',
     title: 'LET IT BREATH',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20LET%20IT%20BREATH.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol5.png',
@@ -1996,7 +2005,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '132',
     title: 'MADE',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20MADE.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol5.png',
@@ -2010,7 +2019,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '133',
     title: 'MY LANE',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20MY%20LANE.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol5.png',
@@ -2024,7 +2033,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '134',
     title: 'BEST WOMAN WALKING',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20BEST%20WOMAN%20WALKING.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/immaan%20vol6.png',
@@ -2038,7 +2047,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '135',
     title: 'BUILT FOR IT',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20BUILT%20FOR%20IT.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/immaan%20vol6.png',
@@ -2052,7 +2061,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '136',
     title: 'GLOW',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20GLOW.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/immaan%20vol6.png',
@@ -2066,7 +2075,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '137',
     title: 'PRAY',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20PRAY.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/immaan%20vol6.png',
@@ -2080,7 +2089,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '138',
     title: 'SPARK',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20SPARK.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/immaan%20vol6.png',
@@ -2094,7 +2103,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '139',
     title: 'SURF',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20SURF.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/immaan%20vol6.png',
@@ -2108,7 +2117,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '140',
     title: 'UP',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20UP.mp3',
     coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
@@ -2122,7 +2131,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '141',
     title: 'BRA! BRA!',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20BRA!%20BRA!.mp3',
     coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
@@ -2136,7 +2145,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '142',
     title: 'BUZZ',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20BUZZ.mp3',
     coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
@@ -2150,7 +2159,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '143',
     title: 'END GAME',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20END%20GAME.mp3',
     coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
@@ -2164,7 +2173,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '144',
     title: 'REACTIVE',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20REACTIVE.mp3',
     coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
@@ -2178,7 +2187,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '145',
     title: 'SPEED',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20SPEED.mp3',
     coverImage: ARTWORK_BY_ARTIST['IMAN AFRIKAH'],
@@ -2192,7 +2201,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '146',
     title: 'STEP OUTSUDE',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20STEP%20OUTSUDE.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol7.png',
@@ -2206,7 +2215,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '147',
     title: 'SWEET',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/IMAN%20AFRIKAH%20-%20SWEET.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/iman%20vol7.png',
@@ -2530,7 +2539,10 @@ const SONGS_RAW: Song[] = [
     title: '1 OF 1',
     artist: 'NDA',
     artistId: '4',
-    audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%20DO%20YOU%20DIGG%20RMS.mp3',
+    // Was pointing at "NDA - DO YOU DIGG RMS.mp3", which does not exist: a
+    // copy/paste from the track above, whose file is "DO YOU DIGG RMS.mp3".
+    // The real file for this one is below, confirmed 200 on the bucket.
+    audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/NDA%20-%201%20OF%201%20RMS.mp3',
     coverImage: 'https://pub-5692eded60084f25a0e00a8c74c83fb1.r2.dev/NDA%20-%20SIGNALS%20FROM%20THE%20OTHER%20SIDE%20VL%204.jpg',
     plays: 0,
     likes: 0,
@@ -2612,7 +2624,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '176',
     title: 'RUDE BOY',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20RUDE%20BOY.mp3',
@@ -2628,7 +2640,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '177',
     title: 'ID FLEX',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20ID%20FLEX.mp3',
@@ -2644,7 +2656,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '178',
     title: 'LIKKU MISS',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20LIKKU%20MISS.mp3',
@@ -2660,7 +2672,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '179',
     title: 'WGE',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20WGE.mp3',
@@ -2676,7 +2688,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '180',
     title: 'TAKE IT HOW YOU WANT',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20TAKE%20IT%20HOW%20YOU%20WANT.mp3',
@@ -2708,7 +2720,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '182',
     title: 'WILD OUT',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20WILD%20OUT.mp3',
@@ -2986,7 +2998,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '190',
     title: 'KEEP IT TO MYSELF',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20KEEP%20IT%20TO%20MYSELF.mp3',
@@ -3002,7 +3014,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '191',
     title: 'LIKKU MISS',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20LIKKU%20MISS.mp3',
@@ -3018,7 +3030,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '192',
     title: 'PASSIONATE EATER',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20PASSIONATE%20EATER.mp3',
@@ -3034,7 +3046,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '193',
     title: 'SHE OUTSIDE',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20SHE%20OUTSIDE.mp3',
@@ -3050,7 +3062,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '194',
     title: 'THERE SHE GOES',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20THERE%20SHE%20GOES.mp3',
@@ -3066,7 +3078,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '195',
     title: 'TURN IT UP AGAIN',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20-%20TURN%20IT%20UP%20AGAIN.mp3',
@@ -3082,7 +3094,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '196',
     title: 'JIGGY WITH ME (ft TRACEY LOVE)',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFRIKAH%20%20ft%20TRACEY%20LOVE-%20JIGGY%20WITH%20ME.mp3',
@@ -3098,7 +3110,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '197',
     title: 'BEEN BAD',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20BEEN%20BAD%20(Riddim).mp3",
@@ -3114,7 +3126,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '198',
     title: "CAN'T LET YOU GO",
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20CAN'T%20LET%20YOU%20GO.mp3",
@@ -3130,7 +3142,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '199',
     title: 'ROYALTY',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20ROYALTY.mp3",
@@ -3146,7 +3158,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '200',
     title: 'STYLE UP',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20STYLE%20UP.mp3",
@@ -3162,7 +3174,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '201',
     title: 'WHEN SHE TOUCH ROAD',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20WHEN%20SHE%20TOUCH%20ROAD.mp3",
@@ -3178,7 +3190,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '202',
     title: 'HAVE YOU SEEN HER',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20HAVE%20YOU%20SEEN%20HER.mp3",
@@ -3194,7 +3206,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '203',
     title: 'WILD (FT RVSSIAN)',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       "https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/Er'ting%20flex/IMAN%20AFRIKAH%20-%20Wild%20ft%20RVSSIAN.mp3",
@@ -3210,7 +3222,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '215',
     title: 'WORLD CHAMPION GYAL',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20WORLD%20CHAMPION%20GYAL.mp3',
@@ -3226,7 +3238,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '216',
     title: 'LETI NALANTI',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20LETI%20NALANTI.mp3',
@@ -3242,7 +3254,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '217',
     title: 'NO B.S',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20NO%20B.S.mp3',
@@ -3258,7 +3270,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '218',
     title: 'EUPHORIA',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20EUPHORIA.mp3',
@@ -3274,7 +3286,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '219',
     title: 'HURTACHE',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20HURTACHE.mp3',
@@ -3290,7 +3302,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '220',
     title: 'SHE WILL ALWAYS BE PERFECT',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20SHE%20WILL%20ALWAYS%20BE%20PERFECT.mp3',
@@ -3306,7 +3318,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '221',
     title: 'HIGHLY POSITIVE',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFARIKAH%20-%207USHIMI%20CATALOG%20DATA/IMAN%20AFRIKAH%20-%20HIGHLY%20POSITIVE.mp3',
@@ -3354,7 +3366,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '224',
     title: 'I Miss You Bad',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-02031b2f7f24476c9c42081bfe076230.r2.dev/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20I%20MISS%20YOU%20BAD/IMAN%20AFRIKAH%20-%20I%20MISS%20YOU%20BAD.mp3',
@@ -3370,7 +3382,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '225',
     title: '10 10',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%2010%2010.mp3',
@@ -3386,7 +3398,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '226',
     title: 'BUILD A BETTER WORLD',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20BUILD%20A%20BETTER%20WORLD.mp3',
@@ -3402,7 +3414,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '227',
     title: 'CAME A LONG WAY',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20CAME%20A%20LONG%20WAY.mp3',
@@ -3418,7 +3430,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '228',
     title: 'FINALLY THEY PUT ME ON',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20FINALLY%20THEY%20PUT%20ME%20ON.mp3',
@@ -3434,7 +3446,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '229',
     title: 'IYA PEOPLE SONG',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20IYA%20PEOPLE%20SONG.mp3',
@@ -3450,7 +3462,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '230',
     title: 'LATELY ALOT',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20LATELY%20ALOT.mp3',
@@ -3466,7 +3478,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '231',
     title: 'THE BIGMAN CALL',
-    artist: 'IMAN AFRIKAH',
+    artist: 'IMan Afrikah',
     artistId: '3',
     audioUrl:
       'https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev/IMAN%20AFRIKAH%20-%20HIGH-BRED/HIGH-BRED/IMAN%20AFRIKAH%20-%20THE%20BIGMAN%20CALL.mp3',

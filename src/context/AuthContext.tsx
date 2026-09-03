@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
-import { hasWalletProvider, connectWallet, getConnectedAccounts, signMessage, generateNonce, selectWallet, subscribeWallets } from '@/lib/baseWallet';
+import { hasWalletProvider, connectWallet, signMessage, generateNonce, selectWallet, subscribeWallets, toChecksumAddress } from '@/lib/baseWallet';
 
 interface AuthContextType {
   user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null;
@@ -10,6 +10,8 @@ interface AuthContextType {
   isAdmin: boolean;
   isArtist: boolean;
   artistId: string | null;
+  /** Blue tick. Set by us on the artist_accounts row, never self-declared. */
+  isVerifiedArtist: boolean;
   isLoading: boolean;
   audienceProfile: AudienceProfile | null;
   needsOnboarding: boolean;
@@ -139,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isArtist, setIsArtist] = useState(false);
   const [artistId, setArtistId] = useState<string | null>(null);
+  const [isVerifiedArtist, setIsVerifiedArtist] = useState(false);
   const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(bootProfile);
   const [needsOnboarding, setNeedsOnboarding] = useState(bootUser ? false : shouldRequireOnboardingFromStorage());
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -165,14 +168,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  /**
+   * Resolve what this account is allowed to be: admin, and artist.
+   *
+   * `isArtist` was declared, threaded through the whole context and consumed by
+   * the app, but `setIsArtist` was called fourteen times and every single one
+   * passed false. There was no code path that could make anybody a musician,
+   * which is why /studio was unreachable. The artist_accounts table existed the
+   * whole time and was never read; this reads it.
+   *
+   * A row in artist_accounts linking this user to an artist id IS the artist
+   * identity. Nothing self-declared: the row is written when the account is
+   * created for them, so an artist cannot appoint themselves.
+   */
   const refreshRoles = useCallback(async (userId: string) => {
     if (!isSupabaseConfigured) return;
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-    setIsAdmin(data?.role === 'admin');
+
+    const [{ data: roleRow }, { data: artistRow }] = await Promise.all([
+      supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+      supabase
+        .from('artist_accounts')
+        .select('artist_id, is_verified')
+        .eq('user_id', userId)
+        .maybeSingle(),
+    ]);
+
+    setIsAdmin(roleRow?.role === 'admin');
+
+    const artist = artistRow as { artist_id?: string; is_verified?: boolean } | null;
+    setIsArtist(Boolean(artist?.artist_id));
+    setArtistId(artist?.artist_id ?? null);
+    setIsVerifiedArtist(Boolean(artist?.is_verified));
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -264,6 +290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAdmin(false);
         setIsArtist(false);
         setArtistId(null);
+        setIsVerifiedArtist(false);
         setIsLoading(false);
         return;
       }
@@ -287,6 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setIsArtist(false);
         setArtistId(null);
+        setIsVerifiedArtist(false);
         if (u) void refreshRoles(u.id);
       } catch {
         // On timeout or network error, don't touch user/isAdmin — onAuthStateChange
@@ -295,6 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted) {
           setIsArtist(false);
           setArtistId(null);
+          setIsVerifiedArtist(false);
         }
       } finally {
         if (mounted) setIsLoading(false);
@@ -323,6 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setIsArtist(false);
       setArtistId(null);
+      setIsVerifiedArtist(false);
       setWalletAddress(null);
     });
 
@@ -355,18 +385,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: new Error('No wallet detected. Please install a Base compatible wallet.') };
       }
 
-      // Connect and get address, switching to Base chain automatically
-      let address: string | undefined;
-      const existing = await getConnectedAccounts();
-      if (existing.length > 0) {
-        address = existing[0];
-      } else {
-        const result = await connectWallet();
-        if (!result.success || !result.address) {
-          return { error: new Error(result.error ?? 'Failed to connect wallet') };
-        }
-        address = result.address;
+      // Always ask the wallet who is connected right now, rather than trusting
+      // the account it authorised on some earlier visit. A user who switched
+      // accounts inside their wallet would otherwise be asked to sign as an
+      // address the wallet is no longer holding, and strict wallets refuse to
+      // display that request at all. eth_requestAccounts does not re-prompt an
+      // already-authorised site, so this costs nothing, and it is also what
+      // switches the wallet over to Base.
+      const result = await connectWallet();
+      if (!result.success || !result.address) {
+        return { error: new Error(result.error ?? 'Failed to connect wallet') };
       }
+      // EIP-55, because SIWE requires it and wallets compare against it.
+      const address = toChecksumAddress(result.address);
 
       // Build an EIP-4361 SIWE message
       const domain = window.location.host || 'songchainn.xyz';
@@ -413,6 +444,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
+      setIsVerifiedArtist(false);
       setWalletAddress(address);
       // refreshProfile via useEffect will determine onboarding status for this user
       await refreshProfile();
@@ -436,6 +468,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
+      setIsVerifiedArtist(false);
       setNeedsOnboarding(true);
       try {
         localStorage.setItem('songchainn_needs_onboarding', '1');
@@ -462,6 +495,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
+      setIsVerifiedArtist(false);
       // Returning users land on home; the user-change effect triggers refreshProfile
       // which will set needsOnboarding=true only if their profile is genuinely incomplete.
       setNeedsOnboarding(false);
@@ -499,6 +533,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
+      setIsVerifiedArtist(false);
       if (isNewUser) {
         setNeedsOnboarding(true);
         try { localStorage.setItem('songchainn_needs_onboarding', '1'); } catch { void 0; }
@@ -534,6 +569,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refreshRoles(u.id);
       setIsArtist(false);
       setArtistId(null);
+      setIsVerifiedArtist(false);
       if (isNewUser) {
         setNeedsOnboarding(true);
         try { localStorage.setItem('songchainn_needs_onboarding', '1'); } catch { void 0; }
@@ -631,6 +667,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
     setIsArtist(false);
     setArtistId(null);
+    setIsVerifiedArtist(false);
     setNeedsOnboarding(false);
     try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
   }, [refreshRoles]);
@@ -709,7 +746,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: fcUser, profile } = buildFcUserAndProfile(fc);
       setUser(fcUser);
       setAudienceProfile(profile);
-      setIsAdmin(false); setIsArtist(false); setArtistId(null);
+      setIsAdmin(false); setIsArtist(false); setArtistId(null); setIsVerifiedArtist(false);
       setNeedsOnboarding(false);
       try {
         localStorage.setItem(FC_USER_KEY, JSON.stringify({ user: fcUser, profile }));
@@ -773,7 +810,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
               setAudienceProfile(profileData as any);
               await refreshRoles(u.id);
-              setIsArtist(false); setArtistId(null);
+              setIsArtist(false); setArtistId(null); setIsVerifiedArtist(false);
               setNeedsOnboarding(false);
               try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
               return { error: null };
@@ -795,7 +832,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: fbUser, profile } = buildFbUserAndProfile(fb);
       setUser(fbUser);
       setAudienceProfile(profile);
-      setIsAdmin(false); setIsArtist(false); setArtistId(null);
+      setIsAdmin(false); setIsArtist(false); setArtistId(null); setIsVerifiedArtist(false);
       setNeedsOnboarding(false);
       try {
         localStorage.setItem(FB_USER_KEY, JSON.stringify({ user: fbUser, profile }));
@@ -824,6 +861,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAdmin(false);
     setIsArtist(false);
     setArtistId(null);
+    setIsVerifiedArtist(false);
     setAudienceProfile(null);
     setNeedsOnboarding(false);
     setWalletAddress(null);
@@ -836,6 +874,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isArtist,
       artistId,
+      isVerifiedArtist,
       isLoading,
       audienceProfile, 
       needsOnboarding,
@@ -872,6 +911,7 @@ export function useAuth() {
       isAdmin: false,
       isArtist: false,
       artistId: null,
+      isVerifiedArtist: false,
       isLoading: false,
       audienceProfile: null,
       needsOnboarding: false,

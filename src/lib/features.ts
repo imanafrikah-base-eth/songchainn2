@@ -47,13 +47,18 @@ export const ZABAL_GAMEZ_ENABLED = false;
  *
  * Checked against the live project's /auth/v1/settings on 22 Aug 2026:
  *
- *   google    listed as enabled but the authorize endpoint answers
- *             "Unsupported provider: missing OAuth secret", so it failed for
- *             every user, every time. To switch it on: create an OAuth client
- *             in Google Cloud, put the client ID and SECRET into Supabase
- *             (Authentication > Providers > Google), confirm
- *             /auth/v1/authorize?provider=google redirects to accounts.google.com,
- *             then flip this to true.
+ *   google    LIVE since 2 Sep 2026. It was broken for a year by two separate
+ *             faults, both invisible from the app: the OAuth client in Google
+ *             Cloud had been created as a DESKTOP client, which has no web
+ *             origins and cannot do One Tap at all, and Supabase had the
+ *             provider switched on with no client secret saved. A new Web
+ *             application client was created and both the ID and the secret are
+ *             now in Supabase.
+ *             Verified before switching this on: /auth/v1/authorize?provider=google
+ *             returns 302 to accounts.google.com, the client_id it sends matches
+ *             VITE_GOOGLE_CLIENT_ID, and the id_token endpoint rejects a bad
+ *             token with "Bad ID token" rather than refusing the provider,
+ *             which is what proves the One Tap path is really configured.
  *   facebook  provider is not enabled on the project at all.
  *   phone     disabled on the project, and there is no SMS provider configured.
  *   emailLink magic links need working SMTP; the handler was already hardcoded
@@ -64,7 +69,7 @@ export const ZABAL_GAMEZ_ENABLED = false;
  * confirmation email standing in the way.
  */
 export const AUTH_PROVIDERS = {
-  google: false,
+  google: true,
   facebook: false,
   phone: false,
   emailLink: false,

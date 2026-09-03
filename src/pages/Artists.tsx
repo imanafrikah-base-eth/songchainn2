@@ -156,7 +156,7 @@ export default function Artists() {
                           />
                         </div>
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-primary/30 to-secondary/50 flex items-center justify-center">
+                        <div className="w-full h-full bg-secondary flex items-center justify-center">
                           <span className="text-5xl font-heading font-bold text-foreground/80">
                             {artist.name.charAt(0)}
                           </span>
@@ -229,7 +229,7 @@ export default function Artists() {
                       </div>
                       
                       {/* Location Badge */}
-                      <div className="px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs text-center font-medium truncate">
+                      <div className="px-3 py-2 rounded-xl bg-primary/10 border border-border text-primary text-xs text-center font-medium truncate">
                         {artist.location}
                       </div>
                     </div>

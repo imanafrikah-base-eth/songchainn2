@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Zap, Home, Radio, Calendar, Trophy, HelpCircle, LogOut, ArrowLeft } from "lucide-react";
-import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
 import NotificationsDropdown from "@/battlezone/components/NotificationsDropdown";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
 import AppLink from "@/battlezone/components/AppLink";

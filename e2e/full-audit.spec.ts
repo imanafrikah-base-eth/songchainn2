@@ -44,7 +44,9 @@ test.describe('MOBILE (375×812)', () => {
   });
 
   test('M-03 · Auth page — email sign-in form visible', async ({ page }) => {
-    await page.goto(`${BASE}/auth`);
+    // The landing opens on an intro view; ?auth=signin opens the form directly,
+    // which is also how a world sends a guest here to sign in.
+    await page.goto(`${BASE}/?auth=signin`);
     await waitForApp(page);
     await ss(page, 'M03-auth-page');
     const emailInput = page.locator('input[type="email"], input[placeholder*="email" i], input[placeholder*="Email" i]');

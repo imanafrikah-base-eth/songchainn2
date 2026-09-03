@@ -1,0 +1,8 @@
+{
+  "name": "SONGCHAINN",
+  "symbol": "ONGCHAINN",
+  "payoutRecipient": "0x70d211C7ed27CFA73d6FdDAF43736159F19EA118",
+  "uri": "ipfs://REPLACE_WITH_METADATA_CID",
+  "currency": "ETH",
+  "_note": "payoutRecipient is the verified SONGCHAINN treasury. For an ARTIST coin this must be the artist's own wallet instead."
+}

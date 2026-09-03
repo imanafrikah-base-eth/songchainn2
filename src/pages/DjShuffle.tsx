@@ -7,7 +7,7 @@ import { AmbientBackground } from '@/components/AmbientBackground';
 import { Button } from '@/components/ui/button';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { ARTISTS, CATALOGS, SONGS, Song } from '@/data/musicData';
-import djShuffleBranding from '@/assets/Dj Suffle Branding.png';
+import djShuffleBranding from '@/assets/Dj Suffle Branding.webp';
 
 type DjMode = 'artists' | 'all-songs' | 'catalogs';
 
@@ -131,7 +131,7 @@ export default function DjShuffle() {
                 </Button>
               </div>
               <p className="text-xs text-zinc-300">
-                Now Playing: {currentSong ? `${currentSong.title} Â· ${currentSong.artist}` : 'Nothing yet'} {isPlaying ? '(Live)' : ''}
+                Now Playing: {currentSong ? `${currentSong.title} · ${currentSong.artist}` : 'Nothing yet'} {isPlaying ? '(Live)' : ''}
               </p>
             </div>
             <div className="rounded-2xl border border-cyan-300/25 bg-black/45 p-2">
@@ -195,7 +195,7 @@ export default function DjShuffle() {
                     }`}
                   >
                     {catalog.title}
-                    <span className="ml-1 text-xs text-zinc-400">Â· {catalog.artist}</span>
+                    <span className="ml-1 text-xs text-zinc-400">· {catalog.artist}</span>
                   </button>
                 ))}
               </div>

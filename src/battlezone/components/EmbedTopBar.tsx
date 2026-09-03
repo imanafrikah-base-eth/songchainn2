@@ -1,6 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
-import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
 
 interface EmbedTopBarProps {
   title?: string;

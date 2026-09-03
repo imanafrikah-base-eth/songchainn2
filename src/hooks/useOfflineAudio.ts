@@ -54,7 +54,7 @@ export function useOfflineAudio() {
       setIsOnline(false);
       toast({ 
         title: 'You\'re offline', 
-        description: 'Only cached songs are available.' 
+        description: 'You are offline. Only the songs you saved will play.' 
       });
     };
 

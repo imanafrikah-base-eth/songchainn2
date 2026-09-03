@@ -29,6 +29,9 @@ export default function WaveWarzBattleZoneFeature() {
         <Sonner />
         <AuthProvider>
           <EmbedModeProvider>
+            {/* wavewarz-theme scopes the battle palette to this subtree so it
+                no longer leaks out and repaints the rest of SONGCHAINN. */}
+            <div className="wavewarz-theme min-h-full">
             <Routes>
               <Route index element={<Index />} />
               <Route path="how-it-works" element={<HowItWorks />} />
@@ -46,6 +49,7 @@ export default function WaveWarzBattleZoneFeature() {
               <Route path="results" element={<Navigate to="/wavewarz-africa/battles/results" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </div>
           </EmbedModeProvider>
         </AuthProvider>
       </TooltipProvider>

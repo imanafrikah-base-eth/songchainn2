@@ -1,0 +1,50 @@
+{
+  "_comment": "IMan Afrikah token + Empire launch config. Fill every PLACEHOLDER before running. Amounts/fees reviewed by IMan before signing — this deploys REAL liquidity on Base mainnet.",
+
+  "token": {
+    "name": "IMan Afrikah",
+    "symbol": "IMAN",
+    "imageUrl": "PLACEHOLDER https url to the token image (square, ideally the World #001 artwork)",
+    "tokenDescription": "Artist token for IMan Afrikah. Keys to IMan's World on SONGCHAINN.",
+    "socialTwitter": "",
+    "socialFarcaster": "",
+    "socialWebsite": "https://www.songchainn.xyz/world/iman-afrikah",
+    "socialTelegram": ""
+  },
+
+  "economics": {
+    "vaultPercentage": 10,
+    "vaultDays": 180,
+    "poolType": "standard",
+    "feeType": "dynamic",
+    "initialMarketCap": 10,
+    "enableDevBuy": false,
+    "devBuyAmount": 0,
+    "enableSniperFees": true,
+    "sniperFeeDuration": 15
+  },
+
+  "airdrop": {
+    "enabled": false,
+    "_comment": "Flip enabled true + fill entries to airdrop IMAN to top loyalty-leaderboard fans at launch. lockupDays must be >= 1.",
+    "lockupDays": 30,
+    "vestingDays": 0,
+    "entries": []
+  },
+
+  "empire": {
+    "displayName": "IMan Afrikah Empire",
+    "metadata": {
+      "bio": "Community treasury for IMan Afrikah fans on SONGCHAINN.",
+      "website_url": "https://www.songchainn.xyz/world/iman-afrikah",
+      "twitter_url": "",
+      "warpcast_url": "",
+      "telegram_url": ""
+    }
+  },
+
+  "worldGate": {
+    "supabaseSecretName": "IMAN_TOKEN_ADDRESS",
+    "decimalsSecretName": "IMAN_TOKEN_DECIMALS"
+  }
+}

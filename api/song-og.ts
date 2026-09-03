@@ -380,7 +380,7 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  const displayTitle = artist ? `${title} — ${artist}` : title;
+  const displayTitle = artist ? `${title} · ${artist}` : title;
   const description = artist
     ? `Listen to "${title}" by ${artist} on $ongChainn`
     : "Listen on $ongChainn";

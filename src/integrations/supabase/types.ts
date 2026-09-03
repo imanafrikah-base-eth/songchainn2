@@ -388,6 +388,16 @@ export type Database = {
           nakulu_points_a: number
           nakulu_points_b: number
           nakulu_verdict: string | null
+          now_playing?: Json | null
+          stage?: string
+          points_spent?: number
+          music_ends_at?: string | null
+          closes_at?: string | null
+          council_verdicts?: Json | null
+          council_points_a?: number | null
+          council_points_b?: number | null
+          council_summoned_at?: string | null
+          decided_by?: string | null
           region: string
           room_id: string | null
           round: number
@@ -431,6 +441,16 @@ export type Database = {
           nakulu_points_a?: number
           nakulu_points_b?: number
           nakulu_verdict?: string | null
+          now_playing?: Json | null
+          stage?: string
+          points_spent?: number
+          music_ends_at?: string | null
+          closes_at?: string | null
+          council_verdicts?: Json | null
+          council_points_a?: number | null
+          council_points_b?: number | null
+          council_summoned_at?: string | null
+          decided_by?: string | null
           region?: string
           room_id?: string | null
           round?: number
@@ -474,6 +494,16 @@ export type Database = {
           nakulu_points_a?: number
           nakulu_points_b?: number
           nakulu_verdict?: string | null
+          now_playing?: Json | null
+          stage?: string
+          points_spent?: number
+          music_ends_at?: string | null
+          closes_at?: string | null
+          council_verdicts?: Json | null
+          council_points_a?: number | null
+          council_points_b?: number | null
+          council_summoned_at?: string | null
+          decided_by?: string | null
           region?: string
           room_id?: string | null
           round?: number
@@ -1258,6 +1288,7 @@ export type Database = {
           audio_url: string | null
           audition: Json | null
           cover_art_url: string | null
+          music_reading?: Json | null
           created_at: string | null
           duration_seconds: number | null
           file_bytes: number | null
@@ -1278,6 +1309,7 @@ export type Database = {
           audio_url?: string | null
           audition?: Json | null
           cover_art_url?: string | null
+          music_reading?: Json | null
           created_at?: string | null
           duration_seconds?: number | null
           file_bytes?: number | null
@@ -1298,6 +1330,7 @@ export type Database = {
           audio_url?: string | null
           audition?: Json | null
           cover_art_url?: string | null
+          music_reading?: Json | null
           created_at?: string | null
           duration_seconds?: number | null
           file_bytes?: number | null
@@ -1472,6 +1505,318 @@ export type Database = {
           created_at?: string
           id?: string
           source?: string | null
+        }
+        Relationships: []
+      }
+      worlds: {
+        Row: {
+          id: string
+          slug: string
+          world_number: number|null
+          owner_id: string
+          artist_id: string|null
+          artist_name: string
+          token_symbol: string
+          chain: string
+          swap_url: string|null
+          farcaster_url: string|null
+          positioning: string
+          story: string[]
+          featured_song_ids: string[]
+          accent: string
+          hero_image: string|null
+          room_art: Json
+          city_art: Json
+          tier: string
+          status: string
+          created_at: string
+          updated_at: string
+          published_at: string|null
+        }
+        Insert: {
+          id?: string
+          slug: string
+          world_number?: number|null
+          owner_id: string
+          artist_id?: string|null
+          artist_name: string
+          token_symbol?: string
+          chain?: string
+          swap_url?: string|null
+          farcaster_url?: string|null
+          positioning?: string
+          story?: string[]
+          featured_song_ids?: string[]
+          accent?: string
+          hero_image?: string|null
+          room_art?: Json
+          city_art?: Json
+          tier?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+          published_at?: string|null
+        }
+        Update: {
+          id?: string
+          slug?: string
+          world_number?: number|null
+          owner_id?: string
+          artist_id?: string|null
+          artist_name?: string
+          token_symbol?: string
+          chain?: string
+          swap_url?: string|null
+          farcaster_url?: string|null
+          positioning?: string
+          story?: string[]
+          featured_song_ids?: string[]
+          accent?: string
+          hero_image?: string|null
+          room_art?: Json
+          city_art?: Json
+          tier?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+          published_at?: string|null
+        }
+        Relationships: []
+      }
+      world_cities: {
+        Row: {
+          id: string
+          world_id: string
+          slug: string
+          name: string
+          kind: string
+          tagline: string
+          teaser: string
+          empty_line: string
+          hue: string
+          sort_order: number
+          buildings: string[]
+        }
+        Insert: {
+          id?: string
+          world_id: string
+          slug: string
+          name: string
+          kind?: string
+          tagline?: string
+          teaser?: string
+          empty_line?: string
+          hue?: string
+          sort_order?: number
+          buildings?: string[]
+        }
+        Update: {
+          id?: string
+          world_id?: string
+          slug?: string
+          name?: string
+          kind?: string
+          tagline?: string
+          teaser?: string
+          empty_line?: string
+          hue?: string
+          sort_order?: number
+          buildings?: string[]
+        }
+        Relationships: []
+      }
+      world_streets: {
+        Row: {
+          id: string
+          world_id: string
+          slug: string
+          name: string
+          ring: number|null
+          access: string
+          tagline: string
+          teaser: string
+          hue: string
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          world_id: string
+          slug: string
+          name: string
+          ring?: number|null
+          access?: string
+          tagline?: string
+          teaser?: string
+          hue?: string
+          sort_order?: number
+        }
+        Update: {
+          id?: string
+          world_id?: string
+          slug?: string
+          name?: string
+          ring?: number|null
+          access?: string
+          tagline?: string
+          teaser?: string
+          hue?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      world_blocks: {
+        Row: {
+          id: string
+          street_id: string
+          block_type: string
+          props: Json
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          street_id: string
+          block_type: string
+          props?: Json
+          sort_order?: number
+        }
+        Update: {
+          id?: string
+          street_id?: string
+          block_type?: string
+          props?: Json
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      world_gates: {
+        Row: {
+          world_id: string
+          kind: string
+          token_address: string|null
+          token_decimals: number
+          fan_threshold: number
+          insider_threshold: number
+          council_size: number
+        }
+        Insert: {
+          world_id: string
+          kind?: string
+          token_address: string|null
+          token_decimals?: number
+          fan_threshold?: number
+          insider_threshold?: number
+          council_size?: number
+        }
+        Update: {
+          world_id?: string
+          kind?: string
+          token_address?: string|null
+          token_decimals?: number
+          fan_threshold?: number
+          insider_threshold?: number
+          council_size?: number
+        }
+        Relationships: []
+      }
+      world_roles: {
+        Row: {
+          world_id: string
+          user_id: string
+          role: string
+        }
+        Insert: {
+          world_id: string
+          user_id: string
+          role: string
+        }
+        Update: {
+          world_id?: string
+          user_id?: string
+          role?: string
+        }
+        Relationships: []
+      }
+      world_citizens: {
+        Row: {
+          id: string
+          world_slug: string
+          user_id: string
+          display_name: string | null
+          avatar: Json
+          incognito: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          world_slug: string
+          user_id: string
+          display_name?: string | null
+          avatar?: unknown
+          incognito?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          world_slug?: string
+          user_id?: string
+          display_name?: string | null
+          avatar?: unknown
+          incognito?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      world_meeting_requests: {
+        Row: {
+          id: string
+          world_slug: string
+          user_id: string
+          wallet: string | null
+          kind: string
+          minutes: number
+          // always read via ::text, so the exact amount survives
+          fee_tokens: string
+          tier: string
+          message: string | null
+          status: string
+          payment_tx: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          world_slug: string
+          user_id: string
+          wallet?: string | null
+          kind: string
+          minutes: number
+          // numeric over the wire accepts a string, and the Parlour sends one
+          // so a token amount is never rounded through a JS float.
+          fee_tokens: number | string
+          tier: string
+          message?: string | null
+          status?: string
+          payment_tx?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          world_slug?: string
+          user_id?: string
+          wallet?: string | null
+          kind?: string
+          minutes?: number
+          fee_tokens?: number | string
+          tier?: string
+          message?: string | null
+          status?: string
+          payment_tx?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1769,6 +2114,35 @@ export type Database = {
           lifetime_points: number
           points: number
           tier: string
+        }[]
+      }
+      get_or_create_my_referral_code: { Args: Record<PropertyKey, never>; Returns: string }
+      has_role: {
+        Args: { _user_id: string; _role: string }
+        Returns: boolean
+      }
+      publish_world: {
+        Args: { _world_id: string }
+        Returns: {
+          ok: boolean
+          message: string
+          world_number: number
+        }[]
+      }
+      get_my_referral_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          code: string
+          invited: number
+          points_earned: number
+        }[]
+      }
+      redeem_referral_code: {
+        Args: { _code: string }
+        Returns: {
+          ok: boolean
+          message: string
+          points_awarded: number
         }[]
       }
       create_songchainn_system_post: {

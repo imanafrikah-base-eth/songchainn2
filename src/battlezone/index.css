@@ -1,110 +1,104 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+/* WaveWarz Africa (BattleZone) surface theme.
+ *
+ * This file used to declare its palette on :root and pull in its own copy of
+ * @tailwind base/components/utilities. Because the battle zone is a lazily
+ * loaded route, that meant the first visit to /wavewarz-africa injected a
+ * second stylesheet whose :root block won the cascade and repainted the whole
+ * SONGCHAINN app green until the next full reload, and shipped ~146 kB of
+ * duplicated Tailwind output.
+ *
+ * The palette is now scoped to .wavewarz-theme (applied to the battle zone's
+ * root element) and written as plain CSS, so nothing leaks out and no Tailwind
+ * pass is duplicated. Shared tokens (--neon-green, --cyan, --gold, --live-red)
+ * also live in src/index.css so the neon and live Tailwind colours resolve
+ * app-wide.
+ */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+.wavewarz-theme {
+  --background: 220 20% 6%;
+  --foreground: 210 20% 95%;
 
-@layer base {
-  :root {
-    --background: 220 20% 6%;
-    --foreground: 210 20% 95%;
+  --card: 220 18% 10%;
+  --card-foreground: 210 20% 95%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 210 20% 95%;
+  --popover: 220 18% 10%;
+  --popover-foreground: 210 20% 95%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 210 20% 95%;
+  --primary: 145 80% 45%;
+  --primary-foreground: 220 20% 6%;
 
-    --primary: 145 80% 45%;
-    --primary-foreground: 220 20% 6%;
+  --secondary: 195 90% 50%;
+  --secondary-foreground: 220 20% 6%;
 
-    --secondary: 195 90% 50%;
-    --secondary-foreground: 220 20% 6%;
+  --muted: 220 15% 15%;
+  --muted-foreground: 215 15% 55%;
 
-    --muted: 220 15% 15%;
-    --muted-foreground: 215 15% 55%;
+  --accent: 35 90% 55%;
+  --accent-foreground: 220 20% 6%;
 
-    --accent: 35 90% 55%;
-    --accent-foreground: 220 20% 6%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+  --border: 220 15% 18%;
+  --input: 220 15% 18%;
+  --ring: 145 80% 45%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 18%;
-    --ring: 145 80% 45%;
+  --radius: 0.75rem;
 
-    --radius: 0.75rem;
+  --neon-green: 145 80% 45%;
+  --neon-green-glow: 145 80% 45%;
+  --cyan: 195 90% 50%;
+  --cyan-glow: 195 90% 50%;
+  --gold: 35 90% 55%;
+  --gold-glow: 35 90% 55%;
+  --live-red: 0 85% 55%;
+  --surface-1: 220 18% 10%;
+  --surface-2: 220 16% 14%;
+  --surface-3: 220 14% 18%;
 
-    --neon-green: 145 80% 45%;
-    --neon-green-glow: 145 80% 45%;
-    --cyan: 195 90% 50%;
-    --cyan-glow: 195 90% 50%;
-    --gold: 35 90% 55%;
-    --gold-glow: 35 90% 55%;
-    --live-red: 0 85% 55%;
-    --surface-1: 220 18% 10%;
-    --surface-2: 220 16% 14%;
-    --surface-3: 220 14% 18%;
+  --sidebar-background: 220 18% 8%;
+  --sidebar-foreground: 210 20% 95%;
+  --sidebar-primary: 145 80% 45%;
+  --sidebar-primary-foreground: 220 20% 6%;
+  --sidebar-accent: 220 15% 15%;
+  --sidebar-accent-foreground: 210 20% 95%;
+  --sidebar-border: 220 15% 18%;
+  --sidebar-ring: 145 80% 45%;
 
-    --sidebar-background: 220 18% 8%;
-    --sidebar-foreground: 210 20% 95%;
-    --sidebar-primary: 145 80% 45%;
-    --sidebar-primary-foreground: 220 20% 6%;
-    --sidebar-accent: 220 15% 15%;
-    --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 145 80% 45%;
-  }
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  html, body, #root {
-    height: 100%;
-    min-height: 100%;
-  }
-
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-  }
+.text-glow-green {
+  text-shadow: 0 0 20px hsl(var(--neon-green) / 0.6), 0 0 40px hsl(var(--neon-green) / 0.3);
 }
-
-@layer utilities {
-  .text-glow-green {
-    text-shadow: 0 0 20px hsl(var(--neon-green) / 0.6), 0 0 40px hsl(var(--neon-green) / 0.3);
-  }
-  .text-glow-cyan {
-    text-shadow: 0 0 20px hsl(var(--cyan) / 0.6), 0 0 40px hsl(var(--cyan) / 0.3);
-  }
-  .text-glow-gold {
-    text-shadow: 0 0 20px hsl(var(--gold) / 0.6), 0 0 40px hsl(var(--gold) / 0.3);
-  }
-  .box-glow-green {
-    box-shadow: 0 0 15px hsl(var(--neon-green) / 0.3), 0 0 30px hsl(var(--neon-green) / 0.15);
-  }
-  .box-glow-cyan {
-    box-shadow: 0 0 15px hsl(var(--cyan) / 0.3), 0 0 30px hsl(var(--cyan) / 0.15);
-  }
-  .box-glow-gold {
-    box-shadow: 0 0 15px hsl(var(--gold) / 0.3), 0 0 30px hsl(var(--gold) / 0.15);
-  }
-  .gradient-battle {
-    background: linear-gradient(135deg, hsl(var(--neon-green) / 0.15), hsl(var(--cyan) / 0.1), hsl(var(--gold) / 0.05));
-  }
-  .border-glow-green {
-    border-color: hsl(var(--neon-green) / 0.5);
-    box-shadow: inset 0 0 15px hsl(var(--neon-green) / 0.05), 0 0 15px hsl(var(--neon-green) / 0.1);
-  }
-  .pulse-live {
-    animation: pulse-live 2s ease-in-out infinite;
-  }
-  .float-slow {
-    animation: float-slow 6s ease-in-out infinite;
-  }
+.text-glow-cyan {
+  text-shadow: 0 0 20px hsl(var(--cyan) / 0.6), 0 0 40px hsl(var(--cyan) / 0.3);
+}
+.text-glow-gold {
+  text-shadow: 0 0 20px hsl(var(--gold) / 0.6), 0 0 40px hsl(var(--gold) / 0.3);
+}
+.box-glow-green {
+  box-shadow: 0 0 15px hsl(var(--neon-green) / 0.3), 0 0 30px hsl(var(--neon-green) / 0.15);
+}
+.box-glow-cyan {
+  box-shadow: 0 0 15px hsl(var(--cyan) / 0.3), 0 0 30px hsl(var(--cyan) / 0.15);
+}
+.box-glow-gold {
+  box-shadow: 0 0 15px hsl(var(--gold) / 0.3), 0 0 30px hsl(var(--gold) / 0.15);
+}
+.gradient-battle {
+  background: linear-gradient(135deg, hsl(var(--neon-green) / 0.15), hsl(var(--cyan) / 0.1), hsl(var(--gold) / 0.05));
+}
+.border-glow-green {
+  border-color: hsl(var(--neon-green) / 0.5);
+  box-shadow: inset 0 0 15px hsl(var(--neon-green) / 0.05), 0 0 15px hsl(var(--neon-green) / 0.1);
+}
+.pulse-live {
+  animation: pulse-live 2s ease-in-out infinite;
+}
+.float-slow {
+  animation: float-slow 6s ease-in-out infinite;
 }
 
 @keyframes pulse-live {
@@ -117,16 +111,16 @@
   50% { transform: translateY(-10px); }
 }
 
-::-webkit-scrollbar {
+.wavewarz-theme ::-webkit-scrollbar {
   width: 6px;
 }
-::-webkit-scrollbar-track {
+.wavewarz-theme ::-webkit-scrollbar-track {
   background: hsl(var(--background));
 }
-::-webkit-scrollbar-thumb {
+.wavewarz-theme ::-webkit-scrollbar-thumb {
   background: hsl(var(--muted));
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
+.wavewarz-theme ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground));
 }

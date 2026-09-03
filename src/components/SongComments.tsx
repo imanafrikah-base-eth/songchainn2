@@ -99,7 +99,7 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
       toast.success('Comment posted!');
     },
     onError: (error: Error) => {
-      toast.error('Failed to post comment', { description: error.message });
+      toast.error('Could not post that comment', { description: 'Give it another go in a moment.' });
     },
   });
 
@@ -115,7 +115,7 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
       toast.success('Comment deleted');
     },
     onError: () => {
-      toast.error('Failed to delete comment');
+      toast.error('Could not delete that comment');
     },
   });
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { claimInterruption, releaseInterruption } from '@/lib/interruptions';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, X } from 'lucide-react';
@@ -9,8 +10,9 @@ import { ARTISTS, CATALOGS, SONGS, Song } from '@/data/musicData';
 import { supabase } from '@/integrations/supabase/client';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useEngagement } from '@/context/EngagementContext';
+import { useUserPoints } from '@/hooks/useUserPoints';
 import { useToast } from '@/hooks/use-toast';
-import moshaAvatar from '@/assets/Mo$ha chat pop up.png';
+import moshaAvatar from '@/assets/Mo$ha chat pop up.webp';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { fcOpenUrl } from '@/lib/farcasterActions';
 
@@ -151,9 +153,31 @@ export function VibeAgent() {
   const { playSong } = usePlayerActions();
   const { likedSongs, playlists, createPlaylist, addSongsToPlaylist, updatePlaylistVisibility } = useAudienceInteractions();
   const { engagementPoints, currentStreak } = useEngagement();
+  const { lifetimePoints: ledgerPoints, streak: ledgerStreak } = useUserPoints();
 
   const [mode, setMode] = useState<AgentMode>('unset');
   const [step, setStep] = useState<AgentStep | null>(null);
+
+  // The launcher tab steps aside while the page is moving (see .agent-tab in
+  // index.css). A body flag, so it is one listener for the whole app and the
+  // CSS decides what "aside" looks like at each width.
+  useEffect(() => {
+    let timer: number | null = null;
+    const onScroll = () => {
+      document.body.dataset.scrolling = 'true';
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        delete document.body.dataset.scrolling;
+        timer = null;
+      }, 650);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (timer) window.clearTimeout(timer);
+      delete document.body.dataset.scrolling;
+    };
+  }, []);
   const [suggestedSong, setSuggestedSong] = useState<Song | null>(null);
   const [roomInvite, setRoomInvite] = useState<RoomInviteSummary | null>(null);
   const [dismissedUntil, setDismissedUntil] = useState(0);
@@ -209,6 +233,9 @@ export function VibeAgent() {
   );
 
   const openStep = useCallback((next: AgentStep) => {
+    // App-initiated. Mo$ha asks the interruption budget for the floor like
+    // every other surface; a direct "Call Mo$ha" tap bypasses this on purpose.
+    if (!claimInterruption('mosha-prompt', { priority: 'promo' })) return;
     setStep((prev) => prev || next);
   }, []);
 
@@ -254,6 +281,12 @@ export function VibeAgent() {
     }
   }, [currentSong, dismissedUntil, mode, openStep]);
 
+  // Whenever the external prompt is not the thing on screen, the floor goes
+  // back so the next surface in the queue can use it.
+  useEffect(() => {
+    if (step !== 'external-prompt') releaseInterruption('mosha-prompt');
+  }, [step]);
+
   useEffect(() => {
     const handleOpen = () => {
       setDismissedUntil(0);
@@ -269,6 +302,10 @@ export function VibeAgent() {
       // App-initiated prompts respect a user's dismissal; only a direct
       // "Call Mo$ha" click (handleOpen) overrides the quiet period.
       if (Date.now() < dismissedUntilRef.current) return;
+      // ...and they now also go through the app-wide interruption budget, so
+      // Mo$ha cannot land on someone the second they arrive, and cannot stack
+      // on top of a banner. A direct "Call Mo$ha" tap still always works.
+      if (!claimInterruption('mosha-prompt', { priority: 'promo' })) return;
       setExternalPrompt(prompt);
       setStep('external-prompt');
     };
@@ -317,12 +354,14 @@ export function VibeAgent() {
         text:
           `You are on fire, ${displayName}. Song #${distinctSongStarts} just started and your momentum is building. ` +
           `Your points and streaks keep rising as you play music, chat in The Room, invite new users, and share songs to Feed. ` +
-          `Right now you are on ${currentStreak} streak with ${engagementPoints.toLocaleString()} points. ` +
-          `Rewards redemption opens soon, so every action now stacks your future unlocks.`,
+          `Right now you are on a ${ledgerStreak} day streak with ${ledgerPoints.toLocaleString()} points. ` +
+          `Keep it going and you climb the leaderboard.`,
         ctaLabel: 'Show My Progress',
         ctaPath: '/profile',
       });
-      setStep('external-prompt');
+      if (claimInterruption('mosha-prompt', { priority: 'promo' })) {
+        setStep('external-prompt');
+      }
     }
 
     if (!seenArtistsRef.current.has(currentSong.artistId)) {
@@ -336,7 +375,7 @@ export function VibeAgent() {
 
     prevSongIdRef.current = currentSong.id;
     prevSongTimeRef.current = currentTime;
-  }, [currentSong, currentTime, currentStreak, dismissedUntil, displayName, engagementPoints, mode, openStep, step]);
+  }, [currentSong, currentTime, ledgerStreak, dismissedUntil, displayName, ledgerPoints, mode, openStep, step]);
 
   useEffect(() => {
     if (!currentSong || !isPlaying) return;
@@ -543,44 +582,46 @@ export function VibeAgent() {
   if (!step) {
     if (mode === 'unset') {
       return (
-        <div className="fixed z-[58] bottom-40 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6">
+        <div className="agent-dock agent-tab fixed z-[58]">
           <button
             type="button"
             onClick={() => setStep('welcome')}
-            className="rounded-full border border-primary/35 bg-background/90 backdrop-blur px-2.5 py-1.5 text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors flex items-center gap-1"
+            aria-label="Open Mo$ha"
+            className="agent-tab-button border border-border bg-background/90 backdrop-blur text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors flex items-center gap-1"
           >
             <Sparkles className="w-3 h-3" />
-            Mosha
+            Mo$ha
           </button>
         </div>
       );
     }
     return (
-      <div className="fixed z-[58] bottom-40 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6">
+      <div className="agent-dock agent-tab fixed z-[58]">
         <button
           type="button"
           onClick={() => setStep('taste-lane')}
-          className="rounded-full border border-primary/35 bg-background/90 backdrop-blur px-2.5 py-1.5 text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors"
+          aria-label={`Open Mo$ha, ${modeLabel(mode)}`}
+          className="agent-tab-button border border-border bg-background/90 backdrop-blur text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors"
         >
-          Mosha • {modeLabel(mode)}
+          Mo$ha
         </button>
       </div>
     );
   }
 
   return (
-    <div className="fixed z-[58] bottom-20 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6 w-[min(calc(100vw-0.75rem),22rem)] sm:w-[23rem] md:w-[24rem]">
+    <div className="agent-dock fixed z-[58] bottom-20 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6 w-[min(calc(100vw-0.75rem),22rem)] sm:w-[23rem] md:w-[24rem]">
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
           initial={{ opacity: 0, y: 16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.98 }}
-          className="relative isolate rounded-2xl border border-primary/30 bg-background/95 backdrop-blur shadow-2xl overflow-hidden"
+          className="relative isolate rounded-2xl border border-border bg-background/95 backdrop-blur shadow-2xl overflow-hidden"
         >
           <AmbientBackground pool="moSha" opacity={0.1} overlay="text" className="-z-10" />
           <div className="grid grid-cols-[5.2rem_minmax(0,1fr)] sm:grid-cols-[6.4rem_minmax(0,1fr)]">
-            <div className="relative border-r border-primary/25 bg-gradient-to-b from-black/45 to-black/20">
+            <div className="relative border-r border-border bg-gradient-to-b from-black/45 to-black/20">
               <img
                 src={moshaAvatar}
                 alt="Mosha"

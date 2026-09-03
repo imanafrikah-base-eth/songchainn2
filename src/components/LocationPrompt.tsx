@@ -125,7 +125,7 @@ export function LocationPrompt({ isOpen, onClose, onSuccess }: LocationPromptPro
                   id="location"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Lusaka, Zambia"
+                  placeholder="e.g. Lagos, London, Lusaka"
                   maxLength={100}
                   className={error ? 'border-destructive' : ''}
                   autoFocus

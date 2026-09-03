@@ -250,7 +250,7 @@ export function CommentSheet({
                                 <span className="inline-flex items-center gap-1">
                                   <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(comment.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                                   <span>{displayName}</span>
-                                  {isArtistComment && isVerifiedArtist && <VerifiedBadge size={15} tone="gold" />}
+                                  {isArtistComment && isVerifiedArtist && <VerifiedBadge size={15} />}
                                 </span>
                               </button>
                               <span className="text-xs text-muted-foreground ml-2">

@@ -27,8 +27,12 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
+import { HomeHero, type HeroFeature } from '@/components/HomeHero';
+import { useMoshaTour } from '@/hooks/useMoshaTour';
+import { pickHeroSong } from '@/lib/heroPick';
 import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
-import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
+import { ZABAL_GAMEZ_ENABLED, WORLDS_ENABLED } from '@/lib/features';
+import { WorldsPhase3 } from '@/components/worlds/WorldsPhase3';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -37,7 +41,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import djShuffleBranding from '@/assets/Dj Suffle Branding.png';
+import djShuffleBranding from '@/assets/Dj Suffle Branding.webp';
 import { SearchModal } from '@/components/SearchModal';
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -164,6 +168,17 @@ export default function Home() {
     () => todayHotSongs.filter(({ song }) => earnedPlacement(song)),
     [todayHotSongs],
   );
+  // The page opens on one record at size rather than on copy about the app.
+  // Newest release first, then whatever is hottest, then anything at all: Home
+  // must never open on an empty frame.
+
+  const heroFaces = useMemo(
+    () =>
+      // All of them. There are eleven artists; the row scrolls.
+      rankedArtists.map((a) => ({ id: a.id, name: a.name, image: a.profileImage })),
+    [rankedArtists],
+  );
+
   const songsByCatalog = useMemo(
     () =>
       catalogs
@@ -207,10 +222,35 @@ export default function Home() {
       .filter(Boolean) as Song[];
   }, [allSongs]);
 
+  // Same ranking as the landing page, from the same helper, so the two can
+  // never disagree about what the record of the day is. See src/lib/heroPick.ts.
+  const heroFeature = useMemo<HeroFeature | null>(() => {
+    const pick = pickHeroSong({
+      hotToday: hotTodaySongs.map(({ song }) => song),
+      newMusic: songsFromCatalogs(newReleases),
+      allSongs,
+    });
+    if (!pick) return null;
+    return {
+      id: pick.song.id,
+      title: pick.song.title,
+      artist: pick.song.artist,
+      coverImage: pick.song.coverImage,
+      label: pick.label,
+      href: `/song/${pick.song.id}`,
+    };
+  }, [hotTodaySongs, newReleases, allSongs, songsFromCatalogs]);
+
   const handlePlayAllHotToday = useCallback(() => {
     const queueSongs = hotTodaySongs.map((entry) => entry.song);
     if (queueSongs.length) playQueue(queueSongs);
   }, [playQueue, hotTodaySongs]);
+
+  const handlePlayHero = useCallback(() => {
+    if (!heroFeature) return;
+    const song = allSongs.find((s) => s.id === heroFeature.id);
+    if (song) playQueue([song]);
+  }, [heroFeature, allSongs, playQueue]);
 
   const handlePlayAllNewReleases = useCallback(() => {
     const queueSongs = songsFromCatalogs(newReleases);
@@ -258,38 +298,10 @@ export default function Home() {
     },
   ]), []);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    const newUserKey = `songchainn:new-user-tour-prompt:v1:${user.id}`;
-    const returningUserKey = `songchainn:returning-user-tour-prompt:v2:${user.id}`;
-    try {
-      if (localStorage.getItem(returningUserKey) === 'shown') return;
-      const hasSeenNewUserPrompt = localStorage.getItem(newUserKey) === 'shown';
-
-      if (!hasSeenNewUserPrompt) {
-        localStorage.setItem(newUserKey, 'shown');
-      } else {
-        localStorage.setItem(returningUserKey, 'shown');
-      }
-
-      window.setTimeout(() => {
-        const promptText = hasSeenNewUserPrompt
-          ? 'Yo welcome back fam. Quick heads up: WaveWarz Africa battles now run right here in $ongChainn -- watch live, vote, and speak in the room.'
-          : 'Welcome to $ongChainn. Songs here are real tradeable coins on Base, artists release straight to you, and WaveWarz Africa battles run right here. All of it is live.';
-        window.dispatchEvent(
-          new CustomEvent('songchainn:mosha-prompt', {
-            detail: {
-              text: promptText,
-              ctaLabel: hasSeenNewUserPrompt ? 'Click here to explore' : 'Learn more',
-              ctaPath: hasSeenNewUserPrompt ? '/' : '/about',
-            },
-          }),
-        );
-      }, 900);
-    } catch {
-      void 0;
-    }
-  }, [user?.id]);
+  // The old welcome fired a 40-word paragraph 900ms after login, before the
+  // user had seen a single song. Replaced by a paced, signal-driven tour:
+  // see src/lib/moshaTour.ts and useMoshaTour().
+  useMoshaTour();
 
   // One-time Mo$ha plug for the Zabal Gamez Artist Track. Delayed so it never
   // collides with the welcome/tour prompt above, and never repeats once shown.
@@ -414,7 +426,7 @@ export default function Home() {
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         {playerState?.isRoomMode && playerState.currentSong && (
           <div className="mb-4 sm:mb-6">
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
+            <div className="rounded-2xl border border-border bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/40 overflow-hidden flex-shrink-0">
                 {playerState.currentSong.coverImage ? (
                   <img
@@ -452,16 +464,20 @@ export default function Home() {
             </div>
           </div>
         )}
-        <section className="mb-4 sm:mb-6 rounded-2xl border border-primary/20 bg-primary/5 p-3 sm:p-4">
+        {heroFeature ? (
+          <HomeHero feature={heroFeature} onPlay={handlePlayHero} faces={heroFaces} />
+        ) : null}
+
+        <section className="mb-4 sm:mb-6">
           <div className="flex items-center justify-between gap-3 mb-3">
             <h2 className="text-sm sm:text-base font-semibold text-foreground">$ongChainn Quick Actions</h2>
-            <span className="text-[11px] sm:text-xs text-muted-foreground">Smart shortcuts</span>
+            <span className="pr-1 text-[11px] sm:text-xs text-muted-foreground">Smart shortcuts</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
             {quickActions.map((item) => {
               const Icon = item.icon;
               const content = (
-                <div className="h-full min-h-[98px] rounded-xl border border-border bg-card/60 px-3 py-2.5 text-left hover:border-primary/35 hover:bg-primary/5 transition-colors">
+                <div className="h-full min-h-[98px] rounded-xl border border-border bg-card/60 px-3 py-2.5 text-left hover:border-border hover:bg-primary/5 transition-colors">
                   <div className="mb-1.5 flex items-center gap-2">
                     <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/12">
                       <Icon className="h-3.5 w-3.5 text-primary" />
@@ -521,7 +537,7 @@ export default function Home() {
                     <button
                       type="button"
                       aria-label="What this button does"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/35 bg-background/80 text-primary hover:bg-primary/10 transition-colors"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/80 text-primary hover:bg-primary/10 transition-colors"
                     >
                       <Info className="h-4 w-4" />
                     </button>
@@ -539,7 +555,7 @@ export default function Home() {
                   <button
                     type="button"
                     aria-label="What this button does"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/35 bg-background/80 text-primary hover:bg-primary/10 transition-colors"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/80 text-primary hover:bg-primary/10 transition-colors"
                   >
                     <Info className="h-4 w-4" />
                   </button>
@@ -567,6 +583,11 @@ export default function Home() {
 
         <WhatsLive />
 
+        {/* Phase Three, to somebody already inside. Full width and above the
+            two column grid, because a world is not a sidebar item, and the ask
+            here is the key rather than an account they already have. */}
+        {WORLDS_ENABLED && <WorldsPhase3 variant="member" className="mb-6 sm:mb-8" />}
+
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-8">
           {/* Main Content */}
           <motion.div
@@ -576,13 +597,13 @@ export default function Home() {
             animate="show"
           >
             <motion.section variants={itemVariants}>
-                <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
+                <div className="relative overflow-hidden">
                   <motion.div
                     aria-hidden="true"
                     initial={{ opacity: 0.4, scale: 1 }}
                     animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.05, 1] }}
                     transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                    className="pointer-events-none absolute -inset-x-12 -top-20 h-28 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.7),_transparent_65%)] blur-3xl"
+                    className="hidden"
                   />
                   <div className="relative z-10">
                     <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
@@ -641,7 +662,7 @@ export default function Home() {
 
             {newReleases.length > 0 && (
               <motion.section variants={itemVariants}>
-                <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
+                <div className="relative overflow-hidden">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <div>
                       <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
@@ -652,7 +673,7 @@ export default function Home() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-primary">
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllNewReleases}>
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllNewReleases}>
                         <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
                         Play All
                       </Button>
@@ -679,7 +700,7 @@ export default function Home() {
 
             {likedArtistSongs.length > 0 && (
               <motion.section variants={itemVariants}>
-                <div className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden">
+                <div className="relative overflow-hidden">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <div>
                       <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
@@ -707,7 +728,7 @@ export default function Home() {
 
             {featuredCatalogs.length > 0 && (
               <motion.section variants={itemVariants}>
-                <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay border border-primary/20">
+                <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay border border-border">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <div>
                       <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
@@ -718,7 +739,7 @@ export default function Home() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-primary">
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllFeatured}>
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllFeatured}>
                         <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
                         Play All
                       </Button>
@@ -742,12 +763,12 @@ export default function Home() {
             <motion.section variants={itemVariants}>
               <div
                 ref={allCatalogsCardRef}
-                className="relative glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay overflow-hidden"
+                className="relative overflow-hidden"
               >
                 <motion.div
                   aria-hidden="true"
                   style={{ y: allCatalogsGlowY, opacity: allCatalogsGlowOpacity }}
-                  className="pointer-events-none absolute -inset-x-10 -top-16 h-24 bg-gradient-to-r from-primary/40 via-cyan-400/25 to-emerald-400/35 blur-3xl"
+                  className="hidden"
                 />
                 <div className="relative z-10">
                   <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
@@ -760,7 +781,7 @@ export default function Home() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllCatalogs}>
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllCatalogs}>
                         <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
                         Play All
                       </Button>
@@ -805,7 +826,7 @@ export default function Home() {
             </motion.section>
 
             <motion.section variants={itemVariants} id="playlists">
-              <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay">
+              <div className="relative">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="flex items-center gap-2">
                     <ListMusic className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
@@ -933,14 +954,14 @@ export default function Home() {
 
             <motion.section variants={itemVariants}>
               <Link to="/marketplace" className="block group">
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-primary/40 hover:border-primary/60 transition-all duration-300">
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-border hover:border-primary/60 transition-all duration-300">
                   {/* Animated gradient background */}
                   <div className="absolute inset-0 gradient-primary opacity-10 group-hover:opacity-20 transition-opacity" />
                   <div className="absolute top-0 right-0 w-64 h-64 opacity-40">
                     <motion.div
                       className="absolute inset-0 rounded-full"
                       style={{
-                        background: 'radial-gradient(circle, hsl(var(--primary) / 0.8) 0%, transparent 70%)',
+                        background: 'none',
                         filter: 'blur(60px)',
                       }}
                       animate={{ 
@@ -955,7 +976,7 @@ export default function Home() {
                     <motion.div
                       className="absolute inset-0 rounded-full"
                       style={{
-                        background: 'radial-gradient(circle, hsl(217 91% 60% / 0.6) 0%, transparent 70%)',
+                        background: 'none',
                         filter: 'blur(40px)',
                       }}
                       animate={{ 
@@ -986,8 +1007,9 @@ export default function Home() {
                           <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary group-hover:translate-x-1 transition-transform" />
                         </h3>
                         <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4 max-w-lg">
-                          Buy a song's coin on Base to truly own it: unlimited streaming, 1,000 offline
-                          plays, and you can resell it anytime. 95% of every purchase goes straight to the artist.
+                          A dollar buys one digital copy of a song, held in your own wallet on Base. Its
+                          price moves with the song, so it can be worth more than you paid or less.
+                          Holding it backs the artist and earns you points, badges and doors in their world.
                         </p>
                         
                         {/* Stats */}
@@ -997,7 +1019,7 @@ export default function Home() {
                             <span>On-Chain Songs</span>
                           </div>
                           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 text-green-500 text-xs sm:text-sm font-medium">
-                            <span>95% to Artists</span>
+                            <span>Backs the artist</span>
                           </div>
                           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 text-xs sm:text-sm font-medium">
                             <span>Base Blockchain</span>
@@ -1012,12 +1034,12 @@ export default function Home() {
 
             {/* Discover Community Section */}
             <motion.section variants={itemVariants}>
-              <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 shine-overlay relative overflow-hidden">
+              <div className="relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
                   <motion.div
                     className="absolute inset-0 rounded-full"
                     style={{
-                      background: 'radial-gradient(circle, hsl(var(--primary) / 0.6) 0%, transparent 70%)',
+                      background: 'none',
                       filter: 'blur(30px)',
                     }}
                     animate={{ scale: [1, 1.2, 1] }}
@@ -1093,7 +1115,7 @@ export default function Home() {
             </Link>
 
             {/* What is live */}
-            <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 shine-overlay">
+            <div className="relative">
               <h3 className="font-heading font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Live now</h3>
               <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-5 leading-relaxed">
                 Songs are now real, tradeable coins on Base. Buy them, sell them,
@@ -1102,19 +1124,19 @@ export default function Home() {
               <div className="space-y-2 sm:space-y-3">
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                   <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full gradient-primary shadow-glow" />
-                  <span className="text-foreground">Music Discovery</span>
+                  <span className="text-foreground">Music you have not heard yet</span>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                   <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full gradient-primary shadow-glow" />
-                  <span className="text-foreground">Community Participation</span>
+                  <span className="text-foreground">Rooms, the feed and live battles</span>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                   <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full gradient-primary shadow-glow" />
-                  <span className="text-foreground">On-Chain Ownership & Trading</span>
+                  <span className="text-foreground">Own songs, and sell them on</span>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                   <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-muted" />
-                  <span className="text-muted-foreground">Rewards (Coming Soon)</span>
+                  <span className="text-muted-foreground">Points and the leaderboard</span>
                 </div>
               </div>
             </div>
@@ -1127,12 +1149,12 @@ export default function Home() {
           transition={{ delay: 0.3 }}
           className="px-4 mt-6 sm:mt-10 mb-4 sm:mb-6"
         >
-          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shine-overlay relative overflow-hidden">
+          <div className="relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 opacity-25">
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: 'radial-gradient(circle, hsl(var(--primary) / 0.7) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(40px)',
                 }}
                 animate={{ scale: [1, 1.1, 1], x: [0, 8, 0], y: [0, -6, 0] }}

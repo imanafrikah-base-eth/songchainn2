@@ -17,6 +17,7 @@ import { useSocial } from '@/hooks/useSocial';
 import { useAuth } from '@/context/AuthContext';
 import { AudienceProfile } from '@/types/database';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
+import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +28,7 @@ import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { SONGS } from '@/data/musicData';
 
 export default function Social() {
-  const { user } = useAuth();
+  const { user, audienceProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -95,6 +96,16 @@ export default function Social() {
   useEffect(() => {
     refetchPosts(feedType === 'following' ? 'following' : 'all');
   }, [feedType, refetchPosts]);
+
+  // Claim the right edge while the feed is open. The like/comment/share rail
+  // lives there, and the Mo$ha launcher docks to the same corner, so on a phone
+  // the launcher sat on top of the share button. See .agent-dock in index.css.
+  useEffect(() => {
+    document.body.dataset.feedOpen = 'true';
+    return () => {
+      delete document.body.dataset.feedOpen;
+    };
+  }, []);
 
   useEffect(() => {
     if (shareSongId) setShowComposer(true);
@@ -234,11 +245,43 @@ export default function Social() {
     setLoadingComments(false);
   };
 
+  /**
+   * Post a comment and show it immediately.
+   *
+   * This used to await the insert and then await a full refetch before
+   * anything appeared, while the input had already cleared. Two round trips of
+   * nothing on screen reads as "my comment vanished", and the database agrees:
+   * one comment across eighty-eight posts. Liking and following were already
+   * optimistic; this was the one interaction that still made you wait.
+   *
+   * The comment goes up instantly against the real profile, then the refetch
+   * reconciles it. If the write fails, it is pulled back out and said so.
+   */
   const handleAddComment = async (content: string) => {
-    if (!commentSheet.postId) return;
-    await addComment(commentSheet.postId, content);
-    const comments = await getPostComments(commentSheet.postId);
-    setCurrentComments(comments);
+    if (!commentSheet.postId || !user) return;
+    const postId = commentSheet.postId;
+    const tempId = `pending-${Date.now()}`;
+
+    const pending: PostComment = {
+      id: tempId,
+      user_id: user.id,
+      post_id: postId,
+      content,
+      created_at: new Date().toISOString(),
+      profile: audienceProfile ?? undefined,
+      likes_count: 0,
+      is_liked: false,
+    };
+    setCurrentComments((prev) => [...prev, pending]);
+
+    try {
+      await addComment(postId, content);
+      const comments = await getPostComments(postId);
+      setCurrentComments(comments);
+    } catch {
+      setCurrentComments((prev) => prev.filter((c) => c.id !== tempId));
+      toast({ title: 'Your comment did not send', variant: 'destructive' });
+    }
   };
 
   const closeComposer = useCallback(() => {
@@ -441,7 +484,7 @@ export default function Social() {
 
             {/* Room banner */}
             {playerState?.isRoomMode && playerState.currentSong && (
-              <div className="mt-3 rounded-2xl border border-primary/30 bg-black/50 backdrop-blur-md px-3 py-2 flex items-center gap-3">
+              <div className="mt-3 rounded-2xl border border-border bg-black/50 backdrop-blur-md px-3 py-2 flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
                   {playerState.currentSong.coverImage && (
                     <img
@@ -467,9 +510,14 @@ export default function Social() {
         </div>
       </div>
 
-      {/* ── Floating create button ── */}
+      {/* ── Floating create button ──
+          Under the header rather than in a bottom corner. The right corner is
+          the action rail and the left one is the caption, which grows with the
+          post, so anything measured up from the bottom eventually lands on one
+          of them. The band under the header is empty at every screen size. */}
       <motion.button
-        className="absolute right-4 bottom-24 w-12 h-12 rounded-full bg-primary text-white shadow-xl flex items-center justify-center z-30"
+        aria-label="Create a post"
+        className="absolute right-4 top-24 md:top-auto md:bottom-24 w-12 h-12 rounded-full bg-primary text-white shadow-xl flex items-center justify-center z-30"
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.93 }}
         onClick={() => setShowComposer(true)}
@@ -499,8 +547,8 @@ export default function Social() {
                 <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
               </div>
               <PostComposer
-                onPost={async (content, type, songId) => {
-                  const ok = await createPost(content, type, songId);
+                onPost={async (content, type, songId, extras) => {
+                  const ok = await createPost(content, type, songId, undefined, extras);
                   if (ok !== false) closeComposer();
                 }}
                 initialType={shareSongId ? 'song_share' : 'text'}

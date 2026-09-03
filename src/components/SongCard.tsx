@@ -197,7 +197,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             isCurrentSong
               ? artworkColor
                 ? "glass-card border-[hsl(var(--artwork-glow)/0.3)]"
-                : "glass-card border-primary/30"
+                : "glass-card border-border"
               : "hover:bg-secondary/30"
           )}
           style={artworkGlowStyle}
@@ -381,7 +381,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           {/* Cover art */}
           <div className="relative aspect-[4/3] overflow-hidden">
             {isCurrentSong ? (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-cyan-400/10">
+              <div className="w-full h-full flex items-center justify-center bg-secondary">
                 <SpinningSongArt isPlaying={isPlaying} size="xl" coverImage={song.coverImage} />
               </div>
             ) : song.coverImage ? (
@@ -392,7 +392,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 className="w-full h-full object-contain"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/30 via-secondary to-cyan-400/20 flex items-center justify-center">
+              <div className="w-full h-full bg-secondary flex items-center justify-center">
                 <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
               </div>
             )}
@@ -559,7 +559,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               onClick={(e) => e.stopPropagation()}
               className="inline-flex"
             >
-              <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 text-primary text-[10px] px-2 py-0.5 font-medium">
+              <span className="inline-flex items-center rounded-full border border-border bg-primary/10 text-primary text-[10px] px-2 py-0.5 font-medium">
                 On-chain
               </span>
             </Link>
@@ -606,7 +606,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.96 }}
               onClick={handleShareToFeed}
-              className="px-2 py-1 rounded-full text-[11px] font-medium text-foreground border border-primary/40 bg-primary/5"
+              className="px-2 py-1 rounded-full text-[11px] font-medium text-foreground border border-border bg-primary/5"
             >
               Share to feed
             </motion.button>

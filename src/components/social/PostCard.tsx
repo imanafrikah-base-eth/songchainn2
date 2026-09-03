@@ -1,6 +1,6 @@
 import { useState, type SyntheticEvent } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check, CheckCircle2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check, CheckCircle2, Flag, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,6 +20,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useShare } from '@/hooks/useShare';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useUserPresence } from '@/hooks/useUserPresence';
+import { ReportDialog } from '@/components/ReportDialog';
+import { OfficialBadge } from '@/components/OfficialBadge';
 
 interface PostCardProps {
   post: SocialPostWithProfile;
@@ -29,6 +31,8 @@ interface PostCardProps {
   isFollowing: boolean;
   onGetComments: (postId: string) => Promise<PostComment[]>;
   onAddComment: (postId: string, content: string) => void;
+  /** Optional so existing callers keep working; without it the option hides. */
+  onUntagSelf?: (postId: string) => Promise<boolean> | void;
 }
 
 export function PostCard({ 
@@ -38,7 +42,8 @@ export function PostCard({
   onFollow, 
   isFollowing,
   onGetComments,
-  onAddComment
+  onAddComment,
+  onUntagSelf
 }: PostCardProps) {
   const { user } = useAuth();
   const { playSong } = usePlayer();
@@ -49,6 +54,7 @@ export function PostCard({
   const [comments, setComments] = useState<PostComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const { isOnline } = useUserPresence(post.user_id, { includeLastSeen: false, includeNowPlayingFallback: false });
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
@@ -60,6 +66,9 @@ export function PostCard({
   const isVerifiedArtist = !!post.artist_is_verified;
   const isFollowingArtist = post.artist_id ? isArtistLiked(post.artist_id) : false;
   const isOwnPost = user?.id === post.user_id;
+  const isTaggedHere = !!user?.id && (post.tagged ?? []).some((t) => t.user_id === user.id);
+  // Set by hand in the database on one row only. Never self-declared.
+  const isOfficial = Boolean((post.profile as { is_official?: boolean } | null)?.is_official);
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
     if (target.dataset.fallbackApplied === 'true') return;
@@ -145,7 +154,14 @@ export function PostCard({
                 <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-muted'}`} />
                 {displayName}
               </button>
-              {isArtistPost && isVerifiedArtist && <VerifiedBadge size={17} tone="gold" />}
+              {/* The official mark wins over the artist tick. An account can be
+                  both, but "this is SONGCHAINN" is the more important claim and
+                  showing two badges reads as noise. */}
+              {isOfficial ? (
+                <OfficialBadge size={17} />
+              ) : (
+                isArtistPost && isVerifiedArtist && <VerifiedBadge size={17} />
+              )}
               {!isOwnPost && (
                 isArtistPost ? (
                   <Button
@@ -177,22 +193,52 @@ export function PostCard({
           </div>
         </div>
 
-        {isOwnPost && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+        {/* The menu used to render only on your OWN post, which is the one post
+            nobody needs to report. Everyone else's had no menu at all, so the
+            Terms promised a way to report something that could not be reached
+            from anywhere in the app. Delete stays yours alone; report is for
+            everyone else's. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {isOwnPost ? (
               <DropdownMenuItem onClick={() => onDelete(post.id)} className="text-destructive">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Post
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+            ) : (
+              <>
+                {/* Being tagged is not consent to stay tagged. TagPeople has
+                    always told people they could take their own name off; until
+                    now there was no way to actually do it. */}
+                {isTaggedHere && onUntagSelf && (
+                  <DropdownMenuItem onClick={() => void onUntagSelf(post.id)}>
+                    <UserMinus className="w-4 h-4 mr-2" />
+                    Take my name off this
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => setReporting(true)}>
+                  <Flag className="w-4 h-4 mr-2" />
+                  Report this post
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      {reporting && (
+        <ReportDialog
+          targetType="post"
+          targetId={post.id}
+          targetUser={post.user_id}
+          onClose={() => setReporting(false)}
+        />
+      )}
 
       {/* Content */}
       {post.content && (

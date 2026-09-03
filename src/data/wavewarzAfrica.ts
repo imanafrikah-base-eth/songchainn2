@@ -1,11 +1,11 @@
-import heroBackgroundImage from '@/assets/WaveWarz Africa HEADER HERO MOCKUP.png';
-import heroLogoTransparent from '@/assets/WaveWarz Africa music logo transparent.png';
-const heroLogoWithBackground = '/wavewarz-africa-background.png';
-import onboardingHeroImage from '@/assets/WaveWarz Africa New Page Mock up.png';
-import imanAfrikahImage from '@/assets/IMan Afrikah/IMan Afrikah (1).png';
-import ndaImage from '@/assets/NDA/NDA (1).png';
-import purposeImage from '@/assets/PRP/PRP.png';
-import santanaImage from '@/assets/Santana/Santana (1).png';
+import heroBackgroundImage from '@/assets/WaveWarz Africa HEADER HERO MOCKUP.webp';
+import heroLogoTransparent from '@/assets/WaveWarz Africa music logo transparent.webp';
+const heroLogoWithBackground = '/wavewarz-africa-background.webp';
+import onboardingHeroImage from '@/assets/WaveWarz Africa New Page Mock up.webp';
+import imanAfrikahImage from '@/assets/IMan Afrikah/IMan Afrikah (1).webp';
+import ndaImage from '@/assets/NDA/NDA (1).webp';
+import purposeImage from '@/assets/PRP/PRP.webp';
+import santanaImage from '@/assets/Santana/Santana (1).webp';
 
 export const WAVEWARZ_AFRICA_LINKS = {
   enterBattlez: '/wavewarz-africa',

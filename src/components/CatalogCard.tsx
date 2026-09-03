@@ -31,7 +31,7 @@ export function CatalogCard({ catalog, isNew, className }: CatalogCardProps) {
               loading="lazy"
             />
           ) : (
-            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-cyan-400/10">
+            <div className="h-full w-full flex items-center justify-center bg-secondary">
               <Music className="w-10 h-10 text-primary/70" />
             </div>
           )}

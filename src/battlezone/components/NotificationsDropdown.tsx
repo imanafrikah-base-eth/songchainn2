@@ -3,6 +3,11 @@ import { Bell, Zap, Users, Trophy, Music, MessageCircle, X } from "lucide-react"
 import { supabase } from "@/battlezone/integrations/supabase/client";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
 
+/* A counter, not a clock: two mounts in the same millisecond would share a
+   channel name and therefore share one channel object. */
+let channelSeq = 0;
+const nextChannelId = () => ++channelSeq;
+
 interface NotificationRow {
   id: string;
   type: string | null;
@@ -76,7 +81,7 @@ const NotificationsDropdown = () => {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`battlezone-notifications-${user.id}-${Date.now()}`)
+      .channel(`battlezone-notifications-${user.id}-${nextChannelId()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },

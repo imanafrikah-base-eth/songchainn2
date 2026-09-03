@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Mic, MicOff, Hand, Send, Play, Pause, SkipForward,
-  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile, Music, X, Radio,
+  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile, Music, X, Radio, Heart,
+  Feather, Music2, Flame, Hourglass, type LucideIcon,
 } from "lucide-react";
 import { VOICE_ENABLED } from "@/battlezone/config";
 import LiveBadge from "@/battlezone/components/LiveBadge";
@@ -19,10 +20,22 @@ import { Room, RoomEvent } from "livekit-client";
 import { getLiveKitToken } from "@/battlezone/lib/livekit";
 import MicControls from "@/battlezone/components/MicControls";
 import SpeakerManagement from "@/battlezone/components/SpeakerManagement";
-import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
 import { useHostAudio } from "@/battlezone/hooks/useHostAudio";
 import { SONGS } from "@/data/musicData";
-import { HIKULU_USER_ID, HIKULU_NAME, mentionsHikulu, pingHikuluChat, requestHikuluVerdict } from "@/battlezone/lib/hikulu";
+import {
+  JUDGE_BY_USER_ID, judgesMentioned, pingJudgeChat, requestHikuluVerdict,
+  type JudgeKey,
+} from "@/battlezone/lib/hikulu";
+import { battleChatScope } from "@/battlezone/lib/roomScope";
+import BattleStage from "@/battlezone/components/BattleStage";
+import { BattleCountdown } from "@/battlezone/components/BattleCountdown";
+import { STAGES } from "@/battlezone/lib/battleStages";
+
+/* A counter, not a clock: two mounts in the same millisecond would share a
+   channel name and therefore share one channel object. */
+let channelSeq = 0;
+const nextChannelId = () => ++channelSeq;
 
 interface ChatMessage {
   id: string;
@@ -30,8 +43,19 @@ interface ChatMessage {
   text: string;
   timestamp: Date;
   type: "message" | "system" | "reaction";
-  isHikulu?: boolean;
+  judge?: JudgeKey;
 }
+
+/* Bubble styling per AI judge: the resident couple plus the Council of Elders. */
+const JUDGE_STYLES: Record<JudgeKey, { box: string; name: string; icon: LucideIcon }> = {
+  hikulu: { box: "border-amber-400/40 bg-amber-400/10", name: "text-amber-400", icon: Crown },
+  nakulu: { box: "border-rose-400/40 bg-rose-400/10", name: "text-rose-400", icon: Heart },
+  ngoma: { box: "border-emerald-400/40 bg-emerald-400/10", name: "text-emerald-400", icon: Music },
+  jeli: { box: "border-sky-400/40 bg-sky-400/10", name: "text-sky-400", icon: Feather },
+  kalimba: { box: "border-purple-400/40 bg-purple-400/10", name: "text-purple-400", icon: Music2 },
+  imbokodo: { box: "border-orange-400/40 bg-orange-400/10", name: "text-orange-400", icon: Flame },
+  mzee: { box: "border-cyan-400/40 bg-cyan-400/10", name: "text-cyan-400", icon: Hourglass },
+};
 
 // RoomParticipant interface is now imported from useBattleRoles hook
 type SidebarTab = "audience" | "requests" | "chat";
@@ -49,13 +73,13 @@ const LiveRoom = () => {
   const [votedFor, setVotedFor] = useState<"A" | "B" | null>(null);
   const [localVotesA, setLocalVotesA] = useState(0);
   const [localVotesB, setLocalVotesB] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const [round, setRound] = useState(1);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("chat");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isVerySmallMobile, setIsVerySmallMobile] = useState(false);
   const [audioConnected, setAudioConnected] = useState(false);
   const [showSongPicker, setShowSongPicker] = useState(false);
+  const [clockClosed, setClockClosed] = useState(false);
   const liveKitRoomRef = useRef<Room | null>(null);
 
   const hostAudio = useHostAudio();
@@ -133,6 +157,39 @@ const LiveRoom = () => {
   const totalVotes = localVotesA + localVotesB;
   const pctA = totalVotes ? Math.round((localVotesA / totalVotes) * 100) : 50;
 
+  // Server-owned gates. battle is re-polled every 5s, so when the host ends the
+  // battle or closes voting the whole room reacts, not just the host's screen.
+  const battleEnded = battle?.status === "ended";
+  const votingOpen = battle?.votingOpen !== false;
+  const canVote = !!battle && !battleEnded && votingOpen && !clockClosed;
+
+  /* The clock is a real gate, not a decoration, so it is re-read from the row
+     every time the battle refetches. Somebody who opens the room after it has
+     already run out sees it closed immediately rather than after their first
+     tick. */
+  useEffect(() => {
+    const closesAt = battle?.closesAt ? Date.parse(battle.closesAt) : NaN;
+    setClockClosed(Number.isFinite(closesAt) && Date.now() >= closesAt);
+  }, [battle?.closesAt, battle?.id]);
+
+  /* When the clock runs out the host's screen is the one that writes it down,
+     so the closure survives a refresh and reaches everyone through the row
+     rather than living only in each viewer's timer. Anyone else's screen
+     already refuses the vote locally.
+     votingOpen is a dependency on purpose: advancing a round reopens the poll,
+     and after the clock has run out that has to be closed again rather than
+     leaving a row that says open while every screen refuses to vote. */
+  useEffect(() => {
+    if (!clockClosed || !roomId || battleEnded) return;
+    if (myRole !== "host" || !votingOpen) return;
+    /* Awaited, not fired and forgotten. A Supabase query builder is lazy: it
+       only sends the request when something calls then on it, so "void query"
+       builds a request that never leaves the browser. */
+    void (async () => {
+      await supabase.from("battles").update({ voting_open: false }).eq("id", roomId);
+    })();
+  }, [clockClosed, roomId, battleEnded, myRole, votingOpen]);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
@@ -152,7 +209,7 @@ const LiveRoom = () => {
       const { data } = await supabase
         .from("room_messages")
         .select("id, message, user_id, created_at")
-        .eq("room_name", roomId)
+        .eq("room_id", battleChatScope(roomId))
         .order("created_at", { ascending: true })
         .limit(200);
 
@@ -161,27 +218,29 @@ const LiveRoom = () => {
       const currentProfile = profileRef.current;
       const currentUser = userRef.current;
       const names = new Map(currentParticipants.map((p) => [p.user_id, p.display_name || "Listener"]));
-      const nextMessages: ChatMessage[] = data.map((msg: RoomMessageRow) => ({
-        id: msg.id,
-        userName:
-          msg.user_id === HIKULU_USER_ID
-            ? HIKULU_NAME
-            : names.get(msg.user_id) ||
-              (msg.user_id === currentUser?.id ? currentProfile?.display_name || currentProfile?.username || "You" : "Listener"),
-        text: msg.message,
-        timestamp: new Date(msg.created_at),
-        type: "message",
-        isHikulu: msg.user_id === HIKULU_USER_ID,
-      }));
+      const nextMessages: ChatMessage[] = data.map((msg: RoomMessageRow) => {
+        const aiJudge = JUDGE_BY_USER_ID.get(msg.user_id);
+        return {
+          id: msg.id,
+          userName:
+            aiJudge?.name ||
+            names.get(msg.user_id) ||
+            (msg.user_id === currentUser?.id ? currentProfile?.display_name || currentProfile?.username || "You" : "Listener"),
+          text: msg.message,
+          timestamp: new Date(msg.created_at),
+          type: "message" as const,
+          judge: aiJudge?.key,
+        };
+      });
       setChatMessages(nextMessages);
     };
 
     void fetchMessages();
     const chatChannel = supabase
-      .channel(`battle-room-chat-${roomId}-${Date.now()}`)
+      .channel(`battle-room-chat-${roomId}-${nextChannelId()}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "room_messages", filter: `room_name=eq.${roomId}` },
+        { event: "*", schema: "public", table: "room_messages", filter: `room_id=eq.${battleChatScope(roomId)}` },
         () => void fetchMessages(),
       )
       .subscribe();
@@ -199,7 +258,8 @@ const LiveRoom = () => {
     setShowEmojiPicker(false);
 
     const { error } = await supabase.from("room_messages").insert({
-      room_name: roomId,
+      room_id: battleChatScope(roomId),
+      room_name: profile?.display_name || profile?.username || "Listener",
       user_id: user.id,
       message: messageText,
     });
@@ -209,9 +269,10 @@ const LiveRoom = () => {
       return;
     }
 
-    // Summon the AI judge when he is addressed.
-    if (mentionsHikulu(messageText)) {
-      pingHikuluChat(roomId, messageText, profile?.display_name || profile?.username || undefined);
+    // Summon every judge addressed by name: the couple or any Council elder.
+    const senderName = profile?.display_name || profile?.username || undefined;
+    for (const judgeKey of judgesMentioned(messageText)) {
+      pingJudgeChat(roomId, messageText, judgeKey, senderName);
     }
   };
 
@@ -235,17 +296,29 @@ const LiveRoom = () => {
     if (!roomId || !battle) return;
     const newRound = Math.min(round + 1, battle.totalRounds);
     setRound(newRound);
-    await supabase.from("battles").update({ round: newRound }).eq("id", roomId);
+    // A new round always reopens voting, otherwise the host has to remember to
+    // undo a close they made at the end of the previous round.
+    await supabase.from("battles").update({ round: newRound, voting_open: true }).eq("id", roomId);
   };
 
   const endBattle = async () => {
     if (!roomId) return;
     await supabase
       .from("battles")
-      .update({ status: "ended", ended_time: new Date().toISOString() })
+      .update({ status: "ended", voting_open: false, ended_time: new Date().toISOString() })
       .eq("id", roomId);
     void requestHikuluVerdict(roomId);
-    navigate("/wavewarz-africa");
+    navigate(embedTo(`/battle/${roomId}`));
+  };
+
+  const setVotingOpen = async (open: boolean) => {
+    if (!roomId) return;
+    const { error } = await supabase.from("battles").update({ voting_open: open }).eq("id", roomId);
+    if (error) {
+      toast({ title: "Could not change voting", description: "Please try again." });
+      return;
+    }
+    toast({ title: open ? "Voting is open" : "Voting is closed" });
   };
 
   const addEmoji = (emoji: string) => {
@@ -256,6 +329,13 @@ const LiveRoom = () => {
   // upserted so tapping the other artist switches the vote.
   const vote = async (side: "A" | "B") => {
     if (!user || !roomId || votedFor === side) return;
+    if (!canVote) {
+      toast({
+        title: battleEnded ? "This battle has ended" : "Voting is closed",
+        description: battleEnded ? "See the final score on the battle page." : "The host will reopen it for the next round.",
+      });
+      return;
+    }
     const previous = votedFor;
     setVotedFor(side);
     if (side === "A") {
@@ -527,7 +607,7 @@ const LiveRoom = () => {
           {switchableBattles.map((live) => (
             <button
               key={live.id}
-              onClick={() => navigate(embedTo(`/entry/${live.id}`))}
+              onClick={() => navigate(embedTo(`/room/${live.id}`))}
               className={`rounded-lg border border-border bg-background font-medium text-foreground hover:border-primary/40 hover:text-primary ${isVerySmallMobile ? "max-w-[140px] px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs"}`}
             >
               <span className="block truncate">{live.title}</span>
@@ -577,11 +657,23 @@ const LiveRoom = () => {
             </div>
           )}
 
+          {/* The songs play here, in the room, while the battle is live. */}
+          <BattleStage
+            battleId={roomId || ""}
+            round={round}
+            songsA={battle.songsA}
+            songsB={battle.songsB}
+            artistAName={battle.artistA.name}
+            artistBName={battle.artistB.name}
+            isHost={iAmHostOrCoHost}
+            compact={isVerySmallMobile}
+          />
+
           {/* Battle Panel */}
           <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-display text-muted-foreground">Round {round} of {battle.totalRounds}</span>
-              <span className="text-xs text-primary flex items-center gap-1"><Play className="h-3 w-3" /> Now Playing</span>
+              <span className="text-xs text-muted-foreground">{battle.battleType === "community" ? "Community battle" : "Quick battle"}</span>
             </div>
 
             <div className={`${isVerySmallMobile ? "space-y-3" : "grid grid-cols-3 gap-4 items-center"} mb-6`}>
@@ -630,11 +722,49 @@ const LiveRoom = () => {
 
             {/* Voting Panel */}
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-foreground text-center">Cast Your Vote</h3>
-              <div className={`flex ${isVerySmallMobile ? "flex-col" : "gap-3"}`}>
+              <h3 className="text-sm font-bold text-foreground text-center">
+                {battleEnded ? "Final Score" : canVote ? "Cast Your Vote" : "Voting Is Closed"}
+              </h3>
+
+              {!battleEnded && battle.closesAt && (
+                <BattleCountdown
+                  musicEndsAt={battle.musicEndsAt ?? null}
+                  closesAt={battle.closesAt}
+                  onClosed={() => setClockClosed(true)}
+                />
+              )}
+
+              {battle.stage === "open_mic" && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Open Mic. The judges and the poll decide it for real, and nothing here is
+                  worth money.
+                </p>
+              )}
+
+              {!canVote && (
+                <div className="text-center space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {battleEnded
+                      ? "This battle has ended. The judges' verdict and the final score are on the battle page."
+                      : clockClosed
+                        ? "Time is up. The poll is closed and the verdict is next."
+                        : "The host has paused voting. It reopens when the next round starts."}
+                  </p>
+                  {battleEnded && (
+                    <button
+                      onClick={() => navigate(embedTo(`/battle/${roomId}`))}
+                      className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      See the result
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className={`flex ${isVerySmallMobile ? "flex-col" : "gap-3"} ${canVote ? "" : "opacity-60"}`}>
                 <button
                   onClick={() => vote("A")}
-                  className={`flex-1 rounded-2xl ${isVerySmallMobile ? "py-3 text-sm" : "py-4 text-base sm:text-lg"} font-bold transition-all duration-300 ${
+                  disabled={!canVote}
+                  className={`flex-1 rounded-2xl ${isVerySmallMobile ? "py-3 text-sm" : "py-4 text-base sm:text-lg"} font-bold transition-all duration-300 disabled:cursor-not-allowed ${
                     votedFor === "A"
                       ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-[0_0_25px_hsl(var(--neon-green)/0.4)]"
                       : "bg-primary/10 border-2 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50"
@@ -644,7 +774,8 @@ const LiveRoom = () => {
                 </button>
                 <button
                   onClick={() => vote("B")}
-                  className={`flex-1 rounded-2xl ${isVerySmallMobile ? "mt-2 py-3 text-sm" : "py-4 text-base sm:text-lg"} font-bold transition-all duration-300 ${
+                  disabled={!canVote}
+                  className={`flex-1 rounded-2xl ${isVerySmallMobile ? "mt-2 py-3 text-sm" : "py-4 text-base sm:text-lg"} font-bold transition-all duration-300 disabled:cursor-not-allowed ${
                     votedFor === "B"
                       ? "bg-gradient-to-br from-secondary to-secondary/80 text-secondary-foreground shadow-[0_0_25px_hsl(var(--cyan)/0.4)]"
                       : "bg-secondary/10 border-2 border-secondary/30 text-secondary hover:bg-secondary/20 hover:border-secondary/50"
@@ -656,7 +787,8 @@ const LiveRoom = () => {
 
               {votedFor && (
                 <p className="text-center text-sm text-primary">
-                  You voted for {votedFor === "A" ? battle.artistA.name : battle.artistB.name}. Tap the other artist to change your vote before the round ends.
+                  You voted for {votedFor === "A" ? battle.artistA.name : battle.artistB.name}.
+                  {canVote ? " Tap the other artist to change your vote before the round ends." : ""}
                 </p>
               )}
 
@@ -698,8 +830,13 @@ const LiveRoom = () => {
           {myRole === "host" && (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => setIsPaused(!isPaused)} className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2">
-                  {isPaused ? <><Play className="h-4 w-4" /> Resume</> : <><Pause className="h-4 w-4" /> Pause Round</>}
+                <button
+                  onClick={() => void setVotingOpen(!votingOpen)}
+                  disabled={battleEnded || clockClosed}
+                  title={clockClosed ? "The battle clock has run out, so voting cannot reopen." : undefined}
+                  className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {votingOpen ? <><Pause className="h-4 w-4" /> Close Voting</> : <><Play className="h-4 w-4" /> Open Voting</>}
                 </button>
                 <button onClick={advanceRound} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
                   <SkipForward className="h-4 w-4" /> Next Round
@@ -908,16 +1045,21 @@ const LiveRoom = () => {
                   )}
                   {chatMessages.map((msg) => (
                     <div key={msg.id} className={`text-sm ${msg.type === "system" ? "text-center text-xs text-muted-foreground italic" : ""}`}>
-                      {msg.type === "message" && msg.isHikulu && (
-                        <div className="rounded-lg border border-neon-gold/40 bg-neon-gold/10 px-2.5 py-1.5">
-                          <span className="font-semibold text-neon-gold flex items-center gap-1">
-                            <Crown className="h-3 w-3" /> {msg.userName}
-                            <span className="text-[10px] font-normal text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
-                          </span>
-                          <p className="text-foreground">{msg.text}</p>
-                        </div>
-                      )}
-                      {msg.type === "message" && !msg.isHikulu && (
+                      {msg.type === "message" && msg.judge && (() => {
+                        const style = JUDGE_STYLES[msg.judge];
+                        const JudgeIcon = style.icon;
+                        return (
+                          <div className={`rounded-lg border px-2.5 py-1.5 ${style.box}`}>
+                            <span className={`font-semibold flex items-center gap-1 ${style.name}`}>
+                              <JudgeIcon className="h-3 w-3" /> {msg.userName}
+                              <span className="rounded border border-current/40 px-1 text-[9px] font-semibold uppercase tracking-wide opacity-80" title="An AI judge. This message was generated automatically.">AI</span>
+                              <span className="text-[10px] font-normal text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
+                            </span>
+                            <p className="text-foreground">{msg.text}</p>
+                          </div>
+                        );
+                      })()}
+                      {msg.type === "message" && !msg.judge && (
                         <>
                           <span className={`font-semibold ${msg.userName === (profile?.display_name || profile?.username || "You") ? "text-primary" : "text-foreground"}`}>{msg.userName}</span>
                           <span className="text-[10px] text-muted-foreground/50 ml-1">{formatTime(msg.timestamp)}</span>

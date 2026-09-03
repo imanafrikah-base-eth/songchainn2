@@ -9,7 +9,7 @@ import { TierBadge, OgBadge } from '@/components/TierBadge';
 export function EngagementPanel() {
   const { engagementPoints, currentStreak, totalPlays, likedSongs, getPointsBreakdown } = useEngagement();
   const { user } = useAuth();
-  const { lifetimePoints, tier, isOg } = useUserPoints();
+  const { lifetimePoints, tier, isOg, streak } = useUserPoints();
   const breakdown = getPointsBreakdown();
   // Signed-in users see the authoritative server balance; signed-out fall back
   // to the local estimate until they create an account and it is imported.
@@ -46,7 +46,7 @@ export function EngagementPanel() {
           <div className="w-8 h-8 sm:w-10 sm:h-10 mx-auto rounded-full bg-orange-500/10 flex items-center justify-center mb-1.5 sm:mb-2">
             <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
           </div>
-          <p className="text-base sm:text-lg font-semibold text-foreground">{currentStreak}</p>
+          <p className="text-base sm:text-lg font-semibold text-foreground">{user ? streak : currentStreak}</p>
           <p className="text-[10px] sm:text-xs text-muted-foreground">Day Streak</p>
         </div>
         <div className="text-center">
@@ -85,11 +85,11 @@ export function EngagementPanel() {
       {/* Leaderboard link + what points are for */}
       <Link
         to="/leaderboard"
-        className="mt-4 sm:mt-6 flex items-center justify-center gap-2 rounded-lg sm:rounded-xl bg-primary/10 border border-primary/20 py-2.5 text-xs sm:text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
+        className="mt-4 sm:mt-6 flex items-center justify-center gap-2 rounded-lg sm:rounded-xl bg-primary/10 border border-border py-2.5 text-xs sm:text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
       >
         <Trophy className="w-4 h-4" /> View Top Fans
       </Link>
-      <div className="mt-3 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-primary/5 border border-primary/10">
+      <div className="mt-3 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-primary/5 border border-border">
         <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
           Points come from real listening, so they cannot be faked. Top fans get first look at new song coins and battle rewards. Keep listening.
         </p>

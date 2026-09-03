@@ -324,7 +324,7 @@ export default function PlaylistDetail() {
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="flex items-center gap-3 text-muted-foreground">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span>Loading playlistâ€¦</span>
+          <span>Loading playlist...</span>
         </div>
       </div>
     );
@@ -370,7 +370,7 @@ export default function PlaylistDetail() {
               {(playlist.mood || playlist.vibe) && (
                 <div className="flex flex-wrap items-center gap-2 mb-5">
                   {playlist.mood && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 border border-border text-xs font-medium text-primary">
                       Mood: {playlist.mood}
                     </span>
                   )}
@@ -383,7 +383,7 @@ export default function PlaylistDetail() {
               )}
 
               <div className="flex items-center gap-4 mb-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-sm font-medium">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-border text-sm font-medium">
                   {playlist.is_public ? (
                     <>
                       <Globe className="w-4 h-4" />
@@ -469,7 +469,7 @@ export default function PlaylistDetail() {
                     ) : isSaving ? (
                       <>
                         <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        Savingâ€¦
+                        Saving...
                       </>
                     ) : (
                       <>
@@ -517,7 +517,7 @@ export default function PlaylistDetail() {
           {isLoading ? (
             <div className="flex items-center gap-3 text-muted-foreground">
               <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span>Loading tracksâ€¦</span>
+              <span>Loading tracks...</span>
             </div>
           ) : songs.length === 0 ? (
             <div className="border border-dashed border-border rounded-xl p-6 text-center">
@@ -662,7 +662,7 @@ export default function PlaylistDetail() {
                       placeholder="Search by username or name"
                     />
                     {isSearchingCollaborators && (
-                      <p className="text-xs text-muted-foreground">Searchingâ€¦</p>
+                      <p className="text-xs text-muted-foreground">Searching...</p>
                     )}
                     {collaboratorResults.length > 0 && (
                       <div className="space-y-1 max-h-40 overflow-y-auto">

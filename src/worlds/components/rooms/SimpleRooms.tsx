@@ -102,8 +102,8 @@ export function StageRoom({ world }: { world: WorldConfig }) {
     <div className="space-y-4">
       <RoomNote icon={<Radio className="h-5 w-5 text-red-300" />} title="No live moment right now">
         <p>
-          Listening parties, premiere nights and Q&A sessions run on this stage. When one is live, this
-          door lights up across the whole world and every holder can walk in. The Council gets front row.
+          Listening parties, premiere nights and Q&A sessions will run on this stage, announced ahead
+          of time so every holder can be here for them. The Council gets front row.
         </p>
         <p>The first Stage event is being scheduled. Follow {world.artistName} to catch the announcement.</p>
       </RoomNote>

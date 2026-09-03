@@ -1,3 +1,5 @@
+import { getAddress } from "viem";
+
 export const BASE_CHAIN_ID = 8453;
 export const BASE_CHAIN_ID_HEX = "0x2105";
 
@@ -103,6 +105,24 @@ export function getWalletProvider(): EIP1193Provider | null {
   return discoveredWallets[0]?.provider ?? null;
 }
 
+/**
+ * EIP-55 checksum an address.
+ *
+ * SIWE (EIP-4361) requires the address line to be checksummed, and strict
+ * wallets enforce it. Phantom parses the message, compares the address line
+ * against its own account, and refuses to even display the request when the
+ * casing does not match, with "the address does not match the provided
+ * address for verification". Wallets return accounts in mixed casing, so
+ * normalise before the address goes anywhere near a message or a signature.
+ */
+export function toChecksumAddress(address: string): string {
+  try {
+    return getAddress(address as `0x${string}`);
+  } catch {
+    return address;
+  }
+}
+
 export function generateNonce(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
@@ -171,7 +191,7 @@ export async function connectWallet(walletRdns?: string): Promise<ConnectResult>
       };
     }
 
-    const address = accounts[0];
+    const address = toChecksumAddress(accounts[0]);
 
     // Switch to Base chain
     await switchToBaseChain(provider);

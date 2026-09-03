@@ -630,9 +630,12 @@ export default function Room() {
       }
 
       const cutoffIso = new Date(Date.now() - ROOM_TTL_MS).toISOString();
+      // room_id is the scope. Without it this query also pulled every WaveWarz
+      // battle room's chat into here, showing a battle UUID as the speaker.
       const messagesRes = await (supabase as any)
         .from('room_messages')
         .select('*')
+        .eq('room_id', ROOM_ID)
         .gte('created_at', cutoffIso)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -899,6 +902,7 @@ export default function Room() {
     const messagesRes = await (supabase as any)
       .from('room_messages')
       .select('*')
+      .eq('room_id', ROOM_ID)
       .gte('created_at', cutoffIso)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -943,7 +947,7 @@ export default function Room() {
 
     const channel = supabase.channel('room-messages-realtime');
 
-    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'room_messages' }, payload => {
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'room_messages', filter: `room_id=eq.${ROOM_ID}` }, payload => {
       const eventType = (payload as any)?.eventType as string | undefined;
       if (eventType === 'INSERT' || eventType === 'UPDATE') {
         const next = coerceRoomMessage((payload as any)?.new);
@@ -1064,11 +1068,11 @@ export default function Room() {
     const normalized = normalizeRoomName(nextName);
     if (normalized.length < 2) return;
 
-    localStorage.setItem(`room_username:${user.id}`, normalized);
-    setRoomName(normalized);
-    setNameDraft(normalized);
-    setIsNamePromptOpen(false);
-
+    // Save first, then close. This used to close the prompt and write the name
+    // to localStorage before the upsert ran, so a rejected name (room_profiles
+    // has a unique index on lower(room_name)) left the prompt shut, the local
+    // name set, and the server unchanged. On the next visit the prompt came
+    // straight back, which read as "I already did this and it did not take".
     setIsSavingName(true);
     const { error } = await (supabase as any)
       .from('room_profiles')
@@ -1080,12 +1084,26 @@ export default function Room() {
     setIsSavingName(false);
     if (error) {
       if (isMissingTableError(error)) {
+        // No table to save to, so the local name is all there is. Take it.
+        localStorage.setItem(`room_username:${user.id}`, normalized);
+        setRoomName(normalized);
+        setNameDraft(normalized);
+        setIsNamePromptOpen(false);
         setChatBackend('local');
         return;
       }
-      toast.error('Could not save Room name', { description: error.message });
+      const taken = /duplicate key|unique/i.test(error.message || '');
+      toast.error(
+        taken ? 'That name is already taken in the Room' : 'Could not save Room name',
+        { description: taken ? 'Pick another one and try again.' : error.message },
+      );
       return;
     }
+
+    localStorage.setItem(`room_username:${user.id}`, normalized);
+    setRoomName(normalized);
+    setNameDraft(normalized);
+    setIsNamePromptOpen(false);
   }, [user]);
 
   const saveRoomName = useCallback(async () => {
@@ -1159,7 +1177,7 @@ export default function Room() {
     );
 
     if (insertRes?.error) {
-      toast.error('Failed to send mentions', { description: insertRes.error.message });
+      toast.error('Could not send those mentions', { description: 'Your message went out, the mentions did not.' });
     }
   }, [chatBackend, roomName, user]);
 
@@ -1224,6 +1242,7 @@ export default function Room() {
     if (res?.error && isMissingColumnError(res.error)) {
       const minimalPayload: any = {
         id: isUuid(optimisticId) ? optimisticId : undefined,
+        room_id: ROOM_ID,
         user_id: sessionUser.id,
         room_name: roomName,
         message: cleaned.slice(0, 280),
@@ -1280,11 +1299,24 @@ export default function Room() {
   }, [sendMessage]);
 
   const handleRetryAutoplay = useCallback(() => {
-    if (playlist.length === 0) return;
+    if (playlist.length === 0) {
+      toast.error('The Room playlist is empty right now');
+      return;
+    }
     const nowSeconds = Date.now() / 1000;
     const startIndex = Math.floor(nowSeconds / ROOM_SEGMENT_SECONDS) % playlist.length;
     const startTime = nowSeconds % ROOM_SEGMENT_SECONDS;
-    void enterRoomMode(playlist, { startIndex, startTime }).then(ok => setAutoplayBlocked(!ok));
+    // Called straight from the tap, and enterRoomMode now starts the audio
+    // before it does anything that waits, so the gesture is still valid when
+    // play() runs.
+    void enterRoomMode(playlist, { startIndex, startTime }).then(ok => {
+      setAutoplayBlocked(!ok);
+      if (!ok) {
+        toast.error('Your browser would not start the audio', {
+          description: 'Check that this site is not muted in your browser settings, then tap Start again.',
+        });
+      }
+    });
   }, [enterRoomMode, playlist]);
 
   const handleVolumeChange = useCallback(([v]: number[]) => {
@@ -1776,7 +1808,7 @@ export default function Room() {
                     </div>
                   ))}
                   {upNextSongs.length === 0 ? (
-                    <div className="text-sm text-zinc-400">Queue unavailable.</div>
+                    <div className="text-sm text-zinc-400">Cannot load what is playing next.</div>
                   ) : null}
                 </div>
               </div>

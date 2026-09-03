@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useInterruption } from '@/hooks/useInterruption';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, X, Smartphone, Share, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,12 @@ export function clearDeferredInstallPrompt() {
 type InstallState = 'idle' | 'prompting' | 'installing' | 'complete' | 'error';
 
 export function DownloadAppBanner() {
-  const [isVisible, setIsVisible] = useState(false);
+  const [wantsToShow, setIsVisible] = useState(false);
+  // Promotional. Install prompts are the classic thing that appears one time
+  // too many, so it queues behind the app-wide budget like everything else.
+  const { granted: isVisible } = useInterruption(
+    'install-banner', wantsToShow, { priority: 'promo' }
+  );
   const [isInstalled, setIsInstalled] = useState(false);
   const [installState, setInstallState] = useState<InstallState>('idle');
   const [installProgress, setInstallProgress] = useState(0);

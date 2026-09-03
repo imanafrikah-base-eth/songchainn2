@@ -31,6 +31,24 @@ bun.lockb
 Song Arts/
 *.tsbuildinfo
 
+# Android / Capacitor
+# The android/ project itself IS committed (it holds the manifest, icons and
+# gradle config). Only signing secrets, local paths and build output are not.
+android/keystore.properties
+android/*.keystore
+android/*.jks
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/capacitor-cordova-android-plugins/
+# Copied from dist/ on every `cap sync`, so it is build output not source.
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+*.apk
+*.aab
+
 # Private credentials — never commit this folder
 .private/
 
@@ -51,3 +69,31 @@ playwright-report/
 .mcp.json
 this is me SONGCHAINN.txt
 supabase/.temp/
+.ui-inspect-session.json
+artist-credentials.json
+ARTIST_LOGINS.md
+.artist-session*
+.empty-session.json
+
+# Private handover sheet, never commit
+ARTIST-HANDOVER.md
+
+# Not part of this app, and this repo is PUBLIC.
+# BattleZone/ holds separate products with their own git repos. A blanket
+# `git add -A` used to stage all of them into songchainn2, including a whole
+# other Next.js app with its own admin console and auth routes.
+BattleZone/AUDIO ENGEN/
+BattleZone/africa-battle-live-ui/
+
+# Material sent in by users for debugging. Never publish someone's video.
+vids from users for fixing/
+
+# Working files from the Diyama review, not source.
+e2e/.auth/
+
+# Launcher key must never be committed
+.launcher-key
+scripts/coins/*.key.json
+
+# Database dumps taken for rollback while fixing BattleZone. Real user rows; never public.
+scripts/*backup*.json

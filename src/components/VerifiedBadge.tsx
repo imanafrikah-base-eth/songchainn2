@@ -14,7 +14,11 @@ import { useId } from 'react';
 export type VerifiedBadgeProps = {
   /** Rendered width and height in pixels. */
   size?: number;
-  /** 'gold' for the founding catalog, 'blue' for a claimed page. */
+  /**
+   * 'blue' is the verified artist tick, and the default: it is the mark people
+   * already read as "this is really them" on X and Meta, so it needs no
+   * explaining. 'gold' is kept for founding-catalog treatments.
+   */
   tone?: 'gold' | 'blue';
   className?: string;
   /** Accessible label. Set null to hide it from screen readers entirely. */
@@ -40,7 +44,7 @@ const TONES = {
 
 export function VerifiedBadge({
   size = 20,
-  tone = 'gold',
+  tone = 'blue',
   className,
   title = 'Verified artist',
 }: VerifiedBadgeProps) {

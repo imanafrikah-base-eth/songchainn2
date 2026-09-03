@@ -126,7 +126,7 @@ export default function SongDetail() {
       updateMetaName('twitter:image', imageUrl);
 
       return () => {
-        document.title = '$ongChainn â€” Audience-First Music Streaming';
+        document.title = '$ongChainn. Own the music you love.';
       };
     }
   }, [song, artist]);
@@ -229,7 +229,7 @@ export default function SongDetail() {
                 {song.isTokenGated && (
                   <Link
                     to="/marketplace"
-                    className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 text-primary text-xs px-3 py-1 font-medium"
+                    className="inline-flex items-center rounded-full border border-border bg-primary/10 text-primary text-xs px-3 py-1 font-medium"
                   >
                     On-chain on Marketplace
                   </Link>
@@ -269,7 +269,7 @@ export default function SongDetail() {
               </div>
 
               {/* Genre Badge */}
-              <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+              <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-border mb-6">
                 <span className="text-sm text-primary font-medium">{song.genre}</span>
               </div>
 

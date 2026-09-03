@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              Android App Links for songchainn.xyz.
+
+              This is what brings Supabase magic links and OAuth redirects back
+              into the app instead of stranding the user in Chrome. It only
+              takes effect once /.well-known/assetlinks.json on the domain lists
+              this app's signing certificate SHA-256.
+
+              With Play App Signing that fingerprint is Google's app signing
+              key, which is only visible in Play Console AFTER the first upload,
+              so assetlinks.json has to be published as a follow-up step.
+              Until then these links still open the browser, which is the
+              current behaviour and not a regression.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="songchainn.xyz" />
+                <data android:scheme="https" android:host="www.songchainn.xyz" />
+            </intent-filter>
+
+            <!--
+              Private scheme fallback. Wallet apps and any OAuth provider that
+              cannot use an https redirect can return to xyz.songchainn.app://
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="@string/custom_url_scheme" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+    <!--
+      Permissions are deliberately minimal. Every extra permission is another
+      question on the Play data safety form and another reason for review to
+      stall, so nothing is declared that the app does not actually use.
+
+      Not declared, and why:
+        FOREGROUND_SERVICE / _MEDIA_PLAYBACK — no native media service in v1.0.
+          Playback runs in the WebView with MediaSession, which gives lock
+          screen controls but can be killed under memory pressure. Declaring
+          the permission without a service would be a policy problem.
+        POST_NOTIFICATIONS — no FCM/Firebase in this build, so push is
+          web-only for now.
+        RECORD_AUDIO — LiveKit voice is behind VOICE_ENABLED=false.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+</manifest>

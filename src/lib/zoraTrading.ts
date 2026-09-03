@@ -3,6 +3,28 @@ import { base } from 'viem/chains';
 import { tradeCoin, createQuote } from '@zoralabs/coins-sdk';
 import { getWalletProvider } from './baseWallet';
 
+/*
+ * THE 4% WE CANNOT CURRENTLY CLAIM, and why there is no referrer below.
+ *
+ * Zora's 1% trading fee splits creator 50, platform referrer 20, LP 20,
+ * protocol 5, TRADE REFERRER 4, doppler 1. The trade referrer is set per trade
+ * by whoever routes it, which would be us on every buy and sell in this app.
+ *
+ * `TradeParameters` in coins-sdk 0.7.1 has no referrer field at all. Its only
+ * members are sell, buy, amountIn, slippage, sender, signer, recipient,
+ * signatures and permitActiveSeconds. So this is NOT an omission that can be
+ * fixed by passing one more argument; the installed SDK does not expose it.
+ *
+ * To claim it: upgrade to 0.8.0 or later and check whether TradeParameters
+ * gained the field, or call the underlying router directly with a referrer.
+ * Either is a real change to the path that carries every trade for 231 coins,
+ * so it wants its own testing rather than being slipped in beside other work.
+ *
+ * The 20% platform referrer is a different slice and IS being claimed, on every
+ * coin launched through scripts/launch-coin.mjs. It is set once at creation and
+ * is permanent, which is why coins created before SONGCHAINN existed can never
+ * pay us that share.
+ */
 const RPC_URL = 'https://mainnet.base.org';
 const ERC20_BALANCE_OF_ABI = parseAbi(['function balanceOf(address account) view returns (uint256)']);
 

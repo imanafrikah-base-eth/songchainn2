@@ -475,8 +475,7 @@ export default function Community() {
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background:
-                    'radial-gradient(circle, hsl(var(--primary) / 0.8) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(40px)',
                 }}
                 animate={{ scale: [1, 1.1, 1], x: [0, 10, 0], y: [0, -10, 0] }}

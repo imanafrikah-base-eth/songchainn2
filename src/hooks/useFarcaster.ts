@@ -32,11 +32,28 @@ export function useFarcaster(): FarcasterState {
       } catch {
         // SDK unavailable or not in a Farcaster client
       } finally {
-        // Dismiss the splash screen immediately after frame detection —
-        // don't hold it open waiting for sdk.context.
-        if (!cancelled && !sdkReadyCalled) {
+        /*
+         * Dismiss the splash immediately after frame detection, and never
+         * hold it open waiting for sdk.context.
+         *
+         * Deliberately NOT guarded on the cancelled flag. If this effect is
+         * torn down before isInMiniApp() settles, which React does on every
+         * mount in development and can do in production on a fast route
+         * change, the old guard skipped ready() and the Farcaster client sat
+         * on its splash screen for ever with no way back. A splash that never
+         * lifts is the worst failure a mini app has, because the person never
+         * sees the app at all, so this fires no matter what happened above.
+         *
+         * Wrapped, because a throw here would escape as an unhandled
+         * rejection and take the rest of init() down with it.
+         */
+        if (!sdkReadyCalled) {
           sdkReadyCalled = true;
-          sdk.actions.ready();
+          try {
+            void sdk.actions.ready();
+          } catch {
+            // Not in a client that has a splash to dismiss. Nothing to do.
+          }
         }
       }
 
@@ -51,7 +68,9 @@ export function useFarcaster(): FarcasterState {
       }
     }
 
-    init();
+    // Nothing above may become an unhandled rejection: in the mini app that
+    // shows up as a blank frame rather than an error anybody can read.
+    void init().catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
 

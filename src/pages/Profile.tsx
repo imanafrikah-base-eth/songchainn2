@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive, Plus, Lock, Globe, Trash2, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AccountNotice } from '@/components/AccountNotice';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { useEngagement } from '@/context/EngagementContext';
+import { useUserPoints } from '@/hooks/useUserPoints';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import { useReferrals } from '@/hooks/useReferrals';
@@ -83,9 +85,12 @@ const BaseIcon = () => (
 
 export default function Profile() {
   const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding, isLoading } = useAuth();
-  const { engagementPoints, currentStreak } = useEngagement();
+  // The server ledger, not the browser counter. These two used to disagree on
+  // screen: the Leaderboard read user_points while this card read a localStorage
+  // number that cleared with site data.
+  const { lifetimePoints, streak } = useUserPoints();
   const { likedSongs, playlists, savedCatalogs, createPlaylist, deletePlaylist, updatePlaylistVisibility } = useAudienceInteractions();
-  const { points, completedReferrals, shareInviteLink } = useReferrals();
+  const { pointsEarned: referralPoints, completedReferrals, shareInviteLink } = useReferrals();
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
@@ -682,6 +687,13 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Anything in force on this account, and the way to argue with it.
+          Top of the page on purpose: a restriction somebody cannot see reads
+          as the app being broken. */}
+      <div className="px-4 pt-4 empty:hidden">
+        <AccountNotice />
+      </div>
+
       {/* Cover Photo */}
       <div className="relative h-48 bg-gradient-to-br from-primary/30 to-primary/10">
         <input
@@ -1040,7 +1052,7 @@ export default function Profile() {
             )}
             <div className="flex items-center gap-3">
               <p className="text-sm text-muted-foreground">{isArtist ? 'Artist' : 'Audience Member'}</p>
-              <span className="text-xs text-muted-foreground">{profilePresenceLabel}</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{profilePresenceLabel}</span>
               {isArtist && artistId && (
                 <Link to={`/artist/${artistId}`} className="text-sm text-primary hover:underline">
                   View Artist Page
@@ -1323,12 +1335,12 @@ export default function Profile() {
           )}
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <Star className="w-5 h-5 mx-auto text-primary mb-2" />
-            <p className="text-2xl font-bold text-foreground">{engagementPoints.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-foreground">{lifetimePoints.toLocaleString()}</p>
             <p className="text-sm text-muted-foreground">Points</p>
           </div>
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <Flame className="w-5 h-5 mx-auto text-orange-500 mb-2" />
-            <p className="text-2xl font-bold text-foreground">{currentStreak}</p>
+            <p className="text-2xl font-bold text-foreground">{streak}</p>
             <p className="text-sm text-muted-foreground">Streak</p>
           </div>
           <div className="bg-card border border-border rounded-xl p-4 text-center">
@@ -1433,7 +1445,7 @@ export default function Profile() {
 
         {/* Invite Friends Section */}
         <motion.div 
-          className="bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 rounded-xl p-5 mb-8"
+          className="bg-gradient-to-br from-primary/20 to-primary/5 border border-border rounded-xl p-5 mb-8"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -1504,9 +1516,9 @@ export default function Profile() {
         )}
 
         {/* Early Access Note */}
-        <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center">
+        <div className="bg-primary/10 border border-border rounded-xl p-4 text-center">
           <p className="text-sm text-muted-foreground">
-            Your Audience activity here unlocks future access and ownership.
+            What you play and post here builds your place on the leaderboard.
           </p>
         </div>
       </div>

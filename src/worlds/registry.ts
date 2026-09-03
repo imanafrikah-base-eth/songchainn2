@@ -4,6 +4,7 @@
 // getWorldByArtistId.
 
 import type { WorldConfig } from './types';
+import { getArtistCoin, zoraCoinUrl } from '@/lib/artistCoins';
 import { CLASSIC_NINE_ROOMS, THE_PARLOUR } from './rooms';
 import { CLASSIC_FIVE_CITIES } from './cities';
 
@@ -43,12 +44,13 @@ export const IMAN_AFRIKAH_WORLD: WorldConfig = {
   artistName: 'IMan Afrikah',
   tokenSymbol: '$IMAN',
   chain: 'base',
-  // $IMAN went live on Base 26 Aug 2026. Token 0x58f65dF9566C85E125855E97391F52Dc375bA37e,
-  // pool 0x4cC581A56DD250AA3C4F4c58B55d33dDbbcBa089 (Uniswap v3, IMAN/WETH, 1% tier).
-  // The world-gate edge function is still the only authority on access; this
-  // link is display only, for the visitor who wants to pick up a key.
-  swapUrl:
-    'https://app.uniswap.org/swap?chain=base&outputCurrency=0x58f65dF9566C85E125855E97391F52Dc375bA37e',
+  // THE KEY IS HIS ZORA CREATOR COIN, and nothing else. Founder's rule, 3 Sep
+  // 2026: every artist's world is keyed on the creator coin they gave us, the
+  // one recorded in src/lib/artistCoins.ts, and the world-gate edge function
+  // checks that exact contract. The link a visitor is sent to must therefore
+  // buy that same coin. (An earlier link here pointed at a different $IMAN
+  // contract on Uniswap; anyone who bought it held a key that fit no door.)
+  swapUrl: zoraCoinUrl(getArtistCoin('3')!.coinAddress),
   farcasterUrl: 'https://farcaster.xyz/imanafrikah',
   positioning: '$IMAN is not a fan token. It is the key to my world.',
   story: [

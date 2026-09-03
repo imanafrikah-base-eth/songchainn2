@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-This is a monorepo-style workspace. The git working tree is rooted at `$ONGCHAINN/` but the git directory lives inside `BattleZone/`. Two distinct apps share the same Supabase backend:
+This is a monorepo-style workspace. The git repo is rooted at `$ONGCHAINN/`, git directory included (`git rev-parse --git-dir` returns `.git`). An earlier version of this file claimed the git directory lived inside `BattleZone/`; that was wrong, caused by a stray empty `BattleZone/.git` which has since been removed.
+
+**`origin` is a PUBLIC repo.** `BattleZone/AUDIO ENGEN/` and `BattleZone/africa-battle-live-ui/` are separate products with their own git repos and are gitignored, as is `vids from users for fixing/` which holds material sent in by users. Do not un-ignore them.
+
+Two distinct apps share the same Supabase backend:
 
 | Path | App | Purpose |
 |---|---|---|
@@ -103,6 +107,7 @@ Key modules:
 | `wallet-auth` | Verifies SIWE signature, returns Supabase JWT |
 | `farcaster-auth` | Verifies Farcaster frame signature |
 | `facebook-auth` | Exchanges Facebook token, upserts profile |
+| `hikulu-judge` | $HIKULU + NAKULU AI judges: room chat replies and post-battle verdicts |
 | `generate-artwork` | AI artwork generation |
 | `moderate-comment` | Comment moderation |
 | `artist-follow-counts` | Aggregates follow counts |

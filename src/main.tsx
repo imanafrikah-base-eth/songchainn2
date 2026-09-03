@@ -8,6 +8,27 @@ import App from "./App.tsx";
 import "./index.css";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { checkSupabaseReachability } from "./lib/networkCheck";
+import { shouldRegisterServiceWorker } from "./lib/native";
+import { initNativeShell } from "./lib/nativeShell";
+import { installImageFallback } from "./lib/imageFallback";
+import { installStorageShim } from "./lib/storageShim";
+import { capturePendingReferralCode } from "./hooks/useReferrals";
+
+// FIRST, ahead of every other line in this file.
+//
+// Where storage is blocked, reading window.localStorage throws rather than
+// returning null, and inside an embedded frame (a Farcaster mini app, an in-app
+// browser) that took the whole app down to the error boundary before a single
+// pixel rendered. Anything below this line may touch storage freely.
+installStorageShim();
+
+// Before anything renders, so no image can ever paint the browser's
+// broken-image glyph. See src/lib/imageFallback.ts.
+installImageFallback();
+
+// Stash ?ref=CODE before anything can navigate it away, so an invite survives
+// the whole sign-up round trip and is redeemed once there is a session.
+capturePendingReferralCode();
 
 declare global {
   interface Window {
@@ -164,7 +185,7 @@ if (typeof window !== "undefined") {
   });
 }
 
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
+if ("serviceWorker" in navigator && import.meta.env.PROD && shouldRegisterServiceWorker()) {
   // Capture the controller that was active before registration so we can tell
   // the difference between a fresh install (no prior controller) and an upgrade.
   const existingController = navigator.serviceWorker.controller;
@@ -186,6 +207,10 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     window.location.reload();
   });
 }
+
+// Native-only: splash, status bar, back button, external links, deep links.
+// No-op in the browser.
+void initNativeShell();
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

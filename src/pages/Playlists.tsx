@@ -64,7 +64,7 @@ export default function Playlists() {
         >
           <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 shine-overlay flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-primary/15 border border-primary/30">
+              <div className="p-2.5 rounded-xl bg-primary/15 border border-border">
                 <ListMusic className="w-6 h-6 text-primary" />
               </div>
               <div>

@@ -231,7 +231,7 @@ export default function Discover() {
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
         {playerState?.isRoomMode && playerState.currentSong && (
           <div className="mb-6">
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
+            <div className="rounded-2xl border border-border bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/40 overflow-hidden flex-shrink-0">
                 {playerState.currentSong.coverImage ? (
                   <img
@@ -287,8 +287,7 @@ export default function Discover() {
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background:
-                    'radial-gradient(circle, hsl(var(--primary) / 0.8) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(40px)',
                 }}
                 animate={{ scale: [1, 1.1, 1], x: [0, 10, 0], y: [0, -10, 0] }}
@@ -332,7 +331,7 @@ export default function Discover() {
             transition={{ delay: 0.08 }}
             className="mb-8"
           >
-            <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 shine-overlay overflow-hidden">
+            <div className="relative overflow-hidden">
               <div className="pointer-events-none absolute -inset-x-10 -top-12 h-20 bg-gradient-to-r from-sky-500/35 via-cyan-400/20 to-transparent blur-3xl opacity-70" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -399,12 +398,12 @@ export default function Discover() {
             <motion.div
               whileHover={{ scale: 1.01, y: -2 }}
               whileTap={{ scale: 0.99 }}
-              className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-secondary/20 border border-primary/20 p-6 cursor-pointer group"
+              className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-secondary/20 border border-border p-6 cursor-pointer group"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-primary/20 border border-primary/30">
+                  <div className="p-3 rounded-xl bg-primary/20 border border-border">
                     <Users className="w-6 h-6 text-primary" />
                   </div>
                   <div>
@@ -432,7 +431,7 @@ export default function Discover() {
             transition={{ delay: 0.12 }}
             className="mb-8"
           >
-            <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 shine-overlay overflow-hidden">
+            <div className="relative overflow-hidden">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <div>
                   <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground flex items-center gap-2">
@@ -447,7 +446,7 @@ export default function Discover() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20"
+                    className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20"
                     onClick={() => playQueue(songsFromCatalogs(newReleases))}
                   >
                     <Play className="w-3.5 h-3.5 mr-1.5" />
@@ -542,8 +541,8 @@ export default function Discover() {
               initial="hidden"
               animate="show"
             >
-              <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shine-overlay overflow-hidden">
-                <div className="pointer-events-none absolute -inset-x-10 -top-12 h-20 bg-gradient-to-r from-primary/35 via-cyan-400/20 to-emerald-400/25 blur-3xl opacity-60" />
+              <div className="relative overflow-hidden">
+                {/* glow removed */}
                 <div className="relative z-10">
                   <motion.div variants={itemVariants} className="flex items-center justify-between gap-2 mb-4">
                     <div className="flex items-center gap-2">
@@ -559,7 +558,7 @@ export default function Discover() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20"
+                        className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20"
                         onClick={() => playQueue(songsFromCatalogs(recommendedCatalogs))}
                       >
                         <Play className="w-3.5 h-3.5 mr-1.5" />
@@ -593,26 +592,34 @@ export default function Discover() {
               initial="hidden"
               animate="show"
             >
-              <div className="relative glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shine-overlay overflow-hidden">
-                <div className="pointer-events-none absolute -inset-x-10 -top-12 h-20 bg-gradient-to-r from-primary/30 via-purple-500/25 to-cyan-400/30 blur-3xl opacity-70" />
+              <div className="relative overflow-hidden">
+                {/* glow removed */}
                 <div className="relative z-10">
-                  <motion.div variants={itemVariants} className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-primary" />
-                      <h2 className="font-heading text-xl font-semibold text-foreground">
+                  {/*
+                    This row used to be a single non-wrapping flex line, so on a
+                    narrow phone the sort controls were pushed past the right
+                    edge and clipped by the overflow-hidden parent. The Newest
+                    button was 47px off-screen at 320px and could not be scrolled
+                    to, and the heading broke mid-word making room for it.
+                    Wrapping lets the controls drop to their own line instead.
+                  */}
+                  <motion.div variants={itemVariants} className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-primary shrink-0" />
+                      <h2 className="font-heading text-xl font-semibold text-foreground truncate">
                         {selectedGenre === 'all' ? 'All Catalogs' : selectedGenre}
                       </h2>
-                      <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                      <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 shrink-0">
                         <Music className="w-3.5 h-3.5 text-primary" />
-                        <span>{filteredCatalogs.length} catalogs</span>
+                        <span className="whitespace-nowrap">{filteredCatalogs.length} catalogs</span>
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-[11px] sm:text-xs">
                       {selectedGenre === 'all' && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 text-xs border-primary/40 bg-primary/10 hover:bg-primary/20"
+                          className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20"
                           onClick={() => playQueue(songsFromCatalogs(sortedCatalogs))}
                         >
                           <Play className="w-3.5 h-3.5 mr-1.5" />
@@ -779,12 +786,12 @@ export default function Discover() {
           transition={{ delay: 0.25 }}
           className="mt-10 sm:mt-12 mb-2"
         >
-          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-7 shine-overlay relative overflow-hidden">
+          <div className="relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 opacity-25">
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: 'radial-gradient(circle, hsl(var(--primary) / 0.7) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(40px)',
                 }}
                 animate={{ scale: [1, 1.1, 1], x: [0, 8, 0], y: [0, -6, 0] }}
@@ -795,7 +802,7 @@ export default function Discover() {
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: 'radial-gradient(circle, hsl(210 100% 70% / 0.7) 0%, transparent 70%)',
+                  background: 'none',
                   filter: 'blur(40px)',
                 }}
                 animate={{ scale: [1, 1.15, 1] }}
@@ -819,7 +826,7 @@ export default function Discover() {
                 <Link to="/">
                   <Button
                     variant="outline"
-                    className="w-full sm:w-auto gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                    className="w-full sm:w-auto gap-2 border-border text-primary hover:bg-primary/10"
                   >
                     <ArrowRight className="w-4 h-4" />
                     <span>Back Home</span>

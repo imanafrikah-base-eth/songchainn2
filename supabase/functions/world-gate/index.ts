@@ -8,8 +8,30 @@
 // is unset is in pre-launch mode: every balance reads zero, doors stay
 // locked, and the client shows the "key is being cut" state.
 //
-// Request:  POST { world: string, wallet?: string | null }
+// Request:  POST { world: string }  with the caller's Supabase JWT in Authorization
 // Response: { rings: { ring0, ring1, ring2, council, balance, thresholds, rank, tokenLive } }
+//
+// WHOSE WALLET. The first version took a wallet address in the request body
+// and reported that address's holdings as the caller's. Balances are public,
+// so anybody could paste a whale's address and walk into the insider rooms.
+// Now the body's wallet is ignored. The caller is identified from their JWT
+// and the wallet is the one linked to their own account (audience_profiles
+// or the SIWE metadata written by wallet-auth), the same rule song-holdings
+// uses. No session, or no linked wallet, means the outer ring only.
+//
+// The verified result is also written to world_access_snapshots, so database
+// triggers (meeting request pricing) can price by real holdings instead of by
+// whatever tier the browser claims.
+
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+function admin() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+}
 
 const ALLOWED_ORIGINS = new Set<string>(
   (Deno.env.get("ALLOWED_ORIGINS") ??
@@ -41,10 +63,33 @@ type WorldTokenConfig = {
   insiderEnv: string;
   defaultFan: number;
   defaultInsider: number;
+  /**
+   * The artist's Zora Creator Coin, used when no secret overrides it.
+   *
+   * This is why the doors open. Before this, the gate had only an env var name,
+   * so until somebody set a Supabase secret every world reported tokenLive
+   * false and every inner door read "the key is being cut". A world whose coin
+   * is a published fact should not wait on a secret to admit anybody.
+   *
+   * The env var still wins where it is set, so a coin can be changed without a
+   * deploy.
+   */
+  defaultTokenAddress?: string;
 };
 
-// One entry per launched world, keyed by world slug (must match the client
-// registry in src/worlds/registry.ts).
+/**
+ * One entry per world, keyed by world slug (must match src/worlds/registry.ts).
+ *
+ * Addresses are the artists' Zora Creator Coins, read off the Zora API on
+ * 1 Sep 2026 from handles the artists gave us directly. Full list and the
+ * verification note live in `src/lib/artistCoins.ts`.
+ *
+ * THRESHOLDS: every Zora creator coin is minted at 1,000,000,000 supply, which
+ * was checked against IMan's rather than assumed. So 500,000 is 0.05% of the
+ * coin and 5,000,000 is 0.5%, and the same pair is meaningful for every artist
+ * here. If a coin ever launches with a different supply, give it its own
+ * numbers rather than inheriting these.
+ */
 const WORLD_TOKENS: Record<string, WorldTokenConfig> = {
   "iman-afrikah": {
     tokenAddressEnv: "IMAN_TOKEN_ADDRESS",
@@ -53,7 +98,21 @@ const WORLD_TOKENS: Record<string, WorldTokenConfig> = {
     insiderEnv: "WORLD_INSIDER_THRESHOLD",
     defaultFan: 500_000,
     defaultInsider: 5_000_000,
+    defaultTokenAddress: "0x46bd92b482e506ecacffd4e485f3b50a4828deb7",
   },
+};
+
+/**
+ * Artists whose creator coin is known but whose world is not built yet. Kept
+ * here so that the day a world is published, its door already has a key.
+ */
+const ARTIST_CREATOR_COINS: Record<string, string> = {
+  "nda": "0xd95f5343ddd180e560dcdf165c39d2e904da3d8f",
+  "santana": "0xedbad33620e105d499cbe97a00c0deee252064b6",
+  "7roo7h-based": "0x846ddf7f47b3c65e73b24db75fb4211f5f1df3b5",
+  "denajah": "0x0f2a0e134a19f53d266b976fd2fae370ac832d13",
+  "sanchy": "0xc8b3b18f1c51bdcab4b7e971e093780bd074e9fd",
+  "prp": "0x7dc287ab5512524a4814786db339ea5b89fbbf70",
 };
 
 function intFromEnv(name: string, fallback: number): number {
@@ -63,10 +122,46 @@ function intFromEnv(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+const IS_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+
+/**
+ * The token rules for a world.
+ *
+ * A world listed in WORLD_TOKENS uses its own entry. Any other world whose slug
+ * matches an artist we hold a creator coin for gets a config built on the spot,
+ * so a world published from the builder is gated the moment it exists rather
+ * than waiting for someone to remember to add it here.
+ */
+function worldConfigFor(slug: string): WorldTokenConfig | undefined {
+  const known = WORLD_TOKENS[slug];
+  if (known) return known;
+
+  const coin = ARTIST_CREATOR_COINS[slug];
+  if (!coin) return undefined;
+
+  return {
+    tokenAddressEnv: `WORLD_TOKEN_${slug.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`,
+    decimalsEnv: "WORLD_TOKEN_DECIMALS",
+    fanEnv: "WORLD_FAN_THRESHOLD",
+    insiderEnv: "WORLD_INSIDER_THRESHOLD",
+    defaultFan: 500_000,
+    defaultInsider: 5_000_000,
+    defaultTokenAddress: coin,
+  };
+}
+
 function tokenAddressFor(cfg: WorldTokenConfig): string | null {
+  // A secret, where one is set, always wins: it is how a coin gets changed
+  // without a deploy.
   const raw = Deno.env.get(cfg.tokenAddressEnv)?.trim();
-  if (!raw || !/^0x[a-fA-F0-9]{40}$/.test(raw)) return null;
-  return raw;
+  if (raw && IS_ADDRESS.test(raw)) return raw;
+
+  // Otherwise fall back to the artist's published creator coin. This is what
+  // stops a world sitting shut waiting on a secret nobody set.
+  const fallback = cfg.defaultTokenAddress?.trim();
+  if (fallback && IS_ADDRESS.test(fallback)) return fallback;
+
+  return null;
 }
 
 const BALANCE_OF_SELECTOR = "0x70a08231"; // balanceOf(address)
@@ -126,8 +221,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { world, wallet } = await req.json().catch(() => ({}));
-    const cfg = typeof world === "string" ? WORLD_TOKENS[world] : undefined;
+    const { world } = await req.json().catch(() => ({}));
+    const cfg = typeof world === "string" ? worldConfigFor(world) : undefined;
     if (!cfg) return json(origin, { error: "Unknown world" }, 404);
 
     const thresholds = {
@@ -135,6 +230,28 @@ Deno.serve(async (req) => {
       INSIDER: intFromEnv(cfg.insiderEnv, cfg.defaultInsider),
     };
     const tokenLive = tokenAddressFor(cfg) !== null;
+
+    // Who is asking, and which wallet is really theirs.
+    let userId: string | null = null;
+    let wallet: string | null = null;
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    let db: ReturnType<typeof admin> | null = null;
+    if (token) {
+      db = admin();
+      const { data } = await db.auth.getUser(token);
+      const user = data?.user;
+      if (user) {
+        userId = user.id;
+        const { data: profile } = await db
+          .from("audience_profiles")
+          .select("wallet_address")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+        wallet =
+          [profile?.wallet_address, meta.wallet_address, meta.farcaster_address].find(isAddress) ?? null;
+      }
+    }
 
     if (!isAddress(wallet)) {
       return json(origin, {
@@ -150,18 +267,36 @@ Deno.serve(async (req) => {
     // leaderboard is live nobody holds a seat.
     const rank: number | null = null;
 
-    return json(origin, {
-      rings: {
-        ring0: true,
-        ring1: balance >= thresholds.FAN,
-        ring2: balance >= thresholds.INSIDER,
-        council: rank !== null && rank <= 10,
-        balance,
-        thresholds,
-        rank,
-        tokenLive,
-      },
-    });
+    const rings = {
+      ring0: true,
+      ring1: balance >= thresholds.FAN,
+      ring2: balance >= thresholds.INSIDER,
+      council: rank !== null && rank <= 10,
+      balance,
+      thresholds,
+      rank,
+      tokenLive,
+    };
+
+    // Remember what was verified, for the database to price against.
+    if (userId && db) {
+      const { error } = await db.from("world_access_snapshots").upsert(
+        {
+          user_id: userId,
+          world_slug: world,
+          wallet: wallet.toLowerCase(),
+          ring1: rings.ring1,
+          ring2: rings.ring2,
+          council: rings.council,
+          balance,
+          checked_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,world_slug" },
+      );
+      if (error) console.error("world-gate snapshot write failed:", error.message);
+    }
+
+    return json(origin, { rings });
   } catch (err) {
     console.error("world-gate error:", err);
     return json(origin, { error: "Gate resolution failed" }, 500);

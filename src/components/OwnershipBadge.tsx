@@ -55,7 +55,7 @@ export function OwnershipBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center font-medium rounded-full border border-primary/40 bg-background/80 backdrop-blur-sm shadow-soft',
+        'inline-flex items-center font-medium rounded-full border border-border bg-background/80 backdrop-blur-sm shadow-soft',
         sizeClasses,
         badge.color,
         className

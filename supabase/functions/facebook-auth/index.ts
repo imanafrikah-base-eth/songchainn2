@@ -79,7 +79,7 @@ async function issueSupabaseSession(facebookId: string, metadata: Record<string,
   }
 
   if (!link?.properties?.hashed_token) {
-    throw new Error('OTP generation failed — hashed_token missing');
+    throw new Error('Could not start your session. Please try again.');
   }
 
   console.log('[facebook-auth] issuing session for facebook_id:', facebookId, 'isExistingUser:', isExistingUser);

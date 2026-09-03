@@ -87,9 +87,9 @@ function parseSiwePreamble(message: string) {
 
 function checkTimestamps(issuedAt: string, expirationTime: string): string | null {
   const issuedMs = new Date(issuedAt).getTime();
-  if (isNaN(issuedMs)) return 'Invalid issuedAt timestamp';
+  if (isNaN(issuedMs)) return 'That sign-in request was not readable. Please try again.';
   if (issuedMs > Date.now() + 60_000) return 'Message issued in the future';
-  if (Date.now() - issuedMs > MAX_AGE_MS) return 'Message expired — please try again';
+  if (Date.now() - issuedMs > MAX_AGE_MS) return 'That sign-in request expired. Please try again.';
   if (expirationTime) {
     const exp = new Date(expirationTime).getTime();
     if (!isNaN(exp) && Date.now() > exp) return 'Message past expiration time';
@@ -138,7 +138,7 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
   // hashed_token is required for verifyOtp({ type: 'magiclink' }) on the client
   if (!link?.properties?.hashed_token) {
     console.error('[farcaster-auth] generateLink returned no hashed_token. properties:', JSON.stringify(link?.properties));
-    throw new Error('OTP generation failed — hashed_token missing');
+    throw new Error('Could not start your session. Please try again.');
   }
 
   console.log('[farcaster-auth] issuing session for fid:', fid, 'isExistingUser:', isExistingUser);

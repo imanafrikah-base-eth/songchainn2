@@ -4,13 +4,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Coins, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { useInterruption } from '@/hooks/useInterruption';
 
 const SEEN_KEY = 'songchainn_seen_phase2_marketplace_announcement_v1';
 
 export function PhaseTwoAnnouncement() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [isVisible, setIsVisible] = useState(false);
+  const [wantsToShow, setWantsToShow] = useState(false);
+  // Promotional. Only appears if the app has not already interrupted recently.
+  const { granted: isVisible, dismiss: releaseFloor } = useInterruption(
+    'phase-two-announcement', wantsToShow, { priority: 'promo' }
+  );
 
   useEffect(() => {
     if (!user) return;
@@ -19,12 +24,13 @@ export function PhaseTwoAnnouncement() {
     } catch {
       // localStorage unavailable -- show once for this session instead of erroring.
     }
-    const timer = setTimeout(() => setIsVisible(true), 6000);
+    const timer = setTimeout(() => setWantsToShow(true), 6000);
     return () => clearTimeout(timer);
   }, [user]);
 
   const dismiss = () => {
-    setIsVisible(false);
+    setWantsToShow(false);
+    releaseFloor();
     try {
       localStorage.setItem(SEEN_KEY, 'true');
     } catch {
@@ -46,7 +52,7 @@ export function PhaseTwoAnnouncement() {
           exit={{ opacity: 0, y: -20 }}
           className="fixed inset-x-0 top-16 z-[80] px-3 sm:px-4 flex justify-center"
         >
-          <div className="relative glass-card rounded-2xl p-4 sm:p-5 border border-primary/30 shadow-glow max-w-lg w-full overflow-hidden">
+          <div className="relative glass-card rounded-2xl p-4 sm:p-5 border border-border shadow-glow max-w-lg w-full overflow-hidden">
             <div className="absolute inset-0 gradient-primary opacity-10 pointer-events-none" />
 
             <button

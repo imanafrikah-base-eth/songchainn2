@@ -1,9 +1,10 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { Bot, Send } from 'lucide-react';
+import { Bot, Send, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Navigation } from '@/components/Navigation';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { Conversations } from '@/components/social/Conversations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -103,6 +104,8 @@ export default function Inbox() {
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'people' | 'mosha'>('people');
+
 
   const userId = user?.id || null;
 
@@ -245,13 +248,55 @@ export default function Inbox() {
       <Navigation />
 
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
+        {/* Two inboxes, one place: the people you know, and Mo$ha. */}
+        <div className="mb-3 flex items-center gap-1.5">
+          <button
+            onClick={() => setTab('people')}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+              tab === 'people'
+                ? 'bg-primary text-primary-foreground'
+                : 'border border-border text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {/*
+              No unread count on this pill. Reading it here meant calling
+              useConversations() a second time, and because Conversations already
+              calls it for the same user, both landed on one shared realtime
+              channel: doubled queries per message, and whichever unmounted first
+              took the channel down for the other.
+            */}
+            <MessageSquare className="h-3.5 w-3.5" /> People
+          </button>
+          <button
+            onClick={() => setTab('mosha')}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+              tab === 'mosha'
+                ? 'bg-primary text-primary-foreground'
+                : 'border border-border text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Bot className="h-3.5 w-3.5" /> Mo$ha
+          </button>
+        </div>
+
+        {tab === 'people' && (
+          <section className="rounded-2xl border border-border/50 bg-background/85 backdrop-blur p-3 sm:p-4">
+            <h1 className="mb-1 text-lg font-semibold text-foreground sm:text-xl">Messages</h1>
+            <p className="mb-4 text-xs text-muted-foreground sm:text-sm">
+              Talk to anyone here. Send them a song and it arrives ready to play.
+            </p>
+            <Conversations />
+          </section>
+        )}
+
+        {tab === 'mosha' && (
         <section className="rounded-2xl border border-border/50 bg-background/85 backdrop-blur p-3 sm:p-4">
           <div className="flex items-center gap-2 mb-3">
             <Bot className="w-4 h-4 text-primary" />
-            <h1 className="text-lg sm:text-xl font-semibold text-foreground">$ongChainn Direct Message Center</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-foreground">Mo$ha</h1>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-            Mo$ha inbox only. Ask $ongChainn-related questions for smart replies.
+            Ask $ongChainn-related questions for smart replies.
           </p>
 
           <div className="max-h-[58vh] overflow-y-auto rounded-xl border border-border/40 bg-black/20 p-2 sm:p-3 space-y-2">
@@ -310,6 +355,7 @@ export default function Inbox() {
             </Button>
           </div>
         </section>
+        )}
       </main>
 
       <AudioPlayer />

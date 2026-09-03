@@ -84,7 +84,7 @@ export function SellSongModal({ song, isOpen, onClose, balance, coinAddress, wal
         setStep('error');
       }
     } catch (err: any) {
-      setError(err?.message || 'An error occurred');
+      setError(err?.message || 'The sale did not go through. Check your wallet and try again.');
       setStep('error');
     } finally {
       submittingRef.current = false;
@@ -164,7 +164,7 @@ export function SellSongModal({ song, isOpen, onClose, balance, coinAddress, wal
                 <AlertCircle size={28} className="text-destructive" />
               </div>
               <h3 className="text-lg font-semibold text-destructive">Sale Failed</h3>
-              <p className="text-muted-foreground text-sm mt-2 px-4">{error || 'Something went wrong. Please try again.'}</p>
+              <p className="text-muted-foreground text-sm mt-2 px-4">{error || 'The sale did not complete. Nothing was sold.'}</p>
               <Button onClick={() => setStep('select')} className="mt-4" variant="outline">
                 Try Again
               </Button>
@@ -260,7 +260,7 @@ export function SellSongModal({ song, isOpen, onClose, balance, coinAddress, wal
                 <TrendingDown size={18} />
                 Confirm Sale
               </Button>
-              <p className="text-xs text-center text-muted-foreground mt-3">Gas fees apply • Powered by Base</p>
+              <p className="text-xs text-center text-muted-foreground mt-3">A small network fee applies • Powered by Base</p>
             </>
           )}
         </div>

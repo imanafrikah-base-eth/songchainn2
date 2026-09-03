@@ -25,6 +25,15 @@ export interface SocialPost {
   playlist_id: string | null;
   image_url?: string | null;
   image_path?: string | null;
+  /** A picture or a clip attached to the post. */
+  media_url?: string | null;
+  media_kind?: 'image' | 'video' | null;
+  media_poster_url?: string | null;
+  media_id?: string | null;
+  /** Where the media came from. A song card carries no file at all. */
+  media_source?: 'upload' | 'songcard' | null;
+  /** The song card definition, when this post is one. */
+  songcard?: SongCardData | null;
   post_type: PostType;
   activity_type?: ActivityType;
   metadata?: SocialPostMetadata | null;
@@ -40,6 +49,15 @@ export interface SocialPostWithProfile extends SocialPost {
   comments_count: number;
   is_liked: boolean;
   playlist_name?: string | null;
+  /** The people tagged in it, resolved to names the feed can render. */
+  tagged?: TaggedPerson[];
+}
+
+export interface TaggedPerson {
+  user_id: string;
+  display_name: string;
+  username?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface UserFollow {
@@ -76,3 +94,21 @@ export interface CommentLike {
   created_at: string;
 }
 
+
+/**
+ * A song card: the audience's way of making something.
+ *
+ * It lives here rather than beside the component that draws it because the data
+ * layer writes it and the feed reads it, so the shape is shared, not a
+ * rendering detail.
+ */
+export type SongCardStyleId = 'pulse' | 'spin' | 'drift' | 'still';
+
+export interface SongCardData {
+  songId: string;
+  title: string;
+  artist: string;
+  coverImage: string | null;
+  style: SongCardStyleId;
+  caption: string;
+}

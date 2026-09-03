@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Play, UserCheck, UserPlus, BarChart3, Square, CheckCircle, Pause, ExternalLink,
+  ArrowLeft, UserCheck, UserPlus, BarChart3, Square, CheckCircle, ExternalLink,
 } from "lucide-react";
 import Navbar from "@/battlezone/components/Navbar";
 import { useBattle } from "@/battlezone/hooks/useBattles";
@@ -17,16 +17,23 @@ const HostControl = () => {
   const navigate = useNavigate();
   const { data: battle, isLoading } = useBattle(roomId);
 
-  const [isLive, setIsLive] = useState(true);
-  const [votingOpen, setVotingOpen] = useState(true);
   const [round, setRound] = useState(1);
-  const [ended, setEnded] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  // Room state is read off the battle row (polled), not local state, so the
+  // panel always shows what the audience is actually seeing.
+  const ended = battle?.status === "ended";
+  const votingOpen = battle?.votingOpen !== false;
 
   useEffect(() => {
     if (battle) setRound(battle.round || 1);
   }, [battle]);
+
+  const toggleVoting = async () => {
+    if (!roomId) return;
+    await supabase.from("battles").update({ voting_open: !votingOpen }).eq("id", roomId);
+  };
 
   const fetchParticipants = useCallback(async () => {
     if (!roomId) return;
@@ -71,23 +78,19 @@ const HostControl = () => {
     if (!roomId) return;
     await supabase
       .from("battles")
-      .update({ status: "ended", winner, ended_time: new Date().toISOString() })
+      .update({ status: "ended", winner, voting_open: false, ended_time: new Date().toISOString() })
       .eq("id", roomId);
     void requestHikuluVerdict(roomId);
-    setEnded(true);
-    setIsLive(false);
   };
 
   const handleEndRoom = async () => {
     if (!roomId) return;
     await supabase
       .from("battles")
-      .update({ status: "ended", ended_time: new Date().toISOString() })
+      .update({ status: "ended", voting_open: false, ended_time: new Date().toISOString() })
       .eq("id", roomId);
     void requestHikuluVerdict(roomId);
-    setEnded(true);
-    setIsLive(false);
-    navigate("/wavewarz-africa");
+    navigate(`/wavewarz-africa/battle/${roomId}`);
   };
 
   if (isLoading || !battle) {
@@ -124,8 +127,8 @@ const HostControl = () => {
             <h3 className="font-bold text-foreground">Room Status</h3>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Status</span>
-              <span className={`font-bold ${ended ? "text-muted-foreground" : isLive ? "text-live" : "text-neon-gold"}`}>
-                {ended ? "Ended" : isLive ? "LIVE" : "Paused"}
+              <span className={`font-bold ${ended ? "text-muted-foreground" : battle.status === "live" ? "text-live" : "text-neon-gold"}`}>
+                {ended ? "Ended" : battle.status === "live" ? "LIVE" : "Upcoming"}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
@@ -228,13 +231,6 @@ const HostControl = () => {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => setIsLive(!isLive)}
-              className="rounded-lg bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2"
-            >
-              {isLive ? <><Pause className="h-4 w-4" /> Pause</> : <><Play className="h-4 w-4" /> Go Live</>}
-            </button>
-            <button
-              type="button"
               onClick={handleApproveSpeaker}
               disabled={!selectedUserId}
               className="rounded-lg bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -251,21 +247,26 @@ const HostControl = () => {
             </button>
             <button
               type="button"
-              onClick={() => setVotingOpen(!votingOpen)}
-              className="rounded-lg bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/80 flex items-center gap-2"
+              onClick={() => void toggleVoting()}
+              disabled={ended}
+              className="rounded-lg bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/80 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <BarChart3 className="h-4 w-4" /> {votingOpen ? "End Voting" : "Start Voting"}
             </button>
             <button
               type="button"
+              disabled={ended}
               onClick={async () => {
                 const newRound = Math.min(round + 1, battle.totalRounds);
                 setRound(newRound);
                 if (roomId) {
-                  await supabase.from("battles").update({ round: newRound }).eq("id", roomId);
+                  await supabase
+                    .from("battles")
+                    .update({ round: newRound, voting_open: true })
+                    .eq("id", roomId);
                 }
               }}
-              className="rounded-lg bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/80"
+              className="rounded-lg bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Next Round
             </button>

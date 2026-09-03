@@ -15,7 +15,7 @@ const flowSteps = [
   { emoji: "\u{1F451}", title: "Host creates", desc: "A host sets up the battle: artists, songs, region" },
   { emoji: "\u{1F534}", title: "Room goes live", desc: "Voice runs on the host's X Space" },
   { emoji: "\u{1F525}", title: "Crowd votes", desc: "Audience votes and chats in real time" },
-  { emoji: "⚖️", title: "$HIKULU speaks", desc: "The AI judge drops his verdict" },
+  { emoji: "⚖️", title: "The judges speak", desc: "$HIKULU and NAKULU drop their verdicts" },
   { emoji: "\u{1F3C6}", title: "Results drop", desc: "Winner posted to the feed and results page" },
 ];
 
@@ -25,7 +25,7 @@ const roomGuide = [
   { title: "The face-off", desc: "Both artists, their songs and the live vote meter. Watch it swing in real time as votes land." },
   { title: "The vote buttons", desc: "One vote per round, and you can change it any time before the round ends. Vote with your ears, not your friendships." },
   { title: "View Battle Charts", desc: "Opens the live trading screen for both battle songs. Totally optional, totally fun to watch." },
-  { title: "The chat is the stadium", desc: "Hype your artist, react to bars, welcome newcomers. $HIKULU reads the room too. Keep it spicy, keep it respectful." },
+  { title: "The chat is the stadium", desc: "Hype your artist, react to bars, welcome newcomers. $HIKULU and NAKULU read the room too. Keep it spicy, keep it respectful." },
 ];
 
 const hostSteps = [
@@ -109,9 +109,13 @@ const RoomMock = () => (
         <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[8px] font-black text-primary">MW</div>
         <div className="rounded-lg bg-muted px-2 py-1 text-[10px] text-foreground"><span className="block text-[8px] font-bold text-primary">MoWave</span>nah that SAMMIE hook is different, changed my vote</div>
       </div>
-      <div className="mb-2 flex items-start gap-1.5">
+      <div className="mb-1.5 flex items-start gap-1.5">
         <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/20 text-[9px]">&#128081;</div>
         <div className="rounded-lg border border-accent/40 bg-accent/10 px-2 py-1 text-[10px] text-foreground"><span className="block text-[8px] font-bold text-accent">$HIKULU</span>I am listening. Both of you brought heat today...</div>
+      </div>
+      <div className="mb-2 flex items-start gap-1.5">
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-400/20 text-[9px]">&#10084;&#65039;</div>
+        <div className="rounded-lg border border-rose-400/40 bg-rose-400/10 px-2 py-1 text-[10px] text-foreground"><span className="block text-[8px] font-bold text-rose-400">NAKULU</span>He listens, I feel. And this room is feeling side B right now.</div>
       </div>
       <div className="flex items-center gap-1.5">
         <div className="flex-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[10px] text-muted-foreground">Say something...</div>
@@ -210,8 +214,9 @@ const Learn = () => {
             </div>
             <div className="rounded-2xl border border-accent/40 bg-accent/5 p-6">
               <Crown className="h-7 w-7 text-accent mb-3" />
-              <h3 className="font-bold text-foreground mb-2">2. $HIKULU's verdict (the wildcard)</h3>
-              <p className="text-sm text-muted-foreground">The AI judge listens to every round and weighs in after the battle. His verdict adds judge points to the final score.</p>
+              <h3 className="font-bold text-foreground mb-2">2. The judges' verdict (the wildcard)</h3>
+              <p className="text-sm text-muted-foreground">$HIKULU and NAKULU listen to every round and weigh in after the battle, each from their own corner. He scores the craft, she scores the feeling, and both of their points count in the final score.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Both judges, and the Council of Elders below, are AI. They run automatically in every battle. No person sits behind them.</p>
             </div>
             <div className="rounded-2xl border border-secondary/40 bg-secondary/5 p-6">
               <TrendingUp className="h-7 w-7 text-secondary mb-3" />
@@ -222,7 +227,7 @@ const Learn = () => {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-border bg-card/80 p-5 text-sm font-bold">
             <span className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-2 text-primary">&#128293; Crowd votes</span>
             <span className="text-muted-foreground">+</span>
-            <span className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2 text-accent">&#128081; $HIKULU points</span>
+            <span className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2 text-accent">&#128081; $HIKULU + NAKULU points</span>
             <span className="text-muted-foreground">+</span>
             <span className="rounded-xl border border-secondary/40 bg-secondary/10 px-4 py-2 text-secondary">&#128200; Coin support</span>
             <span className="text-primary">=</span>
@@ -234,7 +239,8 @@ const Learn = () => {
         <section className="rounded-3xl border-2 border-accent/50 bg-gradient-to-b from-accent/10 to-transparent p-8 md:p-12 text-center">
           <div className="text-5xl mb-3">&#128081;</div>
           <h2 className="text-4xl font-black text-accent text-glow-gold mb-1">$HIKULU</h2>
-          <p className="text-sm font-bold uppercase tracking-widest text-accent/80 mb-6">The wisest man on the planet of music</p>
+          <p className="text-sm font-bold uppercase tracking-widest text-accent/80 mb-1">The wisest man on the planet of music</p>
+          <p className="text-xs text-muted-foreground mb-6">An AI judge, built by $ongChainn. Always on, always automated, never a person.</p>
           <p className="text-lg italic text-foreground max-w-xl mx-auto mb-8">
             "I have heard every kick, every snare and every lie ever told on a beat. Play your song. I will tell you the truth."
           </p>
@@ -250,6 +256,68 @@ const Learn = () => {
             <div className="rounded-2xl border border-accent/30 bg-card/80 p-5">
               <h3 className="font-bold text-foreground mb-2">&#128172; He talks back</h3>
               <p className="text-sm text-muted-foreground">Chat with him in the battle room. Ask him what he thinks mid-battle. He might humble you, he might crown you. He is never boring.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* NAKULU */}
+        <section className="rounded-3xl border-2 border-rose-400/50 bg-gradient-to-b from-rose-400/10 to-transparent p-8 md:p-12 text-center">
+          <div className="text-5xl mb-3">&#10084;&#65039;</div>
+          <h2 className="text-4xl font-black text-rose-400 mb-1">NAKULU</h2>
+          <p className="text-sm font-bold uppercase tracking-widest text-rose-400/80 mb-1">The wisest woman on the planet of music, and $HIKULU's companion</p>
+          <p className="text-xs text-muted-foreground mb-6">An AI judge, like him. Her verdicts are generated, not written by a person.</p>
+          <p className="text-lg italic text-foreground max-w-xl mx-auto mb-8">
+            "He hears the technique. I feel the truth. Between the two of us, no song hides."
+          </p>
+          <div className="grid gap-4 md:grid-cols-3 text-left">
+            <div className="rounded-2xl border border-rose-400/30 bg-card/80 p-5">
+              <h3 className="font-bold text-foreground mb-2">&#127926; She feels the room</h3>
+              <p className="text-sm text-muted-foreground">NAKULU sits beside $HIKULU in every battle. While he studies the craft, she reads the crowd: the mood, the movement, and whether the artist means every word.</p>
+            </div>
+            <div className="rounded-2xl border border-rose-400/30 bg-card/80 p-5">
+              <h3 className="font-bold text-foreground mb-2">&#9878;&#65039; Her own scorecard</h3>
+              <p className="text-sm text-muted-foreground">She judges with her own eyes and ears, not his. Her verdict and her points land separately, and yes, the two of them do not always agree.</p>
+            </div>
+            <div className="rounded-2xl border border-rose-400/30 bg-card/80 p-5">
+              <h3 className="font-bold text-foreground mb-2">&#128172; She speaks her mind</h3>
+              <p className="text-sm text-muted-foreground">Call her name in the chat and she will tell you exactly what she is feeling. Warm, sharp, and quick to tease $HIKULU when he overthinks a groove.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* The Council of Elders */}
+        <section className="rounded-3xl border-2 border-border bg-card/60 p-8 md:p-12 text-center">
+          <div className="text-5xl mb-3">&#127963;&#65039;</div>
+          <h2 className="text-4xl font-black text-foreground mb-1">The Council of Elders</h2>
+          <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-6">Five voices on the high bench</p>
+          <p className="text-lg italic text-foreground max-w-2xl mx-auto mb-8">
+            Beside the two judges sits a council of five AI elders, and each listens for one thing only. Call any of them by name in the battle chat and they will answer, automatically.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 text-left">
+            <div className="rounded-2xl border border-emerald-400/30 bg-card/80 p-5">
+              <h3 className="font-bold text-emerald-400 mb-2">&#129345; NGOMA</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Elder of the Drum</p>
+              <p className="text-sm text-muted-foreground">He judges the rhythm alone: the groove, the pocket, whether the drums tell the truth.</p>
+            </div>
+            <div className="rounded-2xl border border-sky-400/30 bg-card/80 p-5">
+              <h3 className="font-bold text-sky-400 mb-2">&#128220; JELI</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Elder of the Word</p>
+              <p className="text-sm text-muted-foreground">Born of griot blood. He judges the pen: the lyrics, the story, and who the song speaks for.</p>
+            </div>
+            <div className="rounded-2xl border border-purple-400/30 bg-card/80 p-5">
+              <h3 className="font-bold text-purple-400 mb-2">&#127925; KALIMBA</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Elder of Melody</p>
+              <p className="text-sm text-muted-foreground">She judges the tune: the hooks, the harmony, the melody that stays in your mouth for days.</p>
+            </div>
+            <div className="rounded-2xl border border-orange-400/30 bg-card/80 p-5">
+              <h3 className="font-bold text-orange-400 mb-2">&#128293; IMBOKODO</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Elder of Fire</p>
+              <p className="text-sm text-muted-foreground">Named for the grinding stone. She judges presence and command: did you stand tall and mean it?</p>
+            </div>
+            <div className="rounded-2xl border border-cyan-400/30 bg-card/80 p-5">
+              <h3 className="font-bold text-cyan-400 mb-2">&#8987; MZEE</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Elder of Time</p>
+              <p className="text-sm text-muted-foreground">The oldest voice on the bench. He judges legacy: will this song still be sung when the arena is dust?</p>
             </div>
           </div>
         </section>
@@ -342,7 +410,7 @@ const Learn = () => {
             <Trophy className="h-7 w-7 text-accent mb-3" />
             <h3 className="text-lg font-bold text-foreground mb-3">After the battle</h3>
             <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-              <li>Check the Results tab for final scores and $HIKULU's verdict.</li>
+              <li>Check the Results tab for final scores and the verdicts from $HIKULU and NAKULU.</li>
               <li>Winners hit the $ongChainn feed automatically. Share the result card to X and tag the artists.</li>
               <li>Voting, joining rooms and showing up earn you loyalty points on the $ongChainn leaderboard.</li>
               <li>When you lose a round, take it like a champ: there is always a rematch.</li>

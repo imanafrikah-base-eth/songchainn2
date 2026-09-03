@@ -37,7 +37,7 @@ export function usePushNotifications() {
     if (!isSupported) {
       toast({
         title: 'Not Supported',
-        description: 'Push notifications are not supported in this browser.',
+        description: 'This browser cannot show notifications.',
         variant: 'destructive'
       });
       return false;
@@ -56,7 +56,7 @@ export function usePushNotifications() {
       } else if (result === 'denied') {
         toast({
           title: 'Notifications Blocked',
-          description: 'Please enable notifications in your browser settings.',
+          description: 'Turn notifications on in your browser settings.',
           variant: 'destructive'
         });
       }
@@ -108,8 +108,8 @@ export function usePushNotifications() {
         console.error('Error subscribing to push:', error);
       }
       toast({
-        title: 'Subscription Failed',
-        description: 'Could not subscribe to notifications.',
+        title: 'Could not turn on notifications',
+        description: 'Something went wrong. Please try again.',
         variant: 'destructive'
       });
       return false;
@@ -146,8 +146,8 @@ export function usePushNotifications() {
   const showLocalNotification = useCallback((title: string, options?: NotificationOptions) => {
     if (permission === 'granted') {
       new Notification(title, {
-        icon: '/favicon.png',
-        badge: '/favicon.png',
+        icon: '/favicon.webp',
+        badge: '/favicon.webp',
         ...options
       });
     }

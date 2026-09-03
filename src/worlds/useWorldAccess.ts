@@ -6,6 +6,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { getConnectedAccounts } from '@/lib/baseWallet';
 import { requestWalletConnection } from '@/lib/walletGate';
@@ -83,6 +85,7 @@ export interface WorldAccess {
 export function useWorldAccess(world: WorldConfig): WorldAccess {
   const [wallet, setWallet] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Recover an already-connected wallet: the signed-in user's saved address
   // first, then any account the browser wallet already exposes.
@@ -141,13 +144,28 @@ export function useWorldAccess(world: WorldConfig): WorldAccess {
   });
 
   const connect = useCallback(async () => {
+    // The gate only reads a wallet that is linked to an account, so a guest
+    // is sent to sign in first. Connecting a wallet nothing will check is a
+    // door that looks like it opens and does not.
+    if (isSupabaseConfigured) {
+      const { data } = await supabase.auth.getSession();
+      if (!data?.session) {
+        toast('Sign in first, then link your wallet and your doors will show.');
+        navigate('/?auth=signin');
+        return null;
+      }
+    }
     const address = await requestWalletConnection();
     if (address) {
       setWallet(address);
+      // requestWalletConnection saves the address on the account in the
+      // background; give that write a moment before the gate is asked again,
+      // or it answers for the old, walletless account.
+      await new Promise((r) => setTimeout(r, 600));
       void queryClient.invalidateQueries({ queryKey: ['world-gate', world.slug] });
     }
     return address;
-  }, [queryClient, world.slug]);
+  }, [navigate, queryClient, world.slug]);
 
   const refresh = useCallback(() => {
     void refetch();

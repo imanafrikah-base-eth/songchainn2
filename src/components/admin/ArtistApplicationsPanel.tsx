@@ -123,7 +123,7 @@ function SongRow({
       const { data: audioPublic } = supabase.storage.from('songs-audio').getPublicUrl(audioDestPath);
 
       let coverPublicUrl: string | null = null;
-      let linkedArtist = artistChoice !== '__new__' ? allArtists.find((a) => a.id === artistChoice) : null;
+      const linkedArtist = artistChoice !== '__new__' ? allArtists.find((a) => a.id === artistChoice) : null;
 
       if (song.cover_path) {
         const coverExt = song.cover_path.includes('.') ? song.cover_path.split('.').pop() : 'jpg';

@@ -5,17 +5,33 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verifyMessage } from 'npm:viem';
 
-// SIWE domain allowlist — prod only by default. Override locally via
-// ALLOWED_SIWE_DOMAINS env (CSV). NEVER ship localhost in prod env.
-const ALLOWED_DOMAINS = new Set<string>(
-  (Deno.env.get('ALLOWED_SIWE_DOMAINS') ?? 'songchainn.xyz,app.songchainn.xyz,www.songchainn.xyz')
-    .split(',').map((s) => s.trim()).filter(Boolean),
-);
+// SIWE domain allowlist. The domain line in a signed message is the only thing
+// binding that signature to this site, so anything on this list can spend a
+// signature a user produced here. Real deployments only.
+const PROD_DOMAINS = 'songchainn.xyz,www.songchainn.xyz,app.songchainn.xyz,beta.songchainn.xyz';
+const PROD_ORIGINS = 'https://songchainn.xyz,https://www.songchainn.xyz,https://app.songchainn.xyz,https://beta.songchainn.xyz';
 
-const ALLOWED_ORIGINS = new Set<string>(
-  (Deno.env.get('ALLOWED_ORIGINS') ?? 'https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz')
-    .split(',').map((s) => s.trim()).filter(Boolean),
-);
+// Local development is opt-in and off unless someone deliberately sets
+// SIWE_ALLOW_LOCALHOST=true on this function. Localhost on the list means a
+// signature phished from a page the user was told to run locally would be
+// accepted here, so it must never be the default.
+const ALLOW_LOCALHOST = (Deno.env.get('SIWE_ALLOW_LOCALHOST') ?? '').toLowerCase() === 'true';
+const LOCAL_DOMAINS = 'localhost:5173,127.0.0.1:5173,localhost:4173,127.0.0.1:4173';
+const LOCAL_ORIGINS = 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173';
+
+function listFrom(...parts: string[]): Set<string> {
+  return new Set(parts.flatMap((p) => p.split(',')).map((s) => s.trim()).filter(Boolean));
+}
+
+// ALLOWED_SIWE_DOMAINS / ALLOWED_ORIGINS still override everything when set,
+// for a preview deployment on a domain nobody predicted.
+const ALLOWED_DOMAINS = Deno.env.get('ALLOWED_SIWE_DOMAINS')
+  ? listFrom(Deno.env.get('ALLOWED_SIWE_DOMAINS')!)
+  : listFrom(PROD_DOMAINS, ALLOW_LOCALHOST ? LOCAL_DOMAINS : '');
+
+const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')
+  ? listFrom(Deno.env.get('ALLOWED_ORIGINS')!)
+  : listFrom(PROD_ORIGINS, ALLOW_LOCALHOST ? LOCAL_ORIGINS : '');
 
 // Messages older than 5 minutes are rejected as stale / replayed.
 const MAX_AGE_MS = 5 * 60 * 1000;
@@ -47,9 +63,9 @@ function parseSiwe(message: string) {
 
 function checkTimestamps(issuedAt: string, expirationTime: string): string | null {
   const issuedMs = new Date(issuedAt).getTime();
-  if (isNaN(issuedMs)) return 'Invalid issuedAt timestamp';
+  if (isNaN(issuedMs)) return 'That sign-in request was not readable. Please try again.';
   if (issuedMs > Date.now() + 30_000) return 'Message issued in the future';
-  if (Date.now() - issuedMs > MAX_AGE_MS) return 'Message expired — sign in again';
+  if (Date.now() - issuedMs > MAX_AGE_MS) return 'That sign-in request expired. Sign in again.';
   if (expirationTime) {
     const exp = new Date(expirationTime).getTime();
     if (!isNaN(exp) && Date.now() > exp) return 'Message past expiration time';

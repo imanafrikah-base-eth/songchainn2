@@ -122,7 +122,7 @@ export function WorldDoor({
               )}
               {state === 'no-wallet' && <span className="text-white/60">Connect to see your doors.</span>}
               {state === 'event' && (
-                <span className="text-white/60">No live moment right now. The next one lights this door up.</span>
+                <span className="text-white/60">No live moment right now. The first one is being scheduled.</span>
               )}
             </div>
           </div>

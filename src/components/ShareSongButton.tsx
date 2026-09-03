@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Share2, Link2, Copy, Check, X, Music, ChevronRight } from 'lucide-react';
+import { Share2, Link2, Copy, Check, X, Music, ChevronRight, MessageCircle } from 'lucide-react';
 import { useShare } from '@/hooks/useShare';
-import { useSocial } from '@/hooks/useSocial';
+import { SendSongSheet } from '@/components/social/SendSongSheet';
+import { shareToFeed } from '@/lib/shareToFeed';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { fcComposeCast, fcOpenUrl, isInMiniApp } from '@/lib/farcasterActions';
@@ -53,12 +54,12 @@ export function ShareSongButton({
   className = '',
 }: ShareSongButtonProps) {
   const [showSheet, setShowSheet] = useState(false);
+  const [showSendTo, setShowSendTo] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inMiniApp, setInMiniApp] = useState(false);
   const [postingToFeed, setPostingToFeed] = useState(false);
   const postingToFeedRef = useRef(false);
   const { getSongShareUrl } = useShare();
-  const { createPost } = useSocial();
 
   const shareUrl = getSongShareUrl({ id: songId });
   const shareText = `"${songTitle}" by ${artistName} 🎵`;
@@ -99,7 +100,7 @@ export function ShareSongButton({
       toast.success('Link copied!');
       setTimeout(() => { setCopied(false); setShowSheet(false); }, 1800);
     } else {
-      toast.error('Failed to copy link');
+      toast.error('Could not copy that link');
     }
   }, [copyText, shareUrl]);
 
@@ -150,16 +151,18 @@ export function ShareSongButton({
     postingToFeedRef.current = true;
     setPostingToFeed(true);
     try {
-      const ok = await createPost('', 'song_share', songId);
-      if (ok) {
+      const res = await shareToFeed({ postType: 'song_share', songId });
+      if (res.ok) {
         toast.success('Shared to your feed');
         setShowSheet(false);
+      } else {
+        toast.error('Could not share that', { description: res.error });
       }
     } finally {
       postingToFeedRef.current = false;
       setPostingToFeed(false);
     }
-  }, [createPost, songId]);
+  }, [songId]);
 
   const platforms = useMemo(() => [
     {
@@ -305,6 +308,25 @@ export function ShareSongButton({
 
               {/* Action rows */}
               <div className="px-4 pb-4 space-y-2">
+                {/*
+                  Send it to somebody here. On a music app the most natural share
+                  is not a link posted outward, it is a record handed to one
+                  person, and it arrives in their inbox ready to play.
+                */}
+                <button
+                  type="button"
+                  onClick={() => { setShowSheet(false); setShowSendTo(true); }}
+                  className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/10 active:bg-white/[12%] rounded-2xl px-4 py-3.5 transition-colors border border-white/5"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <MessageCircle className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm font-medium text-white">Send to someone</p>
+                    <p className="text-[11px] text-white/35">It lands in their inbox, ready to play</p>
+                  </div>
+                </button>
+
                 {/* Copy Link */}
                 <button
                   type="button"
@@ -354,6 +376,12 @@ export function ShareSongButton({
     <>
       {trigger}
       {typeof document !== 'undefined' && createPortal(sheet, document.body)}
+      <SendSongSheet
+        songId={songId}
+        songTitle={`${songTitle} by ${artistName}`}
+        isOpen={showSendTo}
+        onClose={() => setShowSendTo(false)}
+      />
     </>
   );
 }

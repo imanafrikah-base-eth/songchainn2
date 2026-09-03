@@ -2,10 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { X, Unlock, Loader2, Music, Wallet, AlertCircle, Check, ArrowRight, Crown, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AdultOnly } from '@/components/AdultOnly';
 import { Song } from '@/data/musicData';
 import { hasWalletProvider } from '@/lib/baseWallet';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { getEthUsdPrice } from '@/lib/ethPrice';
+import { recordCopyPurchase } from '@/hooks/useSongCopies';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
@@ -18,9 +21,21 @@ interface UnlockSongModalProps {
   onWalletConnected?: (address: string) => void;
 }
 
-// Pricing options (ETH equivalents at ~$3,500/ETH)
-const UNLOCK_PRICE_ETH = "0.00009";  // ~$0.30 USD - streaming access only
-const BUY_PRICE_ETH = "0.00029";     // ~$1.00 USD - full ownership
+/*
+ * A dollar buys one digital copy.
+ *
+ * These used to be two hardcoded ETH amounts with "~$0.30" and "~$1.00" written
+ * next to them in a comment, pinned to an ETH price from whenever they were
+ * typed. A dollar has to actually be a dollar for "you paid $1, it is worth this
+ * now" to mean anything, so the ETH amount is computed from the live rate at the
+ * moment of purchase instead.
+ */
+const COPIES_SINGLE = 1;
+const COPIES_BUNDLE = 5;
+const USD_PER_COPY = 1;
+
+// Only used if the price feed is unreachable, so a purchase is still possible.
+const FALLBACK_ETH_USD = 3500;
 
 type Step = 'connect' | 'select' | 'confirm' | 'signing' | 'processing' | 'success' | 'error';
 type PurchaseType = 'unlock' | 'buy';
@@ -44,8 +59,24 @@ export function UnlockSongModal({
 
   const hasWallet = hasWalletProvider();
   const isConnected = !!connectedAddress;
-  
-  const selectedPrice = purchaseType === 'buy' ? BUY_PRICE_ETH : UNLOCK_PRICE_ETH;
+
+  // The live ETH price, so a dollar is a dollar at the moment of purchase.
+  const [ethUsd, setEthUsd] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    void getEthUsdPrice().then((usd) => {
+      if (!cancelled) setEthUsd(usd);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen]);
+
+  const selectedCopies = purchaseType === 'buy' ? COPIES_BUNDLE : COPIES_SINGLE;
+  const selectedUsd = selectedCopies * USD_PER_COPY;
+  const rate = ethUsd ?? FALLBACK_ETH_USD;
+  const selectedPrice = (selectedUsd / rate).toFixed(8);
+  const singleEth = (USD_PER_COPY / rate).toFixed(8);
+  const bundleEth = ((COPIES_BUNDLE * USD_PER_COPY) / rate).toFixed(8);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -120,6 +151,17 @@ export function UnlockSongModal({
       if (result.success) {
         setStep('success');
 
+        // The receipt. Without it the app can never say what was paid, and
+        // "worth this much now" has nothing to be measured against.
+        void recordCopyPurchase({
+          songId: song.id,
+          copies: selectedCopies,
+          usdPaid: selectedUsd,
+          ethPaid: selectedPrice,
+          walletAddress: connectedAddress,
+          txHash: (result as { txHash?: string }).txHash,
+        });
+
         // Fire confetti celebration
         confetti({
           particleCount: 100,
@@ -128,20 +170,22 @@ export function UnlockSongModal({
           colors: ['#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6']
         });
 
-        toast.success(purchaseType === 'buy'
-          ? '🎉 Congratulations! You now own this track!'
-          : '🎉 Congratulations! Song unlocked!');
+        toast.success(
+          selectedCopies === 1
+            ? 'You own a copy of this song'
+            : `You own ${selectedCopies} copies of this song`,
+        );
 
         setTimeout(() => {
           onClose();
           setStep('select');
         }, 3500);
       } else {
-        setError(result.error || 'Failed to unlock song');
+        setError(result.error || 'The purchase did not go through. Nothing was charged.');
         setStep('error');
       }
     } catch (err: any) {
-      setError(err?.message || 'An error occurred');
+      setError(err?.message || 'The transaction did not go through. Check your wallet and try again.');
       setStep('error');
     } finally {
       submittingRef.current = false;
@@ -268,12 +312,12 @@ export function UnlockSongModal({
                   </div>
                   
                   <p className="text-lg font-semibold text-foreground mb-2">
-                    {purchaseType === 'buy' ? 'You now own this track!' : 'Song Unlocked!'}
+                    {purchaseType === 'buy' ? 'You now own this track!' : 'You own it'}
                   </p>
                   
                   <p className="text-muted-foreground text-sm">
                     {purchaseType === 'buy' 
-                      ? 'Enjoy unlimited streaming + 1,000 offline plays' 
+                      ? 'Enjoy unlimited streaming' 
                       : 'Enjoy unlimited streaming access'}
                   </p>
                   
@@ -315,13 +359,13 @@ export function UnlockSongModal({
               >
                 <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-full bg-primary/20 flex items-center justify-center relative">
                   <motion.div
-                    className="absolute inset-0 rounded-full border-2 border-primary/30"
+                    className="absolute inset-0 rounded-full border-2 border-border"
                     animate={{ rotate: 360 }}
                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                   />
                   <Loader2 size={28} className="text-primary animate-spin" />
                 </div>
-                <h3 className="text-lg font-semibold">Processing Transaction</h3>
+                <h3 className="text-lg font-semibold">Sending your payment</h3>
                 <motion.p 
                   key={processingStatus}
                   initial={{ opacity: 0, y: 5 }}
@@ -336,7 +380,7 @@ export function UnlockSongModal({
                     <span>Do not close this window</span>
                   </div>
                   <p className="text-xs text-muted-foreground/60">
-                    Song will unlock once confirmed on blockchain
+                    Your copy lands once the transaction confirms on Base
                   </p>
                 </div>
               </motion.div>
@@ -352,9 +396,9 @@ export function UnlockSongModal({
                 <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-full bg-destructive/20 flex items-center justify-center">
                   <AlertCircle size={28} className="text-destructive" />
                 </div>
-                <h3 className="text-lg font-semibold text-destructive">Transaction Failed</h3>
+                <h3 className="text-lg font-semibold text-destructive">Payment did not go through</h3>
                 <p className="text-muted-foreground text-sm mt-2 px-4">
-                  {error || 'Something went wrong. Please try again.'}
+                  {error || 'The purchase did not complete. Nothing was charged, and you can try again.'}
                 </p>
                 <Button onClick={handleRetry} className="mt-4" variant="outline">
                   Try Again
@@ -368,7 +412,7 @@ export function UnlockSongModal({
                 <div className="text-center mb-4 sm:mb-6">
                   <h3 className="text-lg font-semibold mb-2">Connect Wallet</h3>
                   <p className="text-sm text-muted-foreground">
-                    Connect your wallet to unlock this song
+                    Connect your wallet to own a copy of this song
                   </p>
                 </div>
 
@@ -423,7 +467,8 @@ export function UnlockSongModal({
                   </div>
                 )}
 
-                <h3 className="text-base font-semibold mb-3">Choose an option</h3>
+                <h3 className="text-base font-semibold mb-1">How many copies?</h3>
+                <p className="text-xs text-muted-foreground mb-3">One dollar is one copy. What it is worth after that follows the song.</p>
 
                 {/* Unlock Option */}
                 <motion.button
@@ -438,15 +483,15 @@ export function UnlockSongModal({
                         <Unlock size={20} className="text-amber-500" />
                       </div>
                       <div>
-                        <div className="font-semibold text-foreground">Unlock</div>
+                        <div className="font-semibold text-foreground">One copy</div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Unlimited streaming access
+                          Your name on the song, and it counts toward your standing
                         </p>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="text-lg font-bold text-primary">~$0.30</div>
-                      <div className="text-xs text-muted-foreground">{UNLOCK_PRICE_ETH} ETH</div>
+                      <div className="text-lg font-bold text-primary">$1</div>
+                      <div className="text-xs text-muted-foreground">{singleEth} ETH</div>
                     </div>
                   </div>
                 </motion.button>
@@ -460,7 +505,7 @@ export function UnlockSongModal({
                 >
                   <div className="absolute top-2 right-2">
                     <span className="text-[10px] font-bold uppercase bg-primary text-primary-foreground px-1.5 py-0.5 rounded">
-                      Best Value
+                      Backs them more
                     </span>
                   </div>
                   <div className="flex items-start justify-between gap-3">
@@ -469,21 +514,21 @@ export function UnlockSongModal({
                         <Crown size={20} className="text-primary" />
                       </div>
                       <div>
-                        <div className="font-semibold text-foreground">Buy & Own</div>
+                        <div className="font-semibold text-foreground">Five copies</div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Full ownership + 1,000 offline plays
+                          Five times the holding, and it counts toward Top Fan
                         </p>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0 mt-4">
-                      <div className="text-lg font-bold text-primary">~$1.00</div>
-                      <div className="text-xs text-muted-foreground">{BUY_PRICE_ETH} ETH</div>
+                      <div className="text-lg font-bold text-primary">$5</div>
+                      <div className="text-xs text-muted-foreground">{bundleEth} ETH</div>
                     </div>
                   </div>
                 </motion.button>
 
                 <p className="text-xs text-center text-muted-foreground mt-4">
-                  95% goes directly to the artist • Base blockchain
+                  Settled on Base, from your own wallet.
                 </p>
               </>
             )}
@@ -554,69 +599,80 @@ export function UnlockSongModal({
                       <span className="text-muted-foreground">Network</span>
                       <span className="font-medium">Base</span>
                     </div>
+                    {/*
+                      This row said "Artist Share 95%", next to the amount, at the
+                      moment of payment. No split executes: the purchase is a swap
+                      into the coin's pool. Stating a number the code does not
+                      produce is the worst place in the product to be wrong.
+                    */}
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Artist Share</span>
-                      <span className="font-medium text-green-500">95%</span>
+                      <span className="text-muted-foreground">Settles</span>
+                      <span className="font-medium">From your own wallet</span>
                     </div>
                   </div>
+                  <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+                    The price of this coin moves. What you hold can be worth less than you paid,
+                    including nothing. This is not financial advice.
+                  </p>
                 </div>
 
                 {/* What you get */}
                 <div className="space-y-2 mb-4 sm:mb-6">
-                  <h4 className="text-sm font-medium">What you get:</h4>
+                  <h4 className="text-sm font-medium">
+                    What {selectedCopies === 1 ? 'a copy' : `${selectedCopies} copies`} gets you
+                  </h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    {purchaseType === 'buy' ? (
-                      <>
-                        <li className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          Unlimited streaming access
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          1,000 offline plays
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          Own the song token on Base
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          Support the artist directly
-                        </li>
-                      </>
-                    ) : (
-                      <>
-                        <li className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          Unlimited streaming access
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          Support the artist directly
-                        </li>
-                      </>
-                    )}
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      {selectedCopies === 1 ? 'One digital copy' : `${selectedCopies} digital copies`} of this
+                      song, held in your own wallet
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Worth whatever the song is worth from here, which can be less than you paid
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Counts toward your holder tier, so every point you earn is worth more
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Counts toward Top Fan of this artist
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Can open doors the artist locks in their world
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Backs this artist directly, on Base
+                    </li>
                   </ul>
                 </div>
 
-                {/* Action Button */}
-                <Button
-                  onClick={handleUnlock}
-                  disabled={isBalanceLoading || !hasEnoughBalance}
-                  className="w-full gradient-primary text-primary-foreground h-11 sm:h-12"
-                >
-                  {purchaseType === 'buy' ? (
-                    <>
-                      <Crown size={18} className="mr-2" />
-                      Buy for {selectedPrice} ETH
-                    </>
-                  ) : (
-                    <>
-                      <Unlock size={18} className="mr-2" />
-                      Unlock for {selectedPrice} ETH
-                    </>
-                  )}
-                </Button>
+                {/* "Anything involving money" is the fourth door the Terms close
+                    to under-18s, and buying a coin is the plainest example of
+                    one. Listening is untouched: this gates the purchase, not
+                    the music. */}
+                <AdultOnly reason="money">
+                  <Button
+                    onClick={handleUnlock}
+                    disabled={isBalanceLoading || !hasEnoughBalance}
+                    className="w-full gradient-primary text-primary-foreground h-11 sm:h-12"
+                  >
+                    {purchaseType === 'buy' ? (
+                      <>
+                        <Crown size={18} className="mr-2" />
+                        Buy for {selectedPrice} ETH
+                      </>
+                    ) : (
+                      <>
+                        <Unlock size={18} className="mr-2" />
+                        Unlock for {selectedPrice} ETH
+                      </>
+                    )}
+                  </Button>
+                </AdultOnly>
 
                 <p className="text-xs text-center text-muted-foreground mt-3">
                   Gas fees apply • Powered by Base

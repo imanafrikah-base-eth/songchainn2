@@ -12,6 +12,7 @@ import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { SongCardMotion, normaliseSongCard } from '@/components/social/SongCardMotion';
 import { useShare } from '@/hooks/useShare';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePulseCounts } from '@/hooks/usePopularity';
@@ -61,6 +62,12 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
     : null;
 
   const battleMatch = post.content?.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)::(.*)/);
+  /** Something the person uploaded, as opposed to artwork we already had. */
+  const hasOwnMedia = !!post.media_url;
+  const tagged = post.tagged ?? [];
+  /* A song card is made in the app out of a track already on SONGCHAINN, so it
+     is stored as data and drawn here rather than fetched as a file. */
+  const songCard = normaliseSongCard(post.songcard);
   const totalPulses = pulseCounts && song ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count ?? 0) : 0;
   const coverUrl    = isArtistFollowPost ? (postArtist?.profileImage ?? artistSong?.coverImage) : activeSong?.coverImage;
 
@@ -111,7 +118,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
 
       {/* Full-bleed blurred background */}
       {isWelcomePost ? (
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/60 via-purple-600/40 to-pink-600/50" />
+        <div className="absolute inset-0 bg-secondary" />
       ) : coverUrl && !imgErr ? (
         <>
           <img src={coverUrl} alt="" aria-hidden onError={handleImgError}
@@ -119,7 +126,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
           <div className="absolute inset-0 bg-black/55" />
         </>
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-background/60 to-primary/10" />
+        <div className="absolute inset-0 bg-secondary" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-black/40 pointer-events-none" />
 
@@ -173,7 +180,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
                 <img src={postArtist.profileImage ?? '/placeholder.svg'} alt={postArtist.name}
                   className="w-full h-full object-cover" onError={handleImgError} />
                 {/* Pulsing ring */}
-                <motion.div className="absolute inset-0 rounded-full border-4 border-primary/40"
+                <motion.div className="absolute inset-0 rounded-full border-4 border-border"
                   animate={{ scale: [1, 1.1, 1], opacity: [0.6, 0, 0.6] }}
                   transition={{ duration: 2, repeat: Infinity }} />
               </motion.div>
@@ -188,8 +195,44 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
             </div>
           )}
 
+          {/* A PICTURE OR A CLIP the person posted themselves.
+              It fills the card, because a photograph shrunk into a corner is
+              not the thing they wanted to show. It also wins over the spinning
+              disc: their own work comes first. */}
+          {hasOwnMedia && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black">
+              {post.media_kind === 'video' ? (
+                <video
+                  src={post.media_url!}
+                  poster={post.media_poster_url ?? undefined}
+                  className="h-full w-full object-contain"
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              ) : (
+                <img
+                  src={post.media_url!}
+                  alt={post.content ?? 'A post'}
+                  className="h-full w-full object-contain"
+                  loading="lazy"
+                  onError={handleImgError}
+                />
+              )}
+            </div>
+          )}
+
+          {/* A SONG CARD somebody made in the app. */}
+          {!hasOwnMedia && songCard && (
+            <div className="absolute inset-0 flex items-center justify-center px-8 py-16">
+              <div className="w-full max-w-[300px]">
+                <SongCardMotion card={songCard} large />
+              </div>
+            </div>
+          )}
+
           {/* SONG — spinning disc artwork */}
-          {!isWelcomePost && !isArtistFollowPost && !isPlaylistCreatedPost && !isRoomEnteredPost && (
+          {!hasOwnMedia && !songCard && !isWelcomePost && !isArtistFollowPost && !isPlaylistCreatedPost && !isRoomEnteredPost && (
             <>
               {coverUrl && !imgErr ? (
                 <motion.div
@@ -327,7 +370,12 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
       </div>
 
       {/* Bottom info */}
-      <div className="absolute bottom-0 left-0 right-16 p-4 z-10">
+      {/* The caption sits at the foot of a full bleed slide, and the tab bar is
+          fixed over the same pixels, so p-4 alone put the last line of every
+          post underneath it. The bar is 56px plus the home indicator; this
+          clears both and goes back to normal padding on desktop, where the bar
+          does not exist. */}
+      <div className="absolute bottom-0 left-0 right-16 p-4 pb-24 md:pb-4 z-10">
         <button onClick={goToProfile} className="flex items-center gap-2 mb-2">
           <span className="font-bold text-white text-base truncate max-w-[220px]">
             @{post.profile?.profile_name || 'Anonymous'}
@@ -400,6 +448,30 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
         {!isWelcomePost && !isArtistFollowPost && !isSongLikePost && !isSongPulsePost && !isSongCommentPost
           && !isPlaylistCreatedPost && !isRoomEnteredPost && post.content && (
           <p className="text-white/90 text-sm mb-2 line-clamp-2">{post.content}</p>
+        )}
+
+        {/* Who is in it. Names, not avatars: a row of tiny faces tells you
+            nothing, and the name is what people scan for. */}
+        {tagged.length > 0 && (
+          <p className="mb-2 text-xs text-white/70">
+            with{' '}
+            {tagged.slice(0, 3).map((person, i) => (
+              <span key={person.user_id}>
+                {i > 0 && ', '}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/audience/${person.user_id}`);
+                  }}
+                  className="font-semibold text-white underline-offset-2 hover:underline"
+                >
+                  {person.display_name}
+                </button>
+              </span>
+            ))}
+            {tagged.length > 3 && ` and ${tagged.length - 3} more`}
+          </p>
         )}
 
         {battleMatch && (

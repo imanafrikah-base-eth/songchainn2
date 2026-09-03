@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 const logo = '/songchainn-logo.webp';
-const wavewarzHeroBackground = '/wavewarz-africa-background.png';
+const wavewarzHeroBackground = '/wavewarz-africa-background.webp';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { SearchModal } from '@/components/SearchModal';
 import { CountryCodeSelector } from '@/components/CountryCodeSelector';
@@ -31,7 +31,12 @@ import { CARD_TILES } from '@/data/backgroundPools';
 import { ZabalGamezSection } from '@/components/ZabalGamezSection';
 import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
 import { MusicianCta } from '@/components/MusicianCta';
-import { AUTH_PROVIDERS } from '@/lib/features';
+import { WorldsPhase3 } from '@/components/worlds/WorldsPhase3';
+import { HomeHero, type HeroFeature } from '@/components/HomeHero';
+import { pickHeroSong } from '@/lib/heroPick';
+import { GenreExplorer } from '@/components/GenreExplorer';
+import { claimInterruption, releaseInterruption } from '@/lib/interruptions';
+import { AUTH_PROVIDERS, WORLDS_ENABLED } from '@/lib/features';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
@@ -173,13 +178,25 @@ export default function Auth() {
       .slice(0, 6);
   }, [popularityBySongId]);
 
-  const previewArtists = useMemo(() => rankedArtists.slice(0, 8), [rankedArtists]);
+  // Every artist on the platform, not a top slice. There are eleven; showing
+  // all of them is the point, and the row scrolls.
+  const previewArtists = useMemo(() => rankedArtists, [rankedArtists]);
 
   const previewSongs = useMemo(() => {
     return [...SONGS].sort(
       (a, b) => (popularityBySongId.get(b.id) || b.plays || 0) - (popularityBySongId.get(a.id) || a.plays || 0)
     );
   }, [popularityBySongId]);
+
+  // The landing used to open on a three-line poster headline over a stock
+  // image: "Discover. Vibe. Support. Real music. Real people." Words about
+  // music. A first-time visitor could not tell what was actually on here.
+  // It opens on a real record now, and Play plays that exact record.
+
+  const landingFaces = useMemo(
+    () => previewArtists.map((a) => ({ id: a.id, name: a.name, image: a.profileImage })),
+    [previewArtists],
+  );
 
   // New music grouped by release: catalog drops collapse into one catalog
   // card (title + track count) while singles stand alone, pro-app style.
@@ -222,6 +239,30 @@ export default function Auth() {
 
     return releases.sort((a, b) => b.addedAt - a.addedAt).slice(0, 12);
   }, []);
+
+  const landingFeature = useMemo<HeroFeature | null>(() => {
+    const pick = pickHeroSong({
+      hotToday: hotTodaySongs.map(({ song }) => song),
+      newMusic: newMusicReleases.flatMap((r) => (r.kind === 'single' ? [r.song] : r.songs)),
+      allSongs: previewSongs,
+      playsFor: (s) => popularityBySongId.get(s.id) ?? s.plays ?? 0,
+    });
+    if (!pick) return null;
+    return {
+      id: pick.song.id,
+      title: pick.song.title,
+      artist: pick.song.artist,
+      coverImage: pick.song.coverImage,
+      label: pick.label,
+      href: `/song/${pick.song.id}`,
+    };
+  }, [hotTodaySongs, newMusicReleases, previewSongs, popularityBySongId]);
+
+  const handlePlayLanding = useCallback(() => {
+    const id = landingFeature?.id;
+    const song = previewSongs.find((s) => s.id === id) ?? hotTodaySongs[0]?.song ?? previewSongs[0];
+    if (song) playSong(song);
+  }, [landingFeature, hotTodaySongs, previewSongs, playSong]);
 
   const coinAddressBySongId = useMemo(() => {
     const map = new Map<string, string>();
@@ -589,6 +630,19 @@ export default function Auth() {
     setAuthView('main');
   }, []);
 
+  // Another page can land here with ?auth=signin or ?auth=signup and have the
+  // form already open. A world's "connect to see your doors" uses this: the
+  // gate only reads a wallet linked to an account, so a guest is walked to
+  // sign in first instead of connecting a wallet nothing will check.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const wanted = new URLSearchParams(window.location.search).get('auth');
+    if (wanted !== 'signin' && wanted !== 'signup') return;
+    setAuthMode(wanted);
+    setAuthView('main');
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+
   const handleNewMusicPlayAttempt = useCallback(() => {
     setAuthMode('signup');
     setAuthView('main');
@@ -689,10 +743,33 @@ export default function Auth() {
     };
   }, [clearMoshaTourTimers]);
 
-  // Delay Mo$ha by 3 s so it doesn't block navigation on first load
+  // Mo$ha used to open by itself three seconds after a stranger landed here,
+  // on top of the music, before they had scrolled once. A first-time visitor
+  // should meet the records first. He now waits for them to actually engage:
+  // they played something, or they scrolled past the hero. Even then the
+  // app-wide interruption budget has the final say, and the "Call Mo$ha"
+  // button is on screen the whole time for anyone who wants him sooner.
   useEffect(() => {
-    const t = window.setTimeout(() => setIsMoshaOpen(true), 3000);
-    return () => window.clearTimeout(t);
+    let done = false;
+    const offer = () => {
+      if (done) return;
+      if (!claimInterruption('mosha-landing', { priority: 'promo' })) return;
+      done = true;
+      setIsMoshaOpen(true);
+      window.removeEventListener('scroll', onScroll);
+    };
+    const onScroll = () => {
+      if (window.scrollY > window.innerHeight * 0.6) offer();
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // Backstop for someone who reads without scrolling. Well past the quiet
+    // window, so it never lands on arrival.
+    const t = window.setTimeout(offer, 45000);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('scroll', onScroll);
+      releaseInterruption('mosha-landing');
+    };
   }, []);
 
   useEffect(() => {
@@ -800,13 +877,34 @@ export default function Auth() {
           />
         </div>
 
+        {/* Phase Three, to a person who has not signed up yet. It sits this
+            high on purpose: a world is the most interesting thing on this page
+            and burying it under six rows of song art wastes it. */}
+        {WORLDS_ENABLED && (
+        <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-6 md:pt-8">
+          <WorldsPhase3
+            variant="guest"
+            onSignUp={() => {
+              setAuthMode('signup');
+              setAuthView('email');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSignIn={() => {
+              setAuthMode('signin');
+              setAuthView('email');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </div>
+        )}
+
         {ZABAL_GAMEZ_ENABLED && (
           <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-3 md:pt-4">
             <ZabalGamezSection source="auth" />
           </div>
         )}
 
-        <div className={`max-w-[1400px] mx-auto p-3 md:p-4${hotTodaySongs.length > 0 ? ' lg:grid lg:grid-cols-[280px_1fr] lg:gap-4' : ''}`}>
+        <div className={`max-w-[1400px] mx-auto p-3 md:p-4${hotTodaySongs.length > 0 ? ' lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-4' : ''}`}>
           {hotTodaySongs.length > 0 && (
           <aside className="hidden lg:block rounded-xl border border-border/40 bg-background/80 backdrop-blur p-3">
             <div className="flex items-center justify-between mb-3">
@@ -851,21 +949,11 @@ export default function Auth() {
           </aside>
           )}
 
-          <main className="rounded-xl border border-border/40 bg-background/80 backdrop-blur p-4 md:p-5">
-            {/* Landing hero */}
-            <section className="relative isolate overflow-hidden rounded-2xl mb-7 p-5 md:p-8 min-h-[13rem] flex flex-col justify-center">
-              <TileBackdrop image={CARD_TILES.heroArtist} opacity={0.55} />
-              <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground leading-[1.08]">
-                Discover.
-                <br />
-                Vibe.
-                <br />
-                Support.
-              </h1>
-              <p className="mt-3 text-sm md:text-base text-muted-foreground max-w-xs">
-                Real music. Real people. Real connection.
-              </p>
-            </section>
+          <main className="min-w-0 rounded-xl border border-border/40 bg-background/80 backdrop-blur p-4 md:p-5">
+            {/* Landing hero: one real record, its own artwork, at size. */}
+            {landingFeature ? (
+              <HomeHero feature={landingFeature} onPlay={handlePlayLanding} faces={landingFaces} />
+            ) : null}
 
             {hotTodaySongs.length > 0 && (
             <section id="hot-today" className="mb-7 lg:hidden">
@@ -909,7 +997,7 @@ export default function Auth() {
             </section>
             )}
 
-            <div className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-primary/20 p-4 md:p-5 mb-6">
+            <div className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-border p-4 md:p-5 mb-6">
               <TileBackdrop image={CARD_TILES.dailyMix} opacity={0.32} />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -927,7 +1015,7 @@ export default function Auth() {
                     type="button"
                     variant="outline"
                     onClick={() => scrollToSection('about-songchainn')}
-                    className="rounded-full border-primary/30 text-primary hover:bg-primary/10"
+                    className="rounded-full border-border text-primary hover:bg-primary/10"
                   >
                     About $ongChainn
                     <ArrowRight className="w-4 h-4 ml-2" />
@@ -944,7 +1032,7 @@ export default function Auth() {
               <div className="rounded-3xl border border-border/50 bg-gradient-to-br from-background via-background to-primary/5 p-5 md:p-6">
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                   <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary mb-3">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary mb-3">
                       <Sparkles className="w-3.5 h-3.5" />
                       About $ongChainn
                     </div>
@@ -968,7 +1056,7 @@ export default function Auth() {
                       ))}
                     </div>
 
-                    <div className="relative isolate overflow-hidden mt-4 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="relative isolate overflow-hidden mt-4 rounded-2xl border border-dashed border-border bg-primary/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <TileBackdrop image={CARD_TILES.makeMusic} opacity={0.28} />
                       <div className="flex items-start gap-2.5">
                         <Mic className="w-4 h-4 text-primary mt-0.5 shrink-0" />
@@ -983,7 +1071,7 @@ export default function Auth() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="rounded-full border-primary/30 text-primary hover:bg-primary/10 shrink-0"
+                        className="rounded-full border-border text-primary hover:bg-primary/10 shrink-0"
                         onClick={() => navigate('/about#artist-submission')}
                       >
                         Submit Your Music
@@ -993,7 +1081,7 @@ export default function Auth() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 md:p-5">
+                    <div className="rounded-2xl border border-border bg-primary/5 p-4 md:p-5">
                       <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
                         How your journey works
                       </p>
@@ -1029,7 +1117,7 @@ export default function Auth() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="rounded-full border-primary/30 text-primary hover:bg-primary/10"
+                          className="rounded-full border-border text-primary hover:bg-primary/10"
                           onClick={() => {
                             setAuthMode('signin');
                             setAuthView('email');
@@ -1099,7 +1187,7 @@ export default function Auth() {
                         key={`catalog-${release.artist}-${release.title}`}
                         type="button"
                         onClick={handleNewMusicPlayAttempt}
-                        className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 border border-primary/25 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group"
+                        className="text-left rounded-xl bg-secondary/30 hover:bg-secondary/45 border border-border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group"
                       >
                         <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                           {release.coverImage ? (
@@ -1194,64 +1282,29 @@ export default function Auth() {
               </div>
             </section>
 
-            <section id="all-songs">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-heading text-foreground">All Songs</h2>
-                <div className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium bg-primary/10 text-primary">
-                  One free play per song
-                </div>
-              </div>
-              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                  {previewSongs.map((song) => (
-                    <div
-                      key={song.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleSongPlayAttempt(song)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSongPlayAttempt(song); } }}
-                      className={cn(
-                        "text-left rounded-xl transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-2.5 group cursor-pointer",
-                        !user && guestLockedSongIds.has(song.id)
-                          ? "bg-secondary/20 border border-primary/30"
-                          : "bg-secondary/30 hover:bg-secondary/45"
-                      )}
-                    >
-                      <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
-                        {song.coverImage ? (
-                          <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
-                        )}
-                        {!user && guestLockedSongIds.has(song.id) ? (
-                          <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center">
-                            <Lock className="w-3 h-3 text-primary" />
-                          </div>
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center shadow-glow">
-                              <Play className="w-5 h-5 text-primary-foreground ml-0.5" fill="currentColor" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-sm text-foreground truncate">{song.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                      <p className="text-[11px] text-muted-foreground truncate mt-1">{song.genre}</p>
-                      {coinAddressBySongId.has(song.id) && (
-                        <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" className="mt-1.5" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
+            {/* Was "All Songs": 230 records in a six-column dump, with the same
+                cover repeating four and five times in a row because catalog
+                mates share artwork. Replaced by a way in. */}
+            <GenreExplorer
+              songs={previewSongs}
+              onPlay={handleSongPlayAttempt}
+              isLocked={(song) => !user && guestLockedSongIds.has(song.id)}
+            />
           </main>
         </div>
 
+        {/* Clearance for the Mo$ha launcher.
+
+            It is fixed at bottom-24, so it floats over whatever happens to be
+            at that height. Scrolled to the foot of the page that was the last
+            row of song cards, and it covered their titles outright with no
+            scroll left to move them out. A floating button is allowed to pass
+            over content on the way past; it is not allowed to park on it. */}
+        <div aria-hidden="true" className="h-36 sm:h-28" />
+
         {isMoshaOpen ? (
           <div className="fixed right-3 sm:right-5 bottom-24 z-[64] w-[min(calc(100vw-1.25rem),22rem)]">
-            <div className="rounded-2xl border border-primary/30 bg-background/95 backdrop-blur p-3 shadow-2xl">
+            <div className="rounded-2xl border border-border bg-background/95 backdrop-blur p-3 shadow-2xl">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm text-foreground">
                   <span className="font-semibold">Hey fam.</span> {moshaLeadMessage}
@@ -1271,7 +1324,7 @@ export default function Auth() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 text-xs border-primary/30 text-primary"
+                  className="h-9 text-xs border-border text-primary"
                   onClick={startMoshaExploreTour}
                   disabled={isMoshaTourRunning}
                 >
@@ -1293,7 +1346,7 @@ export default function Auth() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9 text-xs border-primary/30 text-primary"
+                    className="h-9 text-xs border-border text-primary"
                     onClick={() => handleStartDailyMix('manual')}
                   >
                     Want to have a taste
@@ -1301,7 +1354,7 @@ export default function Auth() {
                 </div>
               )}
               {moshaTransient && (
-                <div className="mt-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                <div className="mt-2 rounded-xl border border-border bg-primary/5 px-3 py-2 text-xs text-foreground">
                   {moshaTransient}
                 </div>
               )}
@@ -1310,7 +1363,7 @@ export default function Auth() {
         ) : (
           <div className="fixed right-3 sm:right-5 bottom-24 z-[64] flex flex-col items-end gap-2">
             {moshaTransient && (
-              <div className="max-w-xs rounded-xl border border-primary/30 bg-background/95 px-3 py-2 text-xs text-foreground shadow-xl">
+              <div className="max-w-xs rounded-xl border border-border bg-background/95 px-3 py-2 text-xs text-foreground shadow-xl">
                 {moshaTransient}
               </div>
             )}
@@ -1325,7 +1378,7 @@ export default function Auth() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="w-[90vw] max-w-[18.5rem] sm:w-full sm:max-w-sm border border-primary/25 bg-background/95 shadow-2xl rounded-2xl p-3 sm:p-5 shine-overlay max-h-[80vh] sm:max-h-[88vh] overflow-auto"
+              className="w-[90vw] max-w-[18.5rem] sm:w-full sm:max-w-sm border border-border bg-background/95 shadow-2xl rounded-2xl p-3 sm:p-5 shine-overlay max-h-[80vh] sm:max-h-[88vh] overflow-auto"
             >
               <AnimatePresence mode="wait">
             {connectionState === 'success' && !pendingWalletConnection ? (
@@ -1368,7 +1421,7 @@ export default function Auth() {
                   </p>
                 </div>
 
-                  <div className="flex items-start gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 mb-6">
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-primary/5 border border-border mb-6">
                   <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Your wallet supports culture, identity, and future ownership on $ongChainn.
@@ -1478,7 +1531,7 @@ export default function Auth() {
                     setAuthView('email');
                     setError(null);
                   }}
-                  className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl border border-primary/40 bg-primary/5 text-foreground hover:bg-primary/10 transition-colors press-effect mb-5"
+                  className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl border border-border bg-primary/5 text-foreground hover:bg-primary/10 transition-colors press-effect mb-5"
                 >
                   <span className="flex items-center gap-3">
                     <Mail className="w-5 h-5 text-primary" />
@@ -1906,7 +1959,7 @@ export default function Auth() {
                   setAuthView('email');
                   setShowMixFinishedPrompt(false);
                 }}
-                className="border-primary/40 text-primary"
+                className="border-border text-primary"
               >
                 Sign Up
               </Button>

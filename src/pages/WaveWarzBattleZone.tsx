@@ -338,7 +338,7 @@ export default function WaveWarzBattleZone() {
             await (supabase as any).from('notifications').insert(notificationsPayload);
           }
 
-          toast({ title: 'Battle launched', description: 'The battle is now live and visible in feed + notifications.' });
+          toast({ title: 'Battle launched', description: 'The battle is live. People will see it in their feed and get a notification.' });
           await fetchBattles();
           await fetchLiveCounts();
           await ensureBattleConnected(newBattleId);
@@ -346,7 +346,7 @@ export default function WaveWarzBattleZone() {
           return;
         }
 
-        toast({ title: 'Battle scheduled', description: 'Your battle was scheduled successfully.' });
+        toast({ title: 'Battle scheduled', description: 'Your battle is set. We will tell people when it is about to start.' });
         setIsCreatePanelOpen(false);
         setCreateTitle('');
         setCreateDetails('');
@@ -435,7 +435,7 @@ export default function WaveWarzBattleZone() {
       setMicEnabled(true);
     } catch (error: any) {
       toast({
-        title: 'Mic unavailable',
+        title: 'Cannot use your microphone',
         description: String(error?.message || 'Allow microphone permission and try again'),
         variant: 'destructive',
       });

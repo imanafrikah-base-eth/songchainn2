@@ -7,13 +7,13 @@
   "miniapp": {
     "version": "1",
     "name": "$ongChainn",
-    "subtitle": "Music rewards",
-    "description": "Discover, stream, and collect music while supporting artists on Base and Farcaster.",
+    "subtitle": "Music you can own",
+    "description": "Stream music from artists worldwide, and own the songs you love. Artists publish direct and get paid direct, with nobody in between.",
     "homeUrl": "https://songchainn.xyz",
     "iconUrl": "https://songchainn.xyz/assets/icon.png",
-    "imageUrl": "https://songchainn.xyz/assets/splash.png",
+    "imageUrl": "https://songchainn.xyz/assets/splash.webp",
     "buttonTitle": "Open $ongChainn",
-    "splashImageUrl": "https://songchainn.xyz/assets/splash.png",
+    "splashImageUrl": "https://songchainn.xyz/assets/splash.webp",
     "splashBackgroundColor": "#1a0533",
     "primaryCategory": "music",
     "tags": [

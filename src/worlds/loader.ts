@@ -10,6 +10,7 @@
 // it. That rule is the whole reason this is a merge and not a migration.
 
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { worldKeyUrlFor } from '@/lib/artistCoins';
 import type {
   CityContentKind,
   WorldCityDef,
@@ -128,7 +129,10 @@ export function rowsToWorldConfig(
     artistName: world.artist_name,
     tokenSymbol: world.token_symbol,
     chain: 'base',
-    swapUrl: world.swap_url,
+    // A world's key is its artist's Zora creator coin, so the buy link is
+    // derived from the coin on record rather than typed in by hand. A saved
+    // swap_url still wins, for a world keyed on something else on purpose.
+    swapUrl: world.swap_url ?? (world.artist_id ? worldKeyUrlFor(world.artist_id) : null),
     farcasterUrl: world.farcaster_url ?? undefined,
     positioning: world.positioning,
     story: world.story ?? [],

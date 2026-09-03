@@ -2,7 +2,7 @@ import { Users, Music } from "lucide-react";
 import type { Battle } from "@/battlezone/hooks/useBattles";
 import LiveBadge from "./LiveBadge";
 import AppLink from "./AppLink";
-import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
 
 const ArtistAvatar = ({ name, image, side }: { name: string; image: string; side: "A" | "B" }) => (
   image ? (
@@ -30,8 +30,15 @@ const BattleCard = ({ battle }: { battle: Battle }) => {
   const totalVotes = battle.votesA + battle.votesB;
   const pctA = totalVotes ? Math.round((battle.votesA / totalVotes) * 100) : 50;
 
+  /*
+   * A live card goes straight into the room. It used to route through /entry,
+   * which re-fetched the battle purely to learn what this card already knows,
+   * so the first tap sat on "Joining the battle room..." for a round trip and
+   * felt like it had not registered. /entry still exists for shared links,
+   * where the status genuinely is unknown.
+   */
   return (
-    <AppLink to={isLive ? `/entry/${battle.id}` : `/battle/${battle.id}`} className="group flex h-full flex-col rounded-2xl border border-border bg-card/80 p-5 backdrop-blur transition-all hover:border-primary/30 hover:shadow-[0_0_30px_hsl(var(--neon-green)/0.08)]">
+    <AppLink to={isLive ? `/room/${battle.id}` : `/battle/${battle.id}`} className="group flex h-full flex-col rounded-2xl border border-border bg-card/80 p-5 backdrop-blur transition-all hover:border-primary/30 hover:shadow-[0_0_30px_hsl(var(--neon-green)/0.08)]">
       <div className="mb-3 flex min-h-6 items-center justify-between">
         {isLive && <LiveBadge />}
         {isEnded && (
@@ -39,7 +46,17 @@ const BattleCard = ({ battle }: { battle: Battle }) => {
             Ended
           </span>
         )}
-        <span className="text-xs text-muted-foreground">{battle.region}</span>
+        <span className="ml-auto flex items-center gap-2">
+          {/* Only the Open Mic is marked. Main Stage is the ordinary case, and
+              badging every card with it would say nothing while making the list
+              noisier. Marking the exception is the signal. */}
+          {battle.stage === "open_mic" && (
+            <span className="rounded-full border border-border px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+              Open Mic
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground">{battle.region}</span>
+        </span>
       </div>
 
       <h3 className="mb-4 min-h-[3.5rem] text-lg font-bold leading-snug text-foreground">{battle.title}</h3>

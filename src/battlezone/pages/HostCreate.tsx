@@ -8,9 +8,19 @@ import { useAuth } from "@/battlezone/contexts/AuthContext";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import AppLink from "@/battlezone/components/AppLink";
+import { HostFeeNotice } from "@/battlezone/components/HostFeeNotice";
+import { BuyWwat } from "@/components/BuyWwat";
+import { StagePicker } from "@/battlezone/components/StagePicker";
+import { STAGES, buildClock, type BattleStage } from "@/battlezone/lib/battleStages";
 import { toast } from "@/battlezone/hooks/use-toast";
 import { useBattles } from "@/battlezone/hooks/useBattles";
+import { useUserPoints } from "@/hooks/useUserPoints";
 import { ARTISTS, SONGS, type Song } from "@/data/musicData";
+
+/* A counter, not a clock: two mounts in the same millisecond would share a
+   channel name and therefore share one channel object. */
+let channelSeq = 0;
+const nextChannelId = () => ++channelSeq;
 
 const regions = ["Zambia", "South Africa", "Nigeria", "Zimbabwe", "Botswana"];
 
@@ -54,6 +64,8 @@ const HostCreate = () => {
   const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
   const [users, setUsers] = useState<SongchainUser[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [stage, setStage] = useState<BattleStage>("main_stage");
+  const { points: myPoints } = useUserPoints();
   const coHostDropdownRef = useRef<HTMLDivElement>(null);
   const { data: liveBattles = [] } = useBattles("live");
   // Battles stuck on 'live' for over a day are stale and must not brick the
@@ -144,7 +156,7 @@ const HostCreate = () => {
 
     // Set up real-time subscription for new users
     const subscription = supabase
-      .channel(`audience_profiles_changes-${Date.now()}`)
+      .channel(`audience_profiles_changes-${nextChannelId()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audience_profiles' },
@@ -192,6 +204,25 @@ const HostCreate = () => {
   }, []);
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
+
+  /**
+   * When the music ends and when voting and backing close, as real timestamps.
+   *
+   * Durations come from the chosen songs where the catalogue knows them, and
+   * buildClock falls back to a sane length for any it does not, so a battle can
+   * never think it has no music and close the second it opens.
+   */
+  const liveClock = () => {
+    const chosen = [...form.songAIds, ...form.songBIds]
+      .filter(Boolean)
+      .map((id) => SONGS.find((s) => s.id === id)?.duration);
+    const clock = buildClock(chosen as (number | null | undefined)[]);
+    const startedAt = Date.now();
+    return {
+      music_ends_at: new Date(startedAt + clock.musicEndsAt * 1000).toISOString(),
+      closes_at: new Date(startedAt + clock.closesAt * 1000).toISOString(),
+    };
+  };
 
   // Live audio runs on X Spaces while in-app voice is off; store a clean absolute URL.
   const normalizedSpaceUrl = (): string | null => {
@@ -358,6 +389,10 @@ const HostCreate = () => {
         songs_a: songsA.length ? songsA : null,
         songs_b: songsB.length ? songsB : null,
         battle_type: form.battleType,
+        stage,
+        /* points_spent is deliberately not sent. The database writes it when
+           the room actually opens, so a draft costs nothing and a client
+           cannot claim to have paid for a battle it never paid for. */
         host_user_id: user.id,
         host_name: profile?.display_name || profile?.username || (user as any).user_metadata?.display_name || (user as any).user_metadata?.username || (user.email || "").split("@")[0] || "Host",
         co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
@@ -424,6 +459,14 @@ const HostCreate = () => {
       return;
     }
 
+    if (isLaunchNow && stage === "open_mic" && myPoints < STAGES.open_mic.pointsCost) {
+      toast({
+        title: "Not enough points yet",
+        description: `Hosting an Open Mic costs ${STAGES.open_mic.pointsCost.toLocaleString()} points and you have ${myPoints.toLocaleString()}. Listening, voting and liking all earn them.`,
+      });
+      return;
+    }
+
     if (isLaunchNow && liveBattlesCount >= 5) {
       toast({
         title: "Live battle limit reached",
@@ -456,6 +499,12 @@ const HostCreate = () => {
           songs_a: songsA,
           songs_b: songsB,
           battle_type: form.battleType,
+          stage,
+          /* The clock is written by the server-bound insert, not measured on a
+             device, so everyone in the room counts down to the same instant
+             however long ago their page loaded. Only set when going live: a
+             scheduled battle has no start yet to measure from. */
+          ...(status === "live" ? liveClock() : {}),
           host_user_id: user.id,
           host_name: hostName,
           co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
@@ -469,10 +518,10 @@ const HostCreate = () => {
         .single();
 
       if (error || !data) {
-        toast({
-          title: "Failed to create battle",
-          description: error?.message || "Supabase did not return a battle row. Please try again.",
-        });
+        const refusal = error?.message?.includes("Open Mic")
+          ? error.message
+          : "That battle did not save. Please try again.";
+        toast({ title: "Could not create that battle", description: refusal });
         return;
       }
 
@@ -536,6 +585,11 @@ const HostCreate = () => {
               </select>
             </SelectWrapper>
           </div>
+
+          {/* Which room, before anything else. It decides whether this battle
+              can pay anybody, so it should be the first thing settled rather
+              than a detail found at the end. */}
+          <StagePicker value={stage} onChange={setStage} />
 
           {/* Battle type */}
           <div className="space-y-2">
@@ -799,6 +853,17 @@ const HostCreate = () => {
 
           {/* Submit */}
           <div className="space-y-3">
+            {/* Everything needed to actually pay for the battle, at the moment
+                of paying for it. A host who reaches this point without $WWAT
+                should not have to go looking for it. */}
+            {/* Neither of these means anything on the Open Mic: it costs points,
+                not money, so showing a wallet purchase there would be noise. */}
+            {stage === "main_stage" && (
+              <>
+                <BuyWwat />
+                <HostFeeNotice />
+              </>
+            )}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <button
                 onClick={() => createBattle(false)}

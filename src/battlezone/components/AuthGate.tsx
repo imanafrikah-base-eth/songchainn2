@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
 import { Zap, ExternalLink, Loader2 } from "lucide-react";
-import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.png";
+import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
 
 const SONGCHAINN_URL = "https://www.songchainn.xyz";
 const SONGCHAINN_SSO_URL = import.meta.env.VITE_SONGCHAINN_SSO_URL as string | undefined;
@@ -86,7 +86,7 @@ const AuthGate = ({ children }: { children: React.ReactNode }) => {
             <ul className="text-xs text-muted-foreground space-y-1">
               <li>- Register your artist profile and music catalog</li>
               <li>- Submit your country rollout interest</li>
-              <li>- Battle activity takes place on WaveWarz.com</li>
+              <li>- Watch live battles and vote, right here in the app</li>
             </ul>
           </div>
         </div>

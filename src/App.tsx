@@ -1,7 +1,7 @@
 "use client";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WORLDS_ENABLED } from "@/lib/features";
+import { WORLDS_ENABLED, WORLD_BUILDER_ENABLED } from "@/lib/features";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +14,7 @@ import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { ConnectWalletModal } from "@/components/ConnectWalletModal";
+import { AgePrompt } from "@/components/AgePrompt";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { PointsMilestones } from "@/components/PointsMilestones";
 import { RoomPresenceKeeper } from "@/components/RoomPresenceKeeper";
@@ -36,6 +37,7 @@ const SongDetail = lazy(() => import("./pages/SongDetail"));
 const PlaylistDetail = lazy(() => import("./pages/PlaylistDetail"));
 const Playlists = lazy(() => import("./pages/Playlists"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
+const Wallet = lazy(() => import("./pages/Wallet"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
@@ -48,7 +50,6 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Room = lazy(() => import("./pages/Room"));
 const About = lazy(() => import("./pages/About"));
-const TermsOfUse = lazy(() => import("./pages/TermsOfUse"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const WaveWarzBattleZoneFeature = lazy(() => import("./pages/WaveWarzBattleZoneFeature"));
 const DjShuffle = lazy(() => import("./pages/DjShuffle"));
@@ -56,7 +57,12 @@ const Inbox = lazy(() => import("./pages/Inbox"));
 const BetterCallZaal = lazy(() => import("./pages/BetterCallZaal"));
 const SlugResolver = lazy(() => import("./pages/SlugResolver"));
 const World = lazy(() => import("./pages/World"));
+const WorldBuilder = lazy(() => import("@/pages/WorldBuilder"));
+const BuiltWorld = lazy(() => import("@/pages/BuiltWorld"));
 const Studio = lazy(() => import("./pages/Studio"));
+const Launch = lazy(() => import("./pages/Launch"));
+const Policy = lazy(() => import("./pages/Policy"));
+const Console = lazy(() => import("./pages/Console"));
 
 
 // Loading spinner component
@@ -174,19 +180,23 @@ function AppShell() {
                 <Route path="/playlists" element={<Playlists />} />
                 <Route path="/post/:id" element={<Social />} />
                 <Route path="/marketplace" element={<Marketplace />} />
+                <Route path="/wallet" element={<Wallet />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/social" element={<Social />} />
                 <Route path="/inbox" element={<Inbox />} />
                 <Route path="/community" element={<Community />} />
                 <Route path="/audience/:userId" element={<AudienceProfile />} />
                 <Route path="/about" element={<About />} />
-                <Route path="/terms" element={<TermsOfUse />} />
+                <Route path="/terms" element={<Policy which="terms" />} />
+                  <Route path="/guidelines" element={<Policy which="guidelines" />} />
+                <Route path="/console" element={<Console />} />
                 {/* Google Play's listing form requires a privacy policy URL. The
                     terms page is titled "Terms of Use and Privacy Notice", so
                     /privacy is an alias onto it. */}
-                <Route path="/privacy" element={<TermsOfUse />} />
+                <Route path="/privacy" element={<Policy which="privacy" />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/studio" element={<Studio />} />
+                <Route path="/launch" element={<Launch />} />
                 <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
                 <Route path="/dj-shuffle" element={<DjShuffle />} />
                 <Route path="/install" element={<Install />} />
@@ -195,6 +205,8 @@ function AppShell() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/bettercallzaal" element={<BetterCallZaal />} />
                 {WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
+                {WORLD_BUILDER_ENABLED && <Route path="/world-builder" element={<WorldBuilder />} />}
+                {WORLD_BUILDER_ENABLED && <Route path="/w/:slug" element={<BuiltWorld />} />}
                 {WORLDS_ENABLED && <Route path="/world/:worldSlug/:roomSlug" element={<World />} />}
                 <Route path="/auth" element={<Navigate to="/" replace />} />
                 <Route path="/not-found" element={<NotFound />} />
@@ -212,6 +224,10 @@ function AppShell() {
       {/* The Phase Two launch announcement has served its purpose. Nothing is
           in beta or in a phase any more; WhatsLive on Home says what is here. */}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
+      {/* Accounts that existed before we asked for a date of birth. The age
+          checks fail closed, so without this every one of them quietly loses
+          uploads and messaging. */}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><AgePrompt /></ErrorBoundary>}
       <ErrorBoundary fallback={null}><UpdateAvailableBanner /></ErrorBoundary>
       <ErrorBoundary fallback={null}><ConnectWalletModal /></ErrorBoundary>
       <ErrorBoundary fallback={null}><PointsMilestones /></ErrorBoundary>
@@ -225,6 +241,9 @@ const PUBLIC_PATTERNS = [
   '/about', '/artists', '/artist/:id', '/catalog/:id', '/song/:id',
   '/wavewarz-africa', '/wavewarz-africa/*', '/install', '/reset-password', '/bettercallzaal',
   ...(WORLDS_ENABLED ? ['/world/:worldSlug', '/world/:worldSlug/:roomSlug'] : []),
+  // A world an artist built and shared is the whole point of building one. It
+  // used to fall through to the not-found page for anyone not signed in.
+  ...(WORLD_BUILDER_ENABLED ? ['/w/:slug'] : []),
 ];
 
 function isPublicRoute(pathname: string) {
@@ -247,8 +266,9 @@ function AppContent() {
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/about" element={<About />} />
-                <Route path="/terms" element={<TermsOfUse />} />
-                <Route path="/privacy" element={<TermsOfUse />} />
+                <Route path="/terms" element={<Policy which="terms" />} />
+                  <Route path="/guidelines" element={<Policy which="guidelines" />} />
+                <Route path="/privacy" element={<Policy which="privacy" />} />
                 <Route path="/artists" element={<Artists />} />
                 <Route path="/artist/:id" element={<ArtistDetail />} />
                 <Route path="/catalog/:id" element={<CatalogDetail />} />
@@ -289,8 +309,9 @@ function AppContent() {
                 <Routes>
                   {/* Public routes — accessible without login */}
                   <Route path="/about" element={<About />} />
-                  <Route path="/terms" element={<TermsOfUse />} />
-                  <Route path="/privacy" element={<TermsOfUse />} />
+                  <Route path="/terms" element={<Policy which="terms" />} />
+                  <Route path="/guidelines" element={<Policy which="guidelines" />} />
+                  <Route path="/privacy" element={<Policy which="privacy" />} />
                   <Route path="/artists" element={<Artists />} />
                   <Route path="/artist/:id" element={<ArtistDetail />} />
                   <Route path="/catalog/:id" element={<CatalogDetail />} />
@@ -301,6 +322,7 @@ function AppContent() {
                   <Route path="/bettercallzaal" element={<BetterCallZaal />} />
                   {WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
                   {WORLDS_ENABLED && <Route path="/world/:worldSlug/:roomSlug" element={<World />} />}
+                  {WORLD_BUILDER_ENABLED && <Route path="/w/:slug" element={<BuiltWorld />} />}
                   {/* Known auth-required routes → landing */}
                   <Route path="/" element={<Auth />} />
                   <Route path="/discover" element={<Auth />} />
@@ -311,11 +333,18 @@ function AppContent() {
                   <Route path="/playlists" element={<Auth />} />
                   <Route path="/playlist/:id" element={<Auth />} />
                   <Route path="/marketplace" element={<Auth />} />
+                  <Route path="/wallet" element={<Auth />} />
                   <Route path="/inbox" element={<Auth />} />
                   <Route path="/dj-shuffle" element={<Auth />} />
                   <Route path="/admin" element={<Auth />} />
                   <Route path="/audience/:userId" element={<Auth />} />
                   <Route path="/post/:id" element={<Auth />} />
+                  {/* Shared links used to fall through to a not-found page that
+                      redirected itself away before anyone could read it. */}
+                  <Route path="/leaderboard" element={<Auth />} />
+                  <Route path="/studio" element={<Auth />} />
+                  <Route path="/launch" element={<Auth />} />
+                  <Route path="/console" element={<Auth />} />
                   <Route path="/not-found" element={<NotFound />} />
                   {/* Vanity slug routes — must be after all specific routes */}
                   <Route path="/:artistSlug/:songSlug" element={<SlugResolver />} />

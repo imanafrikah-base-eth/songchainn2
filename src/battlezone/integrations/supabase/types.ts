@@ -225,6 +225,9 @@ export type Database = {
           host_name: string
           host_user_id: string | null
           id: string
+          nakulu_points_a: number
+          nakulu_points_b: number
+          nakulu_verdict: string | null
           region: string
           round: number
           scheduled_time: string | null
@@ -236,6 +239,7 @@ export type Database = {
           title: string
           total_rounds: number
           updated_at: string
+          voting_open: boolean | null
           winner: string | null
           x_space_url: string | null
         }
@@ -257,6 +261,9 @@ export type Database = {
           host_name: string
           host_user_id?: string | null
           id?: string
+          nakulu_points_a?: number
+          nakulu_points_b?: number
+          nakulu_verdict?: string | null
           region?: string
           round?: number
           scheduled_time?: string | null
@@ -268,6 +275,7 @@ export type Database = {
           title: string
           total_rounds?: number
           updated_at?: string
+          voting_open?: boolean | null
           winner?: string | null
           x_space_url?: string | null
         }
@@ -289,6 +297,9 @@ export type Database = {
           host_name?: string
           host_user_id?: string | null
           id?: string
+          nakulu_points_a?: number
+          nakulu_points_b?: number
+          nakulu_verdict?: string | null
           region?: string
           round?: number
           scheduled_time?: string | null
@@ -300,6 +311,7 @@ export type Database = {
           title?: string
           total_rounds?: number
           updated_at?: string
+          voting_open?: boolean | null
           winner?: string | null
           x_space_url?: string | null
         }

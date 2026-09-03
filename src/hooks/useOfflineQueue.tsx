@@ -118,7 +118,7 @@ export function useOfflineQueue() {
 
     if (failedActions.length > 0) {
       toast.error(`${failedActions.length} action${failedActions.length > 1 ? 's' : ''} failed to sync`, {
-        description: 'Will retry when possible'
+        description: 'We will try again when you are back online'
       });
     }
   }, [queue, isSyncing]);

@@ -12,8 +12,8 @@ export function AuthGate({ onLogin }: AuthGateProps) {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse-glow" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-glow-cyan/10 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: '1.5s' }} />
+        {/* Coloured blur orbs removed: nothing in a real feed glows. The
+            ground carries the mood now, not a light source behind it. */}
       </div>
 
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">

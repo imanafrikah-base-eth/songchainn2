@@ -72,6 +72,141 @@ const COVER_TYPES: Record<string, string> = {
   "image/webp": "webp",
 };
 
+/* ------------------------------------------------------- visual work --- */
+
+// Artwork, photographs and video. Bigger than a cover because a piece of work
+// is not a thumbnail, and video is the whole reason for the ceiling: a minute
+// of decent phone footage is tens of megabytes.
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+
+// Only formats a browser will actually play or paint. Accepting a MOV that
+// half the audience cannot open is worse than refusing it at the door.
+const VISUAL_TYPES: Record<string, { ext: string; kind: "image" | "video" }> = {
+  "image/jpeg": { ext: "jpg", kind: "image" },
+  "image/jpg": { ext: "jpg", kind: "image" },
+  "image/png": { ext: "png", kind: "image" },
+  "image/webp": { ext: "webp", kind: "image" },
+  "image/gif": { ext: "gif", kind: "image" },
+  "image/avif": { ext: "avif", kind: "image" },
+  "video/mp4": { ext: "mp4", kind: "video" },
+  "video/webm": { ext: "webm", kind: "video" },
+};
+
+const VISUALS_PER_DAY = 40;
+
+async function presignVisual(o: {
+  // deno-lint-ignore no-explicit-any
+  db: any;
+  userId: string;
+  title: string;
+  caption: string | null;
+  fileName: string;
+  contentType: string;
+  fileBytes: number;
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  publicBase: string;
+}): Promise<{ status: number; body: unknown }> {
+  // Artists only. Row level security refuses this too, but a policy refusal
+  // arrives as an empty result rather than a reason, and somebody who just
+  // waited on a 40 MB upload deserves to be told why before it starts.
+  const { data: account } = await o.db
+    .from("artist_accounts").select("artist_id").eq("user_id", o.userId).maybeSingle();
+  if (!account?.artist_id) {
+    return {
+      status: 403,
+      body: {
+        error:
+          "Photos and video are for artist pages. You can still write, share anything on SONGCHAINN, and make a song card in the app.",
+      },
+    };
+  }
+
+  const type = VISUAL_TYPES[o.contentType];
+  if (!type) {
+    return {
+      status: 415,
+      body: { error: "Images can be JPG, PNG, WebP, GIF or AVIF. Video can be MP4 or WebM." },
+    };
+  }
+  const cap = type.kind === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (!Number.isFinite(o.fileBytes) || o.fileBytes <= 0 || o.fileBytes > cap) {
+    return {
+      status: 413,
+      body: { error: `${type.kind === "video" ? "Video" : "Images"} must be under ${cap / (1024 * 1024)} MB.` },
+    };
+  }
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count, error: countErr } = await o.db
+    .from("artist_media")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", o.userId)
+    .gte("created_at", since);
+  if (countErr) {
+    console.error("upload-url visual quota check failed:", countErr);
+    return { status: 500, body: { error: "Could not start the upload. Try again." } };
+  }
+  if ((count ?? 0) >= VISUALS_PER_DAY) {
+    return {
+      status: 429,
+      body: { error: `That is ${VISUALS_PER_DAY} pieces today. Come back tomorrow.` },
+    };
+  }
+
+  // Their page. Read once at the top, where it also decided whether they are
+  // allowed here at all, so an artist's music and their visual work land on one
+  // page rather than two.
+  const artistId = account.artist_id;
+
+  // Reserve the row first so we choose the storage key, never the browser.
+  const mediaId = crypto.randomUUID();
+  const key = [
+    "visuals",
+    o.userId,
+    mediaId,
+    `${slugify(o.fileName.replace(/\.[^.]+$/, ""), type.kind)}.${type.ext}`,
+  ].join("/");
+  const publicUrl = `${o.publicBase}/${key}`;
+
+  // is_published false until the browser confirms the PUT landed. A row that
+  // points at a key holding nothing is a broken tile in somebody's gallery.
+  const { error: insertErr } = await o.db.from("artist_media").insert({
+    id: mediaId,
+    user_id: o.userId,
+    artist_id: artistId,
+    kind: type.kind,
+    title: o.title || null,
+    caption: o.caption,
+    storage_key: key,
+    public_url: publicUrl,
+    mime_type: o.contentType,
+    bytes: Math.round(o.fileBytes),
+    is_published: false,
+  });
+  if (insertErr) {
+    console.error("upload-url could not reserve artist_media:", insertErr);
+    return { status: 500, body: { error: "Could not start the upload. Try again." } };
+  }
+
+  const uploadUrl = await presignPut({
+    accountId: o.accountId,
+    accessKeyId: o.accessKeyId,
+    secretAccessKey: o.secretAccessKey,
+    bucket: o.bucket,
+    key,
+    expiresIn: PRESIGN_TTL,
+  });
+
+  return {
+    status: 200,
+    body: { mediaId, kind: type.kind, uploadUrl, storageKey: key, publicUrl, expiresIn: PRESIGN_TTL },
+  };
+}
+
 /* ------------------------------------------------- AWS SigV4 presign --- */
 
 const enc = new TextEncoder();
@@ -252,6 +387,33 @@ Deno.serve(async (req) => {
   const genre = str(body.genre, 60) || null;
   const fileBytes = Number(body.fileBytes);
 
+  /* ------------------------------------------------------- visual work --- */
+
+  // purpose: 'visual' takes the same road as a song and stops at a different
+  // door. Artwork, photographs and video ride the identical presigned PUT into
+  // the identical bucket, and land in artist_media instead of songs.
+  //
+  // No wallet is asked for here either. Coining a piece on Zora is a separate
+  // act the artist takes later from their own wallet, so uploading stays free
+  // and open to anyone with an account.
+  if (str(body.purpose, 20) === "visual") {
+    const visual = await presignVisual({
+      db: createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } }),
+      userId: user.id,
+      title,
+      caption: str(body.caption, 500) || null,
+      fileName,
+      contentType,
+      fileBytes,
+      accountId: accountId!,
+      accessKeyId: accessKeyId!,
+      secretAccessKey: secretAccessKey!,
+      bucket: bucket!,
+      publicBase,
+    });
+    return json(origin, visual.body, visual.status);
+  }
+
   if (!title) return json(origin, { error: "Give the track a title." }, 400);
   if (!artistName) return json(origin, { error: "Tell us the artist name." }, 400);
 
@@ -318,7 +480,39 @@ Deno.serve(async (req) => {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const artistId = (account as { artist_id?: string } | null)?.artist_id ?? `u-${user.id}`;
+  const existingArtistId = (account as { artist_id?: string } | null)?.artist_id ?? null;
+  const artistId = existingArtistId ?? `u-${user.id}`;
+
+  // RELEASING A RECORD IS WHAT MAKES SOMEBODY AN ARTIST HERE.
+  //
+  // Until now this only ever READ artist_accounts and fell back to a synthetic
+  // id, so a person could upload, pass the audition, be told they were live,
+  // and still never be recorded as an artist. `isArtist` stayed false forever,
+  // which hid Studio from the exact person who had just used it and left them a
+  // permanent guest on a platform whose whole promise is that it is theirs.
+  //
+  // This runs with the service role, which is why it can write a table the
+  // artist deliberately cannot insert into themselves. The row is claimed on
+  // first publish and never touched again, so a later claim of a real catalogue
+  // page is not overwritten by an upload.
+  if (!existingArtistId) {
+    const { error: accountError } = await db
+      .from("artist_accounts")
+      .upsert(
+        {
+          artist_id: artistId,
+          user_id: user.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "artist_id" },
+      );
+    // Never fail the upload over this. The track still publishes and the row
+    // can be reconciled later; losing somebody's release would be far worse
+    // than them waiting to be recognised.
+    if (accountError) {
+      console.error("could not record artist account for", user.id, accountError.message);
+    }
+  }
 
   // Their own profile picture doubles as the artist image on that page.
   const { data: profile } = await db

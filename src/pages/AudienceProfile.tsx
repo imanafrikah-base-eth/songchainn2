@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Navigation } from '@/components/Navigation';
 import { PostCard } from '@/components/social/PostCard';
 import { useSocial } from '@/hooks/useSocial';
+import { useConversations } from '@/hooks/useDirectMessages';
 import { MusicActivity } from '@/components/MusicActivity';
 import { LikedActivity } from '@/components/LikedActivity';
 import { useAuth } from '@/context/AuthContext';
@@ -38,6 +39,8 @@ import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 export default function AudienceProfile() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const { openWith } = useConversations();
+  const [openingChat, setOpeningChat] = useState(false);
   const { user, audienceProfile: myProfile, isArtist, artistId } = useAuth();
   const {
     posts,
@@ -49,7 +52,8 @@ export default function AudienceProfile() {
     followUser,
     isFollowing,
     getPostComments,
-    addComment
+    addComment,
+    untagSelf
   } = useSocial();
 
   const [profile, setProfile] = useState<AudienceProfileType | null>(null);
@@ -207,7 +211,7 @@ export default function AudienceProfile() {
       }
 
       if (!isSupabaseConfigured) {
-        toast({ title: 'Image uploads are not configured yet' });
+        toast({ title: 'Picture uploads are not switched on yet' });
         return;
       }
 
@@ -429,9 +433,32 @@ export default function AudienceProfile() {
               >
                 {amFollowing ? 'Following' : 'Follow'}
               </Button>
-              <Button variant="outline" onClick={() => toast({ title: 'Direct Messages', description: 'Messaging feature coming soon!' })}>
+              {/* Real now. This used to be a button that said messaging was coming soon. */}
+              <Button
+                variant="outline"
+                disabled={openingChat}
+                onClick={async () => {
+                  if (!userId) return;
+                  if (!user) {
+                    toast({ title: 'Sign in to send a message' });
+                    return;
+                  }
+                  setOpeningChat(true);
+                  const conversationId = await openWith(userId);
+                  setOpeningChat(false);
+                  if (!conversationId) {
+                    toast({
+                      title: 'Could not open that conversation',
+                      description: 'One of you may have blocked the other.',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+                  navigate(`/inbox?c=${conversationId}`);
+                }}
+              >
                 <MessageCircle className="w-4 h-4 mr-2" />
-                Message
+                {openingChat ? 'Opening...' : 'Message'}
               </Button>
             </div>
           )}
@@ -487,6 +514,7 @@ export default function AudienceProfile() {
                   isFollowing={isFollowing(post.user_id)}
                   onGetComments={getPostComments}
                   onAddComment={addComment}
+                  onUntagSelf={untagSelf}
                 />
               ))
             )}

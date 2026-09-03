@@ -95,7 +95,7 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
             )}
           </div>
 
-          <div className="mt-3 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs text-center truncate font-medium">
+          <div className="mt-3 px-3 py-1.5 rounded-xl bg-primary/10 border border-border text-primary text-xs text-center truncate font-medium">
             {artist.location}
           </div>
         </div>

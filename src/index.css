@@ -22,77 +22,110 @@
 
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    /* ------------------------------------------------------------------
+       Ground stack. Near neutral on purpose.
 
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
+       The apps that feel like a real place (Instagram, X, TikTok,
+       Facebook) all run their surfaces at near zero saturation:
+       FB #18191A, X #16181C, IG and TikTok #000 through #121212.
+       This app used to run every single surface at 47% saturation,
+       which is a navy, not a grey. A tinted ground shifts the perceived
+       white balance of every photo and every piece of album art sitting
+       on top of it, and that is what reads as "designed" rather than
+       real. Keep saturation on these in the 5 to 8 range. Colour is the
+       content's job, never the container's.
+       ------------------------------------------------------------------ */
+    --background: 220 8% 7%;        /* #101113  page ground   */
+    --foreground: 210 6% 93%;       /* #ECEDEF  primary text  */
 
-    --popover: 222 47% 8%;
-    --popover-foreground: 210 40% 98%;
+    --card: 220 7% 11%;             /* #1A1B1E  resting surface */
+    --card-foreground: 210 6% 93%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 6%;
+    --popover: 220 7% 13%;          /* #1F2125  menus, sheets */
+    --popover-foreground: 210 6% 93%;
 
-    --secondary: 222 47% 12%;
-    --secondary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;         /* brand blue, unchanged  */
+    --primary-foreground: 220 8% 7%;
 
-    --muted: 222 47% 15%;
-    --muted-foreground: 215 20% 55%;
+    --secondary: 220 6% 17%;        /* #292A2E  chips, inactive */
+    --secondary-foreground: 210 6% 93%;
+
+    --muted: 220 6% 20%;            /* #303237  hover, wells  */
+    --muted-foreground: 220 5% 62%; /* #9B9DA2  secondary text */
 
     --accent: 217 91% 60%;
-    --accent-foreground: 222 47% 6%;
+    --accent-foreground: 220 8% 7%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 210 6% 96%;
 
-    --border: 222 47% 18%;
-    --input: 222 47% 15%;
+    --border: 220 6% 21%;           /* #32343A  hairline, used sparingly */
+    --input: 220 6% 18%;
     --ring: 217 91% 60%;
 
-    --radius: 0.75rem;
+    /* 10px, not 12. Reference: X 16 on cards and 8 on inputs, IG 8, FB 8.
+       12 on absolutely everything is what makes a UI read as soft and toy
+       like rather than built. */
+    --radius: 0.625rem;
 
     /* Custom $ongChainn tokens */
     --glow-blue: 217 91% 60%;
     --glow-cyan: 190 95% 60%;
-    --surface-elevated: 222 47% 10%;
-    --surface-overlay: 222 47% 5%;
-    --surface-glass: 222 47% 12%;
+
+    /* WaveWarz Africa battle palette. Declared globally so the neon and live
+       Tailwind colours resolve anywhere, even outside the battle zone. */
+    --neon-green: 145 80% 45%;
+    --cyan: 195 90% 50%;
+    --gold: 35 90% 55%;
+    --live-red: 0 85% 55%;
+
+    --surface-elevated: 220 7% 14%;   /* #212327 raised */
+    --surface-overlay: 220 8% 5%;     /* #0C0D0F scrims  */
+    --surface-glass: 220 7% 13%;
     
-    /* Premium depth tokens */
-    --glass-opacity: 0.08;
-    --glass-blur: 20px;
-    --glass-border: 222 47% 25%;
+    /* Blur belongs on fixed chrome floating over scrolling content, which
+       is what iOS, X and IG actually do. It does not belong on cards in a
+       feed. Kept small and honest. */
+    --glass-opacity: 0.86;
+    --glass-blur: 14px;
+    --glass-border: 220 6% 21%;
     
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(190 95% 60%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(222 47% 10%) 0%, hsl(222 47% 6%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(217 91% 60% / 0.15) 0%, transparent 70%);
-    --gradient-ambient: radial-gradient(ellipse at 30% 20%, hsl(217 91% 60% / 0.08) 0%, transparent 50%),
-                        radial-gradient(ellipse at 70% 80%, hsl(190 95% 60% / 0.06) 0%, transparent 50%);
-    --gradient-glass: linear-gradient(135deg, hsl(222 47% 15% / 0.5) 0%, hsl(222 47% 8% / 0.3) 100%);
-    --gradient-shine: linear-gradient(135deg, hsl(210 40% 98% / 0.1) 0%, transparent 50%);
+    /* Flat. A card is a surface, not a light source. */
+    --gradient-card: linear-gradient(180deg, hsl(220 7% 11%) 0%, hsl(220 7% 11%) 100%);
+    /* The page background is one colour. Ambient colour washes are the
+       loudest single tell of a template. Removed, not dimmed. */
+    --gradient-glow: transparent;
+    --gradient-ambient: transparent;
+    --gradient-glass: linear-gradient(180deg, hsl(220 7% 11%) 0%, hsl(220 7% 11%) 100%);
+    --gradient-shine: transparent;
     
-    /* Shadows - Premium depth */
-    --shadow-glow: 0 0 40px hsl(217 91% 60% / 0.3);
-    --shadow-glow-intense: 0 0 60px hsl(217 91% 60% / 0.4), 0 0 100px hsl(190 95% 60% / 0.2);
-    --shadow-card: 0 8px 32px hsl(222 47% 4% / 0.5);
-    --shadow-elevated: 0 4px 16px hsl(222 47% 4% / 0.3);
-    --shadow-float: 0 12px 40px hsl(222 47% 4% / 0.4), 0 4px 12px hsl(222 47% 4% / 0.2);
-    --shadow-soft: 0 2px 8px hsl(222 47% 4% / 0.2);
-    --shadow-inner-glow: inset 0 1px 1px hsl(210 40% 98% / 0.05);
+    /* Shadows. Neutral and tight.
+
+       Not one of Instagram, X, TikTok or Facebook uses a single coloured
+       box shadow anywhere in its interface. A 40px blue bloom is a game
+       UI signal. These keep their names so nothing downstream changes,
+       but they now read as weight rather than light. */
+    --shadow-glow: 0 2px 8px hsl(220 12% 2% / 0.55);
+    --shadow-glow-intense: 0 8px 24px hsl(220 12% 2% / 0.65), 0 2px 6px hsl(220 12% 2% / 0.5);
+    --shadow-card: 0 1px 2px hsl(220 12% 2% / 0.5);
+    --shadow-elevated: 0 2px 8px hsl(220 12% 2% / 0.5);
+    --shadow-float: 0 8px 28px hsl(220 12% 2% / 0.6), 0 2px 6px hsl(220 12% 2% / 0.45);
+    --shadow-soft: 0 1px 2px hsl(220 12% 2% / 0.4);
+    --shadow-inner-glow: none;
 
     /* Typography */
     --font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
     --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
 
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 98%;
+    --sidebar-background: 220 8% 7%;
+    --sidebar-foreground: 210 6% 93%;
     --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 47% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 47% 18%;
+    --sidebar-primary-foreground: 220 8% 7%;
+    --sidebar-accent: 220 6% 17%;
+    --sidebar-accent-foreground: 210 6% 93%;
+    --sidebar-border: 220 6% 21%;
     --sidebar-ring: 217 91% 60%;
   }
 }
@@ -207,13 +240,13 @@
   }
 
   .shadow-glow-artwork {
-    box-shadow: 0 0 40px hsl(var(--artwork-glow, var(--glow-blue)) / 0.3);
+    box-shadow: 0 0 26px hsl(var(--artwork-glow, var(--glow-blue)) / 0.18);
   }
 
   .shadow-glow-artwork-intense {
     box-shadow:
-      0 0 60px hsl(var(--artwork-glow, var(--glow-blue)) / 0.4),
-      0 0 100px hsl(var(--artwork-glow, var(--glow-cyan)) / 0.2);
+      0 0 40px hsl(var(--artwork-glow, var(--glow-blue)) / 0.26),
+      0 0 72px hsl(var(--artwork-glow, var(--glow-cyan)) / 0.12);
   }
 
   .shadow-card {
@@ -229,35 +262,27 @@
   }
 
   /* Premium glass effect */
+  /* Fixed chrome over scrolling content. This is the one place blur is
+     honest, and it is what iOS, X and IG all do on a sticky bar. */
   .glass {
-    background: hsl(var(--surface-glass) / var(--glass-opacity));
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid hsl(var(--glass-border) / 0.3);
-    box-shadow: var(--shadow-inner-glow), var(--shadow-soft);
+    background: hsl(var(--background) / var(--glass-opacity));
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.1);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.1);
+    border: 1px solid hsl(var(--border));
   }
 
+  /* A card in a feed is an opaque surface. No blur, no gradient, no
+     inner highlight. Separation comes from the background step and a
+     hairline, exactly like every feed you actually use. */
   .glass-card {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--card) / 0.8) 0%,
-      hsl(var(--card) / 0.6) 100%
-    );
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid hsl(var(--border) / 0.5);
-    box-shadow: var(--shadow-inner-glow), var(--shadow-card);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-card);
   }
 
   .glass-surface {
-    background: linear-gradient(
-      180deg,
-      hsl(var(--surface-elevated) / 0.9) 0%,
-      hsl(var(--card) / 0.7) 100%
-    );
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid hsl(var(--border) / 0.4);
+    background: hsl(var(--surface-elevated));
+    border: 1px solid hsl(var(--border));
   }
 
   /* Shine overlay effect */
@@ -273,11 +298,9 @@
     left: 0;
     right: 0;
     height: 50%;
-    background: linear-gradient(
-      180deg,
-      hsl(210 40% 98% / 0.06) 0%,
-      transparent 100%
-    );
+    /* Was a 6% white sweep on every surface. Nothing in a real feed is
+       lit from above. Kept as a hook, painting nothing. */
+    background: none;
     pointer-events: none;
     border-radius: inherit;
   }
@@ -295,20 +318,10 @@
     position: relative;
   }
 
+  /* The 20px blurred brand halo is gone. Emphasis now comes from the
+     element itself, not from light leaking out of it. */
   .glow-effect::after {
-    content: '';
-    position: absolute;
-    inset: -2px;
-    background: var(--gradient-primary);
-    border-radius: inherit;
-    filter: blur(20px);
-    opacity: 0.4;
-    z-index: -1;
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .glow-effect:hover::after {
-    opacity: 0.6;
+    content: none;
   }
 
   /* Ambient glow for backgrounds */
@@ -611,4 +624,285 @@ body {
   min-width: 0;
   max-width: 100vw;
   overflow-x: clip;
+}
+
+/* CUT-OFF GUARD.
+
+   The clip rules above stop the page scrolling sideways, which is right, but
+   clipping is also why a button ends up sliced in half at the screen edge
+   instead of pushing the page wide. Two structural causes account for nearly
+   all of it, so both are closed here rather than one component at a time.
+
+   1. Anything tappable is capped at the width it is given. A control that is
+      wider than its column is a bug every single time.
+   2. Long unbroken strings (wallet addresses, catalog slugs, URLs, handles)
+      are the other way a row gets shoved past the edge. */
+
+button,
+[role="button"],
+a,
+input,
+select,
+textarea,
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+body {
+  overflow-wrap: break-word;
+}
+
+/* Flex and grid children default to min-width:auto, meaning they refuse to
+   shrink below their own content and push their siblings off screen. That is
+   the single most common overflow cause in this app, and it is what put a
+   366px-wide sidebar card on a 320px screen: the card could not shrink, so
+   every control inside it hung off the right edge.
+
+   Applying it to every flex and grid child fixes the class of bug rather than
+   one instance at a time. Elements marked shrink-0 still hold their size,
+   because that sets flex-shrink, which this does not touch. Anything that
+   genuinely must not shrink below its content can set an explicit min-width. */
+.flex > *,
+.grid > * {
+  min-width: 0;
+}
+
+/* ...except a control, which must never collapse narrower than its own label.
+   Without this, "Close" in a tight flex row shrinks to a few pixels and wraps
+   one character per line. min-content is the floor: the button may still give
+   up slack, it just cannot shrink past the word it is showing. */
+.flex > button,
+.grid > button,
+.flex > a,
+.grid > a,
+.flex > [role="button"],
+.grid > [role="button"] {
+  min-width: min-content;
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+/* Mo$ha versus the feed's action rail.
+
+   The agent docks bottom-right. So does the feed's like/comment/share column,
+   which is the busiest right edge in the app, so on a phone the two sat on top
+   of each other and the launcher landed over the like button.
+
+   Raising the agent to a fixed height above the rail was the first attempt and
+   it does not hold: the rail is centred on the slide, so how far up it reaches
+   depends on how tall the phone is. At 23rem the launcher cleared the rail on a
+   short handset and landed straight back on the heart on a tall one.
+
+   So it changes sides instead. The feed owns the right edge, the left edge of a
+   slide carries nothing above the caption, and a side is a side at every
+   viewport height. Nothing to re-tune when a new phone comes out. */
+body[data-feed-open='true'] .agent-dock {
+  left: 0.5rem;
+  right: auto;
+  /* Anchored to the TOP, and that is the whole point.
+
+     Both bottom corners of a feed slide belong to something whose height we do
+     not control: the action rail on the right, the caption on the left, and the
+     caption grows with the post. Every offset measured up from the bottom is a
+     guess that a taller phone or a longer caption breaks, which is exactly how
+     this landed on the like button and then on somebody's username.
+
+     Under the header there is a fixed height band that is empty on every
+     screen, because the header is a fixed height and the slide's own content is
+     centred. So it sits there and stops moving. */
+  top: 5.5rem;
+  bottom: auto;
+}
+
+@media (min-width: 768px) {
+  /* Two column layout up here. The rail is nowhere near the corner. */
+  body[data-feed-open='true'] .agent-dock {
+    left: auto;
+    right: 1.5rem;
+    top: auto;
+    bottom: 1.5rem;
+  }
+}
+
+/* ===========================================================================
+   LIVE SURFACES
+   ---------------------------------------------------------------------------
+   The things that arrive over the app rather than sitting in it: the age
+   prompt, the consent lines, a locked door, a banner. They used to appear as
+   flat rectangles, so a message that had just interrupted you read like an
+   error instead of a moment.
+
+   This makes them feel physical, not lit up. It obeys the palette rule rather
+   than bending it:
+
+     NO COLOURED GLOW. The edge light is plain white at very low alpha, which
+     is what light actually does when it catches the top of a raised surface.
+     A brand-coloured halo is what makes an interface look synthetic, and it is
+     banned here for the same reason the ambient washes were removed.
+
+     THE LIGHT IS ON THE EDGE, NEVER BEHIND THE CARD. Top edge brightest,
+     falling off down the sides, because that is where a light source above
+     would land. Shadows are neutral black, never tinted.
+
+     IT SETTLES. The surface rises, catches the light once, and stops. Nothing
+     here loops. A panel that pulses forever is a panel you want to close.
+   =========================================================================== */
+
+@keyframes live-surface-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.994); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The one movement: the highlight travels the top edge once as it lands, the
+   way a real edge catches light when it tilts into place. */
+@keyframes live-edge-settle {
+  from { opacity: 0; }
+  40%  { opacity: 1; }
+  to   { opacity: 0.55; }
+}
+
+.live-surface {
+  position: relative;
+  isolation: isolate;
+  /* Neutral depth. Two shadows: a tight contact shadow and a soft ambient one,
+     which is how a real object sits on a surface. */
+  box-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.28),
+    0 12px 28px -18px hsl(0 0% 0% / 0.55);
+  animation: live-surface-in 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A hairline of light along the top edge, fading as it wraps down the sides. */
+.live-surface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    to bottom,
+    hsl(0 0% 100% / 0.14) 0%,
+    hsl(0 0% 100% / 0.05) 30%,
+    hsl(0 0% 100% / 0) 65%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+  animation: live-edge-settle 900ms ease-out 100ms both;
+}
+
+/* In daylight the same trick inverts: the edge reads as a subtle dark hairline,
+   because a white card on a white ground is defined by its shadow, not a glow. */
+:root[data-theme='light'] .live-surface {
+  box-shadow:
+    0 1px 2px hsl(220 8% 20% / 0.10),
+    0 12px 28px -18px hsl(220 8% 20% / 0.22);
+}
+
+:root[data-theme='light'] .live-surface::before {
+  background: linear-gradient(
+    to bottom,
+    hsl(0 0% 100% / 0.85) 0%,
+    hsl(0 0% 100% / 0.25) 30%,
+    hsl(0 0% 100% / 0) 65%
+  );
+}
+
+/* Something that needs answering sits a little higher off the page. Depth, not
+   colour, is what carries the urgency. */
+.live-surface--raised {
+  box-shadow:
+    0 2px 4px hsl(0 0% 0% / 0.32),
+    0 22px 48px -22px hsl(0 0% 0% / 0.70);
+}
+
+/* Somebody who asked for less movement gets the surface, not the show. The
+   edge light stays, because it is depth rather than motion. */
+@media (prefers-reduced-motion: reduce) {
+  .live-surface { animation: none; }
+  .live-surface::before { animation: none; opacity: 0.55; }
+}
+
+/* ===========================================================================
+   The Mo$ha launcher, as a tab on the right edge.
+
+   It used to be a pill floating in the bottom-right corner, and a pill in a
+   corner sits on whatever scrolls under it: on Home it covered the WaveWarz
+   card, the Marketplace card and the doorway headline, depending on how far
+   down you were. There is no corner on a page that is empty at every scroll
+   position. There IS a strip that is empty at every scroll position: the page
+   gutter, the padding every page keeps between its content and the edge of
+   the window. So the launcher lives there now, a thin vertical tab hugging the
+   right edge, narrower than the gutter on a desktop and inside the cards' own
+   padding on a phone. It parks on nothing.
+
+   The feed keeps its own placement (above), where the right edge belongs to
+   the action rail. */
+.agent-tab {
+  right: 0;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.agent-tab-button {
+  writing-mode: vertical-rl;
+  min-height: 5.5rem;
+  width: 1.75rem;
+  padding: 0.75rem 0;
+  border-right: 0;
+  border-radius: 9999px 0 0 9999px;
+  justify-content: center;
+  letter-spacing: 0.04em;
+}
+
+@media (min-width: 768px) {
+  .agent-tab-button {
+    width: 2rem;
+  }
+}
+
+body[data-feed-open='true'] .agent-tab {
+  transform: none;
+}
+
+body[data-feed-open='true'] .agent-tab-button {
+  writing-mode: horizontal-tb;
+  width: auto;
+  min-height: 0;
+  padding: 0.375rem 0.625rem;
+  border-right: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+}
+
+/* On a phone the gutter is only 16px, so the tab is cut to 20px on screen
+   (its rounded edge bleeds off the side) and it steps out of the way while
+   the page is moving: a thumb that is scrolling is not a thumb that wants
+   Mo$ha, and text should never be read through a button. */
+@media (max-width: 767px) {
+  .agent-tab {
+    right: -0.25rem;
+  }
+  .agent-tab-button {
+    width: 1.5rem;
+    min-height: 6rem;
+  }
+}
+
+.agent-tab {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+body[data-scrolling='true'] .agent-tab {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(0.75rem, -50%);
 }

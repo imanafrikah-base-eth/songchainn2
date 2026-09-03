@@ -35,7 +35,7 @@ const Leaderboard = () => {
         </p>
 
         {user && (
-          <div className="mb-6 rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-center justify-between">
+          <div className="mb-6 rounded-2xl border border-border bg-primary/5 p-4 flex items-center justify-between">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Your standing</p>
               <p className="text-2xl font-heading font-bold text-gradient">{lifetimePoints.toLocaleString()} pts</p>

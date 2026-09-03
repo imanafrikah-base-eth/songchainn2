@@ -42,6 +42,15 @@ function extractBattleRoute(message?: string | null) {
   return null;
 }
 
+/**
+ * The BATTLE_LIVE marker is an internal address used to build the link. It is
+ * not something anyone should have to read, so it never reaches the screen.
+ */
+function readableMessage(message?: string | null) {
+  if (!message) return message;
+  return message.replace(/BATTLE_LIVE::[a-zA-Z0-9-]+::/g, '').replace(/\bis now LIVE\b/g, 'is now live').trim();
+}
+
 function NotificationItem({ 
   notification, 
   onRead, 
@@ -56,7 +65,7 @@ function NotificationItem({
   const battleRoute = extractBattleRoute(notification.message);
   const isAnnouncement = notification.type === 'announcement';
   const Icon = battleRoute ? Flame : notificationIcons[notification.type];
-  const message = notification.message || notificationMessages[notification.type];
+  const message = readableMessage(notification.message) || notificationMessages[notification.type];
   const profile = notification.from_profile;
 
   const handleClick = () => {
@@ -94,7 +103,11 @@ function NotificationItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          {isAnnouncement ? (
+          {/* A notification with no sender is from us, not from a person. Falling
+              through to the sender branch used to print the literal word "Someone"
+              and throw the title away, which is how a moderation notice reached
+              people reading "Someone" above a message with no heading. */}
+          {isAnnouncement || !profile ? (
             <p className="text-sm">
               {notification.title && (
                 <span className="font-semibold text-foreground block">{notification.title}</span>

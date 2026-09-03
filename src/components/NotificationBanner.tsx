@@ -39,7 +39,7 @@ export function NotificationBanner() {
           exit={{ opacity: 0, y: -20 }}
           className="fixed inset-x-0 top-16 z-50 px-3 sm:px-4 flex justify-center"
         >
-          <div className="glass-card rounded-2xl p-4 border border-primary/20 shadow-glow max-w-lg w-full">
+          <div className="glass-card rounded-2xl p-4 border border-border shadow-glow max-w-lg w-full">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
                 <Bell className="w-5 h-5 text-primary" />

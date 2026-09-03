@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Headphones, User, FileText, Link2, Loader2, MapPin, Camera } from 'lucide-react';
+import { ArrowLeft, Headphones, User, FileText, Link2, Loader2, MapPin, Camera, CalendarDays, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,8 +10,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 const logo = '/songchainn-logo.webp';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { uploadPublicImage } from '../lib/storage';
+import { MIN_AGE, POLICY_VERSIONS } from '@/legal/policies';
+import { yearsSince } from '@/hooks/useCompliance';
 
 // Validation schema
 const profileSchema = z.object({
@@ -43,6 +45,8 @@ export default function Onboarding() {
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [xProfileLink, setXProfileLink] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [makesMusic, setMakesMusic] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
@@ -133,6 +137,27 @@ export default function Onboarding() {
     e.preventDefault();
     setErrors({});
 
+    /* Age, before anything else is saved.
+       Collected as a date rather than a tickbox, because a tick tells us
+       nothing we could act on and this decides what the app opens. Under the
+       floor is refused outright; between the floor and adulthood the account
+       exists and simply has messaging, uploads and money closed. */
+    if (!dateOfBirth) {
+      setErrors({ dateOfBirth: 'We need your date of birth.' });
+      return;
+    }
+    const age = yearsSince(dateOfBirth);
+    if (!Number.isFinite(age) || age < 0 || age > 120) {
+      setErrors({ dateOfBirth: 'That date does not look right.' });
+      return;
+    }
+    if (age < MIN_AGE) {
+      setErrors({
+        dateOfBirth: `You need to be at least ${MIN_AGE} to have an account here. The music is not going anywhere.`,
+      });
+      return;
+    }
+
     const validationResult = profileSchema.safeParse({
       profileName,
       bio: bio || undefined,
@@ -194,6 +219,8 @@ export default function Onboarding() {
         x_profile_link: normalizeXLink(xProfileLink),
         onboarding_completed: true,
         terms_accepted_at: new Date().toISOString(),
+        date_of_birth: dateOfBirth,
+        age_confirmed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         ...(avatarUrl ? { profile_picture_url: avatarUrl } : {}),
         ...(coverUrl ? { cover_photo_url: coverUrl } : {}),
@@ -225,9 +252,43 @@ export default function Onboarding() {
       } catch {
         void 0;
       }
+      /* Record what they agreed to, and which version of it. Never let this
+         fail the sign-up: a missing consent row is ours to notice, not a
+         reason to bounce somebody out of onboarding. */
+      try {
+        await supabase.from('policy_acceptances' as never).insert(
+          (['terms', 'privacy', 'guidelines'] as const).map((policy) => ({
+            user_id: authedUserId,
+            policy_key: policy,
+            version: POLICY_VERSIONS[policy],
+            context: 'onboarding',
+          })) as never,
+        );
+      } catch (consentErr) {
+        console.error('Could not record policy acceptance', consentErr);
+      }
+
       await refreshProfile();
-      toast({ title: 'Welcome to the Audience!' });
-      navigate('/', { replace: true });
+
+      /* Two different people finish this form, and sending both to the feed
+         wastes the one moment a musician is most ready to act. Somebody who
+         said they make music goes straight to the Studio with their name
+         already filled in; everybody else goes to the music.
+
+         Note what this deliberately does NOT do: it does not mark them an
+         artist. Saying you make music is an intention. Releasing a record is
+         what writes the artist_accounts row, and that happens on first publish
+         in upload-url. Nobody gets an artist page for ticking a box. */
+      if (makesMusic) {
+        toast({
+          title: 'You are in. Studio is next.',
+          description: 'Put a record up and your artist page builds itself.',
+        });
+        navigate('/studio', { replace: true });
+      } else {
+        toast({ title: 'Welcome to the Audience!' });
+        navigate('/', { replace: true });
+      }
     } catch (err: any) {
       console.error('Onboarding submit error', err);
       toast({
@@ -459,11 +520,60 @@ export default function Onboarding() {
             </div>
           </div>
 
+          {/* Which of the two people finishing this form is this?
+              Asked first because the answer changes where they land, and asked
+              in plain words rather than "artist or listener", because plenty of
+              people who make music would not call themselves an artist yet. */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Music className="w-4 h-4" />
+              Do you make music?
+            </Label>
+            {/* The one moment in this form worth making feel like something.
+                The chosen seat lifts off the page and catches the light; the
+                other stays flat. Depth carries the choice, not colour, so it
+                still reads as a real surface rather than a lit-up button. */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMakesMusic(false)}
+                aria-pressed={!makesMusic}
+                className={`rounded-xl border px-4 py-3 text-left transition-all duration-300 ${
+                  !makesMusic
+                    ? 'live-surface border-border bg-card -translate-y-0.5'
+                    : 'border-border/60 bg-transparent hover:bg-muted/50'
+                }`}
+              >
+                <span className="block text-sm font-semibold text-foreground">I am here to listen</span>
+                <span className="block text-xs text-muted-foreground">Find music, follow artists</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMakesMusic(true)}
+                aria-pressed={makesMusic}
+                className={`rounded-xl border px-4 py-3 text-left transition-all duration-300 ${
+                  makesMusic
+                    ? 'live-surface border-border bg-card -translate-y-0.5'
+                    : 'border-border/60 bg-transparent hover:bg-muted/50'
+                }`}
+              >
+                <span className="block text-sm font-semibold text-foreground">I make music</span>
+                <span className="block text-xs text-muted-foreground">Put your own records out</span>
+              </button>
+            </div>
+            {makesMusic && (
+              <p className="live-surface rounded-lg border border-border/60 bg-card px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                We will take you to the Studio when you are done. Release one record and your
+                artist page builds itself. No fee, no wallet needed, and nobody approves it.
+              </p>
+            )}
+          </div>
+
           {/* Profile Name */}
           <div className="space-y-2">
             <Label htmlFor="profileName" className="text-sm font-medium flex items-center gap-2">
               <User className="w-4 h-4" />
-              Profile Name <span className="text-destructive">*</span>
+              {makesMusic ? 'Artist name' : 'Profile Name'} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="profileName"
@@ -478,6 +588,27 @@ export default function Onboarding() {
             )}
           </div>
 
+          {/* Date of birth. Asked once, and the account is held to it. */}
+          <div className="space-y-2">
+            <Label htmlFor="dob" className="text-sm font-medium flex items-center gap-2">
+              <CalendarDays className="w-4 h-4" />
+              When were you born?
+            </Label>
+            <Input
+              id="dob"
+              type="date"
+              value={dateOfBirth}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              className={errors.dateOfBirth ? 'border-destructive' : ''}
+            />
+            {errors.dateOfBirth && <p className="text-xs text-destructive">{errors.dateOfBirth}</p>}
+            <p className="text-xs text-muted-foreground">
+              This decides which parts of SONGCHAINN are open to you. Under 18, private messaging,
+              uploads and anything involving money stay closed. Everything else works the same.
+            </p>
+          </div>
+
           {/* Location */}
           <div className="space-y-2">
             <Label htmlFor="location" className="text-sm font-medium flex items-center gap-2">
@@ -488,7 +619,7 @@ export default function Onboarding() {
               id="location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. Lusaka, Zambia"
+              placeholder="e.g. Lagos, London, Lusaka"
               maxLength={100}
               className={errors.location ? 'border-destructive' : ''}
             />
@@ -564,9 +695,27 @@ export default function Onboarding() {
             )}
           </Button>
 
+          {/* Consent, at the moment they proceed, not buried three pages back.
+              The version agreed to is recorded against the account. */}
+          <p className="text-xs text-muted-foreground text-center">
+            By continuing you agree to the{' '}
+            <Link to="/terms" className="text-primary underline-offset-2 hover:underline">
+              Terms of Use
+            </Link>
+            , the{' '}
+            <Link to="/privacy" className="text-primary underline-offset-2 hover:underline">
+              Privacy Policy
+            </Link>{' '}
+            and the{' '}
+            <Link to="/guidelines" className="text-primary underline-offset-2 hover:underline">
+              Community Guidelines
+            </Link>
+            , and you confirm the date above is your real date of birth.
+          </p>
+
           {/* Early Access Note */}
           <p className="text-xs text-muted-foreground text-center">
-            You're early. Your Audience activity here unlocks future access and ownership.
+            You're early. What you play and post here builds your place on the leaderboard.
           </p>
         </motion.form>
       </div>

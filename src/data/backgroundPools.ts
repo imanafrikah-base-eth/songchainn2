@@ -1,8 +1,8 @@
 import collage from '@/assets/app background images/background..jpg';
-import djBranding from '@/assets/app background images/Dj Suffle Branding.png';
-import moshaPopup from '@/assets/app background images/Mo$ha chat pop up.png';
-import wavewarzHero from '@/assets/app background images/WaveWarz Africa HEADER HERO MOCKUP.png';
-import wavewarzBg from '@/assets/app background images/WaveWarz Africa_ with backgroun.png';
+import djBranding from '@/assets/app background images/Dj Suffle Branding.webp';
+import moshaPopup from '@/assets/app background images/Mo$ha chat pop up.webp';
+import wavewarzHero from '@/assets/app background images/WaveWarz Africa HEADER HERO MOCKUP.webp';
+import wavewarzBg from '@/assets/app background images/WaveWarz Africa_ with backgroun.webp';
 
 /**
  * Section background pools for the living-world ambient layer.

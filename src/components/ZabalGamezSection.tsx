@@ -174,7 +174,7 @@ export function ZabalGamezSection({ source = 'app' }: { source?: string }) {
                 <Flame className="w-3.5 h-3.5" />
                 {downloadCount === null ? 'Beat downloads loading...' : `${downloadCount} beat download${downloadCount === 1 ? '' : 's'}`}
               </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 border border-primary/30 text-[11px] sm:text-xs text-primary font-medium">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 border border-border text-[11px] sm:text-xs text-primary font-medium">
                 <Users className="w-3.5 h-3.5" />
                 {`${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} on the wall`}
               </span>
