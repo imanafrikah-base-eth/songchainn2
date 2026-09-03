@@ -26,6 +26,7 @@ import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
 import { WalletPicker } from '@/components/WalletPicker';
 import { useDiscoveredWallets } from '@/hooks/useDiscoveredWallets';
 import { GoogleSignIn } from '@/components/GoogleSignIn';
+import { MoshaChat } from '@/components/mosha/MoshaChat';
 import { AmbientBackground, TileBackdrop } from '@/components/AmbientBackground';
 import { CARD_TILES } from '@/data/backgroundPools';
 import { ZabalGamezSection } from '@/components/ZabalGamezSection';
@@ -125,7 +126,7 @@ export default function Auth() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [moshaTransient, setMoshaTransient] = useState<string | null>(null);
   const [moshaLeadMessage, setMoshaLeadMessage] = useState(
-    "I'm Mo$ha, your vibe mate and listening buddy. I can guide you through $ongChainn without pressure.",
+    "I'm Mo$ha. I know this place inside out. Ask me anything about it, however you want to ask, or let me show you around.",
   );
   const [isMoshaTourRunning, setIsMoshaTourRunning] = useState(false);
   const [isMoshaTourCompleted, setIsMoshaTourCompleted] = useState(false);
@@ -1304,33 +1305,20 @@ export default function Auth() {
 
         {isMoshaOpen ? (
           <div className="fixed right-3 sm:right-5 bottom-24 z-[64] w-[min(calc(100vw-1.25rem),22rem)]">
-            <div className="rounded-2xl border border-border bg-background/95 backdrop-blur p-3 shadow-2xl">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm text-foreground">
-                  <span className="font-semibold">Hey fam.</span> {moshaLeadMessage}
-                </p>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setIsMoshaOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Button type="button" className="h-9 text-xs" onClick={openPublicAbout}>
-                  Learn more about $ongChainn
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 text-xs border-border text-primary"
-                  onClick={startMoshaExploreTour}
-                  disabled={isMoshaTourRunning}
-                >
-                  {isMoshaTourRunning ? 'Exploring...' : 'Click here if ready to explore'}
-                </Button>
-              </div>
+            <div className="overflow-hidden rounded-2xl border border-border bg-background/95 backdrop-blur shadow-2xl">
+              {/* A conversation, not a menu. The tour and the About page are
+                  chips inside it for the person who would rather be shown. */}
+              <MoshaChat
+                compact
+                onClose={() => setIsMoshaOpen(false)}
+                extraChips={[
+                  { label: isMoshaTourRunning ? 'Showing you around' : 'Show me around', onClick: startMoshaExploreTour },
+                  { label: 'The long version', onClick: openPublicAbout },
+                ]}
+              />
+              {moshaLeadMessage && isMoshaTourRunning && (
+                <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">{moshaLeadMessage}</p>
+              )}
               {isMoshaTourCompleted && !isMoshaTourRunning && (
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Button

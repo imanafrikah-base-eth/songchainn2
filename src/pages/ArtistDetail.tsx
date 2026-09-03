@@ -29,6 +29,9 @@ import { ArtistGallery } from '@/components/gallery/ArtistGallery';
 import { useArtistGallery } from '@/hooks/useArtistMedia';
 import type { SocialPostWithProfile } from '@/types/social';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
+import { useArtistCoinHolding, HOLDER_PERK_USD } from '@/hooks/useArtistCoinHolding';
+import { zoraCoinUrl } from '@/lib/artistCoins';
+import { isNativeApp } from '@/lib/native';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -135,6 +138,10 @@ export default function ArtistDetail() {
   }, [artistAccount?.user_id, shouldAutoCreateArtistAccount, user]);
   const { isOnline: isArtistOnline, lastSeenAt: artistLastSeenAt } = useUserPresence(ownerUserId, { includeLastSeen: true });
   const artistPresenceLabel = formatPresenceLabel(isArtistOnline, artistLastSeenAt);
+  // Seeing when the artist is online is a holder's perk: fifty cents of
+  // their coin, read from the wallet on the account. The artist always sees
+  // their own.
+  const holding = useArtistCoinHolding(id);
 
   const { data: artistProfile } = useQuery({
     queryKey: ['artist-public-profile', ownerUserId],
@@ -755,7 +762,21 @@ export default function ArtistDetail() {
                       </span>
                     </h1>
                   )}
-                  <p className="text-sm text-muted-foreground mt-2">{artistPresenceLabel}</p>
+                  {isOwner || holding.holdsEnough ? (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      <span className={`mr-1.5 inline-block h-2 w-2 rounded-full align-middle ${isArtistOnline ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} aria-hidden="true" />
+                      {artistPresenceLabel}
+                    </p>
+                  ) : holding.coin ? (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Hold ${HOLDER_PERK_USD.toFixed(2)} of {artist.name}'s coin to see when {artist.name} is online.{' '}
+                      {!holding.wallet ? (
+                        <Link to="/profile" className="underline underline-offset-4 hover:text-foreground">Link a wallet</Link>
+                      ) : !isNativeApp() ? (
+                        <a href={zoraCoinUrl(holding.coin.coinAddress)} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-foreground">Get the coin</a>
+                      ) : null}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {/*

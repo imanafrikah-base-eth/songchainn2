@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
+import { geoSync, prefetchGeo } from '@/lib/geo';
+import { playSourceNow } from '@/lib/playSource';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // Subscribed broadcast channels keyed by channel name — reused across sendPulse calls.
@@ -224,6 +226,11 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Learn the city once per session, early, so the first play already has it.
+  useEffect(() => {
+    void prefetchGeo();
+  }, []);
+
   const addPlay = useCallback((songId: string) => {
     const now = Date.now();
     const last = lastPlayRef.current;
@@ -247,10 +254,17 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     });
     broadcastCountDelta('play', { songId });
 
+    // Where the play came from and roughly where the listener is, for the
+    // artist's activity board. Both are attached here, once, so no call site
+    // has to remember; see src/lib/playSource.ts and src/lib/geo.ts.
+    const geo = geoSync();
     supabase.from('song_analytics').insert({
       event_type: 'play',
       song_id: songId,
       user_id: user?.id ?? null,
+      source: playSourceNow(),
+      city: geo.city,
+      country: geo.country,
     } as any).then(({ error }) => {
       if (error) {
         if (import.meta.env.DEV) console.error('Failed to record play', error);
@@ -313,6 +327,9 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
             event_type: 'play',
             song_id: p.songId,
             user_id: user?.id ?? null,
+            source: 'offline',
+            city: geoSync().city,
+            country: geoSync().country,
           }));
         if (payload.length === 0) return;
         await supabase.from('song_analytics').insert(payload as any);

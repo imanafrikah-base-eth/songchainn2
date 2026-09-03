@@ -7,6 +7,7 @@
 // their own wallet. The words still say what the key is; they just do not
 // sell it. See ANDROID.md, "Watch the Play Billing line".
 
+import { Link } from 'react-router-dom';
 import { KeyRound, ExternalLink } from 'lucide-react';
 import type { WorldConfig, WorldRings } from '../types';
 import { isNativeApp } from '@/lib/native';
@@ -53,7 +54,10 @@ export function GetKeyCta({
         <KeyRound className="h-5 w-5 text-amber-300" />
         <h3 className="font-heading text-lg font-bold text-white">The key to this world</h3>
       </div>
-      <p className="mt-2 text-sm leading-relaxed text-white/60">{world.positioning} Hold it and doors open. The deeper the room, the more of the key it takes.</p>
+      <p className="mt-2 text-sm leading-relaxed text-white/60">
+        {world.positioning} Hold it and doors open. The deeper the room, the more of the key it takes.{' '}
+        <Link to="/keys" className="underline underline-offset-4 hover:text-white">How keys work</Link>. A key is access, not an investment, and its price can fall to nothing.
+      </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {liveSwapUrl ? (
           <a

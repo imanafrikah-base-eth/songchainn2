@@ -63,6 +63,8 @@ const Studio = lazy(() => import("./pages/Studio"));
 const Launch = lazy(() => import("./pages/Launch"));
 const Policy = lazy(() => import("./pages/Policy"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
+const Licensing = lazy(() => import("./pages/Licensing"));
+const Keys = lazy(() => import("./pages/Keys"));
 const Console = lazy(() => import("./pages/Console"));
 
 
@@ -196,6 +198,9 @@ function AppShell() {
                     /privacy is an alias onto it. */}
                 <Route path="/privacy" element={<Policy which="privacy" />} />
                 <Route path="/delete-account" element={<DeleteAccountPage />} />
+                <Route path="/license/:songId" element={<Licensing />} />
+                <Route path="/license" element={<Licensing />} />
+                <Route path="/keys" element={<Keys />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/studio" element={<Studio />} />
                 <Route path="/launch" element={<Launch />} />
@@ -240,7 +245,7 @@ function AppShell() {
 
 // Routes that are visible to everyone — no auth gate, no auth spinner
 const PUBLIC_PATTERNS = [
-  '/about', '/artists', '/artist/:id', '/catalog/:id', '/song/:id', '/delete-account',
+  '/about', '/artists', '/artist/:id', '/catalog/:id', '/song/:id', '/delete-account', '/license', '/license/:songId', '/keys',
   '/wavewarz-africa', '/wavewarz-africa/*', '/install', '/reset-password', '/bettercallzaal',
   ...(WORLDS_ENABLED ? ['/world/:worldSlug', '/world/:worldSlug/:roomSlug'] : []),
   // A world an artist built and shared is the whole point of building one. It
@@ -272,6 +277,9 @@ function AppContent() {
                   <Route path="/guidelines" element={<Policy which="guidelines" />} />
                 <Route path="/privacy" element={<Policy which="privacy" />} />
                 <Route path="/delete-account" element={<DeleteAccountPage />} />
+                <Route path="/license/:songId" element={<Licensing />} />
+                <Route path="/license" element={<Licensing />} />
+                <Route path="/keys" element={<Keys />} />
                 <Route path="/artists" element={<Artists />} />
                 <Route path="/artist/:id" element={<ArtistDetail />} />
                 <Route path="/catalog/:id" element={<CatalogDetail />} />
@@ -316,6 +324,9 @@ function AppContent() {
                   <Route path="/guidelines" element={<Policy which="guidelines" />} />
                   <Route path="/privacy" element={<Policy which="privacy" />} />
                 <Route path="/delete-account" element={<DeleteAccountPage />} />
+                <Route path="/license/:songId" element={<Licensing />} />
+                <Route path="/license" element={<Licensing />} />
+                <Route path="/keys" element={<Keys />} />
                   <Route path="/artists" element={<Artists />} />
                   <Route path="/artist/:id" element={<ArtistDetail />} />
                   <Route path="/catalog/:id" element={<CatalogDetail />} />

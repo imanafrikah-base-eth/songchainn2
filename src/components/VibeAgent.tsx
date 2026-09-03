@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import moshaAvatar from '@/assets/Mo$ha chat pop up.webp';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { fcOpenUrl } from '@/lib/farcasterActions';
+import { MoshaChat } from '@/components/mosha/MoshaChat';
 
 type AgentMode = 'unset' | 'music' | 'chill' | 'turnup' | 'focus' | 'feelings' | 'explore';
 type MoodChoice = 'loving' | 'cool' | 'not_my_vibe';
@@ -157,6 +158,8 @@ export function VibeAgent() {
 
   const [mode, setMode] = useState<AgentMode>('unset');
   const [step, setStep] = useState<AgentStep | null>(null);
+  /** The conversation. The tab opens this; the scripted flows sit behind a chip inside it. */
+  const [chatOpen, setChatOpen] = useState(false);
 
   // The launcher tab steps aside while the page is moving (see .agent-tab in
   // index.css). A body flag, so it is one listener for the whole app and the
@@ -290,7 +293,9 @@ export function VibeAgent() {
   useEffect(() => {
     const handleOpen = () => {
       setDismissedUntil(0);
-      setStep((prev) => prev || 'welcome');
+      // "Call Mo$ha" opens the conversation. The scripted vibe flow is one
+      // chip away inside it.
+      setChatOpen(true);
     };
     const handlePrompt = (event: Event) => {
       const detail = (event as CustomEvent<ExternalPrompt | undefined>)?.detail;
@@ -580,12 +585,32 @@ export function VibeAgent() {
   }, [addSongsToPlaylist, createPlaylist, displayName, isBuildingLane, mode, tasteLane, toast]);
 
   if (!step) {
+    if (chatOpen) {
+      return (
+        <div className="agent-dock fixed z-[58] bottom-20 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6 w-[min(calc(100vw-0.75rem),22rem)] sm:w-[23rem] md:w-[24rem]">
+          <div className="overflow-hidden rounded-2xl border border-border bg-background/95 shadow-2xl backdrop-blur">
+            <MoshaChat
+              onClose={() => setChatOpen(false)}
+              extraChips={[
+                {
+                  label: mode === 'unset' ? 'Set my vibe' : `Change my vibe (${modeLabel(mode)})`,
+                  onClick: () => {
+                    setChatOpen(false);
+                    setStep(mode === 'unset' ? 'welcome' : 'taste-lane');
+                  },
+                },
+              ]}
+            />
+          </div>
+        </div>
+      );
+    }
     if (mode === 'unset') {
       return (
         <div className="agent-dock agent-tab fixed z-[58]">
           <button
             type="button"
-            onClick={() => setStep('welcome')}
+            onClick={() => setChatOpen(true)}
             aria-label="Open Mo$ha"
             className="agent-tab-button border border-border bg-background/90 backdrop-blur text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors flex items-center gap-1"
           >
@@ -599,7 +624,7 @@ export function VibeAgent() {
       <div className="agent-dock agent-tab fixed z-[58]">
         <button
           type="button"
-          onClick={() => setStep('taste-lane')}
+          onClick={() => setChatOpen(true)}
           aria-label={`Open Mo$ha, ${modeLabel(mode)}`}
           className="agent-tab-button border border-border bg-background/90 backdrop-blur text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors"
         >

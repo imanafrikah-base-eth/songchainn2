@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { askMosha } from '@/lib/mosha';
 
 type DirectMessage = {
   id: string;
@@ -45,57 +46,8 @@ function parseMessageWithCtas(text: string): { content: string; ctas: MessageCta
   };
 }
 
-function isRelevantToMoshaReply(text: string) {
-  const query = text.toLowerCase();
-  return /(songchainn|wavewarz|battle|room|dj|shuffle|playlist|catalog|artist|how|help|feature|signup|login|about|marketplace|coin|token|zora|buy|sell|trade|phase)/i.test(query);
-}
-
-function isFollowUpMessage(text: string) {
-  const query = text.toLowerCase().trim();
-  return /^(and|also|what about|why|how|then|ok|so|that|it|this|they)\b/.test(query) || query.length <= 14;
-}
-
-function buildMoshaReply(text: string, history: DirectMessage[]) {
-  const query = text.toLowerCase();
-  const recentUserText = history
-    .filter((m) => m.sender === 'user')
-    .slice(-4)
-    .map((m) => m.text.toLowerCase())
-    .join(' ');
-  const contextualQuery = `${recentUserText} ${query}`;
-
-  if ((query.includes('share') || query.includes('post')) && contextualQuery.includes('song')) {
-    return 'To share a song to feed: open a song card, tap share to feed, then post. If it fails, refresh feed once and try again while signed in.';
-  }
-  if (query.includes('wavewarz') || query.includes('battle')) {
-    return 'WaveWarz Africa battles run right here in $ongChainn now: watch live, vote each round, and request to speak in the room. You can also host your own battle or register your music and country for rollout.\nCTA::Watch Live Battles::/wavewarz-africa/battles/live';
-  }
-  if (contextualQuery.includes('dj') || contextualQuery.includes('shuffle')) {
-    return 'DJ Shuffle can run Artist, All Songs, or Catalog shuffle. I can guide you to the best mode for your vibe.';
-  }
-  if (contextualQuery.includes('room')) {
-    return 'The Room is live community listening plus chat. Join it for shared discovery and real-time reactions.';
-  }
-  if (
-    contextualQuery.includes('marketplace') ||
-    contextualQuery.includes('coin') ||
-    contextualQuery.includes('token') ||
-    contextualQuery.includes('zora') ||
-    ((contextualQuery.includes('buy') || contextualQuery.includes('sell') || contextualQuery.includes('trade') || contextualQuery.includes('own')) && contextualQuery.includes('song'))
-  ) {
-    return 'That is the Music Marketplace, and it is live. Real songs are tradeable coins on Base: buy in to back an artist, or sell back for ETH anytime. Open the Marketplace to try it.\nCTA::Explore Marketplace::/marketplace';
-  }
-  if (query.includes('phase') || query.includes('audience first') || query.includes('what is live') || query.includes('whats live')) {
-    return 'Everything is live, there is no waiting list and nothing is in beta. Songs are real tradeable coins on Base, artists release straight from the Studio, WaveWarz Africa battles run here, and your points decide the leaderboard.\nCTA::Explore Marketplace::/marketplace';
-  }
-  if (contextualQuery.includes('playlist') || contextualQuery.includes('catalog')) {
-    return 'For follow-up discovery, start from your favorite catalog, then branch by artist and room reactions to find the next best songs.';
-  }
-  return 'I got your follow-up. Based on this conversation, I can help with feed sharing, rooms, WaveWarz, DJ Shuffle, playlists, or profile growth next.';
-}
-
 const SEED_TEXT =
-  'Hey fam, Mo$ha here. Welcome to your $ongChainn message center. Everything here is live: the Music Marketplace where songs are real coins on Base, WaveWarz Africa battles you can watch and vote in, and artists releasing straight to you. Ask me about any of it anytime.';
+  "Mo$ha here. This is your line to me. I know this place inside out: the records, the artists, the worlds, the battles, the coins, the keys. Ask me anything, however you want to ask it, and I will give it to you straight.";
 
 export default function Inbox() {
   const { user } = useAuth();
@@ -208,30 +160,26 @@ export default function Inbox() {
       );
     }
 
+    // Mo$ha answers everything now, from the real account of the app and
+    // what it knows about this person, in the founder's own way of talking.
+    // The thread's last turns go with the question so it can follow along.
     const conversation = [...sortedMessages, userMessage];
-    const shouldReply = isRelevantToMoshaReply(userMessage.text) || isFollowUpMessage(userMessage.text) || conversation.length <= 3;
-
-    if (!shouldReply) {
-      setIsSending(false);
-      toast.message('Message sent.');
-      return;
-    }
-
-    const replyDelay = 650 + Math.floor(Math.random() * 700);
-    window.setTimeout(async () => {
-      const replyText = buildMoshaReply(userMessage.text, conversation);
-      const replyId = await persistMoshaReply(replyText);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: replyId || `${Date.now()}-mosha`,
-          sender: 'mosha',
-          text: replyText,
-          created_at: new Date().toISOString(),
-        },
-      ]);
-      setIsSending(false);
-    }, replyDelay);
+    const turns = conversation
+      .filter((m) => m.id !== 'seed-mosha')
+      .slice(-12)
+      .map((m) => ({ role: m.sender === 'user' ? ('user' as const) : ('assistant' as const), content: m.text }));
+    const replyText = await askMosha(turns, 'inbox');
+    const replyId = await persistMoshaReply(replyText);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: replyId || `${Date.now()}-mosha`,
+        sender: 'mosha',
+        text: replyText,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    setIsSending(false);
   };
 
   const openCtaRoute = (route: string) => {

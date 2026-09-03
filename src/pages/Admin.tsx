@@ -11,12 +11,13 @@ import { ArtistApplicationsPanel } from '@/components/admin/ArtistApplicationsPa
 import { ArtistClaimsPanel } from '@/components/admin/ArtistClaimsPanel';
 import { ArtistWalletsPanel } from '@/components/admin/ArtistWalletsPanel';
 import { FeatureRequestsPanel } from '@/components/admin/FeatureRequestsPanel';
+import { CoinQueuePanel } from '@/components/admin/CoinQueuePanel';
 const logo = '/songchainn-logo.webp';
 
 export default function Admin() {
   const { isAdmin, isLoading } = useAuth();
   const { data: popularityData } = useSongPopularity();
-  const [activeTab, setActiveTab] = useState<'artists' | 'songs' | 'applications' | 'claims' | 'payouts' | 'requests'>('artists');
+  const [activeTab, setActiveTab] = useState<'artists' | 'songs' | 'applications' | 'claims' | 'payouts' | 'requests' | 'coins'>('artists');
   const [artists, setArtists] = useState(ARTISTS);
 
   const songsWithRealStats = useMemo(() => {
@@ -134,6 +135,17 @@ export default function Admin() {
               <Lightbulb className="w-4 h-4 inline mr-2" />
               Asked for
             </button>
+            <button
+              onClick={() => setActiveTab('coins')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                activeTab === 'coins'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Wallet className="w-4 h-4 inline mr-2" />
+              Coin queue
+            </button>
           </div>
 
           {activeTab === 'claims' && <ArtistClaimsPanel />}
@@ -141,6 +153,8 @@ export default function Admin() {
           {activeTab === 'payouts' && <ArtistWalletsPanel />}
 
           {activeTab === 'requests' && <FeatureRequestsPanel />}
+
+          {activeTab === 'coins' && <CoinQueuePanel />}
 
           {/* Artists Tab */}
           {activeTab === 'artists' && (

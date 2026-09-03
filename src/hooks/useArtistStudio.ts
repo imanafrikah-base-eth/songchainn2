@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { saveSongDetails, type SongDetails } from '@/lib/songDetails';
 
 /**
  * The artist side of SONGCHAINN: upload a track, have it auditioned, and see
@@ -71,6 +72,9 @@ export interface ArtistRelease {
   created_at: string;
   published_at: string | null;
   audition: AuditionResult | null;
+  /** 'app' streams here only; 'onchain' also asks for a coin on Base. */
+  distribution: 'app' | 'onchain';
+  onchain_requested_at: string | null;
 }
 
 /** Every track this artist owns, newest first, at any stage. */
@@ -82,7 +86,7 @@ export function useArtistReleases() {
     queryFn: async (): Promise<ArtistRelease[]> => {
       const { data, error } = await supabase
         .from('songs')
-        .select('id, title, artist_name, genre, status, audio_url, cover_art_url, duration_seconds, created_at, published_at, audition')
+        .select('id, title, artist_name, genre, status, audio_url, cover_art_url, duration_seconds, created_at, published_at, audition, distribution, onchain_requested_at')
         .eq('owner_id', user!.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -113,7 +117,14 @@ export function useTrackUpload() {
   const upload = useCallback(
     async (
       file: File,
-      meta: { title: string; artistName: string; genre?: string; cover?: File | null },
+      meta: {
+        title: string;
+        artistName: string;
+        genre?: string;
+        cover?: File | null;
+        /** Lyrics, credits, identifiers and the distribution choice. All optional. */
+        details?: SongDetails;
+      },
     ) => {
       if (!user) {
         setState({ ...IDLE, phase: 'error', error: 'Sign in to upload.' });
@@ -167,6 +178,26 @@ export function useTrackUpload() {
               .eq('id', ticket.songId);
           } catch (coverErr) {
             console.error('Cover art upload failed, continuing without it', coverErr);
+          }
+        }
+
+        // 2c. The record's details and where it lives, written straight onto
+        //     the row the ticket reserved. Never fatal: a record with no lyrics
+        //     still beats no record, and they can be added from the catalog.
+        if (meta.details) {
+          try {
+            await saveSongDetails(ticket.songId, {
+              ...meta.details,
+              onchain_requested_at: meta.details.distribution === 'onchain' ? new Date().toISOString() : null,
+            });
+            if (meta.details.distribution === 'onchain') {
+              await supabase
+                .from('songs')
+                .update({ onchain_requested_at: new Date().toISOString() } as never)
+                .eq('id', ticket.songId);
+            }
+          } catch (detailsErr) {
+            console.error('Song details could not be saved at upload, continuing', detailsErr);
           }
         }
 

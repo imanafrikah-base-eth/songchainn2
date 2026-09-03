@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
  * Same three promises, said in one line each, unboxed, at app scale.
  */
 
-const POINTS = ['Live the same minute', 'No wallet needed', 'Held to a real standard'];
+const POINTS = ['Live the same minute', 'Beside your distributor, not instead', 'Fans you can name', 'Money in your own wallet'];
 
 export function MusicianCta({ onSignUp }: { onSignUp?: () => void }) {
   return (
@@ -28,8 +28,9 @@ export function MusicianCta({ onSignUp }: { onSignUp?: () => void }) {
       </h2>
 
       <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
-        Send a finished record. If it meets the standard it is live to listeners the same minute.
-        Free to release, and the music stays yours.
+        Release here first, then everywhere. Keep your distributor for the stores; this is where the
+        fans who care can hold your records, walk into your world and pay you directly, with no one in
+        between. Send a finished record and, if it meets the standard, it is live the same minute.
       </p>
 
       <ul className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground sm:text-sm">

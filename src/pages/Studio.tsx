@@ -16,6 +16,14 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   useArtistReleases, useTrackUpload, TIER_LABEL, type ArtistRelease, type ReleaseTier,
 } from '@/hooks/useArtistStudio';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { ChevronDown, Pencil } from 'lucide-react';
+import { SongDetailsFields, DistributionChoice } from '@/components/studio/SongDetailsFields';
+import { SongDetailsDialog } from '@/components/studio/SongDetailsDialog';
+import { ActivityBoard } from '@/components/studio/ActivityBoard';
+import { EMPTY_DETAILS, requestOnchain, type SongDetails } from '@/lib/songDetails';
+import { useSongCoin } from '@/hooks/useSongCoins';
 
 // A WAV master runs about 10.6 MB a minute, so this has to be generous enough
 // that a full lossless record fits. Keep in step with MAX_BYTES in upload-url.
@@ -52,7 +60,7 @@ function useMyProfile() {
 }
 
 const Studio = () => {
-  const { user, isArtist } = useAuth();
+  const { user, isArtist, artistId } = useAuth();
   const { data: profile } = useMyProfile();
   const { data: releases = [], isLoading } = useArtistReleases();
   const { phase, progress, error, result, upload, reset } = useTrackUpload();
@@ -66,6 +74,9 @@ const Studio = () => {
   const [cover, setCover] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const coverRef = useRef<HTMLInputElement>(null);
+  /** Lyrics, credits, identifiers and where the record lives. All optional. */
+  const [details, setDetails] = useState<SongDetails>(EMPTY_DETAILS);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     if (!artistName && profile) {
@@ -92,6 +103,7 @@ const Studio = () => {
       artistName: artistName.trim(),
       genre: genre.trim() || undefined,
       cover,
+      details,
     });
   };
 
@@ -100,6 +112,8 @@ const Studio = () => {
     setFile(null);
     setTitle('');
     setGenre('');
+    setDetails(EMPTY_DETAILS);
+    setMoreOpen(false);
     setCover(null);
     setCoverPreview((url) => {
       if (url) URL.revokeObjectURL(url);
@@ -115,9 +129,9 @@ const Studio = () => {
         <Navigation />
         <div className="mx-auto max-w-2xl px-4 py-16 text-center">
           <Music4 className="mx-auto h-10 w-10 text-primary mb-4" />
-          <h1 className="font-heading text-2xl font-bold mb-2">Your music, your store</h1>
+          <h1 className="font-heading text-2xl font-bold mb-2">Release here first, then everywhere</h1>
           <p className="text-sm text-muted-foreground mb-6">
-            Make an account and you can put a record out today. No wallet needed to release, no fee, no waiting on anybody's approval.
+            Keep your distributor for the stores. This is the place your fans can hold your records, walk into your world and pay you directly. Make an account and a record is out today: no wallet needed to release, no fee, no waiting on anybody's approval.
           </p>
           <Link to="/auth" className="inline-flex items-center rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground">
             Create an account
@@ -255,6 +269,35 @@ const Studio = () => {
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
                 />
               </label>
+
+              <div className="sm:col-span-2">
+                <DistributionChoice
+                  value={details.distribution}
+                  onChange={(v) => setDetails((d) => ({ ...d, distribution: v }))}
+                  hasWallet={hasWallet}
+                  disabled={busy}
+                />
+              </div>
+
+              <div className="sm:col-span-2 rounded-xl border border-border">
+                <button
+                  type="button"
+                  onClick={() => setMoreOpen((v) => !v)}
+                  aria-expanded={moreOpen}
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-foreground">Lyrics, credits and paperwork</span>
+                    <span className="block text-xs text-muted-foreground">Optional now, editable any time from your catalog.</span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {moreOpen && (
+                  <div className="border-t border-border p-3">
+                    <SongDetailsFields value={details} onChange={setDetails} disabled={busy} />
+                  </div>
+                )}
+              </div>
             </div>
 
             {busy && (
@@ -416,15 +459,24 @@ const Studio = () => {
           </p>
         ) : (
           <div className="space-y-8">
-            {pending.length > 0 && <ReleaseGroup title="In progress" items={pending} />}
-            {live.length > 0 && <ReleaseGroup title="Live on SONGCHAINN" items={live} />}
+            {pending.length > 0 && <ReleaseGroup title="In progress" items={pending} hasWallet={hasWallet} />}
+            {live.length > 0 && <ReleaseGroup title="Live on SONGCHAINN" items={live} hasWallet={hasWallet} />}
             {workshop.length > 0 && (
               <ReleaseGroup
                 title="Your workshop"
                 note="Only you can see this. Nothing lands here unless something on the file is actually broken, and there is no limit on sending a track back once you have fixed it."
                 items={workshop}
+                hasWallet={hasWallet}
               />
             )}
+          </div>
+        )}
+
+        {/* ---------------------------------------------------- activity --- */}
+
+        {artistId && (
+          <div className="mt-10 border-t border-border pt-8">
+            <ActivityBoard artistId={artistId} />
           </div>
         )}
       </div>
@@ -433,26 +485,52 @@ const Studio = () => {
   );
 };
 
-function ReleaseGroup({ title, note, items }: { title: string; note?: string; items: ArtistRelease[] }) {
+function ReleaseGroup({ title, note, items, hasWallet }: { title: string; note?: string; items: ArtistRelease[]; hasWallet: boolean }) {
   return (
     <section>
       <h2 className="font-heading text-lg font-bold text-foreground">{title}</h2>
       {note && <p className="mt-1 mb-3 text-xs text-muted-foreground">{note}</p>}
       <div className={`space-y-3 ${note ? '' : 'mt-3'}`}>
-        {items.map((r) => <ReleaseCard key={r.id} release={r} />)}
+        {items.map((r) => <ReleaseCard key={r.id} release={r} hasWallet={hasWallet} />)}
       </div>
     </section>
   );
 }
 
-function ReleaseCard({ release }: { release: ArtistRelease }) {
+function ReleaseCard({ release, hasWallet }: { release: ArtistRelease; hasWallet: boolean }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const queryClient = useQueryClient();
+  const coin = useSongCoin(release.id);
   const a = release.audition;
   const tier = a?.tier;
   const hasNote = !!(a && (a.hikulu || a.nakulu || a.failures?.length || a.shortfalls?.length || a.plain));
+  const minted = coin?.mint_status === 'minted';
+  const requested = release.distribution === 'onchain' || Boolean(release.onchain_requested_at);
+
+  /* "Take it onchain": the artist's wish is recorded on the row and lands in
+     the admin coin queue; the mint itself runs from the platform signer. */
+  const takeOnchain = async () => {
+    if (!hasWallet) {
+      toast('Connect a wallet first', { description: 'The coin pays out to it. Add one in your profile, then come back.' });
+      return;
+    }
+    setAsking(true);
+    try {
+      await requestOnchain(release.id);
+      await queryClient.invalidateQueries({ queryKey: ['artist_releases'] });
+      toast('On its way on chain', { description: 'We mint it and message you when the coin is live.' });
+    } catch (err) {
+      toast.error((err as Error)?.message || 'That did not go through. Try again.');
+    } finally {
+      setAsking(false);
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
+      <SongDetailsDialog songId={release.id} title={release.title || 'Untitled'} open={editing} onOpenChange={setEditing} />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-semibold text-foreground">{release.title || 'Untitled'}</p>
@@ -472,6 +550,34 @@ function ReleaseCard({ release }: { release: ArtistRelease }) {
             {STATUS_LABEL[release.status] ?? release.status}
           </span>
         </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+        >
+          <Pencil className="h-3.5 w-3.5" /> Edit details
+        </button>
+        {minted ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+            <Coins className="h-3.5 w-3.5" /> On chain
+          </span>
+        ) : requested ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            <Coins className="h-3.5 w-3.5" /> Coin on its way
+          </span>
+        ) : release.status === 'published' ? (
+          <button
+            type="button"
+            onClick={takeOnchain}
+            disabled={asking}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-60"
+          >
+            <Coins className="h-3.5 w-3.5" /> Take it onchain
+          </button>
+        ) : null}
       </div>
 
       {hasNote && (

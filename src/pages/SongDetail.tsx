@@ -15,6 +15,8 @@ import { SongCard } from '@/components/SongCard';
 import { SongComments } from '@/components/SongComments';
 import { ShareSongButton } from '@/components/ShareSongButton';
 import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
+import { SongInfoSections } from '@/components/song/SongInfoSections';
+import { SongActivity } from '@/components/song/SongActivity';
 import { earnedPlacement } from '@/lib/placement';
 import { useMemo, useEffect, useCallback, useState } from 'react';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
@@ -324,6 +326,12 @@ export default function SongDetail() {
             </div>
           </div>
         </motion.section>
+
+        {/* Lyrics, credits, the record's facts, and the licensing door */}
+        <SongInfoSections songId={song.id} />
+
+        {/* What is happening to it, counted on the server */}
+        <SongActivity songId={song.id} />
 
         {/* Comments Section */}
         <SongComments songId={song.id} songTitle={song.title} artistName={artist.name} />

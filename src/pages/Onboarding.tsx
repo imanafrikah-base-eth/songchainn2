@@ -46,6 +46,7 @@ export default function Onboarding() {
   const [location, setLocation] = useState('');
   const [xProfileLink, setXProfileLink] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
+  const [gender, setGender] = useState('unsaid');
   const [makesMusic, setMakesMusic] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -220,6 +221,7 @@ export default function Onboarding() {
         onboarding_completed: true,
         terms_accepted_at: new Date().toISOString(),
         date_of_birth: dateOfBirth,
+        gender,
         age_confirmed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         ...(avatarUrl ? { profile_picture_url: avatarUrl } : {}),
@@ -606,6 +608,24 @@ export default function Onboarding() {
             <p className="text-xs text-muted-foreground">
               This decides which parts of SONGCHAINN are open to you. Under 18, private messaging,
               uploads and anything involving money stay closed. Everything else works the same.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="gender" className="text-sm font-medium">How should Mo$ha refer to you?</Label>
+            <select
+              id="gender"
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="unsaid">Rather not say</option>
+              <option value="woman">She, her</option>
+              <option value="man">He, him</option>
+              <option value="other">They, them</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Optional. Mo$ha is the guide in the app; this only shapes how it talks to you and about you.
             </p>
           </div>
 
