@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { motion } from 'framer-motion';
 import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound } from 'lucide-react';
-import { ARTISTS, SONGS, getRelatedArtists } from '@/data/musicData';
+import { ARTISTS, SONGS, getRelatedArtists, type Artist } from '@/data/musicData';
 import { getWorldByArtistId } from '@/worlds/registry';
 import { ArtistCoinPanel } from '@/components/ArtistCoinPanel';
 import { WORLDS_ENABLED } from '@/lib/features';
@@ -71,7 +71,7 @@ export default function ArtistDetail() {
   } = useSocial();
   
   const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
-  const artist = ARTISTS.find(a => a.id === id) ?? publishedArtists.find(a => a.id === id);
+  const catalogArtist = ARTISTS.find(a => a.id === id) ?? publishedArtists.find(a => a.id === id);
   const artistSongs = [...SONGS, ...publishedSongs].filter(s => s.artistId === id);
   const isFollowingArtist = id ? isArtistLiked(id) : false;
 
@@ -175,6 +175,23 @@ export default function ArtistDetail() {
     staleTime: 1000 * 10,
     retry: 1,
   });
+
+  // An artist who was granted an account but has no record in the catalogue
+  // yet (a page claimed through "New here?", or a claimed page with nothing
+  // published) still has a page: the account is the artist, and their own
+  // profile dresses it until a record does. Without this, Profile sent a
+  // newly approved artist to their own page and the page said Not Found.
+  const artist: Artist | undefined = catalogArtist ?? (artistAccount?.user_id && id
+    ? {
+        id,
+        name: (artistProfile as any)?.profile_name || (artistProfile as any)?.display_name || 'New artist',
+        bio: (artistProfile as any)?.bio || '',
+        location: (artistProfile as any)?.location || '',
+        townSquare: '',
+        profileImage: (artistProfile as any)?.profile_picture_url || (artistProfile as any)?.avatar_url || undefined,
+        songs: [],
+      }
+    : undefined);
 
   const displayName = (artistProfile as any)?.profile_name || artist?.name;
   const displayBio = (artistProfile as any)?.bio || artist?.bio;
@@ -561,7 +578,7 @@ export default function ArtistDetail() {
 
   if (!artist) {
     // Still loading — show skeleton while artist account/profile resolves
-    if (isArtistAccountLoading) {
+    if (isArtistAccountLoading || (artistAccount?.user_id && artistProfile === undefined)) {
       return (
         <div className="min-h-screen bg-background">
           <Navigation />

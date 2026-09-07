@@ -12,13 +12,15 @@
 // reads the visitor's key balance and lights up what they can open. Whatever
 // is playing dresses the whole layer, because music runs under every city.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Wallet, Disc3, Shirt } from 'lucide-react';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { ARTISTS } from '@/data/musicData';
 import { getWorldBySlug, formatWorldNumber } from '@/worlds/registry';
+import { fetchWorldBySlug } from '@/worlds/loader';
+import { BuiltRoom } from '@/worlds/components/BuiltRoom';
 import { useWorldAccess } from '@/worlds/useWorldAccess';
 import { useAuth } from '@/context/AuthContext';
 import { useCityTheme } from '@/worlds/useCityTheme';
@@ -98,14 +100,38 @@ function WalletChip({
 }
 
 const World = () => {
-  const { worldSlug, roomSlug } = useParams<{ worldSlug: string; roomSlug?: string }>();
-  const world = getWorldBySlug(worldSlug);
+  const { worldSlug, slug, roomSlug } = useParams<{ worldSlug?: string; slug?: string; roomSlug?: string }>();
+  const key = worldSlug ?? slug;
+  // Code-defined worlds answer at once. A world built in the builder is
+  // fetched, and gets the exact same viewer: the same map, doors, cities,
+  // art and gate as World #001, with its streets' blocks inside the rooms.
+  const coded = getWorldBySlug(key);
+  const [loaded, setLoaded] = useState<WorldConfig | null | undefined>(undefined);
+  useEffect(() => {
+    if (coded) return;
+    let live = true;
+    setLoaded(undefined);
+    void fetchWorldBySlug(key).then((w) => {
+      if (live) setLoaded(w ?? null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [key, coded]);
 
+  const world = coded ?? loaded;
+  if (world === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#07070b]">
+        <div className="h-6 w-40 animate-pulse rounded bg-white/10" />
+      </div>
+    );
+  }
   if (!world) return <Navigate to="/not-found" replace />;
-  return <WorldInner world={world} segment={roomSlug} />;
+  return <WorldInner world={world} segment={roomSlug} fromDb={!coded} />;
 };
 
-function WorldInner({ world, segment }: { world: WorldConfig; segment?: string }) {
+function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; segment?: string; fromDb?: boolean }) {
   const { wallet, rings, connect, refresh } = useWorldAccess(world);
   const { artistId } = useAuth();
   const theme = useCityTheme(world);
@@ -317,7 +343,7 @@ function WorldInner({ world, segment }: { world: WorldConfig; segment?: string }
             </header>
 
             {roomIsEnterable(doorStateFor(room, rings, connected)) || room.access === 'public' ? (
-              <RoomContent world={world} roomSlug={room.slug} rings={rings} />
+              <RoomContent world={world} roomSlug={room.slug} rings={rings} fromDb={fromDb} />
             ) : room.access === 'event' ? (
               <StageRoom world={world} />
             ) : (
@@ -469,11 +495,15 @@ function RoomContent({
   world,
   roomSlug,
   rings,
+  fromDb,
 }: {
   world: WorldConfig;
   roomSlug: string;
   rings: ReturnType<typeof useWorldAccess>['rings'];
+  fromDb?: boolean;
 }) {
+  // A built world's rooms are streets with blocks on them.
+  if (fromDb) return <BuiltRoom world={world} roomSlug={roomSlug} rings={rings} />;
   switch (roomSlug) {
     case 'gate':
       return <GateRoom world={world} rings={rings} />;

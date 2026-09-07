@@ -58,7 +58,6 @@ const BetterCallZaal = lazy(() => import("./pages/BetterCallZaal"));
 const SlugResolver = lazy(() => import("./pages/SlugResolver"));
 const World = lazy(() => import("./pages/World"));
 const WorldBuilder = lazy(() => import("@/pages/WorldBuilder"));
-const BuiltWorld = lazy(() => import("@/pages/BuiltWorld"));
 const Studio = lazy(() => import("./pages/Studio"));
 const Launch = lazy(() => import("./pages/Launch"));
 const NftLauncher = lazy(() => import("./pages/NftLauncher"));
@@ -217,7 +216,7 @@ function AppShell() {
                 <Route path="/bettercallzaal" element={<BetterCallZaal />} />
                 {WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
                 {WORLD_BUILDER_ENABLED && <Route path="/world-builder" element={<WorldBuilder />} />}
-                {WORLD_BUILDER_ENABLED && <Route path="/w/:slug" element={<BuiltWorld />} />}
+                {WORLD_BUILDER_ENABLED && <Route path="/w/:slug" element={<World />} />}
                 {WORLDS_ENABLED && <Route path="/world/:worldSlug/:roomSlug" element={<World />} />}
                 <Route path="/auth" element={<Navigate to="/" replace />} />
                 <Route path="/not-found" element={<NotFound />} />
@@ -341,7 +340,7 @@ function AppContent() {
                   <Route path="/bettercallzaal" element={<BetterCallZaal />} />
                   {WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
                   {WORLDS_ENABLED && <Route path="/world/:worldSlug/:roomSlug" element={<World />} />}
-                  {WORLD_BUILDER_ENABLED && <Route path="/w/:slug" element={<BuiltWorld />} />}
+                  {WORLD_BUILDER_ENABLED && <Route path="/w/:slug" element={<World />} />}
                   {/* Known auth-required routes → landing */}
                   <Route path="/" element={<Auth />} />
                   <Route path="/discover" element={<Auth />} />

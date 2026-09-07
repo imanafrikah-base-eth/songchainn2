@@ -75,6 +75,8 @@ type WorldTokenConfig = {
    * deploy.
    */
   defaultTokenAddress?: string;
+  /** Decimals of that token when the world's own gate row says so. */
+  defaultDecimals?: number;
 };
 
 /**
@@ -258,7 +260,7 @@ async function getTokenBalance(cfg: WorldTokenConfig, wallet: string): Promise<n
     if (!body.result || !/^0x[a-fA-F0-9]*$/.test(body.result)) return hit?.balance ?? 0;
 
     const raw = BigInt(body.result === "0x" ? "0x0" : body.result);
-    const divisor = BigInt(10) ** BigInt(intFromEnv(cfg.decimalsEnv, 18));
+    const divisor = BigInt(10) ** BigInt(intFromEnv(cfg.decimalsEnv, cfg.defaultDecimals ?? 18));
     const balance = Number(raw / divisor);
     balanceCache.set(key, { balance, at: Date.now() });
     return balance;
@@ -278,9 +280,34 @@ Deno.serve(async (req) => {
     const { world } = await req.json().catch(() => ({}));
     let cfg = typeof world === "string" ? worldConfigFor(world) : undefined;
     const db = admin();
+    // A world built in the builder brings its own gate row. A token gate is
+    // read from its own contract with its own thresholds; a points gate is
+    // answered from the loyalty ledger; anything else opens the outer ring
+    // and whatever its drops unlock.
+    let pointsGate: { fan: number; insider: number } | null = null;
     if (!cfg && typeof world === "string" && /^[a-z0-9-]{1,64}$/.test(world)) {
-      const { data: row } = await db.from("worlds").select("slug").eq("slug", world).eq("status", "published").maybeSingle();
-      if (row) cfg = builderWorldConfig();
+      const { data: row } = await db.from("worlds").select("id, slug").eq("slug", world).eq("status", "published").maybeSingle();
+      if (row) {
+        cfg = builderWorldConfig();
+        const { data: gate } = await db
+          .from("world_gates")
+          .select("kind, token_address, token_decimals, fan_threshold, insider_threshold")
+          .eq("world_id", (row as { id: string }).id)
+          .maybeSingle();
+        const g = gate as { kind?: string; token_address?: string | null; token_decimals?: number | null; fan_threshold?: number | null; insider_threshold?: number | null } | null;
+        if (g?.kind === "token" && isAddress(g.token_address)) {
+          cfg = {
+            ...cfg,
+            defaultTokenAddress: g.token_address as string,
+            defaultDecimals: Number(g.token_decimals ?? 18),
+            defaultFan: Number(g.fan_threshold ?? cfg.defaultFan),
+            defaultInsider: Number(g.insider_threshold ?? cfg.defaultInsider),
+          };
+        } else if (g?.kind === "points") {
+          pointsGate = { fan: Number(g.fan_threshold ?? 1000), insider: Number(g.insider_threshold ?? 10000) };
+          cfg = { ...cfg, defaultFan: pointsGate.fan, defaultInsider: pointsGate.insider };
+        }
+      }
     }
     if (!cfg) return json(origin, { error: "Unknown world" }, 404);
 
@@ -297,7 +324,8 @@ Deno.serve(async (req) => {
       FAN: intFromEnv(cfg.fanEnv, cfg.defaultFan),
       INSIDER: intFromEnv(cfg.insiderEnv, cfg.defaultInsider),
     };
-    const tokenLive = tokenAddressFor(cfg) !== null;
+    // A points gate has no token and is live all the same.
+    const tokenLive = tokenAddressFor(cfg) !== null || pointsGate !== null;
 
     // Who is asking, and which wallet is really theirs.
     let userId: string | null = null;
@@ -328,10 +356,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [balance, heldNfts] = await Promise.all([
+    const [tokenBalance, heldNfts] = await Promise.all([
       getTokenBalance(cfg, wallet),
       getDropBalances(keyDrops, wallet),
     ]);
+    // On a points gate the "balance" the doors read is the person's points.
+    let balance = tokenBalance;
+    if (pointsGate && userId) {
+      const { data: pts } = await db.from("user_points").select("points").eq("user_id", userId).maybeSingle();
+      balance = Number((pts as { points?: number } | null)?.points ?? 0);
+    }
     // Council rank comes from the reputation service (Phase B). Until the
     // leaderboard is live nobody holds a seat.
     const rank: number | null = null;

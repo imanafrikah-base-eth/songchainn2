@@ -16,7 +16,7 @@
  * guide that suggests a feature the app does not have is worse than no guide.
  */
 
-export type BuilderStep = 'name' | 'streets' | 'blocks' | 'key' | 'drops' | 'walk' | 'publish';
+export type BuilderStep = 'name' | 'streets' | 'blocks' | 'art' | 'key' | 'drops' | 'walk' | 'publish';
 
 export interface MoshaSuggestion {
   /** The shape being suggested, in the artist's language, not ours. */
@@ -38,6 +38,30 @@ export interface MoshaBeat {
 }
 
 export const MOSHA_BEATS: Record<BuilderStep, MoshaBeat> = {
+  art: {
+    question: 'What does this place look like when you walk in?',
+    opener:
+      "This is the step that makes it yours. World #001 has its own picture on every door and a skyline for every city, all from the artist. You do not need all of it today. One good hero and one picture per street already reads as a place.",
+    suggestions: [
+      {
+        label: 'Start with the doors',
+        detail:
+          'A wide hero behind the map and a portrait for the entrance. That is what everybody sees first, so make those two count before anything else.',
+      },
+      {
+        label: 'One picture per street',
+        detail:
+          'Shot on a phone is fine. What matters is that it is yours: a wall in your city, your studio, your crowd. A stock photo reads as a stock photo.',
+      },
+      {
+        label: 'Loops last',
+        detail:
+          'A silent video over a still, under three seconds, seamless. Only where it adds something. A still that is right beats a loop that is nearly right.',
+      },
+    ],
+    watchOut:
+      'Big files slow the walk in. Keep stills under a couple of megabytes and loops short; the picture is the same, the wait is not.',
+  },
   drops: {
     question: 'Is there something here worth owning?',
     opener:

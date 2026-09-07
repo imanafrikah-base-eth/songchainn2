@@ -69,7 +69,10 @@ test.describe('Live: the switch to an artist account', () => {
     const dob = page.locator('input[type="date"]').first();
     if (await dob.count()) await dob.fill('1990-05-05');
     await page.getByRole('button', { name: /Enter \$ongChainn/i }).click();
-    await page.waitForTimeout(2000);
+    // Onboarding saves the profile before it lets go; leaving early lands
+    // back on the form.
+    await expect(name).toBeHidden({ timeout: 45_000 });
+    await page.waitForTimeout(1000);
 
     await page.goto(`${BASE}/profile`);
     const switchBtn = page.locator('a[href="/claim"]', { hasText: 'Switch to artist account' }).first();

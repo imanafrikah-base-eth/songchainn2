@@ -1546,6 +1546,12 @@ export type Database = {
           published_at: string|null
           visitor_posts: string
           mosha_mode: string
+          hero_video: string|null
+          entrance_poster: string|null
+          entrance_video: string|null
+          room_video: Json
+          city_video: Json
+          depth: Json
         }
         Insert: {
           id?: string
@@ -1572,6 +1578,12 @@ export type Database = {
           published_at?: string|null
           visitor_posts?: string
           mosha_mode?: string
+          hero_video?: string|null
+          entrance_poster?: string|null
+          entrance_video?: string|null
+          room_video?: Json
+          city_video?: Json
+          depth?: Json
         }
         Update: {
           id?: string
@@ -1598,6 +1610,12 @@ export type Database = {
           published_at?: string|null
           visitor_posts?: string
           mosha_mode?: string
+          hero_video?: string|null
+          entrance_poster?: string|null
+          entrance_video?: string|null
+          room_video?: Json
+          city_video?: Json
+          depth?: Json
         }
         Relationships: []
       }

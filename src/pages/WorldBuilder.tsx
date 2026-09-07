@@ -11,6 +11,7 @@ import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
 import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
 import { StreetKey } from '@/worlds/builder/StreetKey';
 import { DropsPanel } from '@/worlds/builder/DropsPanel';
+import { ArtPicker } from '@/worlds/builder/ArtPicker';
 import { MoshaPanel } from '@/worlds/builder/MoshaPanel';
 import { MoshaChat, MoshaOptIn } from '@/worlds/builder/MoshaChat';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
@@ -26,12 +27,13 @@ import type { WorldConfig, WorldRings } from '@/worlds/types';
  * exactly one thing and the language is access, never price.
  */
 
-type Step = 'name' | 'streets' | 'blocks' | 'key' | 'drops' | 'walk' | 'publish';
+type Step = 'name' | 'streets' | 'blocks' | 'art' | 'key' | 'drops' | 'walk' | 'publish';
 
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'name', label: 'Name' },
   { id: 'streets', label: 'Streets' },
   { id: 'blocks', label: 'Fill' },
+  { id: 'art', label: 'Art' },
   { id: 'key', label: 'Key' },
   { id: 'drops', label: 'Drops' },
   { id: 'walk', label: 'Walk it' },
@@ -595,7 +597,7 @@ export default function WorldBuilder() {
               <p className="text-sm text-muted-foreground">Add a street first.</p>
             )}
 
-            <Button onClick={() => setStep('key')} size="lg" className="h-11 w-full rounded-full">
+            <Button onClick={() => setStep('art')} size="lg" className="h-11 w-full rounded-full">
               Set the key
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -603,6 +605,110 @@ export default function WorldBuilder() {
         )}
 
         {/* 4 -------------------------------------------------------- key */}
+        {/* 4 -------------------------------------------------------- art */}
+        {step === 'art' && b.world && (
+          <section className="space-y-6">
+            <header>
+              <h1 className="font-heading text-2xl font-semibold text-foreground">Dress the world</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Your own pictures on the doors, the streets and the skyline, the way World #001 is dressed.
+                A still is enough anywhere; a silent loop plays over it where you add one. Every slot is optional.
+              </p>
+            </header>
+
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-foreground">The doors</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ArtPicker label="World hero" help="Behind the map. Wide." value={b.world.hero_image} onChange={(v) => b.saveWorld({ hero_image: v })} />
+                <ArtPicker label="Hero loop" help="Silent video over the hero. Optional." kind="video" value={b.world.hero_video} onChange={(v) => b.saveWorld({ hero_video: v })} />
+                <ArtPicker label="Entrance" help="The doors people walk through on arrival. Portrait." aspect="aspect-[9/16] max-h-64" value={b.world.entrance_poster} onChange={(v) => b.saveWorld({ entrance_poster: v })} />
+                <ArtPicker label="Entrance loop" help="Under three seconds. Plays once a visit." kind="video" aspect="aspect-[9/16] max-h-64" value={b.world.entrance_video} onChange={(v) => b.saveWorld({ entrance_video: v })} />
+              </div>
+            </div>
+
+            {b.streets.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-foreground">The streets</h2>
+                <p className="text-xs text-muted-foreground">One picture per door, seen on the map and as the banner inside.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {b.streets.map((s) => (
+                    <div key={s.id} className="space-y-2">
+                      <ArtPicker
+                        label={s.name}
+                        value={b.world?.room_art?.[s.slug]}
+                        onChange={(v) => {
+                          const next = { ...(b.world?.room_art ?? {}) };
+                          if (v) next[s.slug] = v; else delete next[s.slug];
+                          void b.saveWorld({ room_art: next });
+                        }}
+                      />
+                      <ArtPicker
+                        label={`${s.name} loop`}
+                        kind="video"
+                        aspect="aspect-[16/9] max-h-24"
+                        value={b.world?.room_video?.[s.slug]}
+                        onChange={(v) => {
+                          const next = { ...(b.world?.room_video ?? {}) };
+                          if (v) next[s.slug] = v; else delete next[s.slug];
+                          void b.saveWorld({ room_video: next });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {b.cities.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-foreground">The skyline</h2>
+                <p className="text-xs text-muted-foreground">One picture per city, the tower people see from the map.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {b.cities.map((c) => (
+                    <div key={c.id} className="space-y-2">
+                      <ArtPicker
+                        label={c.name}
+                        value={b.world?.city_art?.[c.slug]}
+                        onChange={(v) => {
+                          const next = { ...(b.world?.city_art ?? {}) };
+                          if (v) next[c.slug] = v; else delete next[c.slug];
+                          void b.saveWorld({ city_art: next });
+                        }}
+                      />
+                      <ArtPicker
+                        label={`${c.name} loop`}
+                        kind="video"
+                        aspect="aspect-[16/9] max-h-24"
+                        value={b.world?.city_video?.[c.slug]}
+                        onChange={(v) => {
+                          const next = { ...(b.world?.city_video ?? {}) };
+                          if (v) next[c.slug] = v; else delete next[c.slug];
+                          void b.saveWorld({ city_video: next });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <details className="rounded-lg border border-border bg-card p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-foreground">The world with depth</summary>
+              <p className="mt-1 text-xs text-muted-foreground">Three textures for the 3D city. Skip it and the city keeps its flat colours, which is a valid world, just a barer one.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <ArtPicker label="Sky" help="Night sky, 2:1, wrapped around everything." aspect="aspect-[2/1]" value={b.world.depth?.sky} onChange={(v) => b.saveWorld({ depth: { ...(b.world?.depth ?? {}), sky: v ?? undefined } })} />
+                <ArtPicker label="Facade" help="Seamless tile on every tower." aspect="aspect-square" value={b.world.depth?.facade} onChange={(v) => b.saveWorld({ depth: { ...(b.world?.depth ?? {}), facade: v ?? undefined } })} />
+                <ArtPicker label="Ground" help="Seamless tile on the ground." aspect="aspect-square" value={b.world.depth?.ground} onChange={(v) => b.saveWorld({ depth: { ...(b.world?.depth ?? {}), ground: v ?? undefined } })} />
+              </div>
+            </details>
+
+            <Button onClick={() => setStep('key')} size="lg" className="h-11 w-full rounded-full">
+              Set the key
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </section>
+        )}
+
         {step === 'key' && b.world && (
           <section className="space-y-4">
             <header>

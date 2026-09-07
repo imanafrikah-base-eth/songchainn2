@@ -32,6 +32,24 @@ export interface DraftWorld {
   visitor_posts: 'off' | 'members' | 'everyone';
   /** How much Mo$ha talks during the build. Only read on paid tiers. */
   mosha_mode: 'guided' | 'quiet';
+  /* The art. Every slot World #001 has; all optional. */
+  hero_video: string | null;
+  entrance_poster: string | null;
+  entrance_video: string | null;
+  room_art: Record<string, string>;
+  room_video: Record<string, string>;
+  city_art: Record<string, string>;
+  city_video: Record<string, string>;
+  depth: { sky?: string; facade?: string; ground?: string };
+}
+
+export interface DraftCity {
+  id: string;
+  slug: string;
+  name: string;
+  kind: string;
+  hue: string;
+  sort_order: number;
 }
 
 export interface DraftStreet {
@@ -87,6 +105,7 @@ export function useWorldBuilder(worldId?: string) {
   const { user, artistId } = useAuth();
   const [world, setWorld] = useState<DraftWorld | null>(null);
   const [streets, setStreets] = useState<DraftStreet[]>([]);
+  const [cities, setCities] = useState<DraftCity[]>([]);
   const [gate, setGate] = useState<DraftGate>(DEFAULT_GATE);
   const [blocksByStreet, setBlocksByStreet] = useState<Record<string, BlockInstance[]>>({});
   const [loading, setLoading] = useState(false);
@@ -101,12 +120,27 @@ export function useWorldBuilder(worldId?: string) {
         const { data: w, error: we } = await supabase
           .from('worlds')
           .select(
-            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode',
+            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth',
           )
           .eq('id', id)
           .maybeSingle();
         if (we || !w) throw new Error('That world could not be opened');
-        setWorld(w as unknown as DraftWorld);
+        const row = w as unknown as DraftWorld;
+        setWorld({
+          ...row,
+          room_art: (row.room_art as Record<string, string> | null) ?? {},
+          room_video: (row.room_video as Record<string, string> | null) ?? {},
+          city_art: (row.city_art as Record<string, string> | null) ?? {},
+          city_video: (row.city_video as Record<string, string> | null) ?? {},
+          depth: (row.depth as DraftWorld['depth'] | null) ?? {},
+        });
+
+        const { data: c } = await supabase
+          .from('world_cities')
+          .select('id, slug, name, kind, hue, sort_order')
+          .eq('world_id', id)
+          .order('sort_order');
+        setCities((c ?? []) as unknown as DraftCity[]);
 
         const { data: s } = await supabase
           .from('world_streets')
@@ -346,6 +380,7 @@ export function useWorldBuilder(worldId?: string) {
   return {
     world,
     streets,
+    cities,
     gate,
     blocksByStreet,
     loading,

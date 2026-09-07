@@ -127,7 +127,10 @@ async function signUp(page: Page, email: string, name: string, makesMusic: boole
   const dobField = page.locator('input[type="date"]').first();
   if (await dobField.count()) await dobField.fill('1990-05-05');
   await page.getByRole('button', { name: /Enter \$ongChainn/i }).click();
-  await page.waitForTimeout(1500);
+  // Onboarding saves the profile before it lets go; leaving early lands back
+  // on the form.
+  await expect(displayName).toBeHidden({ timeout: 45_000 });
+  await page.waitForTimeout(1000);
 
   // Age gate, when it asks
   const dob = page.locator('input[type="date"]').first();
@@ -255,6 +258,10 @@ test.describe('Signed-in journeys', () => {
 
     await visit(page, '/studio', errors);
     expect(await page.locator('text=The Studio is for artist accounts').count(), 'artist sees the Studio').toBe(0);
+    // A brand-new artist has no record in the catalogue yet; their page must
+    // still stand (Profile sends an artist to it).
+    await visit(page, '/profile', errors);
+    expect(await page.locator('text=Artist Not Found').count(), 'new artist has a page').toBe(0);
     await visit(page, '/launch', errors);
     await expect(page.locator('text=/What are you launching|artist accounts/i').first()).toBeVisible({ timeout: 15_000 });
 
@@ -268,6 +275,14 @@ test.describe('Signed-in journeys', () => {
     await page.getByRole('button', { name: /Create my world/i }).click();
     await page.waitForTimeout(2500);
     await noCrash(page, 'builder after create');
+
+    // The Art step: the slots World #001 has, offered to this world.
+    const artStep = page.getByRole('button', { name: /\. Art$/ }).first();
+    await expect(artStep).toBeVisible({ timeout: 20_000 });
+    await artStep.click();
+    await page.waitForTimeout(800);
+    await expect(page.locator('text=Dress the world')).toBeVisible({ timeout: 15_000 });
+    expect(await page.locator('text=World hero').count(), 'hero slot offered').toBeGreaterThan(0);
 
     // The Drops step.
     const dropsStep = page.getByRole('button', { name: /\. Drops$/ }).first();
