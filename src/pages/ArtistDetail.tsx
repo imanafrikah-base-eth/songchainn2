@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound, Mic2 } from 'lucide-react';
 import { ARTISTS, SONGS, getRelatedArtists, type Artist } from '@/data/musicData';
 import { getWorldByArtistId } from '@/worlds/registry';
 import { ArtistCoinPanel } from '@/components/ArtistCoinPanel';
@@ -876,13 +876,21 @@ export default function ArtistDetail() {
                           </Button>
                         </>
                       ) : (
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsEditingProfile(true)}
-                        >
-                          <Edit3 className="w-4 h-4 mr-2" />
-                          Edit
-                        </Button>
+                        <>
+                          <Button asChild>
+                            <Link to="/studio">
+                              <Mic2 className="w-4 h-4 mr-2" />
+                              Open the Studio
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsEditingProfile(true)}
+                          >
+                            <Edit3 className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
+                        </>
                       )}
                       <select
                         value={profileTheme}
