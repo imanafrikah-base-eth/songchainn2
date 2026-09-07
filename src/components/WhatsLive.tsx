@@ -58,9 +58,9 @@ const FOR_ARTISTS: Item[] = [
   {
     icon: UploadCloud,
     title: 'Release today, free',
-    body: 'Send a finished record from the Studio. If it meets the standard it is live to listeners the same minute. Nobody sits between you and your release.',
-    to: '/studio',
-    cta: 'Open the Studio',
+    body: 'Send a finished record from the Studio. If it meets the standard it is live to listeners the same minute. Nobody sits between you and your release. The Studio opens once your artist account is confirmed.',
+    to: '/claim',
+    cta: 'Get your artist account',
   },
   {
     icon: BadgeCheck,

@@ -284,10 +284,10 @@ export default function Onboarding() {
          in upload-url. Nobody gets an artist page for ticking a box. */
       if (makesMusic) {
         toast({
-          title: 'You are in. Studio is next.',
-          description: 'Put a record up and your artist page builds itself.',
+          title: 'You are in. One more step.',
+          description: 'Claim your page, or ask for one, and this account becomes your artist account once we confirm it is you.',
         });
-        navigate('/studio', { replace: true });
+        navigate('/claim', { replace: true });
       } else {
         toast({ title: 'Welcome to the Audience!' });
         navigate('/', { replace: true });

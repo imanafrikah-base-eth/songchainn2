@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -138,6 +139,29 @@ const Studio = () => {
           </Link>
         </div>
         <AudioPlayer />
+      </div>
+    );
+  }
+
+  // The Studio is an artist's room. A listener never sees the upload form,
+  // the same way they never see the launcher: an artist account is granted
+  // (Admin > Claims), not earned by pressing Upload. The server refuses the
+  // upload too; this is the honest sign on the door.
+  if (!isArtist) {
+    return (
+      <div className="min-h-screen bg-background pb-28">
+        <Navigation />
+        <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+          <Music4 className="mx-auto h-10 w-10 text-primary mb-4" />
+          <h1 className="font-heading text-2xl font-bold mb-2">The Studio is for artist accounts</h1>
+          <p className="text-sm text-muted-foreground mb-6 max-w-prose mx-auto">
+            Everything else on SONGCHAINN is open to you. If you make music, claim your page and this same account becomes your artist account once we confirm it is you.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button asChild><Link to="/claim">Claim your artist page</Link></Button>
+            <Button asChild variant="outline"><Link to="/">Back to the music</Link></Button>
+          </div>
+        </div>
       </div>
     );
   }

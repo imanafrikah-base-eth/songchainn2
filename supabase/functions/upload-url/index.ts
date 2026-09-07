@@ -481,37 +481,16 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   const existingArtistId = (account as { artist_id?: string } | null)?.artist_id ?? null;
-  const artistId = existingArtistId ?? `u-${user.id}`;
+  const artistId = existingArtistId as string;
 
-  // RELEASING A RECORD IS WHAT MAKES SOMEBODY AN ARTIST HERE.
-  //
-  // Until now this only ever READ artist_accounts and fell back to a synthetic
-  // id, so a person could upload, pass the audition, be told they were live,
-  // and still never be recorded as an artist. `isArtist` stayed false forever,
-  // which hid Studio from the exact person who had just used it and left them a
-  // permanent guest on a platform whose whole promise is that it is theirs.
-  //
-  // This runs with the service role, which is why it can write a table the
-  // artist deliberately cannot insert into themselves. The row is claimed on
-  // first publish and never touched again, so a later claim of a real catalogue
-  // page is not overwritten by an upload.
+  // ARTISTS ONLY. An artist account is granted (Admin > Claims), never earned
+  // by pressing Upload. This used to make anybody an artist on first publish;
+  // from 7 Sep 2026 a person without an artist_accounts row is told so and
+  // nothing is written. The songs insert policy refuses them as well.
   if (!existingArtistId) {
-    const { error: accountError } = await db
-      .from("artist_accounts")
-      .upsert(
-        {
-          artist_id: artistId,
-          user_id: user.id,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "artist_id" },
-      );
-    // Never fail the upload over this. The track still publishes and the row
-    // can be reconciled later; losing somebody's release would be far worse
-    // than them waiting to be recognised.
-    if (accountError) {
-      console.error("could not record artist account for", user.id, accountError.message);
-    }
+    return json(origin, {
+      error: "The Studio is for artist accounts. Claim your page at /claim and this account becomes your artist account once we confirm it is you.",
+    }, 403);
   }
 
   // Their own profile picture doubles as the artist image on that page.

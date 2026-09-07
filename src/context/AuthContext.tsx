@@ -35,6 +35,8 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /** Re-read artist_accounts for the signed-in person (after a claim is approved). */
+  refreshArtistStatus: () => Promise<void>;
   createFarcasterProfile: (farcasterUser: { fid: number; username?: string; displayName?: string; pfpUrl?: string; location?: string }) => Promise<void>;
 }
 
@@ -903,6 +905,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signOut,
       refreshProfile,
+      refreshArtistStatus: async () => {
+        if (user?.id && !isSyntheticUserId(user.id)) await refreshRoles(user.id);
+      },
       createFarcasterProfile,
     }}>
       {children}
@@ -940,6 +945,7 @@ export function useAuth() {
       signInWithEmail: async () => ({ error: new Error('AuthProvider missing') }),
       signOut: async () => {},
       refreshProfile: async () => {},
+      refreshArtistStatus: async () => {},
       createFarcasterProfile: async () => {},
     };
   }

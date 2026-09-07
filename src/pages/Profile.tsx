@@ -1485,6 +1485,22 @@ export default function Profile() {
             </h2>
             <NotificationSettings />
           </div>
+          {/* A listening account and an artist account are the same account. This
+              is where a person who makes music says so, and where an artist gets
+              back to their tools. */}
+          <div className="bg-card border border-border rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">{isArtist ? 'Artist account' : 'Are you an artist?'}</p>
+              <p className="text-xs text-muted-foreground">
+                {isArtist
+                  ? 'The Studio, your world, the launcher and your drops are open to you.'
+                  : 'Claim your page and this account becomes your artist account once we confirm it is you.'}
+              </p>
+            </div>
+            <Button asChild size="sm" variant={isArtist ? 'outline' : 'default'}>
+              <Link to={isArtist ? '/studio' : '/claim'}>{isArtist ? 'Open the Studio' : 'Switch to artist account'}</Link>
+            </Button>
+          </div>
           <ChangePassword />
           <BlockedPeople />
           <DeleteAccount />

@@ -218,9 +218,14 @@ test.describe('Signed-in journeys', () => {
     }
 
     // Every door a listener can open.
-    for (const p of ['/marketplace', '/artists', '/artist/3', '/world/iman-afrikah', '/keys', '/wallet', '/leaderboard', '/inbox', '/profile', '/room', '/wavewarz-africa/battles/live', '/launch', '/drops/iman-afrikah']) {
+    for (const p of ['/marketplace', '/artists', '/artist/3', '/world/iman-afrikah', '/keys', '/wallet', '/leaderboard', '/inbox', '/profile', '/room', '/wavewarz-africa/battles/live', '/launch', '/drops/iman-afrikah', '/claim', '/studio']) {
       await visit(page, p, errors);
     }
+    // A listener never sees the upload form: the Studio turns them to the claim.
+    await page.goto(`${BASE}/studio`);
+    await appReady(page);
+    await expect(page.locator('text=The Studio is for artist accounts').first()).toBeVisible({ timeout: 15_000 });
+    expect(await page.locator('input[type="file"]').count(), 'no upload input for a listener').toBe(0);
     // A listener is told the launcher and drops are for artists, not shown a broken form.
     await page.goto(`${BASE}/drops/iman-afrikah`);
     await appReady(page);
@@ -249,6 +254,7 @@ test.describe('Signed-in journeys', () => {
     await appReady(page);
 
     await visit(page, '/studio', errors);
+    expect(await page.locator('text=The Studio is for artist accounts').count(), 'artist sees the Studio').toBe(0);
     await visit(page, '/launch', errors);
     await expect(page.locator('text=/What are you launching|artist accounts/i').first()).toBeVisible({ timeout: 15_000 });
 

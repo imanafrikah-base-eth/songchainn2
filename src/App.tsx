@@ -62,6 +62,7 @@ const BuiltWorld = lazy(() => import("@/pages/BuiltWorld"));
 const Studio = lazy(() => import("./pages/Studio"));
 const Launch = lazy(() => import("./pages/Launch"));
 const NftLauncher = lazy(() => import("./pages/NftLauncher"));
+const ClaimArtist = lazy(() => import("./pages/ClaimArtist"));
 const Policy = lazy(() => import("./pages/Policy"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const Licensing = lazy(() => import("./pages/Licensing"));
@@ -206,6 +207,7 @@ function AppShell() {
                 <Route path="/studio" element={<Studio />} />
                 <Route path="/launch" element={<Launch />} />
                 <Route path="/drops/:worldSlug" element={<NftLauncher />} />
+                <Route path="/claim" element={<ClaimArtist />} />
                 <Route path="/wavewarz-africa/*" element={<WaveWarzBattleZoneFeature />} />
                 <Route path="/dj-shuffle" element={<DjShuffle />} />
                 <Route path="/install" element={<Install />} />
@@ -362,6 +364,7 @@ function AppContent() {
                   <Route path="/studio" element={<Auth />} />
                   <Route path="/launch" element={<Auth />} />
                   <Route path="/drops/:worldSlug" element={<Auth />} />
+                  <Route path="/claim" element={<Auth />} />
                   <Route path="/console" element={<Auth />} />
                   <Route path="/not-found" element={<NotFound />} />
                   {/* Vanity slug routes — must be after all specific routes */}
