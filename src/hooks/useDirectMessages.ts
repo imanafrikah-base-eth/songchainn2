@@ -162,11 +162,23 @@ export function useConversation(conversationId: string | null) {
   return { messages, isLoading, send, unsend, reload: load };
 }
 
-export async function blockUser(otherUserId: string, blocked = true) {
-  await supabase.rpc('block_user' as never, {
+/**
+ * Block or unblock somebody. Throws when the RPC refuses (HTTP 400, RLS
+ * denial, network), so a caller cannot show "Blocked" over a block that never
+ * happened. Callers catch and show a failure toast.
+ */
+export async function blockUser(otherUserId: string, blocked = true): Promise<void> {
+  const { error } = await supabase.rpc('block_user' as never, {
     _other_user_id: otherUserId,
     _blocked: blocked,
   } as never);
+  if (error) {
+    throw new Error(error.message || (blocked ? 'Could not block this person' : 'Could not unblock'));
+  }
+}
+
+export async function unblockUser(otherUserId: string): Promise<void> {
+  return blockUser(otherUserId, false);
 }
 
 export async function reportMessage(messageId: string, reportedId: string, reason: string) {

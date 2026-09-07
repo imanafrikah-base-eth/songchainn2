@@ -5,7 +5,9 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "supabase/**"] },
+  // BattleZone/ holds sibling products with their own repos and lint setups;
+  // android/ is Capacitor build output. Neither is this app's source.
+  { ignores: ["dist/**", "supabase/**", "BattleZone/**", "android/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

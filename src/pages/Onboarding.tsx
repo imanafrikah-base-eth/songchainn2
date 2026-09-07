@@ -258,13 +258,14 @@ export default function Onboarding() {
          fail the sign-up: a missing consent row is ours to notice, not a
          reason to bounce somebody out of onboarding. */
       try {
-        await supabase.from('policy_acceptances' as never).insert(
+        await (supabase.from('policy_acceptances' as never) as any).upsert(
           (['terms', 'privacy', 'guidelines'] as const).map((policy) => ({
             user_id: authedUserId,
             policy_key: policy,
             version: POLICY_VERSIONS[policy],
             context: 'onboarding',
-          })) as never,
+          })),
+          { onConflict: 'user_id,policy_key,version', ignoreDuplicates: true },
         );
       } catch (consentErr) {
         console.error('Could not record policy acceptance', consentErr);

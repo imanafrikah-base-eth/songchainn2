@@ -16,7 +16,7 @@
 
 export const POLICY_VERSIONS = {
   terms: '2026-09-01',
-  privacy: '2026-09-01',
+  privacy: '2026-09-06',
   guidelines: '2026-09-01',
   launch_risk: '2026-09-01',
   upload_rights: '2026-09-01',
@@ -168,18 +168,19 @@ export const PRIVACY: PolicyDoc = {
   key: 'privacy',
   title: 'Privacy Policy',
   version: POLICY_VERSIONS.privacy,
-  updated: '1 September 2026',
+  updated: '6 September 2026',
   summary:
     'What we hold about you, why, and what you can do about it. We collect what the app needs to work, and not much else.',
   sections: [
     {
       heading: 'What we hold',
       body: [
-        'Your account: email address, a display name, a username, and a password we never see in readable form. If you sign in with a wallet, Farcaster or Facebook instead, we hold the identifier that service gives us.',
+        'Your account: email address, a display name, a username, and a password we never see in readable form, and how you would like to be referred to, if you tell us. If you sign in with a wallet, Farcaster or Facebook instead, we hold the identifier that service gives us.',
         'Your date of birth, to know whether you are old enough and which parts of the app are open to you.',
         'What you put here: your posts, comments, messages, playlists, uploads and worlds.',
         'What you do here: what you play, like, pulse and collect. This is what powers the charts, your points, and what the app shows you next.',
         'If you connect a wallet, its public address. A public address is public by nature. We never hold a private key or a seed phrase, and we will never ask for one.',
+        'Roughly where you are: the city and country your connection resolves to when you play a song, read from the request itself, never from a location permission and never GPS accurate. It powers the activity numbers artists and visitors see on a song page, and cities with only a few plays are grouped as Other.',
       ],
     },
     {
@@ -361,6 +362,10 @@ export const CONSENT_LINES: Record<string, string> = {
     'By launching this you are the one launching it. It signs with your wallet, you own the result, and you are responsible for what you tell people about it. Value can fall, including to nothing. SONGCHAINN provides the tool and takes no position in it.',
   purchase_risk:
     'By buying this you accept that value can fall, including to nothing, that the transaction is final and cannot be reversed by anyone, and that SONGCHAINN neither holds your funds nor guarantees any return.',
+  collect_risk:
+    'By collecting this you mint an NFT on Base with your own wallet. You pay the price the artist set plus network and protocol fees, the transaction is final, and SONGCHAINN neither holds your funds nor guarantees any value. What you get is the token and whatever the artist says it opens.',
+  drop_risk:
+    'By making this drop you deploy it with your own wallet and you own the contract. The price, the copies and what holders get are your promises to keep. You confirm the song, artwork or content is yours to sell. SONGCHAINN provides the tool and takes no position in it.',
   messaging:
     'By sending a message you agree to the Community Guidelines. Messages are private between you and the person you send them to, but they can be reported to us.',
   world_visit:

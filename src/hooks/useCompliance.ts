@@ -110,13 +110,18 @@ export function useRecordConsent() {
   return useCallback(
     async (policy: PolicyKey, context?: string) => {
       if (!user?.id) return;
-      const { error } = await supabase.from('policy_acceptances' as never).insert({
-        user_id: user.id,
-        policy_key: policy,
-        version: POLICY_VERSIONS[policy],
-        context: context ?? null,
-      } as never);
-      // 23505 is "already accepted this version", which is the normal case.
+      // An upsert that keeps the first row: accepting the same version twice is
+      // the normal case (sign-up, then onboarding) and used to answer 409 to
+      // the browser, which the console reported as an error every time.
+      const { error } = await (supabase.from('policy_acceptances' as never) as any).upsert(
+        {
+          user_id: user.id,
+          policy_key: policy,
+          version: POLICY_VERSIONS[policy],
+          context: context ?? null,
+        },
+        { onConflict: 'user_id,policy_key,version', ignoreDuplicates: true },
+      );
       if (error && error.code !== '23505') {
         console.error('could not record consent', policy, error);
       }

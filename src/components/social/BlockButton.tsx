@@ -72,7 +72,7 @@ export function BlockButton({
         },
       );
     } catch {
-      toast.error('That did not go through. Try again.');
+      toast.error(next ? 'Could not block this person. Try again.' : 'Could not unblock. Try again.');
     } finally {
       setBusy(false);
     }

@@ -10,6 +10,7 @@ import { PropForm } from '@/worlds/builder/PropForm';
 import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
 import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
 import { StreetKey } from '@/worlds/builder/StreetKey';
+import { DropsPanel } from '@/worlds/builder/DropsPanel';
 import { MoshaPanel } from '@/worlds/builder/MoshaPanel';
 import { MoshaChat, MoshaOptIn } from '@/worlds/builder/MoshaChat';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
@@ -25,13 +26,14 @@ import type { WorldConfig, WorldRings } from '@/worlds/types';
  * exactly one thing and the language is access, never price.
  */
 
-type Step = 'name' | 'streets' | 'blocks' | 'key' | 'walk' | 'publish';
+type Step = 'name' | 'streets' | 'blocks' | 'key' | 'drops' | 'walk' | 'publish';
 
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'name', label: 'Name' },
   { id: 'streets', label: 'Streets' },
   { id: 'blocks', label: 'Fill' },
   { id: 'key', label: 'Key' },
+  { id: 'drops', label: 'Drops' },
   { id: 'walk', label: 'Walk it' },
   { id: 'publish', label: 'Publish' },
 ];
@@ -457,7 +459,7 @@ export default function WorldBuilder() {
                       {(b.blocksByStreet[s.id]?.length ?? 0)} on it
                     </span>
                   </div>
-                  <StreetKey street={s} onSave={(patch) => b.saveStreet(s.id, patch)} />
+                  <StreetKey street={s} worldSlug={b.world?.slug} onSave={(patch) => b.saveStreet(s.id, patch)} />
                 </li>
               ))}
             </ul>
@@ -711,6 +713,29 @@ export default function WorldBuilder() {
               </div>
             </div>
 
+            <Button onClick={() => setStep('drops')} size="lg" className="h-11 w-full rounded-full">
+              Drops
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </section>
+        )}
+
+        {/* 5 ------------------------------------------------------ drops */}
+        {step === 'drops' && b.world && (
+          <section className="space-y-4">
+            <header>
+              <h1 className="font-heading text-2xl font-semibold text-foreground">Drops</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Turn a song, artwork or any content into an NFT on Base, minted by your own wallet.
+                You set the price and the copies. Optional, and you can come back to it any time.
+              </p>
+            </header>
+            <DropsPanel
+              worldSlug={b.world.slug}
+              worldId={b.world.id}
+              worldName={b.world.artist_name || b.world.slug}
+              artistId={artistId}
+            />
             <Button onClick={() => setStep('walk')} size="lg" className="h-11 w-full rounded-full">
               Walk it
               <ArrowRight className="ml-2 h-4 w-4" />

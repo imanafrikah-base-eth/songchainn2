@@ -49,8 +49,9 @@ export default function DeleteAccountPage() {
               Receipts: purchases, trades, bookings and coin launches, kept without a live account
               behind them. Consent records, which are our proof of what was agreed. Reports you filed
               about other people. And anything on Base: nothing on a blockchain can be deleted, by us
-              or by anyone, which is worth knowing before you connect a wallet. Released records and
-              published worlds stay as public work, unlinked from the deleted account.
+              or by anyone, which is worth knowing before you connect a wallet. Released records,
+              published worlds and the claim on an artist page stay as public work, unlinked from
+              the deleted account.
             </p>
           </section>
 

@@ -66,6 +66,7 @@ interface StreetRow {
   key_kind?: string | null;
   key_song_id?: string | null;
   key_threshold?: string | number | null;
+  key_nft_id?: string | null;
 }
 
 const ACCESS: WorldRoomAccess[] = ['public', 'fan', 'insider', 'council', 'event'];
@@ -98,6 +99,7 @@ function toRoom(row: StreetRow): WorldRoomDef {
       row.key_kind === 'song' && row.key_song_id
         ? { songId: String(row.key_song_id), threshold: String(row.key_threshold ?? '1') }
         : null,
+    nftKey: row.key_kind === 'nft' && row.key_nft_id ? { nftId: String(row.key_nft_id) } : null,
   };
 }
 
@@ -172,7 +174,7 @@ export async function fetchWorldBySlug(slug: string | undefined): Promise<WorldC
       .eq('world_id', world.id),
     supabase
       .from('world_streets')
-      .select('slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold')
+      .select('slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id')
       .eq('world_id', world.id),
   ]);
 

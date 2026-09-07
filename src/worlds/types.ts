@@ -27,6 +27,12 @@ export interface WorldRoomDef {
    * in. The artist sets this per street and can change it at any time.
    */
   songKey?: { songId: string; threshold: string; title?: string } | null;
+  /**
+   * A drop the artist put on this door. Holding one copy of that NFT opens
+   * it, whatever ring the visitor is in. Checked on the server from the
+   * visitor's real balance on Base.
+   */
+  nftKey?: { nftId: string; title?: string } | null;
 }
 
 /**
@@ -158,6 +164,12 @@ export interface WorldRings {
    * balance that was actually read from the chain.
    */
   heldSongs?: Record<string, string>;
+  /**
+   * Copies of this world's drops the visitor holds, keyed by drop id. Read
+   * from Base by world-gate, so a door locked with a drop is answered by the
+   * chain, never by the browser.
+   */
+  heldNfts?: Record<string, number>;
 }
 
 export type WorldDoorState = 'open' | 'locked' | 'no-wallet' | 'council' | 'event';
@@ -167,8 +179,15 @@ export function doorStateFor(
   rings: WorldRings | null,
   connected: boolean,
 ): WorldDoorState {
-  // A song key is the artist's own decision about this one door, so it is
-  // answered before the ring rules, and it can open a door the rings would shut.
+  // A drop on the door is the artist's own decision about this one door, so it
+  // is answered before the ring rules, and it can open a door the rings would
+  // shut. Same for a song key below.
+  if (room.nftKey) {
+    const held = rings?.heldNfts?.[room.nftKey.nftId] ?? 0;
+    if (held > 0) return 'open';
+    if (!connected) return 'no-wallet';
+    return 'locked';
+  }
   if (room.songKey) {
     const held = rings?.heldSongs?.[room.songKey.songId];
     const need = room.songKey.threshold;

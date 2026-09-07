@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { useSocial } from '@/hooks/useSocial';
 import { PostComposer } from '@/components/social/PostComposer';
 import { PostCard } from '@/components/social/PostCard';
+import { BlockButton } from '@/components/social/BlockButton';
 import { ArtistGallery } from '@/components/gallery/ArtistGallery';
 import { useArtistGallery } from '@/hooks/useArtistMedia';
 import type { SocialPostWithProfile } from '@/types/social';
@@ -807,6 +808,13 @@ export default function ArtistDetail() {
                         </>
                       )}
                     </Button>
+                  )}
+                  {/* Same block control as an audience profile. Posts by an
+                      artist link here, so this is where somebody bothered by
+                      one comes to make it stop. Hidden on your own page and
+                      until the artist's account is known. */}
+                  {user && !isOwner && ownerUserId && (
+                    <BlockButton userId={ownerUserId} displayName={displayName || artist.name} />
                   )}
                   {isOwner && (
                     <>

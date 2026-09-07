@@ -16,6 +16,13 @@
 // other people, and anything already written to Base. Released records and
 // published worlds stay too, with the personal account unlinked; they are the
 // artist's public work, not private data, and coins on chain point at them.
+// The artist_accounts row (the claim on a page, its verification and theme)
+// is one of those: it is unlinked, not deleted, so the page keeps its badge
+// and look and can be claimed again.
+//
+// Profile pictures and covers live in storage, not in a table, so they are
+// removed here explicitly: everything under {uid}/ in the avaters and covers
+// buckets, and nothing outside that prefix.
 //
 // Only the caller can delete the caller. The JWT names them; nothing in the
 // body is trusted.
@@ -80,12 +87,83 @@ const PERSONAL: Array<[table: string, column: string]> = [
   ["world_roles", "user_id"],
   ["artist_media", "user_id"],
   ["artist_claims", "user_id"],
-  ["artist_accounts", "user_id"],
+  // artist_accounts is NOT here on purpose: it is unlinked below, not deleted.
   ["account_appeals", "user_id"],
   ["account_actions", "user_id"],
   ["user_roles", "user_id"],
   ["audience_profiles", "user_id"],
 ];
+
+/**
+ * Tables where the row outlives the person and only the link to them goes.
+ * The row is public work or a record with weight; the person is not.
+ */
+const UNLINK: Array<[table: string, column: string]> = [
+  ["artist_accounts", "user_id"],
+];
+
+/** Public image buckets where a person's own files sit under `{uid}/`. */
+const OWN_IMAGE_BUCKETS = ["avaters", "covers"] as const;
+
+const LIST_PAGE = 1000;
+
+type Admin = ReturnType<typeof admin>;
+
+/**
+ * Every object path under `prefix` in `bucket`, walking into sub-folders.
+ * The prefix is always the caller's own uid, so nothing outside it is ever
+ * listed, let alone removed.
+ */
+async function listOwnObjects(db: Admin, bucket: string, prefix: string): Promise<string[]> {
+  const paths: string[] = [];
+  const folders = [prefix];
+  while (folders.length) {
+    const dir = folders.pop()!;
+    for (let offset = 0; ; offset += LIST_PAGE) {
+      const { data, error } = await db.storage.from(bucket).list(dir, { limit: LIST_PAGE, offset });
+      if (error) throw new Error(error.message);
+      for (const entry of data ?? []) {
+        if (!entry.name) continue;
+        const full = `${dir}/${entry.name}`;
+        // Supabase lists a folder as an entry with no id and no metadata.
+        if (entry.id == null && !entry.metadata) folders.push(full);
+        else paths.push(full);
+      }
+      if (!data || data.length < LIST_PAGE) break;
+    }
+  }
+  return paths;
+}
+
+/**
+ * Remove the caller's own files from the image buckets. Never fatal: a
+ * missing bucket or a storage hiccup is reported in `skipped`, and the rows
+ * and the auth record still go.
+ */
+async function removeOwnImages(
+  db: Admin,
+  uid: string,
+  removed: Record<string, number>,
+  skipped: string[],
+) {
+  for (const bucket of OWN_IMAGE_BUCKETS) {
+    try {
+      const paths = (await listOwnObjects(db, bucket, uid)).filter((p) => p.startsWith(`${uid}/`));
+      if (paths.length === 0) {
+        removed[`storage.${bucket}`] = 0;
+        continue;
+      }
+      const { data, error } = await db.storage.from(bucket).remove(paths);
+      if (error) throw new Error(error.message);
+      removed[`storage.${bucket}`] = data?.length ?? paths.length;
+      if ((data?.length ?? 0) < paths.length) {
+        skipped.push(`storage.${bucket}: ${paths.length - (data?.length ?? 0)} of ${paths.length} objects not removed`);
+      }
+    } catch (err) {
+      skipped.push(`storage.${bucket}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -103,6 +181,23 @@ Deno.serve(async (req) => {
 
     const removed: Record<string, number> = {};
     const skipped: string[] = [];
+
+    // Pictures first, while the profile row that points at them still exists.
+    await removeOwnImages(db, uid, removed, skipped);
+
+    // Unlink what outlives the person.
+    for (const [table, column] of UNLINK) {
+      const { error, count } = await db
+        .from(table)
+        .update({ [column]: null }, { count: "exact" })
+        .eq(column, uid);
+      if (error) {
+        skipped.push(`${table}.${column} (unlink): ${error.message}`);
+        continue;
+      }
+      removed[`${table}.${column} (unlinked)`] = count ?? 0;
+    }
+
     for (const [table, column] of PERSONAL) {
       const { error, count } = await db
         .from(table)

@@ -640,7 +640,9 @@ export default function Auth() {
     const wanted = new URLSearchParams(window.location.search).get('auth');
     if (wanted !== 'signin' && wanted !== 'signup') return;
     setAuthMode(wanted);
-    setAuthView('main');
+    // 'email' is the actual email/password form; 'main' is only the menu of
+    // sign-in options, which is not what a deep link asked for.
+    setAuthView('email');
     window.history.replaceState(null, '', window.location.pathname);
   }, []);
 

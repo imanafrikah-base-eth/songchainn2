@@ -123,7 +123,12 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
               <button
                 onClick={async () => {
                   setMenuOpen(false);
-                  await blockUser(conversation.other_user_id, true);
+                  try {
+                    await blockUser(conversation.other_user_id, true);
+                  } catch {
+                    toast.error('Could not block this person. Try again.');
+                    return;
+                  }
                   toast.success('Blocked', { description: 'They cannot message you now.' });
                   onBack();
                 }}

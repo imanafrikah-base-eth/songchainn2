@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
-import { blockUser } from '@/hooks/useDirectMessages';
+import { unblockUser } from '@/hooks/useDirectMessages';
 
 interface BlockedRow {
   user_id: string;
@@ -55,11 +55,11 @@ export function BlockedPeople() {
   const unblock = useCallback(
     async (row: BlockedRow) => {
       try {
-        await blockUser(row.user_id, false);
+        await unblockUser(row.user_id);
         setRows((prev) => (prev ?? []).filter((r) => r.user_id !== row.user_id));
         toast(`${row.display_name || row.username || 'They'} unblocked`);
       } catch {
-        toast.error('That did not go through. Try again.');
+        toast.error('Could not unblock. Try again.');
       }
     },
     [],

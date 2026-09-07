@@ -16,7 +16,7 @@
  * guide that suggests a feature the app does not have is worse than no guide.
  */
 
-export type BuilderStep = 'name' | 'streets' | 'blocks' | 'key' | 'walk' | 'publish';
+export type BuilderStep = 'name' | 'streets' | 'blocks' | 'key' | 'drops' | 'walk' | 'publish';
 
 export interface MoshaSuggestion {
   /** The shape being suggested, in the artist's language, not ours. */
@@ -38,6 +38,33 @@ export interface MoshaBeat {
 }
 
 export const MOSHA_BEATS: Record<BuilderStep, MoshaBeat> = {
+  drops: {
+    question: 'Is there something here worth owning?',
+    opener:
+      'A drop is a thing people keep. Not every world needs one, and an empty shelf is better than a shelf of nothing much. If you make one, make it the thing you would want to hold yourself.',
+    suggestions: [
+      {
+        label: 'One record, small edition',
+        detail:
+          'The song people ask for, 50 copies, a real price. Scarce enough to mean something, cheap enough that a fan can actually get one.',
+        blocks: ['collectibles'],
+      },
+      {
+        label: 'The cover art, open edition',
+        detail:
+          'Free or nearly free, as many as people want. A way in for someone who is not ready to spend, and a wallet full of your art is a fan who comes back.',
+        blocks: ['collectibles'],
+      },
+      {
+        label: 'A key',
+        detail:
+          'A drop that opens a street. Hold it, walk in. The price of the drop is the price of the door, and you set both.',
+        blocks: ['collectibles'],
+      },
+    ],
+    watchOut:
+      'The terms go on chain when you mint and do not change after. Read the price and the copies back before you confirm in your wallet.',
+  },
   name: {
     question: 'What is this place, and who is it for?',
     opener:

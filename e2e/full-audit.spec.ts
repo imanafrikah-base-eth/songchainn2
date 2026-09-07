@@ -7,16 +7,31 @@ const BASE = 'http://127.0.0.1:4173';
 const SS_DIR = join(_dirname, '../e2e-audit/screenshots');
 
 async function ss(page: Page, name: string) {
-  await page.screenshot({ path: `${SS_DIR}/${name}.png`, fullPage: false });
+  // Screenshots are evidence, not assertions. Playwright waits for web fonts
+  // before it captures, and on the dev server that wait alone has eaten the
+  // whole test budget; a missing picture must never fail a test.
+  // The screenshot's own timeout does not bound its wait for web fonts, and
+  // that wait has held a healthy test until the test timeout more than once.
+  // Race it against a hard timer instead; a late picture is simply dropped.
+  const shot = page
+    .screenshot({ path: `${SS_DIR}/${name}.png`, fullPage: false, timeout: 8000 })
+    .then(() => true)
+    .catch(() => false);
+  const timer = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 9000));
+  const ok = await Promise.race([shot, timer]);
+  if (!ok) console.log(`(screenshot skipped: ${name})`);
 }
 
 async function waitForApp(page: Page) {
-  // Wait for the root to have content (not just spinner)
+  // The root gets a Suspense spinner first and the real page a moment later,
+  // so "root has children" is true too early. Wait for something a page
+  // actually renders: a header, a main, a nav or a form.
   await page.waitForFunction(() => {
     const root = document.getElementById('root');
-    return root && root.children.length > 0;
-  }, { timeout: 15000 });
-  await page.waitForTimeout(800);
+    if (!root || root.children.length === 0) return false;
+    return Boolean(root.querySelector('header, main, nav, form, h1'));
+  }, { timeout: 30000 });
+  await page.waitForTimeout(500);
 }
 
 // ─── MOBILE VIEWPORT ──────────────────────────────────────────────────────────
@@ -167,7 +182,9 @@ test.describe('DESKTOP (1440×900)', () => {
     const quickActions = page.locator('text=Quick Actions').first();
     const count = await quickActions.count();
     console.log('Quick Actions header count:', count);
-    const wavewarz = await page.locator('text=WaveWarz Africa').count();
+    // Scoped to the Quick Actions grid. The landing hero mentions WaveWarz
+    // Africa on purpose; the thing this test guards is the grid.
+    const wavewarz = await page.locator('section:has-text("Quick Actions")').locator('text=WaveWarz Africa').count();
     const searchAction = await page.locator('section:has-text("Quick Actions") button:has-text("Search"), section:has-text("Quick Actions") div:has-text("Search")').count();
     console.log('WaveWarz Africa still in quick actions:', wavewarz, '  Search action in quick actions:', searchAction);
     await ss(page, 'D04-quick-actions');
@@ -388,11 +405,13 @@ test.describe('DESKTOP (1440×900)', () => {
   });
 
   test('D-24 · Navigation links all work', async ({ page }) => {
+    // Five lazy routes on a dev server, compiled on first visit.
+    test.setTimeout(120_000);
     await page.goto(BASE);
     await waitForApp(page);
     const navLinks = ['/discover', '/artists', '/room', '/community', '/social'];
     for (const link of navLinks) {
-      await page.goto(`${BASE}${link}`);
+      await page.goto(`${BASE}${link}`, { waitUntil: 'domcontentloaded' });
       await waitForApp(page);
       await page.waitForTimeout(600);
       const crashed = await page.locator('text=Something went wrong').count();
@@ -621,8 +640,8 @@ test.describe('MOBILE DEEP (375×812)', () => {
     const quickActions = page.locator('text=Quick Actions');
     console.log('Quick Actions on mobile:', await quickActions.count());
     await ss(page, 'M11-quick-actions-mobile');
-    // Search should be there, WaveWarz should not
-    const ww = await page.locator('text=WaveWarz Africa').count();
+    // Search should be there, WaveWarz should not, in the grid itself
+    const ww = await page.locator('section:has-text("Quick Actions")').locator('text=WaveWarz Africa').count();
     console.log('WaveWarz Africa still visible:', ww);
     expect(ww).toBe(0);
   });

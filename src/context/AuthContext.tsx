@@ -1,8 +1,14 @@
+import type { Database } from '@/integrations/supabase/types';
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
 import { hasWalletProvider, connectWallet, signMessage, generateNonce, selectWallet, subscribeWallets, toChecksumAddress } from '@/lib/baseWallet';
+
+/* The profile row's own Update type, so a write never carries a column the
+ * table does not have. Newer supabase-js rejects excess properties at the
+ * type level, which is what turned these two writes into failed builds. */
+type ProfileUpdate = Database['public']['Tables']['audience_profiles']['Update'];
 
 interface AuthContextType {
   user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null;
@@ -618,9 +624,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (existing) {
-      await supabase.from('audience_profiles').update(profileData).eq('user_id', uid);
+      await supabase.from('audience_profiles').update(profileData as ProfileUpdate).eq('user_id', uid);
     } else {
-      await supabase.from('audience_profiles').insert(profileData as any);
+      await supabase.from('audience_profiles').insert(profileData as Database['public']['Tables']['audience_profiles']['Insert']);
     }
 
     await refreshProfile();
@@ -808,9 +814,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               };
               const { data: existing } = await supabase.from('audience_profiles').select('id').eq('user_id', u.id).maybeSingle();
               if (existing) {
-                await supabase.from('audience_profiles').update(profileData).eq('user_id', u.id);
+                await supabase.from('audience_profiles').update(profileData as ProfileUpdate).eq('user_id', u.id);
               } else {
-                await supabase.from('audience_profiles').insert(profileData as any);
+                await supabase.from('audience_profiles').insert(profileData as Database['public']['Tables']['audience_profiles']['Insert']);
               }
               setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
               setAudienceProfile(profileData as any);

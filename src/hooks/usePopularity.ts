@@ -27,20 +27,19 @@ interface SongPopularity {
 
 const numberOrZero = (value: number | null | undefined) => Number(value || 0);
 
-// Plays = historical baseline + real plays. The baseline (song.plays, distributed
-// from ARTIST_STREAM_TARGETS) is the catalogue's carried-over stream history; every
-// row in song_analytics is a real listen recorded by the app and stacks on top.
-// Likes/comments/shares/views are NEVER seeded — only real user actions count.
+// Every count here comes from the database. play_count is the sum, done once
+// in get_song_popularity(), of a song's stream history (song_stream_history,
+// the numbers the catalogue carried before plays were recorded) and every real
+// play in song_analytics. Nothing is seeded on the client: a song the RPC has
+// not mentioned has zero of everything, and the catalogue is only used to make
+// sure every song has a row so lists never have holes.
 function mergeSongPopularity(rows: SongPopularity[] | null | undefined, songs: Song[] = SONGS): SongPopularity[] {
   const merged = new Map<string, SongPopularity>();
-  const baselineById = new Map<string, number>();
 
   songs.forEach((song) => {
-    const baseline = Math.max(0, numberOrZero(song.plays));
-    baselineById.set(song.id, baseline);
     merged.set(song.id, {
       song_id: song.id,
-      play_count: baseline,
+      play_count: 0,
       like_count: 0,
       comment_count: 0,
       share_count: 0,
@@ -53,13 +52,9 @@ function mergeSongPopularity(rows: SongPopularity[] | null | undefined, songs: S
     const songId = String(row.song_id || '').trim();
     if (!songId) return;
 
-    // Songs uploaded after the static catalogue have no baseline — they start at 0
-    // and count only real plays, which is what we want for every new release.
-    const baseline = baselineById.get(songId) ?? 0;
-
     merged.set(songId, {
       song_id: songId,
-      play_count: baseline + numberOrZero(row.play_count),
+      play_count: numberOrZero(row.play_count),
       like_count: numberOrZero(row.like_count),
       comment_count: numberOrZero(row.comment_count),
       share_count: numberOrZero(row.share_count),
@@ -80,8 +75,6 @@ export interface ArtistStreamTotal {
   artist_id: string;
   stream_count: number;
 }
-
-const ARTIST_FOLLOWER_BASELINE = 71;
 
 interface ProfilePopularity {
   profile_id: string | null;
@@ -443,7 +436,7 @@ export function useArtistFollowerCounts() {
       const artistIds = artists.map((artist) => artist.id);
       const countsByArtist = new Map<string, number>();
       artistIds.forEach((artistId) => {
-        countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE);
+        countsByArtist.set(artistId, 0);
       });
 
       try {
@@ -459,7 +452,7 @@ export function useArtistFollowerCounts() {
               if (!artistId) return;
               const count = Number(row?.follower_count || 0);
               const normalizedCount = Math.max(0, Number.isFinite(count) ? Math.floor(count) : 0);
-              countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE + normalizedCount);
+              countsByArtist.set(artistId, normalizedCount);
             });
 
             return Array.from(countsByArtist.entries()).map(([artist_id, follower_count]) => ({
@@ -489,7 +482,7 @@ export function useArtistFollowerCounts() {
           }
         });
         perArtistFollowers.forEach((userIds, artistId) => {
-          countsByArtist.set(artistId, ARTIST_FOLLOWER_BASELINE + userIds.size);
+          countsByArtist.set(artistId, userIds.size);
         });
       }
 
@@ -500,7 +493,7 @@ export function useArtistFollowerCounts() {
     },
     staleTime: 1000 * 10,
     refetchInterval: 10000,
-    placeholderData: () => artists.map(a => ({ artist_id: a.id, follower_count: ARTIST_FOLLOWER_BASELINE })),
+    placeholderData: () => artists.map(a => ({ artist_id: a.id, follower_count: 0 })),
   });
 }
 

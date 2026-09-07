@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ARTISTS, GENRES, type Song, type Artist, type Genre } from '@/data/musicData';
@@ -17,6 +18,9 @@ interface PublishedSongRow {
   // read defensively rather than trusted.
   audition: unknown;
 }
+
+// One shared empty array so a not-yet-loaded catalog has a stable identity.
+const EMPTY_ROWS: PublishedSongRow[] = [];
 
 const TIERS = ['master', 'release', 'raw'] as const;
 type QualityTier = (typeof TIERS)[number];
@@ -58,45 +62,56 @@ export function usePublishedCatalog() {
     staleTime: 30_000,
   });
 
-  const rows = query.data ?? [];
+  // Derived arrays are memoized on the query data so their identity only
+  // changes when the rows do. Consumers put `songs`/`artists` in effect deps
+  // (PlaylistDetail, for one), and a fresh array every render made those
+  // effects re-fire forever.
+  const rows = query.data ?? EMPTY_ROWS;
 
-  const songs: Song[] = rows
-    .filter((row) => row.title && row.artist_name && row.audio_url && row.artist_id)
-    .map((row) => ({
-      id: row.id,
-      title: row.title!,
-      artist: row.artist_name!,
-      artistId: row.artist_id!,
-      audioUrl: row.audio_url!,
-      coverImage: row.cover_art_url ?? undefined,
-      plays: 0,
-      likes: 0,
-      townSquare: row.town_square ?? 'Livingstone Town Square',
-      genre: toGenre(row.genre),
-      addedAt: row.created_at ?? undefined,
-      qualityTier: toTier(row.audition),
-      volume: 'Single',
-    }));
+  const songs = useMemo<Song[]>(
+    () =>
+      rows
+        .filter((row) => row.title && row.artist_name && row.audio_url && row.artist_id)
+        .map((row) => ({
+          id: row.id,
+          title: row.title!,
+          artist: row.artist_name!,
+          artistId: row.artist_id!,
+          audioUrl: row.audio_url!,
+          coverImage: row.cover_art_url ?? undefined,
+          plays: 0,
+          likes: 0,
+          townSquare: row.town_square ?? 'Livingstone Town Square',
+          genre: toGenre(row.genre),
+          addedAt: row.created_at ?? undefined,
+          qualityTier: toTier(row.audition),
+          volume: 'Single',
+        })),
+    [rows],
+  );
 
-  const existingArtistIds = new Set(ARTISTS.map((a) => a.id));
-  const artistsById = new Map<string, Artist>();
-  rows.forEach((row) => {
-    if (!row.artist_id || existingArtistIds.has(row.artist_id) || artistsById.has(row.artist_id)) return;
-    artistsById.set(row.artist_id, {
-      id: row.artist_id,
-      name: row.artist_name || 'Unknown Artist',
-      bio: `${row.artist_name} joined $ongChainn through the artist submission program.`,
-      location: row.town_square ?? 'Unknown',
-      townSquare: row.town_square ?? 'Livingstone Town Square',
-      profileImage: row.artist_image_url ?? undefined,
-      songs: rows.filter((r) => r.artist_id === row.artist_id).map((r) => r.id),
-      addedAt: row.created_at ?? undefined,
+  const artists = useMemo<Artist[]>(() => {
+    const existingArtistIds = new Set(ARTISTS.map((a) => a.id));
+    const artistsById = new Map<string, Artist>();
+    rows.forEach((row) => {
+      if (!row.artist_id || existingArtistIds.has(row.artist_id) || artistsById.has(row.artist_id)) return;
+      artistsById.set(row.artist_id, {
+        id: row.artist_id,
+        name: row.artist_name || 'Unknown Artist',
+        bio: `${row.artist_name} joined $ongChainn through the artist submission program.`,
+        location: row.town_square ?? 'Unknown',
+        townSquare: row.town_square ?? 'Livingstone Town Square',
+        profileImage: row.artist_image_url ?? undefined,
+        songs: rows.filter((r) => r.artist_id === row.artist_id).map((r) => r.id),
+        addedAt: row.created_at ?? undefined,
+      });
     });
-  });
+    return Array.from(artistsById.values());
+  }, [rows]);
 
   return {
     songs,
-    artists: Array.from(artistsById.values()),
+    artists,
     isLoading: query.isLoading,
   };
 }

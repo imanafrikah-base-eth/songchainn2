@@ -9,7 +9,7 @@
 // locked, and the client shows the "key is being cut" state.
 //
 // Request:  POST { world: string }  with the caller's Supabase JWT in Authorization
-// Response: { rings: { ring0, ring1, ring2, council, balance, thresholds, rank, tokenLive } }
+// Response: { rings: { ring0, ring1, ring2, council, balance, thresholds, rank, tokenLive, heldNfts } }
 //
 // WHOSE WALLET. The first version took a wallet address in the request body
 // and reported that address's holdings as the caller's. Balances are public,
@@ -35,7 +35,7 @@ function admin() {
 
 const ALLOWED_ORIGINS = new Set<string>(
   (Deno.env.get("ALLOWED_ORIGINS") ??
-    "https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz,https://beta.songchainn.xyz,http://localhost:5173,http://127.0.0.1:5173")
+    "https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz,https://beta.songchainn.xyz,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173")
     .split(",").map((s) => s.trim()).filter(Boolean),
 );
 
@@ -165,8 +165,62 @@ function tokenAddressFor(cfg: WorldTokenConfig): string | null {
 }
 
 const BALANCE_OF_SELECTOR = "0x70a08231"; // balanceOf(address)
+// ERC-1155 balanceOf(address,uint256), for drops used as keys.
+const BALANCE_OF_1155_SELECTOR = "0x00fdd58e";
 const CACHE_TTL_MS = 30_000;
 const balanceCache = new Map<string, { balance: number; at: number }>();
+
+/**
+ * A world built in the builder has no creator coin here, and until now the
+ * gate answered "Unknown world" for it, so its doors could never open. It
+ * gets the outer ring, and whatever its drops unlock.
+ */
+function builderWorldConfig(): WorldTokenConfig {
+  return {
+    tokenAddressEnv: "WORLD_TOKEN_UNSET",
+    decimalsEnv: "WORLD_TOKEN_DECIMALS",
+    fanEnv: "WORLD_FAN_THRESHOLD",
+    insiderEnv: "WORLD_INSIDER_THRESHOLD",
+    defaultFan: 500_000,
+    defaultInsider: 5_000_000,
+  };
+}
+
+type KeyDrop = { id: string; contract_address: string; token_id: number; key_ring: string | null };
+
+/**
+ * How many copies of each of this world's live drops the wallet holds, read
+ * from Base. A failed read is zero: a door closes, it never opens by mistake.
+ */
+async function getDropBalances(drops: KeyDrop[], wallet: string): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  if (!drops.length) return out;
+  const rpcUrl = Deno.env.get("BASE_RPC_URL") ?? "https://mainnet.base.org";
+  const who = wallet.toLowerCase().slice(2).padStart(64, "0");
+  await Promise.all(drops.map(async (d) => {
+    const key = `1155:${d.contract_address}:${d.token_id}:${wallet.toLowerCase()}`;
+    const hit = balanceCache.get(key);
+    if (hit && Date.now() - hit.at < CACHE_TTL_MS) { out[d.id] = hit.balance; return; }
+    try {
+      const data = BALANCE_OF_1155_SELECTOR + who + BigInt(d.token_id).toString(16).padStart(64, "0");
+      const res = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: d.contract_address, data }, "latest"] }),
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!res.ok) { out[d.id] = hit?.balance ?? 0; return; }
+      const body = (await res.json()) as { result?: string };
+      if (!body.result || !/^0x[a-fA-F0-9]*$/.test(body.result)) { out[d.id] = hit?.balance ?? 0; return; }
+      const n = Number(BigInt(body.result === "0x" ? "0x0" : body.result));
+      balanceCache.set(key, { balance: n, at: Date.now() });
+      out[d.id] = n;
+    } catch {
+      out[d.id] = hit?.balance ?? 0;
+    }
+  }));
+  return out;
+}
 
 function isAddress(value: unknown): value is string {
   return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value);
@@ -222,8 +276,22 @@ Deno.serve(async (req) => {
 
   try {
     const { world } = await req.json().catch(() => ({}));
-    const cfg = typeof world === "string" ? worldConfigFor(world) : undefined;
+    let cfg = typeof world === "string" ? worldConfigFor(world) : undefined;
+    const db = admin();
+    if (!cfg && typeof world === "string" && /^[a-z0-9-]{1,64}$/.test(world)) {
+      const { data: row } = await db.from("worlds").select("slug").eq("slug", world).eq("status", "published").maybeSingle();
+      if (row) cfg = builderWorldConfig();
+    }
     if (!cfg) return json(origin, { error: "Unknown world" }, 404);
+
+    // The drops in this world that are live. Each one the caller holds is
+    // reported by id, and a drop marked as a key grants its ring.
+    const { data: dropRows } = await db
+      .from("world_nfts")
+      .select("id, contract_address, token_id, key_ring")
+      .eq("world_slug", world)
+      .eq("status", "live");
+    const keyDrops = ((dropRows ?? []) as KeyDrop[]).filter((d) => isAddress(d.contract_address) && d.token_id != null);
 
     const thresholds = {
       FAN: intFromEnv(cfg.fanEnv, cfg.defaultFan),
@@ -235,9 +303,7 @@ Deno.serve(async (req) => {
     let userId: string | null = null;
     let wallet: string | null = null;
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-    let db: ReturnType<typeof admin> | null = null;
     if (token) {
-      db = admin();
       const { data } = await db.auth.getUser(token);
       const user = data?.user;
       if (user) {
@@ -262,24 +328,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    const balance = await getTokenBalance(cfg, wallet);
+    const [balance, heldNfts] = await Promise.all([
+      getTokenBalance(cfg, wallet),
+      getDropBalances(keyDrops, wallet),
+    ]);
     // Council rank comes from the reputation service (Phase B). Until the
     // leaderboard is live nobody holds a seat.
     const rank: number | null = null;
 
+    // A drop the artist marked as a key opens its ring for whoever holds one.
+    const keyGrantsFan = keyDrops.some((d) => d.key_ring === "fan" && (heldNfts[d.id] ?? 0) > 0);
+    const keyGrantsInsider = keyDrops.some((d) => d.key_ring === "insider" && (heldNfts[d.id] ?? 0) > 0);
+
     const rings = {
       ring0: true,
-      ring1: balance >= thresholds.FAN,
-      ring2: balance >= thresholds.INSIDER,
+      ring1: balance >= thresholds.FAN || keyGrantsFan || keyGrantsInsider,
+      ring2: balance >= thresholds.INSIDER || keyGrantsInsider,
       council: rank !== null && rank <= 10,
       balance,
       thresholds,
       rank,
       tokenLive,
+      heldNfts,
     };
 
     // Remember what was verified, for the database to price against.
-    if (userId && db) {
+    if (userId) {
       const { error } = await db.from("world_access_snapshots").upsert(
         {
           user_id: userId,

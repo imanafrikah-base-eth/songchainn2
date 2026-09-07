@@ -7,6 +7,8 @@ import { BlockList, type BlockContext, type BlockInstance } from '@/worlds/block
 import { fetchWorldBySlug } from '@/worlds/loader';
 import { WalkIn3D, panelsFromBlocks } from '@/worlds/three/WalkIn3D';
 import type { WorldConfig, WorldRings } from '@/worlds/types';
+import { WorldDrops } from '@/worlds/components/WorldDrops';
+import { useAuth } from '@/context/AuthContext';
 
 /**
  * Viewing a world that was built in the builder.
@@ -32,6 +34,8 @@ export default function BuiltWorld() {
   const [blocks, setBlocks] = useState<Record<string, BlockInstance[]>>({});
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const activeSlug = params.get('street');
 
@@ -51,10 +55,11 @@ export default function BuiltWorld() {
       if (isSupabaseConfigured) {
         const { data: row } = await supabase
           .from('worlds')
-          .select('id')
+          .select('id, owner_id')
           .eq('slug', slug ?? '')
           .maybeSingle();
         const worldId = (row as { id: string } | null)?.id;
+        if (live) setOwnerId((row as { owner_id: string | null } | null)?.owner_id ?? null);
         if (worldId) {
           const { data: s } = await supabase
             .from('world_streets')
@@ -192,6 +197,12 @@ export default function BuiltWorld() {
         ) : (
           <p className="mt-8 text-sm text-muted-foreground">This world has no streets yet.</p>
         )}
+
+        {/* Drops minted from inside this world. Nothing renders when there
+            are none; the owner always gets the door to make one. */}
+        <div className="mt-6 border-t border-border">
+          <WorldDrops worldSlug={world.slug} ownerLink={user && ownerId === user.id ? `/drops/${world.slug}` : null} />
+        </div>
 
         {world.story?.length ? (
           <section className="mt-10 border-t border-border pt-6">

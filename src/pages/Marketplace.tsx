@@ -33,6 +33,31 @@ import { useAuth } from '@/context/AuthContext';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { cn } from '@/lib/utils';
+import { DropCard } from '@/worlds/components/WorldDrops';
+import { useMarketplaceDrops } from '@/hooks/useWorldNfts';
+
+// Drops from artists' worlds that they chose to show outside the world.
+// Renders nothing until there is at least one, so the page is unchanged
+// for as long as nobody has dropped anything.
+function MarketplaceDrops() {
+  const { data: drops = [] } = useMarketplaceDrops();
+  if (drops.length === 0) return null;
+  return (
+    <div className="px-4 py-6">
+      <div className="mb-4">
+        <h3 className="text-lg font-heading font-semibold text-foreground">Collectibles</h3>
+        <p className="text-sm text-muted-foreground">
+          Made in artists' worlds, minted on Base with their own wallets. Yours to keep.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {drops.map((d) => (
+          <DropCard key={d.id} drop={d} showWorld />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Component for individual marketplace song card
 function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
@@ -486,6 +511,9 @@ export default function Marketplace() {
         </div>
       </div>
       
+      {/* Drops: NFTs artists minted in their worlds and chose to show here */}
+      <MarketplaceDrops />
+
       {/* How It Works */}
       <div className="px-4 py-6">
         <h3 className="text-lg font-heading font-semibold text-foreground mb-4">

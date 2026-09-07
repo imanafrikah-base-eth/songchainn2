@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Sparkles, UserPlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ARTISTS, SONGS, Song } from '@/data/musicData';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
@@ -72,6 +73,37 @@ function selectSimilarSong(params: {
 
   if (!candidates.length) return null;
   return candidates[0];
+}
+
+type PlayRow = { event_type?: string; song_id?: string };
+
+// One realtime channel per signed-in user, shared across StrictMode remounts.
+// Events are routed through the handler map so the component can swap in its
+// latest callbacks without ever re-subscribing the channel.
+const behaviorCtaChannelsByUser = new Map<string, RealtimeChannel>();
+const behaviorCtaHandlersByUser = new Map<string, (row: PlayRow) => void>();
+const behaviorCtaConsumersByUser = new Map<string, number>();
+const behaviorCtaTeardownTimersByUser = new Map<string, ReturnType<typeof setTimeout>>();
+
+function ensureBehaviorCtaChannel(userId: string) {
+  const existing = behaviorCtaChannelsByUser.get(userId);
+  if (existing) return existing;
+
+  const channel = supabase
+    .channel(`behavior-ctas-${userId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'song_analytics', filter: `user_id=eq.${userId}` },
+      (payload) => {
+        const row = (payload as any)?.new as PlayRow | undefined;
+        if (!row) return;
+        behaviorCtaHandlersByUser.get(userId)?.(row);
+      },
+    )
+    .subscribe();
+
+  behaviorCtaChannelsByUser.set(userId, channel);
+  return channel;
 }
 
 export function BehaviorCtaPopups() {
@@ -177,82 +209,113 @@ export function BehaviorCtaPopups() {
     };
   }, []);
 
+  // The realtime channel must not be rebuilt every time a CTA opens or closes
+  // (enqueue is keyed on activeItem), so the latest callbacks are held in refs
+  // and the subscription is keyed on the user alone. Same pattern as
+  // useNotifications / usePopularity: one shared channel per user, teardown
+  // delayed so a StrictMode remount reuses it instead of leaving a half-torn
+  // channel racing a fresh join on the same topic.
+  const enqueueRef = useRef(enqueue);
+  const isArtistLikedRef = useRef(isArtistLiked);
+  const isMoshaContextRef = useRef(isMoshaContext);
+  enqueueRef.current = enqueue;
+  isArtistLikedRef.current = isArtistLiked;
+  isMoshaContextRef.current = isMoshaContext;
+
   useEffect(() => {
-    if (!user?.id) return;
+    const userId = user?.id;
+    if (!userId) return;
 
-    const channel = supabase
-      .channel(`behavior-ctas-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'song_analytics', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const row = (payload as any)?.new as { event_type?: string; song_id?: string } | undefined;
-          if (!row || row.event_type !== 'play' || !row.song_id) return;
+    const pendingTimer = behaviorCtaTeardownTimersByUser.get(userId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      behaviorCtaTeardownTimersByUser.delete(userId);
+    }
 
-          const song = SONGS.find((entry) => entry.id === row.song_id);
-          if (!song) return;
+    behaviorCtaConsumersByUser.set(userId, (behaviorCtaConsumersByUser.get(userId) || 0) + 1);
+    behaviorCtaHandlersByUser.set(userId, (row) => {
+      if (row.event_type !== 'play' || !row.song_id) return;
 
-          const now = Date.now();
-          recentGlobalPlaysRef.current = [...recentGlobalPlaysRef.current, { songId: song.id, at: now }].slice(-30);
+      const song = SONGS.find((entry) => entry.id === row.song_id);
+      if (!song) return;
 
-          const perArtist = recentPlaysByArtistRef.current[song.artistId] || [];
-          const nextArtistPlays = [...perArtist, { songId: song.id, at: now }].slice(-12);
-          recentPlaysByArtistRef.current[song.artistId] = nextArtistPlays;
+      const isMoshaContextNow = isMoshaContextRef.current;
+      const now = Date.now();
+      recentGlobalPlaysRef.current = [...recentGlobalPlaysRef.current, { songId: song.id, at: now }].slice(-30);
 
-          const artistUniqueCount = uniqueSongCountWithinWindow(nextArtistPlays, 1000 * 60 * 90);
-          const followCooldownAt = followPromptedAtRef.current[song.artistId] || 0;
-          const canPromptFollow = now - followCooldownAt > FOLLOW_PROMPT_COOLDOWN_MS;
-          const canQueueCta = now - lastQueuedAtRef.current > CTA_MIN_GAP_MS;
+      const perArtist = recentPlaysByArtistRef.current[song.artistId] || [];
+      const nextArtistPlays = [...perArtist, { songId: song.id, at: now }].slice(-12);
+      recentPlaysByArtistRef.current[song.artistId] = nextArtistPlays;
 
-          if (artistUniqueCount >= 2 && canPromptFollow && canQueueCta && !isArtistLiked(song.artistId)) {
-            const artist = ARTISTS.find((entry) => entry.id === song.artistId);
-            if (artist) {
-              followPromptedAtRef.current[song.artistId] = now;
-              lastQueuedAtRef.current = now;
-              enqueue({
-                id: `follow-${artist.id}-${Math.floor(now / 1000)}`,
-                kind: 'follow-artist',
-                artistId: artist.id,
-                title: isMoshaContext ? `Mo$ha cue: you are on ${artist.name}` : `${artist.name} matches your lane`,
-                body: isMoshaContext
-                  ? `Keep your $ongChainn vibe neat. Follow now and I will keep this artist close in your picks.`
-                  : `You just ran two tracks from ${artist.name}. Follow to keep new drops in your flow.`,
-                ctaLabel: 'Follow Now',
-                ctaPath: `/artist/${artist.id}`,
-              });
-            }
-          }
+      const artistUniqueCount = uniqueSongCountWithinWindow(nextArtistPlays, 1000 * 60 * 90);
+      const followCooldownAt = followPromptedAtRef.current[song.artistId] || 0;
+      const canPromptFollow = now - followCooldownAt > FOLLOW_PROMPT_COOLDOWN_MS;
+      const canQueueCta = now - lastQueuedAtRef.current > CTA_MIN_GAP_MS;
 
-          const playsInWindow = recentGlobalPlaysRef.current.filter((entry) => now - entry.at < 1000 * 60 * 15);
-          const canPromptSuggestion = now - suggestionPromptedAtRef.current > SUGGESTION_COOLDOWN_MS;
-          const canQueueSuggestion = now - lastQueuedAtRef.current > CTA_MIN_GAP_MS;
-          if (playsInWindow.length >= 2 && canPromptSuggestion && canQueueSuggestion) {
-            const recentlyPlayedIds = new Set(playsInWindow.map((entry) => entry.songId));
-            const suggestion = selectSimilarSong({ sourceSong: song, recentlyPlayedSongIds: recentlyPlayedIds });
-            if (suggestion) {
-              suggestionPromptedAtRef.current = now;
-              lastQueuedAtRef.current = now;
-              enqueue({
-                id: `similar-${suggestion.id}-${Math.floor(now / 1000)}`,
-                kind: 'similar-song',
-                songId: suggestion.id,
-                title: isMoshaContext ? `Mo$ha pick for your vibe` : `Smart next track`,
-                body: isMoshaContext
-                  ? `Quick switch: "${suggestion.title}" keeps this ${suggestion.genre} energy clean and locked in.`
-                  : `Try "${suggestion.title}" next. It fits your recent listening pattern on $ongChainn.`,
-                ctaLabel: 'Play Next',
-                ctaPath: `/song/${suggestion.id}`,
-              });
-            }
-          }
-        },
-      )
-      .subscribe();
+      if (artistUniqueCount >= 2 && canPromptFollow && canQueueCta && !isArtistLikedRef.current(song.artistId)) {
+        const artist = ARTISTS.find((entry) => entry.id === song.artistId);
+        if (artist) {
+          followPromptedAtRef.current[song.artistId] = now;
+          lastQueuedAtRef.current = now;
+          enqueueRef.current({
+            id: `follow-${artist.id}-${Math.floor(now / 1000)}`,
+            kind: 'follow-artist',
+            artistId: artist.id,
+            title: isMoshaContextNow ? `Mo$ha cue: you are on ${artist.name}` : `${artist.name} matches your lane`,
+            body: isMoshaContextNow
+              ? `Keep your $ongChainn vibe neat. Follow now and I will keep this artist close in your picks.`
+              : `You just ran two tracks from ${artist.name}. Follow to keep new drops in your flow.`,
+            ctaLabel: 'Follow Now',
+            ctaPath: `/artist/${artist.id}`,
+          });
+        }
+      }
+
+      const playsInWindow = recentGlobalPlaysRef.current.filter((entry) => now - entry.at < 1000 * 60 * 15);
+      const canPromptSuggestion = now - suggestionPromptedAtRef.current > SUGGESTION_COOLDOWN_MS;
+      const canQueueSuggestion = now - lastQueuedAtRef.current > CTA_MIN_GAP_MS;
+      if (playsInWindow.length >= 2 && canPromptSuggestion && canQueueSuggestion) {
+        const recentlyPlayedIds = new Set(playsInWindow.map((entry) => entry.songId));
+        const suggestion = selectSimilarSong({ sourceSong: song, recentlyPlayedSongIds: recentlyPlayedIds });
+        if (suggestion) {
+          suggestionPromptedAtRef.current = now;
+          lastQueuedAtRef.current = now;
+          enqueueRef.current({
+            id: `similar-${suggestion.id}-${Math.floor(now / 1000)}`,
+            kind: 'similar-song',
+            songId: suggestion.id,
+            title: isMoshaContextNow ? `Mo$ha pick for your vibe` : `Smart next track`,
+            body: isMoshaContextNow
+              ? `Quick switch: "${suggestion.title}" keeps this ${suggestion.genre} energy clean and locked in.`
+              : `Try "${suggestion.title}" next. It fits your recent listening pattern on $ongChainn.`,
+            ctaLabel: 'Play Next',
+            ctaPath: `/song/${suggestion.id}`,
+          });
+        }
+      }
+    });
+    ensureBehaviorCtaChannel(userId);
 
     return () => {
-      void supabase.removeChannel(channel);
+      const current = Math.max(0, (behaviorCtaConsumersByUser.get(userId) || 0) - 1);
+      behaviorCtaConsumersByUser.set(userId, current);
+      if (current === 0) {
+        // Delay cleanup to survive React StrictMode remount cycle in development.
+        const timer = setTimeout(() => {
+          if ((behaviorCtaConsumersByUser.get(userId) || 0) === 0) {
+            const liveChannel = behaviorCtaChannelsByUser.get(userId);
+            if (liveChannel) {
+              void supabase.removeChannel(liveChannel);
+              behaviorCtaChannelsByUser.delete(userId);
+            }
+            behaviorCtaHandlersByUser.delete(userId);
+          }
+          behaviorCtaTeardownTimersByUser.delete(userId);
+        }, 1500);
+        behaviorCtaTeardownTimersByUser.set(userId, timer);
+      }
     };
-  }, [enqueue, isArtistLiked, isMoshaContext, user?.id]);
+  }, [user?.id]);
 
   if (!user || !activeItem) return null;
 

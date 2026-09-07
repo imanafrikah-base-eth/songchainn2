@@ -20,6 +20,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { ARTISTS } from '@/data/musicData';
 import { getWorldBySlug, formatWorldNumber } from '@/worlds/registry';
 import { useWorldAccess } from '@/worlds/useWorldAccess';
+import { useAuth } from '@/context/AuthContext';
 import { useCityTheme } from '@/worlds/useCityTheme';
 import {
   getCityBySlug,
@@ -43,6 +44,7 @@ import { AvatarPicker } from '@/worlds/components/AvatarPicker';
 import { CitizenAvatar } from '@/worlds/components/CitizenAvatar';
 import { useCitizen } from '@/worlds/useCitizen';
 import { GetKeyCta } from '@/worlds/components/GetKeyCta';
+import { WorldDrops } from '@/worlds/components/WorldDrops';
 import { LockedRoom } from '@/worlds/components/LockedRoom';
 import { GateRoom } from '@/worlds/components/rooms/GateRoom';
 import { StreetsRoom } from '@/worlds/components/rooms/StreetsRoom';
@@ -105,6 +107,7 @@ const World = () => {
 
 function WorldInner({ world, segment }: { world: WorldConfig; segment?: string }) {
   const { wallet, rings, connect, refresh } = useWorldAccess(world);
+  const { artistId } = useAuth();
   const theme = useCityTheme(world);
   const citizen = useCitizen(world, rings);
   const [dressing, setDressing] = useState(false);
@@ -255,6 +258,16 @@ function WorldInner({ world, segment }: { world: WorldConfig; segment?: string }
                   <WorldDoor key={r.slug} world={world} room={r} rings={rings} connected={connected} index={i} />
                 ))}
               </div>
+            </div>
+
+            {/* Drops the artist minted from inside this world. Renders nothing
+                when there are none, so a world without drops is unchanged. */}
+            <div className="mt-8">
+              <WorldDrops
+                worldSlug={world.slug}
+                dark
+                ownerLink={artistId && artistId === world.artistId ? `/drops/${world.slug}` : null}
+              />
             </div>
 
             <div className="mt-8">

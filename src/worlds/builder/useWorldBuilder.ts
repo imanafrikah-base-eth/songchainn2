@@ -47,9 +47,11 @@ export interface DraftStreet {
   /* Per-street key. null key_kind means this street inherits the world gate,
      which is how every street behaved before keys existed. The artist can
      change any of this at any time and it takes effect on the next load. */
-  key_kind: 'open' | 'song' | 'token' | 'points' | null;
+  key_kind: 'open' | 'song' | 'token' | 'points' | 'nft' | null;
   key_song_id: string | null;
   key_threshold: string | null;
+  /* The drop on this door, when key_kind is 'nft'. */
+  key_nft_id: string | null;
 }
 
 export interface DraftGate {
@@ -108,7 +110,7 @@ export function useWorldBuilder(worldId?: string) {
 
         const { data: s } = await supabase
           .from('world_streets')
-          .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold')
+          .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id')
           .eq('world_id', id)
           .order('sort_order');
         const streetRows = (s ?? []) as unknown as DraftStreet[];
@@ -254,7 +256,7 @@ export function useWorldBuilder(worldId?: string) {
           access: 'public',
           sort_order: streets.length,
         })
-        .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold')
+        .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id')
         .single();
       if (data) setStreets((prev) => [...prev, data as unknown as DraftStreet]);
     },

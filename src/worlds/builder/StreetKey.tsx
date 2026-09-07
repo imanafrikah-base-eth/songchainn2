@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { KeyRound, Music } from 'lucide-react';
+import { Gem, KeyRound, Music } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { DraftStreet } from '@/worlds/builder/useWorldBuilder';
+import { useMyDrops } from '@/hooks/useWorldNfts';
 
 /**
  * The key on one street, set by the artist and changeable whenever they like.
@@ -21,13 +22,18 @@ interface OwnSong {
 }
 
 export function StreetKey({
-  street, onSave,
+  street, onSave, worldSlug,
 }: {
   street: DraftStreet;
   onSave: (patch: Partial<DraftStreet>) => void;
+  /** The world this street is in, so its drops can be offered as keys. */
+  worldSlug?: string;
 }) {
   const [songs, setSongs] = useState<OwnSong[]>([]);
   const [loading, setLoading] = useState(false);
+  /* Only live drops from this world can lock its doors; a draft opens nothing. */
+  const { data: myDrops = [] } = useMyDrops(worldSlug);
+  const drops = myDrops.filter((d) => d.status === 'live' || d.status === 'paused');
 
   /* Only songs this artist actually owns can be a key to their own door. */
   useEffect(() => {
@@ -56,11 +62,21 @@ export function StreetKey({
 
   const setKind = (next: string) => {
     if (next === 'inherit') {
-      onSave({ key_kind: null, key_song_id: null, key_threshold: null });
+      onSave({ key_kind: null, key_song_id: null, key_threshold: null, key_nft_id: null });
       return;
     }
     if (next === 'open') {
-      onSave({ key_kind: 'open', key_song_id: null, key_threshold: null });
+      onSave({ key_kind: 'open', key_song_id: null, key_threshold: null, key_nft_id: null });
+      return;
+    }
+    if (next === 'nft') {
+      if (drops.length === 0) return;
+      onSave({
+        key_kind: 'nft',
+        key_song_id: null,
+        key_threshold: null,
+        key_nft_id: street.key_nft_id ?? drops[0]?.id ?? null,
+      });
       return;
     }
     // An artist with nothing uploaded must not be able to pick this. It used to
@@ -72,6 +88,7 @@ export function StreetKey({
       key_kind: 'song',
       key_song_id: street.key_song_id ?? songs[0]?.id ?? null,
       key_threshold: street.key_threshold ?? '1',
+      key_nft_id: null,
     });
   };
 
@@ -93,7 +110,31 @@ export function StreetKey({
         <option value="song" disabled={songs.length === 0}>
           Hold one of my songs{songs.length === 0 ? ' (upload one first)' : ''}
         </option>
+        <option value="nft" disabled={drops.length === 0}>
+          Hold one of my drops{drops.length === 0 ? ' (mint one in the Drops step)' : ''}
+        </option>
       </select>
+
+      {kind === 'nft' && drops.length > 0 && (
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Gem className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <select
+              className={selectCls}
+              value={street.key_nft_id ?? ''}
+              onChange={(e) => onSave({ key_nft_id: e.target.value })}
+            >
+              {drops.map((d) => (
+                <option key={d.id} value={d.id}>{d.title}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Anyone holding one copy of that drop walks straight in. Their balance is read from Base
+            when they arrive, not from anything they tell us.
+          </p>
+        </div>
+      )}
 
       {kind === 'song' && (
         <div className="mt-2 space-y-2">

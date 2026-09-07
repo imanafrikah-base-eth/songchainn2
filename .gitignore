@@ -14,7 +14,9 @@ dist-ssr
 .env
 .env.*
 !.env.example
-package-lock.json
+# package-lock.json is tracked on purpose since 7 Sep 2026: Vercel installs from it,
+# so production builds with the exact dependency versions verified locally.
+# (Every build from 22 Aug to 6 Sep failed because a fresh install drifted.)
 bun.lockb
 
 # Editor directories and files

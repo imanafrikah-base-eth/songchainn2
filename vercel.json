@@ -12,6 +12,14 @@
       "destination": "/api/song-og?id=:id"
     },
     {
+      "source": "/nft/world/:slug/contract.json",
+      "destination": "/api/nft-meta?world=:slug"
+    },
+    {
+      "source": "/nft/:id/metadata.json",
+      "destination": "/api/nft-meta?id=:id"
+    },
+    {
       "source": "/((?!.*\\.(?:js|mjs|css|map|json|txt|xml|webmanifest|ico|png|jpg|jpeg|webp|avif|gif|svg|mp3|wav|m4a|ogg|mp4|webm|woff|woff2|ttf|otf|eot|pdf|wasm)(?:[?#]|$)).*)",
       "destination": "/index.html"
     }

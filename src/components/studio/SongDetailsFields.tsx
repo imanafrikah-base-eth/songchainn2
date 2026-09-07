@@ -170,10 +170,11 @@ export function SongDetailsFields({
           </p>
         ) : (
           <>
+            {/* Below sm the name gets its own line so it stays readable at 320px; role, share and remove sit on the line under it. */}
             <ul className="space-y-2">
               {value.splits.map((s, i) => (
-                <li key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,8rem)_4.5rem_auto] items-center gap-2">
-                  <input value={s.name} disabled={disabled} maxLength={120} placeholder="Name" onChange={(e) => setSplit(i, { name: e.target.value })} className={input} />
+                <li key={i} className="grid grid-cols-[minmax(0,1fr)_4.5rem_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,8rem)_4.5rem_auto]">
+                  <input value={s.name} disabled={disabled} maxLength={120} placeholder="Name" onChange={(e) => setSplit(i, { name: e.target.value })} className={`${input} col-span-full sm:col-span-1`} />
                   <select value={s.role} disabled={disabled} onChange={(e) => setSplit(i, { role: e.target.value })} className={input}>
                     {[...new Set([s.role, ...SPLIT_ROLES])].map((r) => (
                       <option key={r} value={r}>{r}</option>

@@ -14,6 +14,7 @@ import { Play } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
 import { usePlayerActions } from '@/context/PlayerContext';
 import { Button } from '@/components/ui/button';
+import { WorldDrops } from '../components/WorldDrops';
 import {
   bool,
   list,
@@ -300,6 +301,16 @@ function NoteBlock({ props, ctx }: BlockProps) {
   );
 }
 
+/* ---------------------------------------------------------- collectibles */
+
+function CollectiblesBlock({ props, ctx }: BlockProps) {
+  const heading = str(props, 'heading', 'Collectibles');
+  const note = str(props, 'note', 'Made here, minted on Base, yours to keep.');
+  const limit = Math.max(1, Math.min(24, num(props, 'limit', 6)));
+  // Scoped to this world, always. The block cannot name another world.
+  return <WorldDrops worldSlug={ctx.world.slug} heading={heading} note={note} limit={limit} />;
+}
+
 /* ------------------------------------------------------------- the shelf */
 
 export const BLOCK_TYPES: BlockTypeDef[] = [
@@ -402,6 +413,19 @@ export const BLOCK_TYPES: BlockTypeDef[] = [
         kind: 'lines',
         help: 'One per line, as: Label | https://example.com',
       },
+    ],
+  },
+  {
+    id: 'collectibles',
+    name: 'Collectibles',
+    description: 'Your drops, with a Collect button. Made in the Drops step.',
+    category: 'music',
+    component: CollectiblesBlock,
+    defaults: { heading: 'Collectibles', note: 'Made here, minted on Base, yours to keep.', limit: 6 },
+    props: [
+      { key: 'heading', label: 'Heading', kind: 'text' },
+      { key: 'note', label: 'One line under it', kind: 'text', maxLength: 140 },
+      { key: 'limit', label: 'How many', kind: 'number', min: 1, max: 24 },
     ],
   },
   {

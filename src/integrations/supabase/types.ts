@@ -137,6 +137,10 @@ export type Database = {
           wallet_address: string | null
           x_profile: string | null
           x_profile_link: string | null
+          date_of_birth: string|null
+          age_confirmed_at: string|null
+          is_official: boolean
+          gender: string|null
         }
         Insert: {
           avatar_url?: string | null
@@ -161,6 +165,10 @@ export type Database = {
           wallet_address?: string | null
           x_profile?: string | null
           x_profile_link?: string | null
+          date_of_birth?: string|null
+          age_confirmed_at?: string|null
+          is_official?: boolean
+          gender?: string|null
         }
         Update: {
           avatar_url?: string | null
@@ -185,6 +193,10 @@ export type Database = {
           wallet_address?: string | null
           x_profile?: string | null
           x_profile_link?: string | null
+          date_of_birth?: string|null
+          age_confirmed_at?: string|null
+          is_official?: boolean
+          gender?: string|null
         }
         Relationships: []
       }
@@ -1532,6 +1544,8 @@ export type Database = {
           created_at: string
           updated_at: string
           published_at: string|null
+          visitor_posts: string
+          mosha_mode: string
         }
         Insert: {
           id?: string
@@ -1556,6 +1570,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
           published_at?: string|null
+          visitor_posts?: string
+          mosha_mode?: string
         }
         Update: {
           id?: string
@@ -1580,6 +1596,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
           published_at?: string|null
+          visitor_posts?: string
+          mosha_mode?: string
         }
         Relationships: []
       }
@@ -1637,6 +1655,11 @@ export type Database = {
           teaser: string
           hue: string
           sort_order: number
+          key_kind: string|null
+          key_song_id: string|null
+          key_threshold: string|null
+          key_nft_id: string|null
+          key_updated_at: string|null
         }
         Insert: {
           id?: string
@@ -1649,6 +1672,11 @@ export type Database = {
           teaser?: string
           hue?: string
           sort_order?: number
+          key_kind?: string|null
+          key_song_id?: string|null
+          key_threshold?: string|null
+          key_nft_id?: string|null
+          key_updated_at?: string|null
         }
         Update: {
           id?: string
@@ -1661,6 +1689,11 @@ export type Database = {
           teaser?: string
           hue?: string
           sort_order?: number
+          key_kind?: string|null
+          key_song_id?: string|null
+          key_threshold?: string|null
+          key_nft_id?: string|null
+          key_updated_at?: string|null
         }
         Relationships: []
       }
@@ -1685,6 +1718,132 @@ export type Database = {
           block_type?: string
           props?: Json
           sort_order?: number
+        }
+        Relationships: []
+      }
+      song_stream_history: {
+        Row: {
+          song_id: string
+          plays: number
+          note: string|null
+          recorded_at: string
+        }
+        Insert: {
+          song_id: string
+          plays: number
+          note?: string|null
+          recorded_at?: string
+        }
+        Update: {
+          song_id?: string
+          plays?: number
+          note?: string|null
+          recorded_at?: string
+        }
+        Relationships: []
+      }
+      world_nfts: {
+        Row: {
+          id: string
+          world_slug: string
+          world_id: string|null
+          owner_id: string|null
+          artist_id: string|null
+          kind: string
+          title: string
+          description: string
+          song_id: string|null
+          image_url: string
+          media_url: string|null
+          media_kind: string|null
+          price_eth: number
+          copies: number|null
+          per_wallet: number|null
+          sale_end: string|null
+          in_marketplace: boolean
+          key_ring: string|null
+          status: string
+          chain: string
+          contract_address: string|null
+          token_id: number|null
+          minter_address: string|null
+          contract_version: string|null
+          payout_wallet: string|null
+          tx_hash: string|null
+          metadata_uri: string|null
+          status_note: string|null
+          minted_at: string|null
+          verified_at: string|null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          world_slug: string
+          world_id?: string|null
+          owner_id?: string|null
+          artist_id?: string|null
+          kind: string
+          title: string
+          description?: string
+          song_id?: string|null
+          image_url: string
+          media_url?: string|null
+          media_kind?: string|null
+          price_eth?: number
+          copies?: number|null
+          per_wallet?: number|null
+          sale_end?: string|null
+          in_marketplace?: boolean
+          key_ring?: string|null
+          status?: string
+          chain?: string
+          contract_address?: string|null
+          token_id?: number|null
+          minter_address?: string|null
+          contract_version?: string|null
+          payout_wallet?: string|null
+          tx_hash?: string|null
+          metadata_uri?: string|null
+          status_note?: string|null
+          minted_at?: string|null
+          verified_at?: string|null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          world_slug?: string
+          world_id?: string|null
+          owner_id?: string|null
+          artist_id?: string|null
+          kind?: string
+          title?: string
+          description?: string
+          song_id?: string|null
+          image_url?: string
+          media_url?: string|null
+          media_kind?: string|null
+          price_eth?: number
+          copies?: number|null
+          per_wallet?: number|null
+          sale_end?: string|null
+          in_marketplace?: boolean
+          key_ring?: string|null
+          status?: string
+          chain?: string
+          contract_address?: string|null
+          token_id?: number|null
+          minter_address?: string|null
+          contract_version?: string|null
+          payout_wallet?: string|null
+          tx_hash?: string|null
+          metadata_uri?: string|null
+          status_note?: string|null
+          minted_at?: string|null
+          verified_at?: string|null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
