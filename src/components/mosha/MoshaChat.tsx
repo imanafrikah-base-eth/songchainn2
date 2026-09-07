@@ -1,13 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SendHorizontal, Sparkles, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
 import { askMosha, MOSHA_INTRO, type MoshaTurn } from '@/lib/mosha';
+import { useAuth } from '@/context/AuthContext';
 
 const STARTERS = [
   'What is this place?',
   'How do I get closer to an artist?',
   'What can I do without a wallet?',
   'How do I put my music out?',
+  'How do I switch to my artist account?',
 ];
+
+/**
+ * Some questions deserve a door, not just an answer. When the person asks how
+ * to become an artist, claim their page, switch accounts or why they cannot
+ * upload, Mo's reply carries the button that does it. Decided here, on the
+ * words, so the button is never left to a model's mood.
+ */
+const ARTIST_ACCOUNT_ASK = /(artist account|artist profile|claim|switch (to|my) artist|become an artist|upload|put (my|our) (music|song|record)s? out|release (my|a) (song|record|track)|studio)/i;
+
+interface ChatTurn extends MoshaTurn {
+  action?: { label: string; to: string };
+}
 
 /**
  * The chat with Mo$ha, wherever it opens: the tab, the landing page, a room.
@@ -29,7 +44,8 @@ export function MoshaChat({
   initial?: MoshaTurn[];
   compact?: boolean;
 }) {
-  const [turns, setTurns] = useState<MoshaTurn[]>(initial ?? []);
+  const { isArtist } = useAuth();
+  const [turns, setTurns] = useState<ChatTurn[]>(initial ?? []);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -43,16 +59,21 @@ export function MoshaChat({
     async (text: string) => {
       const clean = text.trim();
       if (!clean || busy) return;
-      const next: MoshaTurn[] = [...turns, { role: 'user', content: clean }];
+      const next: ChatTurn[] = [...turns, { role: 'user', content: clean }];
       setTurns(next);
       setDraft('');
       setBusy(true);
-      const reply = await askMosha(next, 'bubble');
-      setTurns((prev) => [...prev, { role: 'assistant', content: reply }]);
+      const reply = await askMosha(next.map(({ role, content }) => ({ role, content })), 'bubble');
+      const action = ARTIST_ACCOUNT_ASK.test(clean)
+        ? isArtist
+          ? { label: 'Open the Studio', to: '/studio' }
+          : { label: 'Switch to artist account', to: '/claim' }
+        : undefined;
+      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action }]);
       setBusy(false);
       input.current?.focus();
     },
-    [busy, turns],
+    [busy, turns, isArtist],
   );
 
   return (
@@ -72,7 +93,18 @@ export function MoshaChat({
       <div ref={scroller} className="flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
         <Bubble role="assistant">{MOSHA_INTRO}</Bubble>
         {turns.map((t, i) => (
-          <Bubble key={i} role={t.role}>{t.content}</Bubble>
+          <Bubble key={i} role={t.role}>
+            {t.content}
+            {t.action && (
+              <Link
+                to={t.action.to}
+                onClick={onClose}
+                className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground"
+              >
+                <Mic2 className="h-3.5 w-3.5" /> {t.action.label}
+              </Link>
+            )}
+          </Bubble>
         ))}
         {busy && (
           <Bubble role="assistant">
