@@ -54,6 +54,7 @@ const price = arg("price", "0.0005");
 const copies = Number(arg("copies", "100"));
 const title = arg("title", "");
 const description = arg("description", "");
+const worldName = arg("world-name", "IMan Afrikah");
 
 if (!SERVICE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY missing");
 if (!ownerId || !/^0x[0-9a-fA-F]{40}$/.test(payout)) throw new Error("--owner and --payout are required");
@@ -103,7 +104,7 @@ const row = (await rest("/rest/v1/world_nfts", {
     artist_id: artistId,
     kind: "song",
     title: dropTitle,
-    description: description || `${dropTitle} by ${song.artist ?? "IMan Afrikah"}. The record, as a token on Base, made in ${worldSlug.replace(/-/g, " ")} world on SONGCHAINN.`,
+    description: description || `${dropTitle} by ${song.artist ?? "IMan Afrikah"}. The record, as a token on Base, made in ${worldName} World on SONGCHAINN.`,
     song_id: songId,
     image_url: imageUrl,
     media_url: audioUrl ?? null,

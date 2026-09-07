@@ -41,6 +41,32 @@ async function client() {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Worlds defined in code (src/worlds/registry.ts) have no worlds row, so their
+ * display name is mirrored here. A world built in the builder has a row and
+ * never reaches this table.
+ */
+const CODE_WORLD_NAMES: Record<string, string> = {
+  'iman-afrikah': 'IMan Afrikah',
+};
+
+function titleCase(slug: string): string {
+  return slug.split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+}
+
+/** The MIME type a wallet should expect, from the file itself, not a guess. */
+function mimeFor(url: string, kind: string | null): string | null {
+  const ext = (url.split('?')[0].split('#')[0].match(/\.([a-z0-9]+)$/i)?.[1] ?? '').toLowerCase();
+  const table: Record<string, string> = {
+    wav: 'audio/wav', mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg',
+    oga: 'audio/ogg', flac: 'audio/flac', opus: 'audio/opus', aiff: 'audio/aiff', aif: 'audio/aiff',
+    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/mp4',
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif',
+  };
+  if (table[ext]) return table[ext];
+  return kind === 'audio' ? 'audio/mpeg' : kind === 'video' ? 'video/mp4' : null;
+}
+
 export default async function handler(req: any, res: any) {
   const id = String(req.query?.id || '').trim();
   const world = String(req.query?.world || '').trim().toLowerCase();
@@ -55,7 +81,7 @@ export default async function handler(req: any, res: any) {
       .select('slug, artist_name, positioning, hero_image')
       .eq('slug', world)
       .maybeSingle();
-    const name = (data as any)?.artist_name || world.replace(/-/g, ' ');
+    const name = (data as any)?.artist_name || CODE_WORLD_NAMES[world] || titleCase(world);
     return send(res, 200, {
       name: `${name} World`,
       description:
@@ -81,11 +107,17 @@ export default async function handler(req: any, res: any) {
     return send(res, 404, { error: 'No such drop' });
   }
 
+  // The world's name: its row if it was built, the code table if it is World
+  // #001, the slug as a last resort. The artist is named the same way when
+  // there is no payout row to read the name from.
+  const { data: worldRow } = await db.from('worlds').select('artist_name').eq('slug', d.world_slug).maybeSingle();
+  const worldName = (worldRow as any)?.artist_name || CODE_WORLD_NAMES[d.world_slug] || titleCase(d.world_slug);
   let artist = '';
   if (d.artist_id) {
     const { data: a } = await db.from('artist_wallets').select('artist_name').eq('artist_id', d.artist_id).maybeSingle();
     artist = (a as any)?.artist_name || '';
   }
+  if (!artist) artist = worldName;
 
   const attributes: Array<{ trait_type: string; value: string | number }> = [
     { trait_type: 'Kind', value: d.kind },
@@ -98,16 +130,15 @@ export default async function handler(req: any, res: any) {
 
   const meta: Record<string, unknown> = {
     name: d.title,
-    description: d.description || `${d.title}, made in ${d.world_slug.replace(/-/g, ' ')} world on SONGCHAINN.`,
+    description: d.description || `${d.title}, made in ${worldName} World on SONGCHAINN.`,
     image: d.image_url,
     external_url: `${ORIGIN}/w/${d.world_slug}`,
     attributes,
   };
   if (d.media_url) {
     meta.animation_url = d.media_url;
-    if (d.media_kind === 'audio' || d.media_kind === 'video') {
-      meta.content = { mime: d.media_kind === 'audio' ? 'audio/mpeg' : 'video/mp4', uri: d.media_url };
-    }
+    const mime = mimeFor(d.media_url, d.media_kind);
+    if (mime) meta.content = { mime, uri: d.media_url };
   }
   return send(res, 200, meta);
 }
