@@ -18,7 +18,7 @@ const STARTERS = [
  * upload, Mo's reply carries the button that does it. Decided here, on the
  * words, so the button is never left to a model's mood.
  */
-const ARTIST_ACCOUNT_ASK = /(artist account|artist profile|claim|switch (to|my) artist|become an artist|upload|put (my|our) (music|song|record)s? out|release (my|a) (song|record|track)|studio)/i;
+const ARTIST_ACCOUNT_ASK = /\b(artist account|artist profile|claim|switch\s+(?:to\s+)?(?:my\s+)?artist|become an artist|upload|put\s+(?:my|our)\s+(?:music|songs?|records?)\s+out|release\s+(?:my|a)\s+(?:song|record|track)|studio)\b/i;
 
 interface ChatTurn extends MoshaTurn {
   action?: { label: string; to: string };

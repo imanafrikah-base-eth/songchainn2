@@ -142,6 +142,30 @@ export async function getSellQuote(params: {
 }
 
 /**
+ * Estimate how many coins a spend of ETH would buy, without submitting a trade.
+ * Returns null when there is no quote (no liquidity, wrong address); callers say
+ * "no quote yet" rather than inventing a number.
+ */
+export async function getBuyQuote(params: {
+  coinAddress: Address;
+  ethAmount: string;
+  userAddress: Address;
+}): Promise<bigint | null> {
+  try {
+    const quote = await createQuote({
+      sell: { type: 'eth' },
+      buy: { type: 'erc20', address: params.coinAddress },
+      amountIn: parseEther(params.ethAmount),
+      sender: params.userAddress,
+    });
+    if (!quote.success || !quote.quote?.amountOut) return null;
+    return BigInt(quote.quote.amountOut);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Real on-chain ERC-20 balance check for a song coin (replaces the old fake ERC-1155 balanceOf).
  */
 export async function getCoinTokenBalance(coinAddress: Address, userAddress: Address): Promise<bigint> {

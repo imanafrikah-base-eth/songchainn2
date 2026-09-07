@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { GetKeyModal } from '@/worlds/components/GetKeyModal';
+import { getArtistCoin } from '@/lib/artistCoins';
 import { Link } from 'react-router-dom';
 import { ArrowRight, DoorOpen, Glasses, Volume2, VolumeX } from 'lucide-react';
 import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
@@ -592,6 +594,8 @@ export function DoorwayCtaGuest({
  */
 export function DoorwayCtaMember() {
   const world = IMAN_AFRIKAH_WORLD;
+  const coin = getArtistCoin(world.artistId);
+  const [keyOpen, setKeyOpen] = useState(false);
   return (
     <div className="flex flex-col gap-3">
       <div>
@@ -607,13 +611,21 @@ export function DoorwayCtaMember() {
         {/* No buy link inside the Android shell: Play reads "buy to unlock"
             as selling access outside its billing. The words stay; the sale
             happens in the person's own wallet. See ANDROID.md. */}
-        {world.swapUrl && !isNativeApp() && (
-          <Button asChild className="h-10 rounded-full px-6 text-sm font-semibold">
-            <a href={world.swapUrl} target="_blank" rel="noopener noreferrer">
+        {coin && !isNativeApp() && (
+          <>
+            <Button className="h-10 rounded-full px-6 text-sm font-semibold" onClick={() => setKeyOpen(true)}>
               Get {world.tokenSymbol}
               <ArrowRight className="ml-1.5 h-4 w-4" />
-            </a>
-          </Button>
+            </Button>
+            <GetKeyModal
+              open={keyOpen}
+              onOpenChange={setKeyOpen}
+              coinAddress={coin.coinAddress}
+              symbol={world.tokenSymbol}
+              artistName={world.artistName}
+              worldSlug={world.slug}
+            />
+          </>
         )}
         <Button
           asChild

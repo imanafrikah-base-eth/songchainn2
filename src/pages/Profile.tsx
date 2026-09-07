@@ -1115,16 +1115,18 @@ export default function Profile() {
           {isEditing ? (
             <div className="space-y-4 rounded-2xl border border-border/70 bg-card/60 p-4 sm:p-5">
               <div className="space-y-1.5">
-                <Label htmlFor="profile-display-name">Display Name</Label>
+                <Label htmlFor="profile-display-name">{isArtist ? 'Artist name' : 'Display Name'}</Label>
                 <Input
                   id="profile-display-name"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="How should people see your name?"
+                  placeholder={isArtist ? 'The name on your artist page' : 'How should people see your name?'}
                   maxLength={50}
                 />
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-destructive">{fieldErrors.displayName || ''}</span>
+                  <span className={fieldErrors.displayName ? 'text-destructive' : 'text-muted-foreground'}>
+                    {fieldErrors.displayName || (isArtist ? 'Your artist page, your world and your drops all carry this name.' : '')}
+                  </span>
                   <span className="text-muted-foreground">{displayName.trim().length}/50</span>
                 </div>
               </div>

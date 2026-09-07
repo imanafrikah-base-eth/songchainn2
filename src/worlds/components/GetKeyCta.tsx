@@ -1,41 +1,65 @@
-// The way in. Pre-launch it says so honestly; once the token is live it links
-// to the coin. Copy rule: access and belonging, never price.
+// The way in. Pre-launch it says so honestly; once the token is live the
+// button buys the key right here, in the person's own wallet (GetKeyModal).
+// Copy rule: access and belonging, never price.
 //
-// INSIDE THE ANDROID SHELL there is no link at all. Google Play reads "buy
-// this to unlock that room" as selling digital access outside Play Billing,
-// so the native build only ever reads a balance the person already holds in
-// their own wallet. The words still say what the key is; they just do not
-// sell it. See ANDROID.md, "Watch the Play Billing line".
+// INSIDE THE ANDROID SHELL there is no buy button at all. Google Play reads
+// "buy this to unlock that room" as selling digital access outside Play
+// Billing, so the native build only ever reads a balance the person already
+// holds in their own wallet. The words still say what the key is; they just
+// do not sell it. See ANDROID.md, "Watch the Play Billing line".
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { KeyRound, ExternalLink } from 'lucide-react';
 import type { WorldConfig, WorldRings } from '../types';
 import { isNativeApp } from '@/lib/native';
+import { getArtistCoin } from '@/lib/artistCoins';
+import { GetKeyModal } from './GetKeyModal';
 
 export function GetKeyCta({
   world,
   rings,
   compact = false,
+  onBought,
 }: {
   world: WorldConfig;
   rings: WorldRings | null;
   compact?: boolean;
+  /** The world re-reads its doors after a key lands. */
+  onBought?: () => void;
 }) {
   const tokenLive = rings?.tokenLive ?? false;
   const native = isNativeApp();
-  const liveSwapUrl = tokenLive && world.swapUrl && !native ? world.swapUrl : null;
+  const coin = getArtistCoin(world.artistId);
+  const canBuy = tokenLive && !!coin && !native;
+  const [open, setOpen] = useState(false);
+
+  const modal = coin ? (
+    <GetKeyModal
+      open={open}
+      onOpenChange={setOpen}
+      coinAddress={coin.coinAddress}
+      symbol={world.tokenSymbol}
+      artistName={world.artistName}
+      thresholds={rings?.thresholds ?? null}
+      worldSlug={world.slug}
+      onBought={onBought}
+    />
+  ) : null;
 
   if (compact) {
-    if (liveSwapUrl) {
+    if (canBuy) {
       return (
-        <a
-          href={liveSwapUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-4 py-2 text-xs font-bold text-black transition hover:bg-amber-300"
-        >
-          <KeyRound className="h-3.5 w-3.5" /> Get {world.tokenSymbol}
-        </a>
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-4 py-2 text-xs font-bold text-black transition hover:bg-amber-300"
+          >
+            <KeyRound className="h-3.5 w-3.5" /> Get {world.tokenSymbol}
+          </button>
+          {modal}
+        </>
       );
     }
     return (
@@ -59,15 +83,14 @@ export function GetKeyCta({
         <Link to="/keys" className="underline underline-offset-4 hover:text-white">How keys work</Link>. A key is access, not an investment, and its price can fall to nothing.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        {liveSwapUrl ? (
-          <a
-            href={liveSwapUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+        {canBuy ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-bold text-black transition hover:bg-amber-300"
           >
-            Get {world.tokenSymbol} <ExternalLink className="h-3.5 w-3.5" />
-          </a>
+            <KeyRound className="h-4 w-4" /> Get {world.tokenSymbol}
+          </button>
         ) : (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-5 py-2 text-sm font-semibold text-amber-300">
             {tokenLive
@@ -86,6 +109,7 @@ export function GetKeyCta({
           </a>
         )}
       </div>
+      {modal}
     </div>
   );
 }

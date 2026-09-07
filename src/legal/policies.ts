@@ -364,6 +364,8 @@ export const CONSENT_LINES: Record<string, string> = {
     'By buying this you accept that value can fall, including to nothing, that the transaction is final and cannot be reversed by anyone, and that SONGCHAINN neither holds your funds nor guarantees any return.',
   collect_risk:
     'By collecting this you mint an NFT on Base with your own wallet. You pay the price the artist set plus network and protocol fees, the transaction is final, and SONGCHAINN neither holds your funds nor guarantees any value. What you get is the token and whatever the artist says it opens.',
+  key_risk:
+    'By getting this key you buy the artist\'s coin on Base with your own wallet, on a market SONGCHAINN does not run. A key is access, not an investment: its price can fall to nothing, the trade is final, and SONGCHAINN neither holds your funds nor guarantees any door stays open if you sell.',
   drop_risk:
     'By making this drop you deploy it with your own wallet and you own the contract. The price, the copies and what holders get are your promises to keep. You confirm the song, artwork or content is yours to sell. SONGCHAINN provides the tool and takes no position in it.',
   messaging:

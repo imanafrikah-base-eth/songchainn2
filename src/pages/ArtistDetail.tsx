@@ -32,7 +32,8 @@ import { useArtistGallery } from '@/hooks/useArtistMedia';
 import type { SocialPostWithProfile } from '@/types/social';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import { useArtistCoinHolding, HOLDER_PERK_USD } from '@/hooks/useArtistCoinHolding';
-import { zoraCoinUrl } from '@/lib/artistCoins';
+import { GetKeyModal } from '@/worlds/components/GetKeyModal';
+import { WORLDS } from '@/worlds/registry';
 import { isNativeApp } from '@/lib/native';
 import {
   DropdownMenu,
@@ -144,6 +145,7 @@ export default function ArtistDetail() {
   // their coin, read from the wallet on the account. The artist always sees
   // their own.
   const holding = useArtistCoinHolding(id);
+  const [keyOpen, setKeyOpen] = useState(false);
 
   const { data: artistProfile } = useQuery({
     queryKey: ['artist-public-profile', ownerUserId],
@@ -780,7 +782,17 @@ export default function ArtistDetail() {
                       {!holding.wallet ? (
                         <Link to="/profile" className="underline underline-offset-4 hover:text-foreground">Link a wallet</Link>
                       ) : !isNativeApp() ? (
-                        <a href={zoraCoinUrl(holding.coin.coinAddress)} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-foreground">Get the coin</a>
+                        <>
+                          <button type="button" onClick={() => setKeyOpen(true)} className="underline underline-offset-4 hover:text-foreground">Get the coin</button>
+                          <GetKeyModal
+                            open={keyOpen}
+                            onOpenChange={setKeyOpen}
+                            coinAddress={holding.coin.coinAddress}
+                            symbol={WORLDS.find((w) => w.artistId === artist.id)?.tokenSymbol ?? `${holding.coin.zoraHandle.toUpperCase()}`}
+                            artistName={artist.name}
+                            worldSlug={WORLDS.find((w) => w.artistId === artist.id)?.slug ?? null}
+                          />
+                        </>
                       ) : null}
                     </p>
                   ) : null}

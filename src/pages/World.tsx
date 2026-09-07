@@ -271,7 +271,7 @@ function WorldInner({ world, segment }: { world: WorldConfig; segment?: string }
             </div>
 
             <div className="mt-8">
-              <GetKeyCta world={world} rings={rings} />
+              <GetKeyCta world={world} rings={rings} onBought={refresh} />
             </div>
           </>
         ) : (
@@ -459,7 +459,7 @@ function CityView({
       )}
 
       <div className="mt-8">
-        <GetKeyCta world={world} rings={rings} />
+        <GetKeyCta world={world} rings={rings} onBought={onRefresh} />
       </div>
     </>
   );

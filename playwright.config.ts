@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // e2e/live runs against the production site and only on purpose:
+  //   npx playwright test --config playwright.live.config.ts
+  testIgnore: ["**/live/**"],
   // 60s per test: the suite runs against the Vite dev server, which compiles
   // routes on first visit and serves hundreds of modules unbundled.
   timeout: 60_000,
