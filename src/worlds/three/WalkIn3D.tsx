@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { lazyWithRecovery } from '@/lib/chunkRecovery';
 import { Box, Headset } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { BlockInstance } from '@/worlds/blocks';
@@ -16,7 +17,7 @@ import type { BlockInstance } from '@/worlds/blocks';
  *     "Enter VR" button that does nothing is worse than no button.
  */
 
-const WorldStage = lazy(() => import('./WorldStage'));
+const WorldStage = lazyWithRecovery(() => import('./WorldStage'));
 
 /** Cheap, cached probe. Creating a context per render would be its own bug. */
 let webglSupport: boolean | null = null;

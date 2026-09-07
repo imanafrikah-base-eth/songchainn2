@@ -1,4 +1,5 @@
 import { Component, ReactNode } from 'react';
+import { isRecoverableLoadError, recoverFromStaleBuild } from '@/lib/chunkRecovery';
 
 interface Props {
   children: ReactNode;
@@ -11,6 +12,8 @@ interface State {
   componentStack: string;
   showDetails: boolean;
   copied: boolean;
+  /** A stale-build reload is on its way; show a quiet screen, not a crash. */
+  recovering: boolean;
 }
 
 const EMPTY: State = {
@@ -19,6 +22,7 @@ const EMPTY: State = {
   componentStack: '',
   showDetails: false,
   copied: false,
+  recovering: false,
 };
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -34,6 +38,12 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: { componentStack: string }) {
     console.error('[App] Uncaught render error:', error.message);
     console.error('[App] Component stack:', info.componentStack);
+    // A chunk that no longer exists means this page is older than the build
+    // that is live. That is not a crash worth showing: fetch the new build.
+    if (isRecoverableLoadError(error) && recoverFromStaleBuild()) {
+      this.setState({ componentStack: info.componentStack || '', recovering: true });
+      return;
+    }
     this.setState({ componentStack: info.componentStack || '' });
   }
 
@@ -106,6 +116,24 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      if (this.state.recovering) {
+        return (
+          <div
+            style={{
+              minHeight: '100vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'hsl(220 8% 7%)',
+              color: 'hsl(215 20% 55%)',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontSize: '0.875rem',
+            }}
+          >
+            Loading the latest version...
+          </div>
+        );
+      }
       if (this.props.fallback) return this.props.fallback;
 
       const ghostButton = {
@@ -153,7 +181,9 @@ export class ErrorBoundary extends Component<Props, State> {
               Something went wrong
             </h1>
             <p style={{ color: 'hsl(215 20% 55%)', fontSize: '0.875rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-              The app hit an unexpected error. Reload to continue.
+              {isRecoverableLoadError(this.state.error)
+                ? 'A newer version of the app is live. Reload to pick it up.'
+                : 'The app hit an unexpected error. Reload to continue.'}
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>

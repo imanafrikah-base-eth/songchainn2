@@ -13,6 +13,7 @@ import { initNativeShell } from "./lib/nativeShell";
 import { installImageFallback } from "./lib/imageFallback";
 import { installStorageShim } from "./lib/storageShim";
 import { capturePendingReferralCode } from "./hooks/useReferrals";
+import { installLoadErrorRecovery } from "./lib/chunkRecovery";
 
 // FIRST, ahead of every other line in this file.
 //
@@ -52,79 +53,9 @@ if (import.meta.env.DEV) {
   checkSupabaseReachability();
 }
 
-if (typeof window !== "undefined" && import.meta.env.PROD) {
-  const AUTO_RELOAD_COUNT_KEY = "__songchainn_reload_count";
-  const AUTO_RELOAD_TS_KEY = "__songchainn_reload_at";
-  const AUTO_RELOAD_WINDOW_MS = 60_000;
-  const MAX_AUTO_RELOADS = 2;
-
-  const canAutoReload = () => {
-    try {
-      const count = Number(sessionStorage.getItem(AUTO_RELOAD_COUNT_KEY) || "0");
-      if (count >= MAX_AUTO_RELOADS) return false;
-      const last = Number(sessionStorage.getItem(AUTO_RELOAD_TS_KEY) || "0");
-      return !last || Date.now() - last > AUTO_RELOAD_WINDOW_MS;
-    } catch {
-      return false;
-    }
-  };
-
-  const markAutoReload = () => {
-    try {
-      const count = Number(sessionStorage.getItem(AUTO_RELOAD_COUNT_KEY) || "0");
-      sessionStorage.setItem(AUTO_RELOAD_COUNT_KEY, String(count + 1));
-      sessionStorage.setItem(AUTO_RELOAD_TS_KEY, String(Date.now()));
-    } catch {
-      void 0;
-    }
-  };
-
-  const isRecoverableLoadError = (value: unknown) => {
-    const message =
-      typeof value === "string"
-        ? value
-        : value && typeof value === "object" && "message" in value
-          ? String((value as any).message)
-          : "";
-
-    const normalized = message.toLowerCase();
-    return (
-      normalized.includes("loading chunk") ||
-      normalized.includes("chunkloaderror") ||
-      normalized.includes("failed to fetch dynamically imported module") ||
-      normalized.includes("importing a module script failed") ||
-      normalized.includes("error loading dynamically imported module")
-    );
-  };
-
-  const tryAutoReload = () => {
-    if (!canAutoReload()) return;
-    markAutoReload();
-    const reload = () => window.location.reload();
-    if (import.meta.env.PROD && "serviceWorker" in navigator) {
-      Promise.all([
-        navigator.serviceWorker.getRegistrations().then((regs) => Promise.all(regs.map((r) => r.unregister()))),
-        typeof caches !== "undefined" && caches.keys ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))) : Promise.resolve([]),
-      ])
-        .catch((err) => { if (import.meta.env.DEV) console.warn('[sw-reset]', err); })
-        .finally(reload);
-      return;
-    }
-    reload();
-  };
-
-  window.addEventListener("error", (event) => {
-    if (isRecoverableLoadError((event as ErrorEvent).error) || isRecoverableLoadError((event as ErrorEvent).message)) {
-      tryAutoReload();
-    }
-  });
-
-  window.addEventListener("unhandledrejection", (event) => {
-    if (isRecoverableLoadError((event as PromiseRejectionEvent).reason)) {
-      tryAutoReload();
-    }
-  });
-}
+// Stale-build recovery for chunk failures that escape React. The lazy routes
+// and the error boundary use the same helper, see src/lib/chunkRecovery.ts.
+installLoadErrorRecovery();
 
 if (typeof window !== "undefined" && typeof window.fetch === "function") {
   const originalFetch = window.fetch.bind(window);

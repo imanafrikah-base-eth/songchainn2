@@ -15,14 +15,15 @@
 // offered the same scene without the headset. On a phone neither appears, and
 // the flat map is the world.
 
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, useState } from 'react';
+import { lazyWithRecovery } from '@/lib/chunkRecovery';
 import { Box, Glasses, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { WorldConfig } from '../types';
 import { useXRSupport } from '../useXRSupport';
 import type { CityTheme } from '../useCityTheme';
 
-const World3DOverlay = lazy(() => import('./WorldScene3D'));
+const World3DOverlay = lazyWithRecovery(() => import('./WorldScene3D'));
 
 export function EnterVR({ world, theme }: { world: WorldConfig; theme: CityTheme }) {
   const support = useXRSupport();
