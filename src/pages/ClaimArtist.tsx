@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeCheck, Check, Loader2, Mic2, RefreshCw, Search } from 'lucide-react';
-import { toast } from 'sonner';
 import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { useAuth } from '@/context/AuthContext';
+import { useBecomeArtist } from '@/hooks/useBecomeArtist';
 import { supabase } from '@/integrations/supabase/client';
 import { ARTISTS } from '@/data/musicData';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
@@ -14,32 +14,23 @@ import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 /**
  * /claim: how a person with a listening account becomes the artist they are.
  *
- * An artist account is never self-declared. It is a row in artist_accounts,
- * written for a person by the founder, because he recorded most of this
- * catalogue himself and knows who is who. What a person CAN do is ask: pick
- * their page from the catalogue and say "this is me", or say they are new
- * here and want a page of their own. Both land in Admin > Claims; approval
- * hands the page over and this same account becomes the artist account on
- * the next load. Nothing changes for the listening side of it.
+ * Two doors, and only one of them is guarded. Claiming a page that already
+ * exists in the catalogue (an artist somebody could be pretending to be)
+ * files an artist_claims row and waits for Admin > Claims; approval hands the
+ * page over. A page of your OWN needs nobody's approval: "New here?" calls
+ * become_artist and this account is an artist account right now, with an id
+ * of its own. Until 9 Sep 2026 that second door was also a review queue, and
+ * a new musician's first hour on SONGCHAINN was a form and a wait.
  */
 
 type Claim = { id: string; artist_id: string; status: 'pending' | 'approved' | 'rejected'; created_at: string };
 
 export default function ClaimArtist() {
-  const { user, isArtist, artistId, refreshArtistStatus, audienceProfile } = useAuth();
+  const { user, isArtist, artistId, refreshArtistStatus } = useAuth();
+  const { becomeArtist, pending: becoming } = useBecomeArtist();
   const queryClient = useQueryClient();
   const { artists: published } = usePublishedCatalog();
   const [q, setQ] = useState('');
-  const [newName, setNewName] = useState('');
-  /* The name box used to show their profile name as a placeholder, which reads
-     as already filled in. People typed their links, pressed send, and were told
-     "Tell us your artist name" with the name sitting right there in grey. Now
-     the profile name is the value, and they can change it. */
-  useEffect(() => {
-    if (!newName && audienceProfile?.profile_name) setNewName(audienceProfile.profile_name);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audienceProfile?.profile_name]);
-  const [newMessage, setNewMessage] = useState('');
   const [checking, setChecking] = useState(false);
 
   const catalogue = useMemo(() => {
@@ -79,30 +70,6 @@ export default function ClaimArtist() {
   });
 
   const newArtistId = user ? `u-${user.id}` : '';
-  const newClaim = mine.find((c) => c.artist_id === newArtistId);
-
-  const applyNew = useMutation({
-    mutationFn: async () => {
-      if (!user) throw new Error('Sign in first');
-      const name = newName.trim();
-      if (name.length < 2) throw new Error('Tell us your artist name');
-      const { error } = await supabase.from('artist_claims').insert({
-        artist_id: newArtistId,
-        user_id: user.id,
-        status: 'pending',
-        message: `NEW ARTIST: ${name}${newMessage.trim() ? `\n${newMessage.trim()}` : ''}`,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['my-artist-claims', user?.id] });
-      toast.success('Sent', { description: 'We will look at this and get back to you.' });
-    },
-    onError: (e: unknown) => {
-      const msg = e instanceof Error ? e.message : 'Please try again.';
-      toast.error('Could not send that', { description: /duplicate|unique/i.test(msg) ? 'You have already asked.' : msg });
-    },
-  });
 
   const checkAgain = async () => {
     setChecking(true);
@@ -131,7 +98,7 @@ export default function ClaimArtist() {
           <p className="mt-3 max-w-prose text-muted-foreground">
             {isArtist
               ? 'The Studio, the launcher, your world and your drops are all open to you.'
-              : 'A listening account and an artist account are the same account. Claim your page and, once we confirm it is you, this account runs it: the Studio, your world, your drops.'}
+              : 'A listening account and an artist account are the same account. Make music? Open your Studio and it is yours right now. Already have a page on here? Claim it and we hand it over once we confirm it is you.'}
           </p>
         </header>
 
@@ -181,7 +148,7 @@ export default function ClaimArtist() {
               </label>
               <ul className="mt-3 divide-y divide-border rounded-xl border border-border bg-card">
                 {filtered.length === 0 ? (
-                  <li className="px-4 py-6 text-center text-sm text-muted-foreground">No page by that name. If you are new here, use the form below.</li>
+                  <li className="px-4 py-6 text-center text-sm text-muted-foreground">No page by that name. If you are new here, open your Studio below.</li>
                 ) : (
                   filtered.map((a) => {
                     const taken = owned[a.id] === true;
@@ -214,35 +181,11 @@ export default function ClaimArtist() {
             <section className="rounded-2xl border border-border bg-card p-5">
               <h2 className="font-heading text-lg font-semibold text-foreground">New here?</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Ask for a page of your own. Say who you are and where we can hear you; we answer every one.
+                A page of your own needs nobody's approval. Open your Studio and this account becomes your artist account right now; the first record you send goes live the same minute.
               </p>
-              {newClaim?.status === 'pending' ? (
-                <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Your request is under review
-                </p>
-              ) : newClaim?.status === 'rejected' ? (
-                <p className="mt-4 text-sm text-muted-foreground">We could not approve this one. Write to songchaindao@gmail.com if you think we got it wrong.</p>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  <input
-                    className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-ring"
-                    placeholder="Your artist name"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    maxLength={80}
-                  />
-                  <textarea
-                    className="min-h-[90px] w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-ring"
-                    placeholder="Links to your music, your socials, who you have worked with. Anything that makes this easy to confirm."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    maxLength={600}
-                  />
-                  <Button onClick={() => applyNew.mutate()} disabled={applyNew.isPending} className="gap-1.5">
-                    {applyNew.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic2 className="h-4 w-4" />} Ask for an artist page
-                  </Button>
-                </div>
-              )}
+              <Button onClick={() => void becomeArtist()} disabled={becoming} className="mt-4 gap-1.5">
+                {becoming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic2 className="h-4 w-4" />} I make music, open my Studio
+              </Button>
             </section>
           </>
         )}

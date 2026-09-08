@@ -483,13 +483,14 @@ Deno.serve(async (req) => {
   const existingArtistId = (account as { artist_id?: string } | null)?.artist_id ?? null;
   const artistId = existingArtistId as string;
 
-  // ARTISTS ONLY. An artist account is granted (Admin > Claims), never earned
-  // by pressing Upload. This used to make anybody an artist on first publish;
-  // from 7 Sep 2026 a person without an artist_accounts row is told so and
-  // nothing is written. The songs insert policy refuses them as well.
+  // ARTISTS ONLY. An artist account is a row in artist_accounts: granted from
+  // Admin > Claims for an existing page, or opened by the person themselves
+  // (become_artist, one tap from onboarding, the Studio door or their profile)
+  // for a page of their own. Pressing Upload never creates one. Without the
+  // row nothing is written, and the songs insert policy refuses them as well.
   if (!existingArtistId) {
     return json(origin, {
-      error: "The Studio is for artist accounts. Claim your page at /claim and this account becomes your artist account once we confirm it is you.",
+      error: "The Studio is for artist accounts. Open your profile and tap Switch to artist account; it takes one tap and this account becomes your artist account right now.",
     }, 403);
   }
 

@@ -12,6 +12,7 @@ import { useCompliance } from '@/hooks/useCompliance';
 import { MediaManager } from '@/components/gallery/MediaManager';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { useAuth } from '@/context/AuthContext';
+import { useBecomeArtist } from '@/hooks/useBecomeArtist';
 import { WORLD_BUILDER_ENABLED } from '@/lib/features';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -62,6 +63,7 @@ function useMyProfile() {
 
 const Studio = () => {
   const { user, isArtist, artistId } = useAuth();
+  const { becomeArtist, pending: becoming } = useBecomeArtist();
   const { data: profile } = useMyProfile();
   const { data: releases = [], isLoading } = useArtistReleases();
   const { phase, progress, error, result, upload, reset } = useTrackUpload();
