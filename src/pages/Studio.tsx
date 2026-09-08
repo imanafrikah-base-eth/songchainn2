@@ -157,11 +157,13 @@ const Studio = () => {
           <Music4 className="mx-auto h-10 w-10 text-primary mb-4" />
           <h1 className="font-heading text-2xl font-bold mb-2">The Studio is for artist accounts</h1>
           <p className="text-sm text-muted-foreground mb-6 max-w-prose mx-auto">
-            Everything else on SONGCHAINN is open to you. If you make music, claim your page and this same account becomes your artist account once we confirm it is you.
+            Everything else on SONGCHAINN is open to you. Make music? Open your Studio and this same account becomes your artist account, right now. Already have a page on here? Claim it and we hand it over once we confirm it is you.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
-            <Button asChild><Link to="/claim">Claim your artist page</Link></Button>
-            <Button asChild variant="outline"><Link to="/">Back to the music</Link></Button>
+            <Button onClick={() => void becomeArtist()} disabled={becoming} className="gap-1.5">
+              {becoming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Music4 className="h-4 w-4" />} I make music, open my Studio
+            </Button>
+            <Button asChild variant="outline"><Link to="/claim">This is my page already</Link></Button>
           </div>
         </div>
       </div>

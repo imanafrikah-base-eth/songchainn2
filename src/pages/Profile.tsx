@@ -1496,11 +1496,11 @@ export default function Profile() {
               <p className="text-xs text-muted-foreground">
                 {isArtist
                   ? 'The Studio, your world, the launcher and your drops are open to you.'
-                  : 'Claim your page and this account becomes your artist account once we confirm it is you.'}
+                  : 'Make music? Switch and your Studio opens right now: no review, no fee, no wallet needed.'}
               </p>
             </div>
             <Button asChild size="sm" variant={isArtist ? 'outline' : 'default'}>
-              <Link to={isArtist ? '/studio' : '/claim'}>{isArtist ? 'Open the Studio' : 'Switch to artist account'}</Link>
+              <Link to="/studio">{isArtist ? 'Open the Studio' : 'Switch to artist account'}</Link>
             </Button>
           </div>
           <ChangePassword />

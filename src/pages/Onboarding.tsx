@@ -35,7 +35,7 @@ const normalizeXLink = (raw: string): string | null => {
 };
 
 export default function Onboarding() {
-  const { user, refreshProfile, signOut } = useAuth();
+  const { user, refreshProfile, refreshArtistStatus, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -283,11 +283,26 @@ export default function Onboarding() {
          what writes the artist_accounts row, and that happens on first publish
          in upload-url. Nobody gets an artist page for ticking a box. */
       if (makesMusic) {
-        toast({
-          title: 'You are in. One more step.',
-          description: 'Claim your page, or ask for one, and this account becomes your artist account once we confirm it is you.',
-        });
-        navigate('/claim', { replace: true });
+        // Saying you make music IS the application. The account gets a page
+        // of its own right now (become_artist) and the Studio is the first
+        // thing they see. Claiming an EXISTING artist's page is the one thing
+        // that still goes through review, from /claim.
+        const { error: artistErr } = await supabase.rpc('become_artist' as never);
+        if (artistErr) {
+          console.error('become_artist failed at onboarding', artistErr);
+          toast({
+            title: 'You are in.',
+            description: 'Open the Studio from your profile when you are ready to send a record.',
+          });
+          navigate('/', { replace: true });
+        } else {
+          await refreshArtistStatus();
+          toast({
+            title: 'Your Studio is open',
+            description: 'Send a record and it goes live the same minute. No fee, no wallet needed.',
+          });
+          navigate('/studio', { replace: true });
+        }
       } else {
         toast({ title: 'Welcome to the Audience!' });
         navigate('/', { replace: true });
