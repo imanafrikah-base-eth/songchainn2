@@ -4,9 +4,15 @@ import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
 // OAuth client IDs are public identifiers (they ship in every page load),
 // so a baked-in fallback is safe and avoids a hard Vercel env dependency.
+// The fallback is the SAME client Supabase's Google provider is configured
+// with. It has to be: the id_token this button hands to signInWithIdToken is
+// only accepted when its audience is that client, and Google only serves the
+// button at all on origins that client lists. The old fallback was a second
+// client with no registered origin, so every phone got "Access blocked:
+// Authorization Error, no registered origin" the moment it tapped Google.
 const GOOGLE_CLIENT_ID =
   (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ||
-  '541798318088-lbu23secpl6fpu6vt3qgg2teecchdfif.apps.googleusercontent.com';
+  '541798318088-t7i3uqpdihatrf3530p58qgqpuvdej4n.apps.googleusercontent.com';
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeCheck, Check, Loader2, Mic2, RefreshCw, Search } from 'lucide-react';
@@ -31,6 +31,14 @@ export default function ClaimArtist() {
   const { artists: published } = usePublishedCatalog();
   const [q, setQ] = useState('');
   const [newName, setNewName] = useState('');
+  /* The name box used to show their profile name as a placeholder, which reads
+     as already filled in. People typed their links, pressed send, and were told
+     "Tell us your artist name" with the name sitting right there in grey. Now
+     the profile name is the value, and they can change it. */
+  useEffect(() => {
+    if (!newName && audienceProfile?.profile_name) setNewName(audienceProfile.profile_name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audienceProfile?.profile_name]);
   const [newMessage, setNewMessage] = useState('');
   const [checking, setChecking] = useState(false);
 
@@ -218,7 +226,7 @@ export default function ClaimArtist() {
                 <div className="mt-4 space-y-3">
                   <input
                     className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-ring"
-                    placeholder={audienceProfile?.profile_name || 'Your artist name'}
+                    placeholder="Your artist name"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     maxLength={80}
