@@ -7,12 +7,27 @@
 // piece already in that gallery, or a link. Video slots are the silent loops
 // that play over a still; a still is always enough.
 
-import { useRef, useState } from 'react';
-import { Image as ImageIcon, Link2, Loader2, Trash2, Upload, Film } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Image as ImageIcon, Link2, Loader2, Trash2, Upload, Film, Move } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useMediaUpload, useMyMedia } from '@/hooks/useArtistMedia';
 import { ClipVideo } from '@/worlds/builder/ClipVideo';
+import { PhotoPositioner } from '@/components/PhotoPositioner';
+import { cropImage, CENTRE_CROP, type PhotoCrop } from '@/lib/cropImage';
+
+/** The slot's shape as a number, read off its Tailwind aspect class. */
+function ratioOf(aspect: string): number {
+  if (/aspect-square/.test(aspect)) return 1;
+  const m = aspect.match(/aspect-\[(\d+)\/(\d+)\]/);
+  return m ? Number(m[1]) / Number(m[2]) : 16 / 9;
+}
+
+/** How wide the cut picture should be for this slot. */
+function outputWidthFor(ratio: number): number {
+  if (ratio === 1) return 1200;
+  return ratio > 1 ? 1920 : 1080;
+}
 
 export function ArtPicker({
   label,
@@ -37,6 +52,13 @@ export function ArtPicker({
   const [link, setLink] = useState('');
   /** A video waiting to be cut into a loop before it uploads. */
   const [clipping, setClipping] = useState<File | null>(null);
+  /** A picture waiting to be dragged into its frame before it uploads. */
+  const [framing, setFraming] = useState<File | null>(null);
+  const framingUrl = useMemo(() => (framing ? URL.createObjectURL(framing) : null), [framing]);
+  const [crop, setCrop] = useState<PhotoCrop>(CENTRE_CROP);
+  const [cutting, setCutting] = useState(false);
+  const ratio = ratioOf(aspect);
+  useEffect(() => () => { if (framingUrl) URL.revokeObjectURL(framingUrl); }, [framingUrl]);
   const busy = phase === 'preparing' || phase === 'uploading';
   const mine = media.filter((m) => m.kind === kind);
 
@@ -46,6 +68,14 @@ export function ArtPicker({
     // The artist can still send the whole thing.
     if (kind === 'video' && !opts?.cut) {
       setClipping(file);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    // A picture is dragged into the slot's frame first, the same positioner
+    // as the profile photos. A GIF keeps its motion by skipping the cut.
+    if (kind === 'image' && !opts?.cut && file.type !== 'image/gif') {
+      setFraming(file);
+      setCrop(CENTRE_CROP);
       if (fileRef.current) fileRef.current.value = '';
       return;
     }
@@ -72,6 +102,58 @@ export function ArtPicker({
           </button>
         ) : null}
       </div>
+
+      {framing && framingUrl ? (
+        <div className="mt-2 rounded-xl border border-border bg-card p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <Move className="h-4 w-4 text-primary" />
+            <p className="text-sm font-semibold text-foreground">Drag it into the frame</p>
+          </div>
+          <p className="mb-2 text-xs text-muted-foreground">
+            This is the exact shape of the slot. Slide the picture until the part you want shows; only that part uploads.
+          </p>
+          <div className={`relative w-full overflow-hidden rounded-md bg-black/40 ${aspect}`}>
+            <PhotoPositioner src={framingUrl} onChange={setCrop} className="absolute inset-0" alt={`${label} preview`} disabled={cutting} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 rounded-full text-xs"
+              disabled={cutting}
+              onClick={async () => {
+                setCutting(true);
+                try {
+                  const cut = await cropImage(framing, { ...crop, aspect: ratio }, {
+                    outputWidth: outputWidthFor(ratio),
+                    mime: framing.type === 'image/png' ? 'image/png' : 'image/jpeg',
+                    quality: 0.9,
+                    fileName: framing.name,
+                  });
+                  setFraming(null);
+                  await onFile(cut, { cut: true });
+                } catch {
+                  toast.error('That picture could not be cut', { description: 'Sending it whole instead.' });
+                  const whole = framing;
+                  setFraming(null);
+                  await onFile(whole, { cut: true });
+                } finally {
+                  setCutting(false);
+                }
+              }}
+            >
+              {cutting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Move className="mr-1 h-3.5 w-3.5" />}
+              Use this framing
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" disabled={cutting} onClick={() => { const whole = framing; setFraming(null); void onFile(whole, { cut: true }); }}>
+              Use the whole picture
+            </Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8 rounded-full text-xs" disabled={cutting} onClick={() => setFraming(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {clipping ? (
         <div className="mt-2">
