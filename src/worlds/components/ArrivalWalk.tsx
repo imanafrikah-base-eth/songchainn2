@@ -13,6 +13,7 @@
 //     get ill or disoriented, so it is honoured completely, not softened.
 
 import { useEffect, useRef, useState } from 'react';
+import { fitStyle, type ArtFit } from '@/lib/artFit';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { AvatarConfig } from '../avatars';
 import { CitizenAvatar } from './CitizenAvatar';
@@ -40,6 +41,7 @@ export function ArrivalWalk({
   avatar,
   accent,
   entrance,
+  fit,
 }: {
   worldSlug: string;
   worldName: string;
@@ -54,6 +56,8 @@ export function ArrivalWalk({
    * arrives.
    */
   entrance?: { poster: string; video?: string };
+  /** How the artist framed the doors: focus and zoom. */
+  fit?: ArtFit;
 }) {
   const reduceMotion = useReducedMotion();
   const [playing, setPlaying] = useState(
@@ -89,7 +93,7 @@ export function ArrivalWalk({
         >
           {/* The doors. Filmed ones if this world has them, drawn ones if not. */}
           {entrance ? (
-            <FilmedDoors entrance={entrance} />
+            <FilmedDoors entrance={entrance} fit={fit} />
           ) : (
             <>
               <motion.div
@@ -162,7 +166,7 @@ export function ArrivalWalk({
  * Nobody who asked for less motion reaches this component at all; the parent
  * has already decided not to play an arrival for them.
  */
-function FilmedDoors({ entrance }: { entrance: { poster: string; video?: string } }) {
+function FilmedDoors({ entrance, fit }: { entrance: { poster: string; video?: string }; fit?: ArtFit }) {
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -178,7 +182,7 @@ function FilmedDoors({ entrance }: { entrance: { poster: string; video?: string 
       animate={{ scale: 1.06 }}
       transition={{ duration: 2.2, ease: 'easeOut' }}
     >
-      <img src={entrance.poster} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <img src={entrance.poster} alt="" className="absolute inset-0 h-full w-full object-cover" style={fitStyle(fit)} />
       {entrance.video && (
         <video
           ref={ref}
@@ -188,6 +192,7 @@ function FilmedDoors({ entrance }: { entrance: { poster: string; video?: string 
           playsInline
           preload="auto"
           className="absolute inset-0 h-full w-full object-cover"
+          style={fitStyle(fit)}
         />
       )}
       {/* The frame darkens at the edges so the citizen reads against it. */}

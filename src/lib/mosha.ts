@@ -15,6 +15,16 @@ export interface MoshaTurn {
   content: string;
 }
 
+/** Something Mo$ha wants the app to open for the person: a flow in the chat, or a page. */
+export type MoshaAction =
+  | { type: 'flow'; flow: 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' }
+  | { type: 'go'; path: string };
+
+export interface MoshaReply {
+  reply: string;
+  action?: MoshaAction;
+}
+
 export const MOSHA_INTRO =
   "I'm Mo$ha. I know this place inside out: the music, the artists, the worlds, the battles, the coins, the keys, all of it. Ask me anything, however you want to ask it.";
 
@@ -22,18 +32,30 @@ const DROPPED =
   'My line dropped for a second. Ask me again, and if it keeps happening, songchaindao@gmail.com is a real person who will help.';
 
 export async function askMosha(turns: MoshaTurn[], surface: 'bubble' | 'inbox' = 'bubble'): Promise<string> {
+  return (await askMoshaFull(turns, surface)).reply;
+}
+
+/** The reply and, when Mo$ha wants to do something for the person, the action. */
+export async function askMoshaFull(turns: MoshaTurn[], surface: 'bubble' | 'inbox' = 'bubble'): Promise<MoshaReply> {
   if (!isSupabaseConfigured) {
-    return 'I am offline right now. Everything here still plays; come back to me in a bit.';
+    return { reply: 'I am offline right now. Everything here still plays; come back to me in a bit.' };
   }
   const page = typeof window !== 'undefined' ? pageName(window.location.pathname) : null;
   try {
     const { data, error } = await supabase.functions.invoke('mosha-chat', {
       body: { messages: turns.slice(-12), surface, page },
     });
-    if (error || !data?.reply) return DROPPED;
-    return String(data.reply);
+    if (error || !data?.reply) return { reply: DROPPED };
+    const raw = data.action as MoshaAction | undefined;
+    const action: MoshaAction | undefined =
+      raw?.type === 'flow' && ['upload_song', 'build_world', 'become_artist', 'connect_wallet', 'edit_world'].includes(raw.flow)
+        ? raw
+        : raw?.type === 'go' && typeof raw.path === 'string' && raw.path.startsWith('/')
+          ? raw
+          : undefined;
+    return { reply: String(data.reply), action };
   } catch {
-    return DROPPED;
+    return { reply: DROPPED };
   }
 }
 

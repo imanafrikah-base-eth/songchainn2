@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
-import { askMosha, MOSHA_INTRO, type MoshaTurn } from '@/lib/mosha';
+import { askMoshaFull, MOSHA_INTRO, type MoshaAction, type MoshaTurn } from '@/lib/mosha';
 import { useAuth } from '@/context/AuthContext';
+import { MoshaFlow, FLOW_LABEL, type MoshaFlowName } from '@/components/mosha/MoshaFlows';
 
 const STARTERS = [
   'What is this place?',
@@ -22,7 +23,18 @@ const ARTIST_ACCOUNT_ASK = /\b(artist account|artist profile|claim|switch\s+(?:t
 
 interface ChatTurn extends MoshaTurn {
   action?: { label: string; to: string };
+  /** A flow Mo$ha opened under this reply. */
+  flow?: MoshaFlowName;
 }
+
+/** One-tap flows for someone who would rather do than ask. */
+const DO_CHIPS: Array<{ flow: MoshaFlowName; artistOnly: boolean }> = [
+  { flow: 'upload_song', artistOnly: true },
+  { flow: 'build_world', artistOnly: true },
+  { flow: 'edit_world', artistOnly: true },
+  { flow: 'become_artist', artistOnly: false },
+  { flow: 'connect_wallet', artistOnly: false },
+];
 
 /**
  * The chat with Mo$ha, wherever it opens: the tab, the landing page, a room.
@@ -63,18 +75,28 @@ export function MoshaChat({
       setTurns(next);
       setDraft('');
       setBusy(true);
-      const reply = await askMosha(next.map(({ role, content }) => ({ role, content })), 'bubble');
-      const action = ARTIST_ACCOUNT_ASK.test(clean)
-        ? isArtist
-          ? { label: 'Open the Studio', to: '/studio' }
-          : { label: 'Switch to artist account', to: '/claim' }
-        : undefined;
-      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action }]);
+      const { reply, action: moshaAction } = await askMoshaFull(next.map(({ role, content }) => ({ role, content })), 'bubble');
+      const flow = moshaAction?.type === 'flow' ? moshaAction.flow : undefined;
+      const go = moshaAction?.type === 'go' ? moshaAction : undefined;
+      // A page Mo$ha points at gets a button; the old keyword door stays as a
+      // fallback for the account questions when the model gave no action.
+      const action = go
+        ? { label: 'Take me there', to: go.path }
+        : !flow && ARTIST_ACCOUNT_ASK.test(clean)
+          ? isArtist
+            ? { label: 'Open the Studio', to: '/studio' }
+            : { label: 'Switch to artist account', to: '/claim' }
+          : undefined;
+      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow }]);
       setBusy(false);
       input.current?.focus();
     },
     [busy, turns, isArtist],
   );
+
+  const openFlow = useCallback((flow: MoshaFlowName) => {
+    setTurns((prev) => [...prev, { role: 'assistant', content: FLOW_LABEL[flow] + '. Right here.', flow }]);
+  }, []);
 
   return (
     <div className={`flex flex-col ${compact ? 'h-[60vh] max-h-[28rem]' : 'h-[68vh] max-h-[34rem]'}`}>
@@ -93,8 +115,14 @@ export function MoshaChat({
       <div ref={scroller} className="flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
         <Bubble role="assistant">{MOSHA_INTRO}</Bubble>
         {turns.map((t, i) => (
-          <Bubble key={i} role={t.role}>
+          <Bubble key={i} role={t.role} wide={Boolean(t.flow)}>
             {t.content}
+            {t.flow && (
+              <MoshaFlow
+                flow={t.flow}
+                onClose={() => setTurns((prev) => prev.map((x, j) => (j === i ? { ...x, flow: undefined } : x)))}
+              />
+            )}
             {t.action && (
               <Link
                 to={t.action.to}
@@ -117,6 +145,11 @@ export function MoshaChat({
         )}
         {turns.length === 0 && !busy && (
           <div className="flex flex-wrap gap-1.5 pt-1">
+            {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).map((c) => (
+              <button key={c.flow} type="button" onClick={() => openFlow(c.flow)} className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20">
+                {FLOW_LABEL[c.flow]}
+              </button>
+            ))}
             {STARTERS.map((s) => (
               <button key={s} type="button" onClick={() => send(s)} className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted">
                 {s}
@@ -167,12 +200,12 @@ export function MoshaChat({
   );
 }
 
-function Bubble({ role, children }: { role: 'user' | 'assistant'; children: React.ReactNode }) {
+function Bubble({ role, children, wide = false }: { role: 'user' | 'assistant'; children: React.ReactNode; wide?: boolean }) {
   const mine = role === 'user';
   return (
     <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+        className={`${wide ? 'w-full' : 'max-w-[85%]'} whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed ${
           mine ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md bg-muted text-foreground'
         }`}
       >

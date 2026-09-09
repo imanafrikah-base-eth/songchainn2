@@ -82,9 +82,7 @@ export function WorldsPhase3({
         Artists do not get a page here. They get a world.
       </h2>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-        Streets you walk, rooms that open on a key, a stage built for live moments. World
-        #001 is {IMAN_AFRIKAH_WORLD.artistName}, and every world an artist opens takes its
-        turn below. Push the doors and see.
+        World #001 is {IMAN_AFRIKAH_WORLD.artistName}. Push the doors.
       </p>
 
       {/* 1. THE DOOR. World #001's brass doors, exactly as they always opened
@@ -133,9 +131,7 @@ export function WorldsPhase3({
               Build your own world, free.
             </h3>
             <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
-              The first {FOUNDING_PLACES} artists on $ongChainn each get a full world of their
-              own, VR and all, at no cost. Name it, lay out the streets, fill the rooms, decide
-              who gets in. Six screens, one afternoon, no code.
+              The first {FOUNDING_PLACES} artists get a full world free. Ask Mo$ha and it builds it with you.
             </p>
             {typeof placesLeft === 'number' && (
               <p className="mt-2 text-xs font-medium text-foreground">

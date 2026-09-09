@@ -134,6 +134,11 @@ export interface WorldConfig {
    */
   ad?: { kind: 'entrance' | 'hero' | 'custom'; image?: string; video?: string };
   /**
+   * How each piece of art sits in its frame, chosen by the artist: focus point
+   * and zoom, keyed 'hero' | 'entrance' | 'ad' | 'room:<slug>' | 'city:<slug>'.
+   */
+  artFit?: Record<string, { x: number; y: number; scale: number }>;
+  /**
    * Textures for the world with depth. Absent means the 3D city falls back
    * to the flat colours it has always used, which is a valid world, just a
    * barer one.

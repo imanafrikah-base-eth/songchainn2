@@ -71,6 +71,7 @@ export function WorldDoor({
         <WorldArt
           poster={art}
           video={loop}
+          fit={world.artFit?.[`room:${room.slug}`]}
           className={`h-full w-full object-cover transition duration-700 group-hover:scale-110 ${
             enterable ? 'brightness-[0.85]' : 'brightness-[0.45] grayscale-[0.6]'
           }`}

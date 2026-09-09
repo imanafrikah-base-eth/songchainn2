@@ -10,6 +10,7 @@
 // it. That rule is the whole reason this is a merge and not a migration.
 
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { normaliseFitMap } from '@/lib/artFit';
 import { worldKeyUrlFor } from '@/lib/artistCoins';
 import type {
   CityContentKind,
@@ -45,6 +46,7 @@ interface WorldRow {
   ad_kind?: string | null;
   ad_image?: string | null;
   ad_video?: string | null;
+  art_fit?: unknown;
   room_video?: unknown;
   city_video?: unknown;
   depth?: unknown;
@@ -160,6 +162,7 @@ export function rowsToWorldConfig(
     roomVideo: asRecord(world.room_video),
     cityVideo: asRecord(world.city_video),
     entrance: world.entrance_poster ? { poster: world.entrance_poster, video: world.entrance_video ?? undefined } : undefined,
+    artFit: normaliseFitMap(world.art_fit),
     ad: {
       kind: world.ad_kind === 'hero' || world.ad_kind === 'custom' ? world.ad_kind : 'entrance',
       image: world.ad_image ?? undefined,
@@ -184,7 +187,7 @@ export async function fetchWorldBySlug(slug: string | undefined): Promise<WorldC
   const { data: world, error } = await supabase
     .from('worlds')
     .select(
-      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video',
+      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video, art_fit',
     )
     .eq('slug', slug.trim().toLowerCase())
     .maybeSingle();
@@ -219,7 +222,7 @@ export async function fetchPublishedWorlds(): Promise<WorldConfig[]> {
   const { data, error } = await supabase
     .from('worlds')
     .select(
-      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video',
+      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video, art_fit',
     )
     .eq('status', 'published')
     .order('world_number', { ascending: true });
@@ -241,7 +244,7 @@ export async function fetchMyWorlds(): Promise<Array<WorldConfig & { id: string;
   const { data, error } = await supabase
     .from('worlds')
     .select(
-      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video',
+      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video, art_fit',
     )
     .order('created_at', { ascending: false });
 

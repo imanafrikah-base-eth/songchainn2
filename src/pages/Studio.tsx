@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { ChevronDown, Pencil } from 'lucide-react';
 import { SongDetailsFields, DistributionChoice } from '@/components/studio/SongDetailsFields';
 import { SongDetailsDialog } from '@/components/studio/SongDetailsDialog';
+import { UploadProgress } from '@/components/studio/UploadProgress';
 import { ActivityBoard } from '@/components/studio/ActivityBoard';
 import { EMPTY_DETAILS, detailProblems, requestOnchain, type SongDetails } from '@/lib/songDetails';
 import { useSongCoin } from '@/hooks/useSongCoins';
@@ -261,7 +262,7 @@ const Studio = () => {
           <Music4 className="mx-auto h-10 w-10 text-primary mb-4" />
           <h1 className="font-heading text-2xl font-bold mb-2">The Studio is for artist accounts</h1>
           <p className="text-sm text-muted-foreground mb-6 max-w-prose mx-auto">
-            Everything else on SONGCHAINN is open to you. Make music? Open your Studio and this same account becomes your artist account, right now. Already have a page on here? Claim it and we hand it over once we confirm it is you.
+            Make music? One tap and this account is your artist account. Already on here? Claim your page.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <Button onClick={() => void becomeArtist()} disabled={becoming} className="gap-1.5">
@@ -287,7 +288,7 @@ const Studio = () => {
           <h1 className="font-heading text-3xl font-bold text-foreground">Studio</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-8">
-          Send a finished record. $HIKULU and NAKULU read how it was mastered and it goes live to New Releases the same minute. Only a broken file is held back. Everything else publishes, and how it was finished decides which rung it lands on: mastered to standard, release ready, or out with room to tighten. Once your page is yours, no record is approved by hand.
+          Send a finished record. The judges listen, and it is live the same minute. One or a whole EP at once.
         </p>
 
         {/* ------------------------------------------------------- world --- */}
@@ -338,7 +339,7 @@ const Studio = () => {
                 />
               </label>
               <p className="mt-2 text-xs text-muted-foreground">
-                WAV or MP3, up to {MAX_MB} MB each. One record or a whole EP at once: pick several files, or drop them here on a computer. Export from your session, not from a streaming rip.
+                WAV or MP3, up to {MAX_MB} MB each. Pick one, or a whole EP.
               </p>
             </div>
 
@@ -697,20 +698,7 @@ function TrackRow({
             </p>
           )}
           {(t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'auditioning') && (
-            <div className="mt-2">
-              <div className="mb-1.5 flex items-center gap-2 text-xs text-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                {t.phase === 'preparing' && 'Getting things ready'}
-                {t.phase === 'uploading' && `Sending your track, ${t.progress}%`}
-                {t.phase === 'auditioning' && 'The judges are listening'}
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-300"
-                  style={{ width: `${t.phase === 'auditioning' ? 100 : t.progress}%` }}
-                />
-              </div>
-            </div>
+            <UploadProgress phase={t.phase} progress={t.progress} />
           )}
           {t.phase === 'done' && t.result && (
             <p className={`mt-2 inline-flex items-center gap-1.5 text-xs font-semibold ${t.result.passed ? 'text-primary' : 'text-amber-500'}`}>

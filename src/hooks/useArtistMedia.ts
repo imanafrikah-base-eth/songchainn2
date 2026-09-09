@@ -106,7 +106,7 @@ export function useMediaUpload() {
   const reset = useCallback(() => setState(IDLE), []);
 
   const upload = useCallback(
-    async (file: File, meta: { title?: string; caption?: string }) => {
+    async (file: File, meta: { title?: string; caption?: string; /** Keep it off the public gallery: world art, not a post. */ private?: boolean }) => {
       if (!user) {
         setState({ ...IDLE, phase: 'error', error: 'Sign in to upload.' });
         return null;
@@ -147,7 +147,8 @@ export function useMediaUpload() {
         const { data: row, error: publishError } = await supabase
           .from('artist_media' as never)
           .update({
-            is_published: true,
+            // World art stays private to the world unless the artist shows it on their page.
+            is_published: !meta.private,
             width: dims?.width ?? null,
             height: dims?.height ?? null,
             duration_seconds: dims?.duration ?? null,

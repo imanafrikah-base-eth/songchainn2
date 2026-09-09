@@ -21,6 +21,7 @@
 // thing and the loop says nothing a screen reader can use.
 
 import { useEffect, useRef, useState } from 'react';
+import { fitStyle, type ArtFit } from '@/lib/artFit';
 
 type Connection = { saveData?: boolean; effectiveType?: string };
 
@@ -51,12 +52,15 @@ export function WorldArt({
    * page paints, so it can skip the observer and start immediately.
    */
   eager = false,
+  fit,
 }: {
   poster?: string;
   video?: string;
   className?: string;
   objectPosition?: string;
   eager?: boolean;
+  /** Where the artist put the focus and how far in they zoomed. */
+  fit?: ArtFit;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -117,7 +121,7 @@ export function WorldArt({
           loading="lazy"
           decoding="async"
           className={`absolute inset-0 ${className}`}
-          style={objectPosition ? { objectPosition } : undefined}
+          style={fit ? fitStyle(fit) : objectPosition ? { objectPosition } : undefined}
         />
       )}
       {showVideo && (
@@ -129,11 +133,9 @@ export function WorldArt({
           loop
           playsInline
           preload="none"
-          // The artist's whole loop, fitted to the frame. The still underneath
-          // covers the frame, so a loop of a different shape sits on its own
-          // picture rather than being cut down to the middle of it.
-          className={`absolute inset-0 ${className.split('object-cover').join('object-contain')}`}
-          style={objectPosition ? { objectPosition } : undefined}
+          // Framed the way the artist framed it: their focus point, their zoom.
+          className={`absolute inset-0 ${className}`}
+          style={fit ? fitStyle(fit) : objectPosition ? { objectPosition } : undefined}
         />
       )}
     </div>

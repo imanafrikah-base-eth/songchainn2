@@ -162,6 +162,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
         avatar={citizen.avatar}
         accent={theme.accent}
         entrance={world.entrance}
+        fit={world.artFit?.entrance}
       />
       {/* The sky, wearing whatever record is playing */}
       <div
@@ -188,6 +189,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
             poster={world.heroImage}
             video={world.heroVideo}
             eager
+            fit={world.artFit?.hero}
             className="h-full w-full object-cover object-top opacity-40"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#07070b]/30 to-[#07070b]" />
@@ -311,6 +313,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
                   <WorldArt
                     poster={roomArt}
                     video={roomLoop}
+                    fit={room ? world.artFit?.[`room:${room.slug}`] : undefined}
                     eager
                     className="h-full w-full scale-105 object-cover opacity-45"
                   />
@@ -434,6 +437,7 @@ function CityView({
             <WorldArt
               poster={art}
               video={loop}
+              fit={city ? world.artFit?.[`city:${city.slug}`] : undefined}
               eager
               className="h-full w-full scale-105 object-cover opacity-30"
             />

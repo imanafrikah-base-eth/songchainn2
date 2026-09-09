@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ArtFit } from '@/lib/artFit';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -217,6 +218,13 @@ export default function WorldBuilder() {
       setCreating(false);
     }
   }, [b, draft, setParams, toast]);
+
+  const fitOf = (key: string) => b.world?.art_fit?.[key];
+  const setFit = (key: string) => (fit: ArtFit | null) => {
+    const next = { ...(b.world?.art_fit ?? {}) };
+    if (fit) next[key] = fit; else delete next[key];
+    void b.saveWorld({ art_fit: next });
+  };
 
   const zoraLinkOk = /^https?:\/\/([a-z0-9-]+\.)*zora\.co\//i.test(b.world?.zora_profile_url ?? '');
   const zoraWalletOk = /^0x[0-9a-fA-F]{40}$/.test(b.world?.zora_wallet_address ?? '');
@@ -622,22 +630,24 @@ export default function WorldBuilder() {
             <div className="space-y-3">
               <h2 className="text-sm font-semibold text-foreground">The doors</h2>
               <div className="grid gap-3 sm:grid-cols-2">
-                <ArtPicker label="World hero" help="Behind the map. Wide." value={b.world.hero_image} onChange={(v) => b.saveWorld({ hero_image: v })} />
-                <ArtPicker label="Hero loop" help="Silent video over the hero. Optional." kind="video" value={b.world.hero_video} onChange={(v) => b.saveWorld({ hero_video: v })} />
-                <ArtPicker label="Entrance" help="The doors people walk through on arrival. Portrait." aspect="aspect-[9/16] max-h-64" value={b.world.entrance_poster} onChange={(v) => b.saveWorld({ entrance_poster: v })} />
-                <ArtPicker label="Entrance loop" help="Under three seconds. Plays once a visit." kind="video" aspect="aspect-[9/16] max-h-64" value={b.world.entrance_video} onChange={(v) => b.saveWorld({ entrance_video: v })} />
+                <ArtPicker label="World hero" help="Behind the map. Wide." value={b.world.hero_image} onChange={(v) => b.saveWorld({ hero_image: v })} fit={fitOf('hero')} onFit={setFit('hero')} />
+                <ArtPicker label="Hero loop" help="Silent video over the hero. Optional." kind="video" value={b.world.hero_video} onChange={(v) => b.saveWorld({ hero_video: v })} fit={fitOf('hero')} onFit={setFit('hero')} />
+                <ArtPicker label="Entrance" help="The doors people walk through on arrival. Portrait." aspect="aspect-[9/16] max-h-64" value={b.world.entrance_poster} onChange={(v) => b.saveWorld({ entrance_poster: v })} fit={fitOf('entrance')} onFit={setFit('entrance')} />
+                <ArtPicker label="Entrance loop" help="Under three seconds. Plays once a visit." kind="video" aspect="aspect-[9/16] max-h-64" value={b.world.entrance_video} onChange={(v) => b.saveWorld({ entrance_video: v })} fit={fitOf('entrance')} onFit={setFit('entrance')} />
               </div>
             </div>
 
             {b.streets.length > 0 && (
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold text-foreground">The streets</h2>
-                <p className="text-xs text-muted-foreground">One picture per door, seen on the map and as the banner inside.</p>
+                <p className="text-xs text-muted-foreground">One picture per door.</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {b.streets.map((s) => (
                     <div key={s.id} className="space-y-2">
                       <ArtPicker
                         label={s.name}
+                        fit={fitOf(`room:${s.slug}`)}
+                        onFit={setFit(`room:${s.slug}`)}
                         value={b.world?.room_art?.[s.slug]}
                         onChange={(v) => {
                           const next = { ...(b.world?.room_art ?? {}) };
@@ -647,6 +657,8 @@ export default function WorldBuilder() {
                       />
                       <ArtPicker
                         label={`${s.name} loop`}
+                        fit={fitOf(`room:${s.slug}`)}
+                        onFit={setFit(`room:${s.slug}`)}
                         kind="video"
                         aspect="aspect-[16/9] max-h-24"
                         value={b.world?.room_video?.[s.slug]}
@@ -665,12 +677,14 @@ export default function WorldBuilder() {
             {b.cities.length > 0 && (
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold text-foreground">The skyline</h2>
-                <p className="text-xs text-muted-foreground">One picture per city, the tower people see from the map.</p>
+                <p className="text-xs text-muted-foreground">One picture per city.</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {b.cities.map((c) => (
                     <div key={c.id} className="space-y-2">
                       <ArtPicker
                         label={c.name}
+                        fit={fitOf(`city:${c.slug}`)}
+                        onFit={setFit(`city:${c.slug}`)}
                         value={b.world?.city_art?.[c.slug]}
                         onChange={(v) => {
                           const next = { ...(b.world?.city_art ?? {}) };
@@ -680,6 +694,8 @@ export default function WorldBuilder() {
                       />
                       <ArtPicker
                         label={`${c.name} loop`}
+                        fit={fitOf(`city:${c.slug}`)}
+                        onFit={setFit(`city:${c.slug}`)}
                         kind="video"
                         aspect="aspect-[16/9] max-h-24"
                         value={b.world?.city_video?.[c.slug]}
@@ -730,8 +746,8 @@ export default function WorldBuilder() {
               </div>
               {(b.world.ad_kind ?? 'entrance') === 'custom' ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <ArtPicker label="Advert still" help="Wide." value={b.world.ad_image} onChange={(v) => b.saveWorld({ ad_image: v })} />
-                  <ArtPicker label="Advert loop" help="Silent, a few seconds." kind="video" value={b.world.ad_video} onChange={(v) => b.saveWorld({ ad_video: v })} />
+                  <ArtPicker label="Advert still" help="Wide." value={b.world.ad_image} onChange={(v) => b.saveWorld({ ad_image: v })} fit={fitOf('ad')} onFit={setFit('ad')} />
+                  <ArtPicker label="Advert loop" help="Silent, a few seconds." kind="video" value={b.world.ad_video} onChange={(v) => b.saveWorld({ ad_video: v })} fit={fitOf('ad')} onFit={setFit('ad')} />
                 </div>
               ) : null}
             </div>

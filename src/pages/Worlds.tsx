@@ -29,7 +29,7 @@ const Worlds = () => {
           <h1 className="font-heading text-3xl font-bold text-foreground">Artist Worlds</h1>
         </div>
         <p className="mb-8 max-w-2xl text-sm text-muted-foreground">
-          Artists do not get a page here. They get a world: streets you walk, rooms that open on a key, a stage built for live moments. Every world that is open is listed here, in the order it was numbered.
+          Every open world, in the order it was numbered. Walk in.
         </p>
 
         {isLoading && worlds.length === 0 ? (
@@ -43,7 +43,7 @@ const Worlds = () => {
                   className="group block overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-primary/50"
                 >
                   <div className="relative aspect-[16/10] w-full overflow-hidden bg-black">
-                    <WorldArt poster={w.heroImage} video={w.heroVideo} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+                    <WorldArt poster={w.heroImage} video={w.heroVideo} fit={w.artFit?.hero} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
                     <p className="absolute left-4 top-4 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
                       {formatWorldNumber(w)}

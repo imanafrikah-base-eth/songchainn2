@@ -5,6 +5,7 @@ import { CLASSIC_NINE_ROOMS } from '../rooms';
 import { CLASSIC_FIVE_CITIES } from '../cities';
 import type { Json } from '@/integrations/supabase/types';
 import type { BlockInstance } from '../blocks';
+import { normaliseFitMap, type ArtFitMap } from '@/lib/artFit';
 
 /**
  * Every write the world builder makes.
@@ -48,6 +49,8 @@ export interface DraftWorld {
   ad_kind: 'entrance' | 'hero' | 'custom';
   ad_image: string | null;
   ad_video: string | null;
+  /** How each slot's art sits in its frame. See src/lib/artFit.ts. */
+  art_fit: ArtFitMap;
 }
 
 export interface DraftCity {
@@ -127,7 +130,7 @@ export function useWorldBuilder(worldId?: string) {
         const { data: w, error: we } = await supabase
           .from('worlds')
           .select(
-            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth, zora_profile_url, zora_wallet_address, ad_kind, ad_image, ad_video',
+            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth, zora_profile_url, zora_wallet_address, ad_kind, ad_image, ad_video, art_fit',
           )
           .eq('id', id)
           .maybeSingle();
@@ -140,6 +143,7 @@ export function useWorldBuilder(worldId?: string) {
           city_art: (row.city_art as Record<string, string> | null) ?? {},
           city_video: (row.city_video as Record<string, string> | null) ?? {},
           depth: (row.depth as DraftWorld['depth'] | null) ?? {},
+          art_fit: normaliseFitMap(row.art_fit),
         });
 
         const { data: c } = await supabase

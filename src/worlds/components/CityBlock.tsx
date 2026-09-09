@@ -67,6 +67,7 @@ export function CityBlock({
             <WorldArt
               poster={art}
               video={loop}
+              fit={world.artFit?.[`city:${city.slug}`]}
               className={`h-full w-full object-cover transition duration-700 group-hover:scale-105 ${
                 dressed ? 'brightness-[0.9] group-hover:brightness-100' : 'brightness-[0.4] group-hover:brightness-[0.5]'
               }`}

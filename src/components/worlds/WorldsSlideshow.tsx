@@ -11,12 +11,12 @@ const SLIDE_MS = 14000;
 const CODE_SLUGS = new Set(WORLDS.map((w) => w.slug));
 
 /** What a world chose to show in its advert: its gate by default. */
-function adFor(world: WorldConfig): { poster?: string; video?: string } {
+function adFor(world: WorldConfig): { poster?: string; video?: string; fitKey: string } {
   const ad = world.ad;
-  if (ad?.kind === 'custom' && (ad.image || ad.video)) return { poster: ad.image, video: ad.video };
-  if (ad?.kind === 'hero') return { poster: world.heroImage, video: world.heroVideo };
-  if (world.entrance?.poster) return { poster: world.entrance.poster, video: world.entrance.video };
-  return { poster: world.heroImage, video: world.heroVideo };
+  if (ad?.kind === 'custom' && (ad.image || ad.video)) return { poster: ad.image, video: ad.video, fitKey: 'ad' };
+  if (ad?.kind === 'hero') return { poster: world.heroImage, video: world.heroVideo, fitKey: 'hero' };
+  if (world.entrance?.poster) return { poster: world.entrance.poster, video: world.entrance.video, fitKey: 'entrance' };
+  return { poster: world.heroImage, video: world.heroVideo, fitKey: 'hero' };
 }
 
 /**
@@ -116,7 +116,7 @@ function WorldAd({ world, cta }: { world: WorldConfig; cta: ReactNode }) {
   return (
     <div>
       <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-border bg-black sm:aspect-[21/9]">
-        <WorldArt poster={ad.poster} video={ad.video} className="h-full w-full object-cover" eager />
+        <WorldArt poster={ad.poster} video={ad.video} fit={world.artFit?.[ad.fitKey]} className="h-full w-full object-cover" eager />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">{formatWorldNumber(world)}</p>

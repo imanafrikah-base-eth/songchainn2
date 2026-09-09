@@ -87,6 +87,7 @@ export default {
         "2xl": "calc(var(--radius) + 8px)",
       },
       keyframes: {
+        shimmer: { from: { transform: "translateX(-100%)" }, to: { transform: "translateX(300%)" } },
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
