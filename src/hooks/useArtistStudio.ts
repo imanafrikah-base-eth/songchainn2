@@ -83,6 +83,8 @@ export interface ArtistRelease {
   onchain_requested_at: string | null;
   /** A date ahead keeps a published record private until that day. */
   release_date: string | null;
+  /** The moment, when a time was set as well. */
+  release_at: string | null;
   release_id: string | null;
   track_number: number | null;
   isrc: string | null;
@@ -90,8 +92,10 @@ export interface ArtistRelease {
 }
 
 /** A published record whose day has not come yet. */
-export function isScheduled(r: Pick<ArtistRelease, 'status' | 'release_date'>): boolean {
-  if (r.status !== 'published' || !r.release_date) return false;
+export function isScheduled(r: Pick<ArtistRelease, 'status' | 'release_date'> & { release_at?: string | null }): boolean {
+  if (r.status !== 'published') return false;
+  if (r.release_at) return new Date(r.release_at).getTime() > Date.now();
+  if (!r.release_date) return false;
   return r.release_date > new Date().toISOString().slice(0, 10);
 }
 
@@ -111,7 +115,7 @@ export function useArtistReleases() {
     queryFn: async (): Promise<ArtistRelease[]> => {
       let q = supabase
         .from('songs')
-        .select('id, title, artist_name, genre, status, audio_url, cover_art_url, duration_seconds, created_at, published_at, audition, distribution, onchain_requested_at, release_date, release_id, track_number, isrc, explicit');
+        .select('id, title, artist_name, genre, status, audio_url, cover_art_url, duration_seconds, created_at, published_at, audition, distribution, onchain_requested_at, release_date, release_at, release_id, track_number, isrc, explicit');
       q = artistId
         ? q.or(`owner_id.eq.${user!.id},artist_id.eq.${artistId.replace(/,/g, '')}`)
         : q.eq('owner_id', user!.id);
@@ -192,7 +196,7 @@ function shapeResult(result: Record<string, unknown>, warnings: string[] = []): 
   };
 }
 
-export type UploadPhase = 'queued' | 'preparing' | 'uploading' | 'auditioning' | 'done' | 'error';
+export type UploadPhase = 'queued' | 'preparing' | 'uploading' | 'ready' | 'auditioning' | 'done' | 'error';
 
 /**
  * One record in the queue. The file and its title belong to the row; the
@@ -239,11 +243,13 @@ export function titleFromFileName(name: string): string {
 /**
  * Send one record, or an EP's worth, in one go.
  *
- * Files go up one at a time (one XHR keeps a slow connection honest and the
- * progress bar true) but the judges are not waited on between files: as
- * soon as a track lands its audition starts and the next file begins. Each
- * row carries its own state, so a failed track can be sent again without
- * touching the ones that are already live.
+ * The file starts going up the moment it is picked, before a title is typed
+ * or a cover chosen, so by the time the artist presses Send the bytes are
+ * already in and the rest is a second's work: names, cover, paperwork, then
+ * the judges. Files go up one after another (one XHR keeps a slow connection
+ * honest and the progress bar true); auditions run without waiting on each
+ * other. Each row carries its own state, so a failed track can be sent again
+ * without touching the ones that are already live.
  */
 export function useBatchUpload() {
   const { user } = useAuth();
@@ -252,9 +258,14 @@ export function useBatchUpload() {
   const tracksRef = useRef<QueuedTrack[]>([]);
   tracksRef.current = tracks;
   const [running, setRunning] = useState(false);
-  // The cover lands once, with the first track that gets it there; every
-  // later track points at the same file rather than sending it again.
+  // The cover lands once; every song row points at the same file.
   const coverUrlRef = useRef<string | null>(null);
+  /** What a ticket is stamped with before the artist has typed anything. */
+  const defaultsRef = useRef<{ artistName: string }>({ artistName: '' });
+  /** One file at a time: the landing chain. */
+  const landingRef = useRef<Promise<void>>(Promise.resolve());
+  /** Per track, the promise that resolves once its file has landed (or failed). */
+  const landedRef = useRef<Map<string, Promise<void>>>(new Map());
 
   const patch = useCallback((key: string, p: Partial<QueuedTrack> | ((t: QueuedTrack) => Partial<QueuedTrack>)) => {
     setTracks((list) => list.map((t) => (t.key === key ? { ...t, ...(typeof p === 'function' ? p(t) : p) } : t)));
@@ -280,10 +291,25 @@ export function useBatchUpload() {
     }));
     if (!entries.length) return;
     setTracks((cur) => [...cur, ...entries]);
-    for (const e of entries) void readDuration(e.file).then((seconds) => patch(e.key, { seconds }));
+    for (const e of entries) {
+      void readDuration(e.file).then((seconds) => patch(e.key, { seconds }));
+      queueLanding(e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patch]);
 
-  const remove = useCallback((key: string) => setTracks((list) => list.filter((t) => t.key !== key)), []);
+  const setDefaults = useCallback((d: { artistName: string }) => { defaultsRef.current = d; }, []);
+
+  /** Take a track out. A row already reserved for it goes too, unless it is live. */
+  const remove = useCallback((key: string) => {
+    const t = tracksRef.current.find((x) => x.key === key);
+    setTracks((list) => list.filter((x) => x.key !== key));
+    if (t?.songId && user && t.phase !== 'done') {
+      void supabase.from('songs').delete().eq('id', t.songId).eq('owner_id', user.id).neq('status', 'published').then(() => {
+        void queryClient.invalidateQueries({ queryKey: ['artist_releases'] });
+      });
+    }
+  }, [user, queryClient]);
 
   const setSeconds = useCallback((key: string, seconds: number | null) => patch(key, { seconds }), [patch]);
   const setTitle = useCallback((key: string, title: string) => patch(key, { title }), [patch]);
@@ -297,6 +323,7 @@ export function useBatchUpload() {
   const reset = useCallback(() => {
     setTracks([]);
     coverUrlRef.current = null;
+    landedRef.current = new Map();
   }, []);
 
   /** The judges, for one record whose file is already in. Never throws. */
@@ -330,47 +357,28 @@ export function useBatchUpload() {
   );
 
   /**
-   * One record, start to finish. Resolves once the file is in the bucket and
-   * the audition has been asked for; the audition itself is returned as a
-   * promise so the caller can move on to the next file while the judges work.
+   * Get one file into the bucket: reserve the row, PUT the bytes, mark the
+   * row ready. Runs the moment a file is picked. The title on the ticket is
+   * the file name and the artist name is whatever the form knows so far;
+   * both are rewritten at send time.
    */
-  const sendOne = useCallback(
-    async (track: QueuedTrack, meta: BatchMeta, batchSize: number): Promise<{ audition: Promise<void> }> => {
-      if (!user) throw new Error('Sign in to upload.');
+  const landOne = useCallback(
+    async (track: QueuedTrack) => {
+      if (!user) { patch(track.key, { phase: 'error', error: 'Sign in to upload.' }); return; }
       const { key, file } = track;
       patch(key, { phase: 'preparing', progress: 0, error: null, result: null });
-
-      const cover = meta.cover ?? null;
-      const wantCover = !!cover && !coverUrlRef.current;
-      const details: SongDetails | undefined = meta.details
-        ? {
-            ...meta.details,
-            ...(batchSize > 1 ? (Object.fromEntries(PER_TRACK_ONLY.map((k) => [k, null])) as Partial<SongDetails>) : {}),
-            track_number: meta.details.release_id ? track.trackNumber : null,
-          }
-        : undefined;
-
-      // The row the ticket reserves. If the file never lands, the row goes
-      // too, so a failed upload does not sit in the Studio as "Upload started"
-      // forever with no way to remove it.
       let reservedSongId: string | null = null;
-      const warnings: string[] = [];
-
       try {
-        // 1. Ask for a short-lived door into our own storage. The row is
-        //    reserved server-side so the artist never picks the storage key.
         const { data: ticket, error: ticketError } = await supabase.functions.invoke('upload-url', {
           body: {
-            title: track.title.trim(),
-            artistName: meta.artistName,
-            genre: meta.genre || null,
+            title: (tracksRef.current.find((t) => t.key === key)?.title ?? track.title).trim() || titleFromFileName(file.name),
+            artistName: defaultsRef.current.artistName || 'Artist',
+            genre: null,
             fileName: file.name,
             contentType: file.type,
             fileBytes: file.size,
-            ...(wantCover && cover ? { coverContentType: cover.type, coverBytes: cover.size } : {}),
           },
         });
-
         if (ticketError || !ticket?.uploadUrl) {
           const message =
             (ticketError as { context?: { body?: string } })?.context?.body ||
@@ -379,84 +387,115 @@ export function useBatchUpload() {
             'Could not start the upload.';
           throw new Error(typeof message === 'string' ? safeMessage(message) : 'Could not start the upload.');
         }
-
         reservedSongId = typeof ticket.songId === 'string' ? ticket.songId : null;
-        patch(key, { songId: ticket.songId });
-
-        // 2. The file goes straight from this browser to storage. It never
-        //    passes through our servers.
-        patch(key, { phase: 'uploading', progress: 0 });
+        patch(key, { songId: ticket.songId, phase: 'uploading', progress: 0 });
         await putWithProgress(ticket.uploadUrl, file, (progress) =>
           patch(key, (t) => (t.phase === 'uploading' ? { progress } : {})),
         );
-
-        // 2b. Artwork. Only once it is genuinely in the bucket does the song
-        //     row point at it, so a failed cover leaves no broken image behind.
-        //     Never fatal: a release with no artwork still beats no release.
-        if (wantCover && cover && ticket.coverUploadUrl && ticket.coverPublicUrl) {
-          try {
-            await putWithProgress(ticket.coverUploadUrl, cover, () => undefined);
-            coverUrlRef.current = ticket.coverPublicUrl;
-          } catch (coverErr) {
-            console.error('Cover art upload failed, continuing without it', coverErr);
-            warnings.push('The cover art did not land. The record is out without it; add it again from your catalog.');
-          }
-        }
-        if (coverUrlRef.current) {
-          await supabase.from('songs').update({ cover_art_url: coverUrlRef.current }).eq('id', ticket.songId);
-        }
-        // The file is in the bucket: from here the row stays even if the rest stumbles.
-        reservedSongId = null;
-
-        // 2c. Details and where it lives, written onto the row the ticket
-        //     reserved. Never fatal: a record with no credits still beats no
-        //     record, and they can be added from the catalog.
-        if (details) {
-          try {
-            await saveSongDetails(ticket.songId, {
-              ...details,
-              onchain_requested_at: details.distribution === 'onchain' ? new Date().toISOString() : null,
-            });
-            if (details.distribution === 'onchain') {
-              await supabase
-                .from('songs')
-                .update({ onchain_requested_at: new Date().toISOString() } as never)
-                .eq('id', ticket.songId);
-            }
-          } catch (detailsErr) {
-            console.error('Song details could not be saved at upload, continuing', detailsErr);
-            warnings.push(
-              details.distribution === 'onchain'
-                ? 'The credits, paperwork and your on-chain choice could not be saved. Open Edit details on the record and add them again.'
-                : 'The credits and paperwork could not be saved. Open Edit details on the record and add them again.',
-            );
-          }
-        }
-
-        // 3. The audition. Measured, then put into words by $HIKULU and NAKULU.
-        //    Not awaited here: the next file can start while they listen.
-        return { audition: runAudition(key, ticket.songId, warnings) };
+        patch(key, { phase: 'ready', progress: 100 });
       } catch (err) {
         if (reservedSongId) {
-          // Best effort: the row is the artist's own and never published, so
-          // the delete policy lets them remove it. A failure here only means
-          // the Studio shows a stray row they can delete by hand.
           const orphan = reservedSongId;
-          void supabase.from('songs').delete().eq('id', orphan).eq('owner_id', user.id).neq('status', 'published').then(() => {
-            void queryClient.invalidateQueries({ queryKey: ['artist_releases'] });
-          });
+          void supabase.from('songs').delete().eq('id', orphan).eq('owner_id', user.id).neq('status', 'published');
         }
-        patch(key, {
-          phase: 'error',
-          progress: 0,
-          songId: null,
-          error: err instanceof Error ? err.message : 'Something went wrong.',
-          result: null,
-        });
-        return { audition: Promise.resolve() };
+        patch(key, { phase: 'error', progress: 0, songId: null, error: err instanceof Error ? err.message : 'Something went wrong.', result: null });
       }
     },
-    [user, queryClient, patch, runAudition],
+    [user, patch],
+  );
+
+  const queueLanding = useCallback(
+    (track: QueuedTrack) => {
+      const p = landingRef.current.then(() => landOne(track));
+      landingRef.current = p.catch(() => undefined);
+      landedRef.current.set(track.key, p.catch(() => undefined));
+    },
+    [landOne],
+  );
+
+  /** The cover, once, through the visual upload door; every row points at it. */
+  const landCover = useCallback(
+    async (cover: File): Promise<string | null> => {
+      if (coverUrlRef.current) return coverUrlRef.current;
+      const { data: ticket, error } = await supabase.functions.invoke('upload-url', {
+        body: { purpose: 'visual', title: 'Cover', fileName: cover.name, contentType: cover.type, fileBytes: cover.size },
+      });
+      if (error || !ticket?.uploadUrl) return null;
+      await putWithProgress(ticket.uploadUrl, cover, () => undefined);
+      const { data: row } = await supabase
+        .from('artist_media' as never)
+        .update({ is_published: false, updated_at: new Date().toISOString() } as never)
+        .eq('id', ticket.mediaId)
+        .select('public_url')
+        .maybeSingle();
+      const url = (row as { public_url?: string } | null)?.public_url ?? (typeof ticket.publicUrl === 'string' ? ticket.publicUrl : null);
+      coverUrlRef.current = url;
+      return url;
+    },
+    [],
+  );
+
+  /**
+   * One record, start to finish. Resolves once the file is in the bucket and
+   * the audition has been asked for; the audition itself is returned as a
+   * promise so the caller can move on to the next file while the judges work.
+   */
+  const sendOne = useCallback(
+    async (track: QueuedTrack, meta: BatchMeta, batchSize: number): Promise<{ audition: Promise<void> }> => {
+      if (!user) throw new Error('Sign in to upload.');
+      const { key } = track;
+      // Still landing, or failed before it landed: get it in first.
+      let cur = tracksRef.current.find((t) => t.key === key) ?? track;
+      if (cur.phase === 'queued' || (cur.phase === 'error' && !cur.songId)) queueLanding(cur);
+      const landed = landedRef.current.get(key);
+      if (landed) await landed;
+      cur = tracksRef.current.find((t) => t.key === key) ?? cur;
+      if (cur.phase !== 'ready' || !cur.songId) return { audition: Promise.resolve() };
+      const songId = cur.songId;
+      const warnings: string[] = [];
+
+      const details: SongDetails | undefined = meta.details
+        ? {
+            ...meta.details,
+            ...(batchSize > 1 ? (Object.fromEntries(PER_TRACK_ONLY.map((k) => [k, null])) as Partial<SongDetails>) : {}),
+            track_number: meta.details.release_id ? cur.trackNumber : null,
+          }
+        : undefined;
+
+      // The names the artist typed, and the cover, onto the row that already holds the file.
+      let coverUrl: string | null = null;
+      if (meta.cover) {
+        try { coverUrl = await landCover(meta.cover); } catch { coverUrl = null; }
+        if (!coverUrl) warnings.push('The cover art did not land. The record is out without it; add it again from your catalog.');
+      }
+      await supabase
+        .from('songs')
+        .update({
+          title: cur.title.trim() || titleFromFileName(cur.file.name),
+          artist_name: meta.artistName,
+          genre: meta.genre || null,
+          ...(coverUrl ? { cover_art_url: coverUrl } : {}),
+        } as never)
+        .eq('id', songId);
+
+      if (details) {
+        try {
+          await saveSongDetails(songId, {
+            ...details,
+            onchain_requested_at: details.distribution === 'onchain' ? new Date().toISOString() : null,
+          });
+          if (details.distribution === 'onchain') {
+            await supabase.from('songs').update({ onchain_requested_at: new Date().toISOString() } as never).eq('id', songId);
+          }
+        } catch (detailsErr) {
+          console.error('Song details could not be saved at upload, continuing', detailsErr);
+          warnings.push('The credits and paperwork could not be saved. Open Edit details on the record and add them again.');
+        }
+      }
+
+      return { audition: runAudition(key, songId, warnings) };
+    },
+    [user, queueLanding, landCover, runAudition],
   );
 
   /** A track whose file landed but whose audition fell over: ask once more. */
@@ -478,7 +517,8 @@ export function useBatchUpload() {
     async (meta: BatchMeta, only?: string) => {
       if (running) return;
       const todo = tracks.filter((t) =>
-        (only ? t.key === only : true) && (t.phase === 'queued' || (t.phase === 'error' && !t.songId)),
+        (only ? t.key === only : true)
+        && (t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId)),
       );
       if (!todo.length) return;
       setRunning(true);
@@ -504,11 +544,14 @@ export function useBatchUpload() {
     [running, tracks, sendOne, queryClient],
   );
 
-  const busy = running || tracks.some((t) => t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'auditioning');
+  /** Something is with the judges or the send is running. Files landing on their own do not block the form. */
+  const busy = running || tracks.some((t) => t.phase === 'auditioning');
+  /** Files still on their way up. */
+  const landing = tracks.some((t) => t.phase === 'preparing' || t.phase === 'uploading');
   /** Every track has had its go: live, in the workshop, or stuck with a file in. Nothing left to send. */
   const finished = tracks.length > 0 && !busy && tracks.every((t) => t.phase === 'done' || (t.phase === 'error' && !!t.songId));
 
-  return { tracks, busy, finished, add, remove, setSeconds, setTitle, setTrackNumber, numberAll, start, askAgain, reset };
+  return { tracks, busy, landing, finished, add, remove, setSeconds, setTitle, setTrackNumber, numberAll, start, askAgain, reset, setDefaults };
 }
 
 /** How long the audio runs, read in the browser before anything is sent. */

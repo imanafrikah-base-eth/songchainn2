@@ -1531,8 +1531,8 @@ export default function Room() {
               <button
                 type="button"
                 onClick={async () => {
-                  navigate('/');
                   await exitRoomMode();
+                  navigate('/');
                 }}
                 className="inline-flex sm:hidden items-center gap-2 text-sm text-zinc-400 hover:text-red-400 transition-colors"
               >
@@ -1543,8 +1543,8 @@ export default function Room() {
             <button
               type="button"
               onClick={async () => {
-                navigate('/');
                 await exitRoomMode();
+                navigate('/');
               }}
               className="hidden sm:inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-red-400 transition-colors"
             >
@@ -2013,7 +2013,7 @@ export default function Room() {
                   type="button"
                   variant="ghost"
                   className="text-zinc-300 hover:text-zinc-100"
-                  onClick={() => navigate('/')}
+                  onClick={async () => { await exitRoomMode(); navigate('/'); }}
                 >
                   Leave Room
                 </Button>
@@ -2122,7 +2122,7 @@ export default function Room() {
                 type="button"
                 variant="ghost"
                 className="text-zinc-300 hover:text-zinc-100"
-                onClick={() => navigate('/')}
+                onClick={async () => { await exitRoomMode(); navigate('/'); }}
               >
                 Leave
               </Button>

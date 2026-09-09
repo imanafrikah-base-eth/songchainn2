@@ -31,6 +31,8 @@ export interface SongDetails {
   language: string | null;
   explicit: boolean;
   release_date: string | null;
+  /** The moment, when the artist set a time as well as a day. ISO. */
+  release_at: string | null;
   publisher: string | null;
   pro: string | null;
   distribution: Distribution;
@@ -50,6 +52,7 @@ export const EMPTY_DETAILS: SongDetails = {
   language: null,
   explicit: false,
   release_date: null,
+  release_at: null,
   publisher: null,
   pro: null,
   distribution: 'app',
@@ -59,7 +62,7 @@ export const EMPTY_DETAILS: SongDetails = {
 };
 
 const COLUMNS =
-  'lyrics, description, credits, splits, isrc, iswc, language, explicit, release_date, publisher, pro, distribution, onchain_requested_at, release_id, track_number';
+  'lyrics, description, credits, splits, isrc, iswc, language, explicit, release_date, release_at, publisher, pro, distribution, onchain_requested_at, release_id, track_number';
 
 /**
  * An ISRC is two letters of country, three of registrant, two of year and
@@ -96,6 +99,7 @@ export function detailProblems(d: SongDetails): string[] {
     problems.push('A track number is a whole number starting at 1.');
   }
   if (d.release_date && Number.isNaN(Date.parse(d.release_date))) problems.push('That release date is not a real date.');
+  if (d.release_at && Number.isNaN(Date.parse(d.release_at))) problems.push('That release time is not a real time.');
   return problems;
 }
 
@@ -113,6 +117,7 @@ function normalise(row: Record<string, unknown> | null): SongDetails {
     language: (row.language as string | null) ?? null,
     explicit: Boolean(row.explicit),
     release_date: (row.release_date as string | null) ?? null,
+    release_at: (row.release_at as string | null) ?? null,
     publisher: (row.publisher as string | null) ?? null,
     pro: (row.pro as string | null) ?? null,
     distribution: row.distribution === 'onchain' ? 'onchain' : 'app',
@@ -156,7 +161,9 @@ export function cleanDetails(d: SongDetails): SongDetails {
     isrc: normaliseIsrc(d.isrc),
     iswc: text(d.iswc)?.toUpperCase().replace(/\s+/g, '') ?? null,
     language: text(d.language),
-    release_date: text(d.release_date),
+    // The day follows the moment, so everything that groups by day agrees with the clock.
+    release_date: d.release_at ? new Date(d.release_at).toISOString().slice(0, 10) : text(d.release_date),
+    release_at: d.release_at ? new Date(d.release_at).toISOString() : null,
     publisher: text(d.publisher),
     pro: text(d.pro),
     release_id: text(d.release_id),
@@ -180,6 +187,7 @@ export async function saveSongDetails(songId: string, details: SongDetails): Pro
       language: clean.language,
       explicit: clean.explicit,
       release_date: clean.release_date,
+      release_at: clean.release_at,
       publisher: clean.publisher,
       pro: clean.pro,
       distribution: clean.distribution,

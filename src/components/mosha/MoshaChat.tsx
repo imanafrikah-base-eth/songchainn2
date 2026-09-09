@@ -114,6 +114,9 @@ export function MoshaChat({
 
       <div ref={scroller} className="flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
         <Bubble role="assistant">{MOSHA_INTRO}</Bubble>
+        {isArtist && (
+          <Bubble role="assistant">Want me to build your world for you? Say the word and it is done in a few taps. I can replace or change anything on it after, whenever you like.</Bubble>
+        )}
         {turns.map((t, i) => (
           <Bubble key={i} role={t.role} wide={Boolean(t.flow)}>
             {t.content}

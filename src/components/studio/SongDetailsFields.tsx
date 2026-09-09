@@ -42,7 +42,15 @@ export function SongDetailsFields({
   const splitTotal = value.splits.reduce((sum, s) => sum + (Number(s.share) || 0), 0);
   const isrcOk = isValidIsrc(value.isrc);
   const today = new Date().toISOString().slice(0, 10);
-  const scheduled = Boolean(value.release_date && value.release_date > today);
+  const scheduled = Boolean((value.release_at && new Date(value.release_at).getTime() > Date.now()) || (!value.release_at && value.release_date && value.release_date > today));
+  // datetime-local speaks the artist's own clock; the row keeps UTC.
+  const localInput = (iso: string | null): string => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
   return (
     <div className="space-y-5">
@@ -146,12 +154,24 @@ export function SongDetailsFields({
           <input value={value.language ?? ''} disabled={disabled} maxLength={40} placeholder="Bemba, English, Nyanja..." onChange={(e) => set('language', e.target.value)} className={input} />
         </label>
         <label className="block">
-          <span className={label}>Release date</span>
-          <input type="date" value={value.release_date ?? ''} disabled={disabled} onChange={(e) => set('release_date', e.target.value || null)} className={input} />
+          <span className={label}>Release date and time</span>
+          <input
+            type="datetime-local"
+            value={localInput(value.release_at) || (value.release_date ? `${value.release_date}T00:00` : '')}
+            disabled={disabled}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) { onChange({ ...value, release_at: null, release_date: null }); return; }
+              const d = new Date(v);
+              if (Number.isNaN(d.getTime())) return;
+              onChange({ ...value, release_at: d.toISOString(), release_date: d.toISOString().slice(0, 10) });
+            }}
+            className={input}
+          />
           <span className={`mt-1 block text-xs ${scheduled ? 'text-primary' : 'text-muted-foreground'}`}>
             {scheduled
-              ? 'A date ahead schedules it: the record stays yours alone until that day, then goes public and your followers hear about it.'
-              : 'Leave it blank to go out the minute the judges are done. A date ahead schedules it.'}
+              ? 'Scheduled. It stays yours alone until that moment, then goes public and your followers are told.'
+              : 'Blank means out the minute the judges are done. A time ahead schedules it, to the minute.'}
           </span>
         </label>
         {!shared && <label className="block">

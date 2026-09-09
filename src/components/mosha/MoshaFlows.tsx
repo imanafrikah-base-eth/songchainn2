@@ -114,7 +114,7 @@ function ConnectWalletFlow() {
 
 function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   const { isArtist, audienceProfile } = useAuth();
-  const { tracks, busy, finished, add, remove, setTitle, start, reset } = useBatchUpload();
+  const { tracks, busy, landing, finished, add, remove, setTitle, start, reset, setDefaults } = useBatchUpload();
   const [artistName, setArtistName] = useState('');
   const [cover, setCover] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -123,6 +123,7 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   useEffect(() => {
     if (!artistName && audienceProfile) setArtistName(audienceProfile.display_name || audienceProfile.username || '');
   }, [audienceProfile, artistName]);
+  useEffect(() => { setDefaults({ artistName: artistName.trim() || audienceProfile?.display_name || '' }); }, [artistName, audienceProfile, setDefaults]);
 
   if (!isArtist) {
     return (
@@ -133,7 +134,7 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
     );
   }
 
-  const queued = tracks.filter((t) => t.phase === 'queued' || (t.phase === 'error' && !t.songId));
+  const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
   const ready = queued.length > 0 && queued.every((t) => t.title.trim()) && artistName.trim() && !busy;
   const send = () => void start({ artistName: artistName.trim(), cover, details: EMPTY_DETAILS });
 
@@ -165,7 +166,7 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
         tracks.length > 0 && (
           <Button size="sm" className="h-10 w-full rounded-full text-xs" disabled={!ready} onClick={send}>
             {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1 h-3.5 w-3.5" />}
-            {busy ? 'Working' : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in'}
+            {busy ? 'Working' : landing ? 'Finish and send' : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in'}
           </Button>
         )
       ) : (
@@ -180,7 +181,7 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
 }
 
 function FlowTrack({ track: t, busy, onTitle, onRemove }: { track: QueuedTrack; busy: boolean; onTitle: (v: string) => void; onRemove: () => void }) {
-  const editable = t.phase === 'queued' || (t.phase === 'error' && !t.songId);
+  const editable = t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId);
   return (
     <li className="rounded-xl border border-border p-2.5">
       <div className="flex items-center gap-2">

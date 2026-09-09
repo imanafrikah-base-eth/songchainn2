@@ -16,7 +16,7 @@ export function UploadProgress({
   passed,
   compact = false,
 }: {
-  phase: 'queued' | 'preparing' | 'uploading' | 'auditioning' | 'done' | 'error';
+  phase: 'queued' | 'preparing' | 'uploading' | 'ready' | 'auditioning' | 'done' | 'error';
   progress: number;
   passed?: boolean;
   compact?: boolean;
@@ -45,6 +45,7 @@ export function UploadProgress({
     phase === 'queued' ? 'Waiting its turn'
     : phase === 'preparing' ? 'Getting things ready'
     : phase === 'uploading' ? 'Sending your track'
+    : phase === 'ready' ? 'In. Press Send when you are ready'
     : judging ? 'The judges are listening'
     : phase === 'done' ? (passed ? 'Live' : 'In the workshop')
     : 'Stopped';

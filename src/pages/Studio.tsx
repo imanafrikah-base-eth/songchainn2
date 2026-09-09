@@ -121,7 +121,7 @@ const Studio = () => {
   const { becomeArtist, pending: becoming } = useBecomeArtist();
   const { data: profile } = useMyProfile();
   const { data: releases = [], isLoading } = useArtistReleases();
-  const { tracks, busy, finished, add, remove, setTitle, setTrackNumber, numberAll, start, askAgain, reset } = useBatchUpload();
+  const { tracks, busy, landing, finished, add, remove, setTitle, setTrackNumber, numberAll, start, askAgain, reset, setDefaults } = useBatchUpload();
   const { cannotUpload } = useCompliance();
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -144,6 +144,11 @@ const Studio = () => {
 
   const hasWallet = !!profile?.wallet_address;
 
+  // What a ticket carries before the artist has typed anything.
+  useEffect(() => {
+    setDefaults({ artistName: artistName.trim() || profile?.display_name || profile?.username || '' });
+  }, [artistName, profile, setDefaults]);
+
   const { live, workshop, pending, scheduled } = useMemo(() => ({
     live: releases.filter((r) => r.status === 'published' && !isScheduled(r)),
     scheduled: releases.filter((r) => isScheduled(r)),
@@ -158,7 +163,7 @@ const Studio = () => {
     return releases.filter((r) => new Date(r.created_at).getTime() > since).length;
   }, [releases]);
   const leftToday = Math.max(0, UPLOADS_PER_DAY - sentToday);
-  const queued = tracks.filter((t) => t.phase === 'queued' || (t.phase === 'error' && !t.songId));
+  const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
   const overCap = queued.length > leftToday;
 
   const detailProblem = detailProblems({ ...details, track_number: null })[0] ?? null;
@@ -509,7 +514,7 @@ const Studio = () => {
               className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-              {busy ? 'Working' : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in'}
+              {busy ? 'Working' : landing ? (queued.length > 1 ? `Finish and send all ${queued.length}` : 'Finish and send') : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in'}
             </button>
           </div>
         )}
@@ -537,7 +542,7 @@ const Studio = () => {
               </div>
             )}
             {tracks.map((t) => (
-              <ResultCard key={t.key} track={t} many={tracks.length > 1} releaseDate={details.release_date} onAskAgain={() => void askAgain(t.key)} />
+              <ResultCard key={t.key} track={t} many={tracks.length > 1} releaseDate={details.release_date} releaseAt={details.release_at} onAskAgain={() => void askAgain(t.key)} />
             ))}
             <button
               type="button"
@@ -657,7 +662,7 @@ function TrackRow({
   onRetry: () => void;
   onAskAgain: () => void;
 }) {
-  const editable = t.phase === 'queued' || (t.phase === 'error' && !t.songId);
+  const editable = t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId);
   const mb = (t.file.size / (1024 * 1024)).toFixed(1);
   return (
     <li className="rounded-xl border border-border p-3">
@@ -697,7 +702,7 @@ function TrackRow({
               You already have a record called this ({STATUS_LABEL[sameTitle.status] ?? sameTitle.status}). Send it anyway if this is a different version, or edit the other one instead.
             </p>
           )}
-          {(t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'auditioning') && (
+          {(t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || t.phase === 'auditioning') && (
             <UploadProgress phase={t.phase} progress={t.progress} />
           )}
           {t.phase === 'done' && t.result && (
@@ -736,7 +741,7 @@ function TrackRow({
 }
 
 /** What the judges said about one record, once the batch is through. */
-function ResultCard({ track: t, many, releaseDate, onAskAgain }: { track: QueuedTrack; many: boolean; releaseDate: string | null; onAskAgain: () => void }) {
+function ResultCard({ track: t, many, releaseDate, releaseAt, onAskAgain }: { track: QueuedTrack; many: boolean; releaseDate: string | null; releaseAt?: string | null; onAskAgain: () => void }) {
   const result = t.result;
   if (t.phase === 'error' || !result) {
     return (
@@ -758,7 +763,9 @@ function ResultCard({ track: t, many, releaseDate, onAskAgain }: { track: Queued
   }
   const today = new Date().toISOString().slice(0, 10);
   const heading = result.passed
-    ? (releaseDate && releaseDate > today ? `It is in. It goes public on ${prettyDate(releaseDate)}` : 'It is live')
+    ? (releaseAt && new Date(releaseAt).getTime() > Date.now()
+        ? `It is in. It goes public ${new Date(releaseAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+        : releaseDate && releaseDate > today ? `It is in. It goes public on ${prettyDate(releaseDate)}` : 'It is live')
     : 'One more pass in the studio';
   return (
     <div className={`rounded-2xl border p-5 ${result.passed ? 'border-primary/40 bg-primary/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
@@ -935,9 +942,9 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
             {release.explicit ? ' · Explicit' : ''}
             {release.duration_seconds ? ` · ${Math.floor(release.duration_seconds / 60)}:${String(Math.round(release.duration_seconds % 60)).padStart(2, '0')}` : ''}
           </p>
-          {scheduled && release.release_date && (
+          {scheduled && (release.release_at || release.release_date) && (
             <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">
-              <CalendarClock className="h-3.5 w-3.5" /> Goes public on {prettyDate(release.release_date)}
+              <CalendarClock className="h-3.5 w-3.5" /> Goes public {release.release_at ? new Date(release.release_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : `on ${prettyDate(release.release_date!)}`}
             </p>
           )}
         </div>

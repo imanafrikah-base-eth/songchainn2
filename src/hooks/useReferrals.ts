@@ -65,13 +65,18 @@ export function useReferrals() {
       const { data, error } = await supabase.rpc('get_my_referral_stats');
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
-      if (row) {
-        setStats({
-          code: row.code ?? null,
-          invited: Number(row.invited ?? 0),
-          pointsEarned: Number(row.points_earned ?? 0),
-        });
+      // A person who has never invited anyone has no code yet, and the invite
+      // link said "not ready" forever. Mint it the first time they look.
+      let code: string | null = row?.code ?? null;
+      if (!code) {
+        const { data: minted } = await supabase.rpc('get_or_create_my_referral_code');
+        if (typeof minted === 'string' && minted) code = minted;
       }
+      setStats({
+        code,
+        invited: Number(row?.invited ?? 0),
+        pointsEarned: Number(row?.points_earned ?? 0),
+      });
     } catch {
       // Never block the screen on this; the invite panel degrades to "unavailable".
       setStats((prev) => prev);

@@ -4,6 +4,50 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/song/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot).*"
+        }
+      ],
+      "destination": "/api/song-og?id=:id"
+    },
+    {
+      "source": "/artist/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot).*"
+        }
+      ],
+      "destination": "/api/artist-og?id=:id"
+    },
+    {
+      "source": "/world/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot).*"
+        }
+      ],
+      "destination": "/api/world-og?slug=:slug"
+    },
+    {
+      "source": "/w/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot).*"
+        }
+      ],
+      "destination": "/api/world-og?slug=:slug&built=1"
+    },
+    {
       "source": "/share/artist/:id",
       "destination": "/api/artist-og?id=:id"
     },
@@ -28,37 +72,55 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
       ]
     },
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
       ]
     },
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/(.*)\\.(woff2|woff|ttf|otf)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/(.*)\\.(png|jpg|jpeg|gif|webp|avif|svg|ico)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=2592000" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800, stale-while-revalidate=2592000"
+        }
       ]
     },
     {
       "source": "/world-assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=2592000" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800, stale-while-revalidate=2592000"
+        }
       ]
     }
   ]

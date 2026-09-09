@@ -264,7 +264,7 @@ async function liveContext(db: ReturnType<typeof admin>, token: string | null, p
       lines.push(`They are an artist here (artist id ${artist.artist_id}${artist.is_verified ? ", verified" : ""}). Studio, uploads, the world builder, the activity board and licensing requests all apply to them. The upload_song and build_world flows are for them.`);
       const list = (myWorlds ?? []) as Array<{ slug: string; status: string }>;
       if (list.length) lines.push(`Their worlds: ${list.map((w) => `${w.slug} (${w.status})`).join(", ")}. A draft can be finished at /world-builder or by the build_world flow.`);
-      else lines.push("They have not started a world yet.");
+      else lines.push("They have not started a world yet. Once in this conversation, when it fits, offer nicely to build it for them right here (build_world), and say you can replace or change anything on it afterwards (edit_world). Never nag.");
     } else {
       lines.push("They are a listener, not an artist account yet. If they make music, the become_artist flow turns this account into an artist account in one tap; the Studio and the builder open after that.");
     }

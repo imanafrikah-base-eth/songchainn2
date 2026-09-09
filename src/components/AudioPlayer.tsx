@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronUp, Headphones } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronUp, Headphones, X } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement, PLAY_THRESHOLD_SECONDS } from '@/context/EngagementContext';
 import { Slider } from '@/components/ui/slider';
@@ -85,7 +85,13 @@ const TimeDisplay = memo(function TimeDisplay({
 export const AudioPlayer = memo(function AudioPlayer() {
   const { currentSong, isPlaying, isRoomMode, isRoomHidden, queue } = usePlayerState();
   const { currentTime, duration } = usePlayerTime();
-  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume, showRoom } = usePlayerActions();
+  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume, showRoom, stop } = usePlayerActions();
+  // What comes after this one, for the small line under the title.
+  const nextUp = (() => {
+    if (!currentSong || queue.length < 2) return null;
+    const i = queue.findIndex((q) => q.id === currentSong.id);
+    return i >= 0 ? queue[(i + 1) % queue.length] : queue[0];
+  })();
   const { addPlay, addOfflinePlay } = useEngagement();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -299,6 +305,9 @@ export const AudioPlayer = memo(function AudioPlayer() {
                       </button>
                     )}
                   </div>
+                  {nextUp && !isRoomMode && (
+                    <p className="truncate text-[11px] text-muted-foreground">Up next: {nextUp.title}</p>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); navigate(`/artist/${currentSong.artistId}`); }}
@@ -372,6 +381,15 @@ export const AudioPlayer = memo(function AudioPlayer() {
                   className="p-2 hover:bg-secondary/80 rounded-full transition-colors press-effect disabled:opacity-40 disabled:hover:bg-transparent"
                 >
                   <SkipForward className="w-4 h-4 sm:w-5 sm:h-5 text-foreground" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Close the player"
+                  title="Close"
+                  onClick={(e) => { e.stopPropagation(); stop(); }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary/50 hover:text-foreground transition-colors"
+                >
+                  <X className="w-4 h-4" />
                 </button>
 
                 <ShareSongButton

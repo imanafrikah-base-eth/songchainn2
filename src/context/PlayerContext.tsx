@@ -20,6 +20,8 @@ interface PlayerActionsContext {
   playSong: (song: Song, options?: { userAddress?: string; hasOwnership?: boolean; force?: boolean; startTime?: number }) => void;
   togglePlay: () => void;
   pause: () => void;
+  /** Close the player: nothing playing, nothing shown. Leaves the Room too. */
+  stop: () => void;
   play: () => void;
   seekTo: (time: number) => void;
   setVolume: (volume: number) => void;
@@ -580,6 +582,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const stop = useCallback(() => {
+    if (isRoomModeRef.current) {
+      roomRestoreRef.current = null;
+      setIsRoomMode(false);
+      setIsRoomHidden(false);
+    }
+    audioRef.current?.pause();
+    nextAudioRef.current?.pause();
+    setIsCrossfading(false);
+    crossfadeTriggeredRef.current = false;
+    setCurrentSong(null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+  }, []);
+
   const play = useCallback(() => {
     if (audioRef.current && currentSong) {
       audioRef.current.play().then(() => {
@@ -891,6 +908,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     roomRestoreRef.current = null;
 
     if (!snapshot) {
+      // Nothing to go back to: the Room's song stops with the Room.
+      audioRef.current?.pause();
+      nextAudioRef.current?.pause();
+      setCurrentSong(null);
+      setIsPlaying(false);
+      setCurrentTime(0);
       if (audio) {
         audio.volume = previousVolume;
       }
@@ -999,7 +1022,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     exitRoomMode,
     hideRoom,
     showRoom,
-  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, jumpToIndex, pause, play, playNext, playPrevious, playQueue, playSong, removeFromQueue, reorderQueue, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
+    stop,
+  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, stop, jumpToIndex, pause, play, playNext, playPrevious, playQueue, playSong, removeFromQueue, reorderQueue, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
 
   return (
     <PlayerStateCtx.Provider value={stateValue}>
