@@ -352,7 +352,7 @@ export default function WorldBuilder() {
                 id="w-name"
                 className={input}
                 value={draft.name}
-                placeholder="N3M3SIS"
+                placeholder="For example, N3M3SIS"
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               />
               {draft.name ? (

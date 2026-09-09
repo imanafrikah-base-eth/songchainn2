@@ -190,7 +190,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
             eager
             className="h-full w-full object-cover object-top opacity-40"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#07070b]/20 via-[#07070b]/70 to-[#07070b]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#07070b]/30 to-[#07070b]" />
         </div>
       )}
       <div className="relative mx-auto max-w-5xl px-4 pb-32 pt-6 sm:px-6">
@@ -314,7 +314,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
                     eager
                     className="h-full w-full scale-105 object-cover opacity-45"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-[#07070b]/60 to-[#07070b]" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#07070b]/30 to-[#07070b]" />
                 </>
               )}
               <div className="relative px-4 pb-10 pt-6 sm:px-6">
@@ -437,7 +437,7 @@ function CityView({
               eager
               className="h-full w-full scale-105 object-cover opacity-30"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[#07070b]/70 to-[#07070b]" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#07070b]/30 to-[#07070b]" />
           </>
         )}
         <div className="relative px-4 pb-10 pt-6 sm:px-6">

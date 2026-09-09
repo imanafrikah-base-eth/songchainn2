@@ -12,6 +12,7 @@ import { Image as ImageIcon, Link2, Loader2, Trash2, Upload, Film } from 'lucide
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useMediaUpload, useMyMedia } from '@/hooks/useArtistMedia';
+import { ClipVideo } from '@/worlds/builder/ClipVideo';
 
 export function ArtPicker({
   label,
@@ -34,11 +35,20 @@ export function ArtPicker({
   const { data: media = [] } = useMyMedia();
   const [picking, setPicking] = useState(false);
   const [link, setLink] = useState('');
+  /** A video waiting to be cut into a loop before it uploads. */
+  const [clipping, setClipping] = useState<File | null>(null);
   const busy = phase === 'preparing' || phase === 'uploading';
   const mine = media.filter((m) => m.kind === kind);
 
-  const onFile = async (file: File | undefined) => {
+  const onFile = async (file: File | undefined, opts?: { cut?: boolean }) => {
     if (!file) return;
+    // A video goes through the cutter first, the way IMan's loops were made.
+    // The artist can still send the whole thing.
+    if (kind === 'video' && !opts?.cut) {
+      setClipping(file);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
     const item = await upload(file, { title: label });
     if (item?.public_url) {
       onChange(item.public_url);
@@ -62,6 +72,18 @@ export function ArtPicker({
           </button>
         ) : null}
       </div>
+
+      {clipping ? (
+        <div className="mt-2">
+          <ClipVideo
+            file={clipping}
+            onDone={(result) => {
+              setClipping(null);
+              if (result) void onFile(result, { cut: true });
+            }}
+          />
+        </div>
+      ) : null}
 
       <div className={`mt-2 overflow-hidden rounded-md bg-black/30 ${aspect}`}>
         {value ? (

@@ -36,6 +36,11 @@ export function CityBlock({
   const loop = world.cityVideo?.[city.slug];
 
   const litWindows = Math.round(ratio * WINDOW_TOTAL);
+  // The artist's own picture is the building. The lit-window grid was drawn
+  // over every tower, art or not, and over IMan's it read as an equaliser
+  // stamped across his work. Where the artist gave us art, the art stands as
+  // they made it; the windows only dress a tower nobody has pictured yet.
+  const dressed = Boolean(art);
 
   return (
     <motion.div
@@ -62,12 +67,14 @@ export function CityBlock({
             <WorldArt
               poster={art}
               video={loop}
-              className="h-full w-full object-cover brightness-[0.4] transition duration-700 group-hover:scale-105 group-hover:brightness-[0.5]"
+              className={`h-full w-full object-cover transition duration-700 group-hover:scale-105 ${
+                dressed ? 'brightness-[0.9] group-hover:brightness-100' : 'brightness-[0.4] group-hover:brightness-[0.5]'
+              }`}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-black/40" />
+            <div className={`absolute inset-0 bg-gradient-to-t ${dressed ? 'from-black/90 via-black/30 to-transparent' : 'from-black/95 via-black/70 to-black/40'}`} />
 
             {/* The windows. Lit ones are content that is actually in there. */}
-            <div
+            {!dressed && <div
               className="absolute inset-x-0 top-0 grid gap-[6px] p-4 opacity-80"
               style={{ gridTemplateColumns: `repeat(${WINDOW_COLUMNS}, minmax(0, 1fr))` }}
               aria-hidden="true"
@@ -84,7 +91,7 @@ export function CityBlock({
                   />
                 );
               })}
-            </div>
+            </div>}
 
             {/* Light spilling from the doorway at street level */}
             <div className={`absolute inset-x-10 bottom-0 h-1.5 rounded-t-full ${hue.light} blur-[7px]`} />

@@ -75,9 +75,13 @@ export function WorldDoor({
             enterable ? 'brightness-[0.85]' : 'brightness-[0.45] grayscale-[0.6]'
           }`}
         />
-        {/* Depth and readability layers */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-black/15" />
-        <div className={`absolute inset-0 bg-gradient-to-b ${hue.bg} to-transparent ${enterable ? 'opacity-50' : 'opacity-25'}`} />
+        {/* Readability only. A door the artist pictured shows that picture as
+            they made it: no colour wash, and just enough dark at the foot for
+            the words. The wash stays for a door with no picture yet. */}
+        <div className={`absolute inset-0 bg-gradient-to-t ${art ? 'from-black/90 via-black/25 to-transparent' : 'from-black/95 via-black/45 to-black/15'}`} />
+        {!art && (
+          <div className={`absolute inset-0 bg-gradient-to-b ${hue.bg} to-transparent ${enterable ? 'opacity-50' : 'opacity-25'}`} />
+        )}
         {/* Light under an enterable door */}
         {enterable && (
           <div className={`absolute inset-x-6 bottom-0 h-1 rounded-t-full ${hue.light} blur-[6px]`} />
