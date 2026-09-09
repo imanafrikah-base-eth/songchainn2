@@ -34,6 +34,8 @@ export const FLOW_LABEL: Record<MoshaFlowName, string> = {
 
 const input = 'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none';
 const HUES = ['emerald', 'violet', 'sky', 'amber', 'rose', 'cyan', 'orange', 'yellow', 'red'];
+/** The kinds a city may be (a database rule); a named city takes them in turn. */
+const CITY_KINDS = ['music', 'canvas', 'motion', 'vault', 'word'];
 
 export function MoshaFlow({ flow, onClose }: { flow: MoshaFlowName; onClose?: () => void }) {
   const [current, setCurrent] = useState<MoshaFlowName>(flow);
@@ -272,16 +274,26 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
       let cityArt: Record<string, string> = {};
       if (cities.length) {
         say('Naming the cities');
-        await supabase.from('world_cities').delete().eq('world_id', id);
-        await supabase.from('world_cities').insert(
-          cities.map((c, i) => ({
-            world_id: id, slug: slugify(c), name: c, kind: 'custom', hue: HUES[i % HUES.length], sort_order: i + 1,
-            tagline: '', teaser: '', empty_line: 'Nothing standing here yet.', buildings: [],
-          })),
-        );
-        for (const c of cities) {
-          const url = pics[`city:${slugify(c)}`]?.url;
-          if (url) cityArt[slugify(c)] = url;
+        // The template's cities go only once the named ones are in, so a
+        // refused insert never leaves the world with no cities at all.
+        const { data: existing } = await supabase.from('world_cities').select('id, slug').eq('world_id', id);
+        const taken = new Set(((existing ?? []) as Array<{ slug: string }>).map((c) => c.slug));
+        const rows = cities.map((c, i) => {
+          let slug = slugify(c) || `city-${i + 1}`;
+          if (taken.has(slug)) slug = `${slug}-city`;
+          return {
+            world_id: id, slug, name: c, kind: CITY_KINDS[i % CITY_KINDS.length], hue: HUES[i % HUES.length], sort_order: i + 1,
+            tagline: '', teaser: '', empty_line: 'Nothing standing here yet.', buildings: [] as string[],
+          };
+        });
+        const { error: cityErr } = await supabase.from('world_cities').insert(rows as never);
+        if (cityErr) throw new Error('The cities could not be named: ' + cityErr.message);
+        const keep = new Set(rows.map((r) => r.slug));
+        const old = ((existing ?? []) as Array<{ id: string; slug: string }>).filter((c) => !keep.has(c.slug)).map((c) => c.id);
+        if (old.length) await supabase.from('world_cities').delete().in('id', old);
+        for (const r of rows) {
+          const url = pics[`city:${slugify(r.name)}`]?.url;
+          if (url) cityArt[r.slug] = url;
         }
       } else {
         cityArt = {};

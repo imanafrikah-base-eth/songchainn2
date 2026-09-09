@@ -56,7 +56,7 @@ export function MoshaChat({
   initial?: MoshaTurn[];
   compact?: boolean;
 }) {
-  const { isArtist } = useAuth();
+  const { isArtist, user } = useAuth();
   const [turns, setTurns] = useState<ChatTurn[]>(initial ?? []);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -145,11 +145,6 @@ export function MoshaChat({
         )}
         {turns.length === 0 && !busy && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).map((c) => (
-              <button key={c.flow} type="button" onClick={() => openFlow(c.flow)} className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20">
-                {FLOW_LABEL[c.flow]}
-              </button>
-            ))}
             {STARTERS.map((s) => (
               <button key={s} type="button" onClick={() => send(s)} className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted">
                 {s}
@@ -163,6 +158,17 @@ export function MoshaChat({
           </div>
         )}
       </div>
+
+      {/* The things Mo$ha can do, always one tap away, not only before the first word. */}
+      {user && (
+        <div className="flex gap-1.5 overflow-x-auto border-t border-border px-3 py-1.5 scrollbar-hide">
+          {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).map((c) => (
+            <button key={c.flow} type="button" disabled={busy} onClick={() => openFlow(c.flow)} className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50">
+              {FLOW_LABEL[c.flow]}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form
         className="flex items-end gap-2 border-t border-border px-3 py-2"
