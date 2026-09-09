@@ -1,3 +1,5 @@
+import { PhotoPositioner } from '@/components/PhotoPositioner';
+import { cropImage, CENTRE_CROP, type PhotoCrop } from '@/lib/cropImage';
 import { type ChangeEvent, type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -165,32 +167,15 @@ export default function Profile() {
   const [isCoverCropOpen, setIsCoverCropOpen] = useState(false);
   const [coverDraftFile, setCoverDraftFile] = useState<File | null>(null);
   const [coverDraftUrl, setCoverDraftUrl] = useState<string | null>(null);
-  const [coverCropOffsetY, setCoverCropOffsetY] = useState(0);
-  const [coverCropMaxOffset, setCoverCropMaxOffset] = useState(0);
+  const [coverCrop, setCoverCrop] = useState<PhotoCrop>(CENTRE_CROP);
   const [isSavingCroppedCover, setIsSavingCroppedCover] = useState(false);
   const [pendingCoverUrl, setPendingCoverUrl] = useState<string | null>(null);
-  const coverPreviewRef = useRef<HTMLDivElement | null>(null);
-  const coverPreviewImageRef = useRef<HTMLImageElement | null>(null);
-  const coverDragStateRef = useRef<{ startY: number; startOffset: number; liveOffset?: number } | null>(null);
   const [isAvatarCropOpen, setIsAvatarCropOpen] = useState(false);
   const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
   const [avatarDraftUrl, setAvatarDraftUrl] = useState<string | null>(null);
-  const [avatarOffsetX, setAvatarOffsetX] = useState(0);
-  const [avatarOffsetY, setAvatarOffsetY] = useState(0);
-  const [avatarMaxOffsetX, setAvatarMaxOffsetX] = useState(0);
-  const [avatarMaxOffsetY, setAvatarMaxOffsetY] = useState(0);
+  const [avatarCrop, setAvatarCrop] = useState<PhotoCrop>(CENTRE_CROP);
   const [isSavingCroppedAvatar, setIsSavingCroppedAvatar] = useState(false);
   const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
-  const avatarPreviewRef = useRef<HTMLDivElement | null>(null);
-  const avatarPreviewImageRef = useRef<HTMLImageElement | null>(null);
-  const avatarDragStateRef = useRef<{
-    startX: number;
-    startY: number;
-    startOffsetX: number;
-    startOffsetY: number;
-    liveOffsetX?: number;
-    liveOffsetY?: number;
-  } | null>(null);
   
   const navigate = useNavigate();
   const wantsSettings = new URLSearchParams(useLocation().search).has('settings');
@@ -323,10 +308,7 @@ export default function Profile() {
         if (prev) URL.revokeObjectURL(prev);
         return url;
       });
-      setAvatarOffsetX(0);
-      setAvatarOffsetY(0);
-      setAvatarMaxOffsetX(0);
-      setAvatarMaxOffsetY(0);
+      setAvatarCrop(CENTRE_CROP);
       setIsAvatarCropOpen(true);
     },
     [toast]
@@ -352,8 +334,7 @@ export default function Profile() {
         if (prev) URL.revokeObjectURL(prev);
         return url;
       });
-      setCoverCropOffsetY(0);
-      setCoverCropMaxOffset(0);
+      setCoverCrop(CENTRE_CROP);
       setIsCoverCropOpen(true);
     },
     [toast]
@@ -362,8 +343,7 @@ export default function Profile() {
   const closeCoverCrop = useCallback(() => {
     setIsCoverCropOpen(false);
     setCoverDraftFile(null);
-    setCoverCropOffsetY(0);
-    setCoverCropMaxOffset(0);
+    setCoverCrop(CENTRE_CROP);
     if (coverDraftUrl) {
       URL.revokeObjectURL(coverDraftUrl);
     }
@@ -373,10 +353,7 @@ export default function Profile() {
   const closeAvatarCrop = useCallback(() => {
     setIsAvatarCropOpen(false);
     setAvatarDraftFile(null);
-    setAvatarOffsetX(0);
-    setAvatarOffsetY(0);
-    setAvatarMaxOffsetX(0);
-    setAvatarMaxOffsetY(0);
+    setAvatarCrop(CENTRE_CROP);
     if (avatarDraftUrl) {
       URL.revokeObjectURL(avatarDraftUrl);
     }
@@ -385,168 +362,40 @@ export default function Profile() {
 
   const cropAndUploadCover = useCallback(async () => {
     if (!coverDraftFile || !user) return;
-    const imgUrl = URL.createObjectURL(coverDraftFile);
+    // The window the person dragged into place, cut from the full-size file.
+    const croppedFile = await cropImage(coverDraftFile, coverCrop, {
+      outputWidth: 1600,
+      quality: 0.9,
+      fileName: coverDraftFile.name || 'cover.jpg',
+    });
+    setIsUploadingCoverPhoto(true);
     try {
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = (err) => reject(err);
-        img.src = imgUrl;
-      });
-
-      const container = coverPreviewRef.current;
-      if (!container) throw new Error('missing-container');
-
-      const rect = container.getBoundingClientRect();
-      const containerWidth = rect.width || 800;
-      const containerHeight = rect.height || 240;
-
-      const scale = containerWidth / image.naturalWidth;
-      const displayedHeight = image.naturalHeight * scale;
-      const maxOffset = Math.max(0, (displayedHeight - containerHeight) / 2);
-      const clampedOffset = Math.min(maxOffset, Math.max(-maxOffset, coverCropOffsetY));
-
-      const centerDisplayedY = displayedHeight / 2 + clampedOffset;
-      const topDisplayed = centerDisplayedY - containerHeight / 2;
-      const topOriginal = topDisplayed / scale;
-      const cropHeightOriginal = containerHeight / scale;
-
-      const outputWidth = 1600;
-      const outputHeight = Math.round((containerHeight / containerWidth) * outputWidth);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = outputWidth;
-      canvas.height = outputHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('missing-context');
-
-      ctx.drawImage(
-        image,
-        0,
-        topOriginal,
-        image.naturalWidth,
-        cropHeightOriginal,
-        0,
-        0,
-        outputWidth,
-        outputHeight
-      );
-
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', 0.9)
-      );
-      if (!blob) throw new Error('missing-blob');
-
-      const croppedFile = new File([blob], coverDraftFile.name || 'cover.jpg', {
-        type: 'image/jpeg',
-      });
-
-      setIsUploadingCoverPhoto(true);
-      try {
-        const imageUrl = await uploadAndUpdateProfileImage(croppedFile, 'cover_photo_url');
-        if (imageUrl) {
-          setPendingCoverUrl(imageUrl);
-        }
-      } finally {
-        setIsUploadingCoverPhoto(false);
+      const imageUrl = await uploadAndUpdateProfileImage(croppedFile, 'cover_photo_url');
+      if (imageUrl) {
+        setPendingCoverUrl(imageUrl);
       }
     } finally {
-      URL.revokeObjectURL(imgUrl);
+      setIsUploadingCoverPhoto(false);
     }
-  }, [coverCropOffsetY, coverDraftFile, uploadAndUpdateProfileImage, user]);
+  }, [coverCrop, coverDraftFile, uploadAndUpdateProfileImage, user]);
 
   const cropAndUploadAvatar = useCallback(async () => {
     if (!avatarDraftFile || !user) return;
-    const imgUrl = URL.createObjectURL(avatarDraftFile);
+    const croppedFile = await cropImage(avatarDraftFile, { ...avatarCrop, aspect: 1 }, {
+      outputWidth: 600,
+      circle: true,
+      fileName: avatarDraftFile.name || 'avatar.png',
+    });
+    setIsUploadingProfilePicture(true);
     try {
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = (err) => reject(err);
-        img.src = imgUrl;
-      });
-
-      const container = avatarPreviewRef.current;
-      if (!container) throw new Error('missing-container');
-
-      const rect = container.getBoundingClientRect();
-      const containerWidth = rect.width || 240;
-      const containerHeight = rect.height || 240;
-
-      const scale = containerWidth / image.naturalWidth;
-      const displayedWidth = image.naturalWidth * scale;
-      const displayedHeight = image.naturalHeight * scale;
-
-      const maxOffsetX = Math.max(0, (displayedWidth - containerWidth) / 2);
-      const maxOffsetY = Math.max(0, (displayedHeight - containerHeight) / 2);
-      const clampedOffsetX = Math.min(
-        maxOffsetX,
-        Math.max(-maxOffsetX, avatarOffsetX)
-      );
-      const clampedOffsetY = Math.min(
-        maxOffsetY,
-        Math.max(-maxOffsetY, avatarOffsetY)
-      );
-
-      const centerDisplayedX = displayedWidth / 2 + clampedOffsetX;
-      const centerDisplayedY = displayedHeight / 2 + clampedOffsetY;
-
-      const leftDisplayed = centerDisplayedX - containerWidth / 2;
-      const topDisplayed = centerDisplayedY - containerHeight / 2;
-
-      const leftOriginal = leftDisplayed / scale;
-      const topOriginal = topDisplayed / scale;
-      const cropSizeOriginal = containerWidth / scale;
-
-      const outputSize = 600;
-      const canvas = document.createElement('canvas');
-      canvas.width = outputSize;
-      canvas.height = outputSize;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('missing-context');
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(outputSize / 2, outputSize / 2, outputSize / 2, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
-
-      ctx.drawImage(
-        image,
-        leftOriginal,
-        topOriginal,
-        cropSizeOriginal,
-        cropSizeOriginal,
-        0,
-        0,
-        outputSize,
-        outputSize
-      );
-
-      ctx.restore();
-
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/png', 0.9)
-      );
-      if (!blob) throw new Error('missing-blob');
-
-      const croppedFile = new File([blob], avatarDraftFile.name || 'avatar.png', {
-        type: 'image/png',
-      });
-
-      setIsUploadingProfilePicture(true);
-      try {
-        const imageUrl = await uploadAndUpdateProfileImage(croppedFile, 'avatar_url');
-        if (imageUrl) {
-          setPendingAvatarUrl(imageUrl);
-        }
-      } finally {
-        setIsUploadingProfilePicture(false);
+      const imageUrl = await uploadAndUpdateProfileImage(croppedFile, 'avatar_url');
+      if (imageUrl) {
+        setPendingAvatarUrl(imageUrl);
       }
     } finally {
-      URL.revokeObjectURL(imgUrl);
+      setIsUploadingProfilePicture(false);
     }
-  }, [avatarDraftFile, avatarOffsetX, avatarOffsetY, uploadAndUpdateProfileImage, user]);
+  }, [avatarCrop, avatarDraftFile, uploadAndUpdateProfileImage, user]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -827,76 +676,20 @@ export default function Profile() {
             <DialogTitle>Adjust cover photo</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div
-              ref={coverPreviewRef}
-              className="relative w-full h-48 overflow-hidden rounded-xl bg-muted touch-pan-y"
-              onPointerDown={(e) => {
-                if (!coverDraftUrl) return;
-                coverDragStateRef.current = { startY: e.clientY, startOffset: coverCropOffsetY };
-                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              }}
-              onPointerMove={(e) => {
-                if (!coverDragStateRef.current) return;
-                const deltaY = e.clientY - coverDragStateRef.current.startY;
-                const nextOffset = coverDragStateRef.current.startOffset + deltaY;
-                const clamped = Math.min(coverCropMaxOffset, Math.max(-coverCropMaxOffset, nextOffset));
-                coverDragStateRef.current.liveOffset = clamped;
-                if (coverPreviewImageRef.current) {
-                  coverPreviewImageRef.current.style.transform = `translate(-50%, ${clamped}px)`;
-                }
-              }}
-              onPointerUp={(e) => {
-                if (!coverDragStateRef.current) return;
-                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-                const final = coverDragStateRef.current.liveOffset ?? coverDragStateRef.current.startOffset;
-                coverDragStateRef.current = null;
-                setCoverCropOffsetY(final);
-              }}
-              onPointerLeave={(e) => {
-                if (!coverDragStateRef.current) return;
-                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-                const final = coverDragStateRef.current.liveOffset ?? coverDragStateRef.current.startOffset;
-                coverDragStateRef.current = null;
-                setCoverCropOffsetY(final);
-              }}
-            >
+            <div className="relative w-full h-48 overflow-hidden rounded-xl bg-muted">
               {coverDraftUrl && (
-                <>
-                  <img
-                    ref={coverPreviewImageRef}
-                    src={coverDraftUrl}
-                    alt="Cover preview"
-                    className="absolute left-1/2 top-1/2 -translate-x-1/2"
-                    onLoad={(event) => {
-                      const img = event.currentTarget;
-                      const container = coverPreviewRef.current;
-                      if (!container) return;
-                      const rect = container.getBoundingClientRect();
-                      const containerWidth = rect.width || 800;
-                      const containerHeight = rect.height || 240;
-                      const scale = containerWidth / img.naturalWidth;
-                      const displayedHeight = img.naturalHeight * scale;
-                      const maxOffset = Math.max(0, (displayedHeight - containerHeight) / 2);
-                      setCoverCropMaxOffset(maxOffset);
-                      setCoverCropOffsetY(0);
-                    }}
-                    style={{
-                      transform: `translate(-50%, ${coverCropOffsetY}px)`,
-                      width: '100%',
-                      height: 'auto',
-                    }}
-                  />
-                  <div className="pointer-events-none absolute inset-0 flex items-end justify-center pb-3">
-                    <div className="px-3 py-1 rounded-full bg-background/70 text-[10px] font-medium tracking-wide text-foreground/80">
-                      Drag to reposition
-                    </div>
-                  </div>
-                </>
+                <PhotoPositioner
+                  src={coverDraftUrl}
+                  onChange={setCoverCrop}
+                  className="absolute inset-0"
+                  alt="Cover preview"
+                  disabled={isSavingCroppedCover}
+                />
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Drag the photo up or down to choose which part shows in your cover. You
-              can change the photo before saving.
+              Drag the photo to choose which part shows in your cover. You can change
+              the photo before saving.
             </p>
           </div>
           <DialogFooter>
@@ -951,88 +744,15 @@ export default function Profile() {
             <DialogTitle>Adjust profile picture</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div
-              ref={avatarPreviewRef}
-              className="relative w-full max-w-xs mx-auto aspect-square overflow-hidden rounded-full bg-muted touch-pan-y"
-              onPointerDown={(e) => {
-                if (!avatarDraftUrl) return;
-                avatarDragStateRef.current = {
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  startOffsetX: avatarOffsetX,
-                  startOffsetY: avatarOffsetY,
-                };
-                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              }}
-              onPointerMove={(e) => {
-                if (!avatarDragStateRef.current) return;
-                const deltaX = e.clientX - avatarDragStateRef.current.startX;
-                const deltaY = e.clientY - avatarDragStateRef.current.startY;
-                const nextX = avatarDragStateRef.current.startOffsetX + deltaX;
-                const nextY = avatarDragStateRef.current.startOffsetY + deltaY;
-                const clampedX = Math.min(avatarMaxOffsetX, Math.max(-avatarMaxOffsetX, nextX));
-                const clampedY = Math.min(avatarMaxOffsetY, Math.max(-avatarMaxOffsetY, nextY));
-                avatarDragStateRef.current.liveOffsetX = clampedX;
-                avatarDragStateRef.current.liveOffsetY = clampedY;
-                if (avatarPreviewImageRef.current) {
-                  avatarPreviewImageRef.current.style.transform = `translate(-50%, -50%) translate(${clampedX}px, ${clampedY}px)`;
-                }
-              }}
-              onPointerUp={(e) => {
-                if (!avatarDragStateRef.current) return;
-                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-                const finalX = avatarDragStateRef.current.liveOffsetX ?? avatarDragStateRef.current.startOffsetX;
-                const finalY = avatarDragStateRef.current.liveOffsetY ?? avatarDragStateRef.current.startOffsetY;
-                avatarDragStateRef.current = null;
-                setAvatarOffsetX(finalX);
-                setAvatarOffsetY(finalY);
-              }}
-              onPointerLeave={(e) => {
-                if (!avatarDragStateRef.current) return;
-                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-                const finalX = avatarDragStateRef.current.liveOffsetX ?? avatarDragStateRef.current.startOffsetX;
-                const finalY = avatarDragStateRef.current.liveOffsetY ?? avatarDragStateRef.current.startOffsetY;
-                avatarDragStateRef.current = null;
-                setAvatarOffsetX(finalX);
-                setAvatarOffsetY(finalY);
-              }}
-            >
+            <div className="relative w-full max-w-xs mx-auto aspect-square overflow-hidden rounded-full bg-muted">
               {avatarDraftUrl && (
-                <>
-                  <img
-                    ref={avatarPreviewImageRef}
-                    src={avatarDraftUrl}
-                    alt="Profile preview"
-                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                    onLoad={(event) => {
-                      const img = event.currentTarget;
-                      const container = avatarPreviewRef.current;
-                      if (!container) return;
-                      const rect = container.getBoundingClientRect();
-                      const containerWidth = rect.width || 240;
-                      const containerHeight = rect.height || 240;
-                      const scale = containerWidth / img.naturalWidth;
-                      const displayedHeight = img.naturalHeight * scale;
-                      const displayedWidth = img.naturalWidth * scale;
-                      const maxOffsetX = Math.max(0, (displayedWidth - containerWidth) / 2);
-                      const maxOffsetY = Math.max(0, (displayedHeight - containerHeight) / 2);
-                      setAvatarMaxOffsetX(maxOffsetX);
-                      setAvatarMaxOffsetY(maxOffsetY);
-                      setAvatarOffsetX(0);
-                      setAvatarOffsetY(0);
-                    }}
-                    style={{
-                      transform: `translate(-50%, -50%) translate(${avatarOffsetX}px, ${avatarOffsetY}px)`,
-                      width: '100%',
-                      height: 'auto',
-                    }}
-                  />
-                  <div className="pointer-events-none absolute inset-0 flex items-end justify-center pb-3">
-                    <div className="px-3 py-1 rounded-full bg-background/70 text-[10px] font-medium tracking-wide text-foreground/80">
-                      Drag to reposition
-                    </div>
-                  </div>
-                </>
+                <PhotoPositioner
+                  src={avatarDraftUrl}
+                  onChange={setAvatarCrop}
+                  className="absolute inset-0"
+                  alt="Profile preview"
+                  disabled={isSavingCroppedAvatar}
+                />
               )}
             </div>
             <p className="text-xs text-muted-foreground">

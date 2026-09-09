@@ -1,6 +1,7 @@
-import { type ReactNode } from "react";
-import { Wallet, ChevronRight } from "lucide-react";
-import { useDiscoveredWallets } from "@/hooks/useDiscoveredWallets";
+import { useEffect, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
+import { useWalletOptions } from "@/hooks/useDiscoveredWallets";
+import { prefetchSdkWallets } from "@/lib/baseWallet";
 
 interface WalletPickerProps {
   /** Called with the chosen wallet's rdns, or undefined for the default provider */
@@ -12,15 +13,18 @@ interface WalletPickerProps {
 
 /**
  * Wallet chooser for sign-in. Lists every installed wallet announced via
- * EIP-6963 (MetaMask, Coinbase/Base app, Rainbow, Rabby, Phantom, ...).
- * Falls back to a single generic connect button when only window.ethereum
- * exists, and renders nothing when no wallet is installed (the parent
- * shows install links in that case).
+ * EIP-6963 (MetaMask, Coinbase/Base app, Rainbow, Rabby, Phantom, ...), then
+ * the wallet apps reachable through their SDKs, so a phone browser with no
+ * extension still connects to the wallet already on the device without
+ * leaving SONGCHAINN.
  */
 export function WalletPicker({ onConnect, busy, busyContent }: WalletPickerProps) {
-  const wallets = useDiscoveredWallets();
-  const hasLegacyProvider =
-    typeof window !== "undefined" && !!(window as any).ethereum?.request;
+  const options = useWalletOptions();
+
+  // Warm the SDK modules while the list is on screen, so a tap connects at once.
+  useEffect(() => {
+    prefetchSdkWallets();
+  }, []);
 
   if (busy) {
     return (
@@ -33,28 +37,17 @@ export function WalletPicker({ onConnect, busy, busyContent }: WalletPickerProps
     );
   }
 
-  if (wallets.length === 0) {
-    if (!hasLegacyProvider) return null;
-    return (
-      <button
-        onClick={() => onConnect()}
-        className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-[#0052FF] text-white font-semibold text-sm hover:opacity-95 active:scale-[0.98] transition-all mb-3"
-      >
-        <Wallet className="w-5 h-5 mr-2" />
-        Connect Wallet
-      </button>
-    );
-  }
+  if (options.length === 0) return null;
 
-  if (wallets.length === 1) {
-    const w = wallets[0];
+  if (options.length === 1) {
+    const w = options[0];
     return (
       <button
-        onClick={() => onConnect(w.info.rdns)}
+        onClick={() => onConnect(w.rdns)}
         className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl bg-[#0052FF] text-white font-semibold text-sm hover:opacity-95 active:scale-[0.98] transition-all mb-3"
       >
-        <img src={w.info.icon} alt="" className="w-6 h-6 rounded-md" />
-        Continue with {w.info.name}
+        <img src={w.icon} alt="" className="w-6 h-6 rounded-md" />
+        Continue with {w.name}
       </button>
     );
   }
@@ -62,17 +55,22 @@ export function WalletPicker({ onConnect, busy, busyContent }: WalletPickerProps
   return (
     <div className="space-y-2 mb-3">
       <p className="text-xs text-muted-foreground text-center">Choose a wallet</p>
-      {wallets.map((w) => (
+      {options.map((w) => (
         <button
-          key={w.info.rdns}
-          onClick={() => onConnect(w.info.rdns)}
+          key={w.rdns}
+          onClick={() => onConnect(w.rdns)}
           className="w-full h-14 flex items-center justify-between gap-3 px-4 rounded-2xl glass border border-border/60 text-foreground hover:bg-secondary/50 transition-colors press-effect"
         >
-          <span className="flex items-center gap-3">
-            <img src={w.info.icon} alt="" className="w-7 h-7 rounded-lg" />
-            <span className="font-semibold text-sm">{w.info.name}</span>
+          <span className="flex items-center gap-3 min-w-0">
+            <img src={w.icon} alt="" className="w-7 h-7 rounded-lg shrink-0" />
+            <span className="min-w-0 text-left">
+              <span className="block font-semibold text-sm truncate">{w.name}</span>
+              {w.sdk && (
+                <span className="block text-[11px] text-muted-foreground">Opens the wallet on this device and brings you back here</span>
+              )}
+            </span>
           </span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
         </button>
       ))}
     </div>

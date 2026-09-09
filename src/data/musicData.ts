@@ -232,7 +232,15 @@ export function buildCatalogs(songs: Song[]): Catalog[] {
     // A releases row is the grouping when there is one, so two EPs that
     // happen to share a title stay two EPs. The founding catalog groups by
     // its volume names as it always has.
-    const key = song.releaseId ? `${song.artistId}-r-${song.releaseId}` : `${song.artistId}-${song.volume ?? 'Singles'}`;
+    // A single is a release of its own. Before this, every single an artist
+    // sent stood in one 'Single' pile that took the newest song's date, so a
+    // new single dragged the whole pile into New Releases. Founding songs
+    // with no volume at all keep their old per-artist bucket.
+    const key = song.releaseId
+      ? `${song.artistId}-r-${song.releaseId}`
+      : song.volume === 'Single'
+        ? `${song.artistId}-s-${song.id}`
+        : `${song.artistId}-${song.volume ?? 'Singles'}`;
     const entry = grouped.get(key);
     if (entry) {
       entry.push(song);
@@ -256,6 +264,8 @@ export function buildCatalogs(songs: Song[]): Catalog[] {
     const totalPlays = group.reduce((sum, song) => sum + (song.plays || 0), 0);
     const totalLikes = group.reduce((sum, song) => sum + (song.likes || 0), 0);
     const displayVolume = top.volume ?? 'Vol1';
+    // A single is named after its song, the way a store lists it.
+    const title = key.includes('-s-') ? top.title : displayVolume;
     // Track order when the artist set one; arrival order otherwise.
     const numbered = group.some((song) => song.trackNumber);
     const inOrder = numbered
@@ -263,7 +273,7 @@ export function buildCatalogs(songs: Song[]): Catalog[] {
       : group;
     return {
       id: key,
-      title: displayVolume,
+      title,
       artist: top.artist,
       artistId: top.artistId,
       coverImage,

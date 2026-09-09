@@ -24,6 +24,13 @@ import path from "path";
 const IS_3D_ONLY =
   /node_modules[\\/](three|three-stdlib|three-mesh-bvh|@react-three[\\/]|@react-spring[\\/]|@monogrid[\\/]|@use-gesture[\\/]|troika-[a-z-]+|camera-controls|maath|meshline|stats-gl|suspend-react|its-fine|react-reconciler)/;
 
+// The wallet SDKs (Coinbase and MetaMask) are only wanted when somebody taps
+// a wallet, and they are heavy. Kept out of vendor so they arrive on demand
+// through the dynamic imports in src/lib/baseWallet.ts. Their small shared
+// dependencies stay in vendor, which is fine: chunks import each other.
+const IS_WALLET_SDK =
+  /node_modules[\\/](@coinbase[\\/]wallet-sdk|@metamask[\\/]sdk|@metamask[\\/]sdk-communication-layer|@metamask[\\/]sdk-install-modal-web|@metamask[\\/]providers|@metamask[\\/]onboarding|socket\.io-client|socket\.io-parser|engine\.io-client|engine\.io-parser|eciesjs)[\\/]/;
+
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
   server: {
@@ -70,6 +77,7 @@ export default defineConfig(() => ({
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
           if (IS_3D_ONLY.test(id)) return;
+          if (IS_WALLET_SDK.test(id)) return;
           return 'vendor';
         },
       },

@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
-import { hasWalletProvider, connectWallet, signMessage, generateNonce, selectWallet, subscribeWallets, toChecksumAddress } from '@/lib/baseWallet';
+import { hasWalletProvider, getWalletProvider, connectWallet, signMessage, generateNonce, selectWallet, subscribeWallets, toChecksumAddress } from '@/lib/baseWallet';
 
 /* The profile row's own Update type, so a write never carries a column the
  * table does not have. Newer supabase-js rejects excess properties at the
@@ -390,11 +390,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: new Error('Supabase is not configured') };
       }
 
-      // Route all wallet calls to the wallet the user picked (EIP-6963);
+      // Route all wallet calls to the wallet the user picked: an installed
+      // one (EIP-6963), or the wallet app on the phone through its SDK;
       // undefined falls back to window.ethereum.
-      selectWallet(walletRdns);
+      try {
+        await selectWallet(walletRdns);
+      } catch (err) {
+        return { error: new Error(err instanceof Error ? err.message : 'That wallet could not be started. Try again.') };
+      }
 
-      if (!hasWalletProvider()) {
+      if (!getWalletProvider() && !hasWalletProvider()) {
         return { error: new Error('No wallet detected. Please install a Base compatible wallet.') };
       }
 

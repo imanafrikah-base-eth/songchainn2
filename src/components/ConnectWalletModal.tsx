@@ -1,7 +1,7 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Wallet, ExternalLink, Loader2, ChevronRight, X } from 'lucide-react';
-import { connectWallet } from '@/lib/baseWallet';
-import { useDiscoveredWallets } from '@/hooks/useDiscoveredWallets';
+import { connectWallet, prefetchSdkWallets } from '@/lib/baseWallet';
+import { useWalletOptions } from '@/hooks/useDiscoveredWallets';
 import { isWalletGateOpen, subscribeWalletGate, resolveWalletGate } from '@/lib/walletGate';
 
 function isMobileBrowser(): boolean {
@@ -11,15 +11,24 @@ function isMobileBrowser(): boolean {
 
 /**
  * Global wallet-connect prompt, opened by requestWalletConnection() whenever
- * a trading action (buy, sell, unlock) needs a wallet. Adapts to environment:
- * wallet picker on desktop, open-in-wallet deep links on mobile browsers
- * without an injected wallet, install links otherwise.
+ * a trading action (buy, sell, unlock) needs a wallet.
+ *
+ * Every option here connects without leaving SONGCHAINN: an installed
+ * wallet directly, or the wallet app already on the phone through its SDK,
+ * which hands off and brings the person straight back to this page. The
+ * old "open SONGCHAINN inside your wallet's browser" links are kept only as
+ * a last resort at the bottom.
  */
 export function ConnectWalletModal() {
   const open = useSyncExternalStore(subscribeWalletGate, isWalletGateOpen, () => false);
-  const wallets = useDiscoveredWallets();
+  const options = useWalletOptions();
   const [connectingRdns, setConnectingRdns] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Warm the SDK modules the moment the sheet opens, so a tap connects at once.
+  useEffect(() => {
+    if (open) prefetchSdkWallets();
+  }, [open]);
 
   if (!open) return null;
 
@@ -73,7 +82,7 @@ export function ConnectWalletModal() {
             Connect a Base wallet
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Buying, selling and collecting songs happens on Base. Connect a wallet to continue.
+            Buying, selling and collecting songs happens on Base. Connect the wallet on this device and you come straight back here.
           </p>
         </div>
 
@@ -83,58 +92,73 @@ export function ConnectWalletModal() {
           </div>
         )}
 
-        {wallets.length > 0 ? (
-          <div className="space-y-2">
-            {wallets.map((w) => (
-              <button
-                key={w.info.rdns}
-                onClick={() => handlePick(w.info.rdns)}
-                disabled={connectingRdns !== null}
-                className="w-full h-14 flex items-center justify-between gap-3 px-4 rounded-2xl glass border border-border/60 text-foreground hover:bg-secondary/50 transition-colors press-effect disabled:opacity-60"
-              >
-                <span className="flex items-center gap-3">
-                  <img src={w.info.icon} alt="" className="w-7 h-7 rounded-lg" />
-                  <span className="font-semibold text-sm">{w.info.name}</span>
+        <div className="space-y-2">
+          {options.map((w) => (
+            <button
+              key={w.rdns}
+              onClick={() => handlePick(w.rdns)}
+              disabled={connectingRdns !== null}
+              className="w-full h-14 flex items-center justify-between gap-3 px-4 rounded-2xl glass border border-border/60 text-foreground hover:bg-secondary/50 transition-colors press-effect disabled:opacity-60"
+            >
+              <span className="flex items-center gap-3 min-w-0">
+                <img src={w.icon} alt="" className="w-7 h-7 rounded-lg shrink-0" />
+                <span className="min-w-0 text-left">
+                  <span className="block font-semibold text-sm truncate">{w.name}</span>
+                  {w.sdk && (
+                    <span className="block text-[11px] text-muted-foreground">
+                      {mobile ? 'Opens the app on this phone, then brings you back' : 'No extension needed'}
+                    </span>
+                  )}
                 </span>
-                {connectingRdns === w.info.rdns ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                )}
-              </button>
-            ))}
-          </div>
-        ) : mobile ? (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground text-center mb-1">
-              Open $ongChainn inside your wallet app to connect:
-            </p>
-            <a
-              href={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`}
-              className="w-full h-14 flex items-center justify-between gap-3 px-4 rounded-2xl bg-[#0052FF] text-white font-semibold text-sm hover:opacity-95 transition-all press-effect"
-            >
-              <span>Open in Base app / Coinbase Wallet</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
-            <a
-              href={`https://metamask.app.link/dapp/${currentHostPath}`}
-              className="w-full h-14 flex items-center justify-between gap-3 px-4 rounded-2xl glass border border-border/60 text-foreground hover:bg-secondary/50 transition-colors press-effect font-semibold text-sm"
-            >
-              <span>Open in MetaMask</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
+              </span>
+              {connectingRdns === w.rdns ? (
+                <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {connectingRdns && (
+          <p className="mt-3 text-xs text-muted-foreground text-center">
+            Approve it in your wallet. This page waits for you.
+          </p>
+        )}
+
+        {mobile ? (
+          <details className="mt-4">
+            <summary className="cursor-pointer text-center text-xs text-muted-foreground">
+              Wallet not responding? Open $ongChainn inside it instead
+            </summary>
+            <div className="mt-2 space-y-2">
+              <a
+                href={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`}
+                className="w-full h-12 flex items-center justify-between gap-3 px-4 rounded-2xl glass border border-border/60 text-foreground text-sm font-semibold hover:bg-secondary/50 transition-colors press-effect"
+              >
+                <span>Open in Base app / Coinbase Wallet</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+              <a
+                href={`https://metamask.app.link/dapp/${currentHostPath}`}
+                className="w-full h-12 flex items-center justify-between gap-3 px-4 rounded-2xl glass border border-border/60 text-foreground text-sm font-semibold hover:bg-secondary/50 transition-colors press-effect"
+              >
+                <span>Open in MetaMask</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </details>
         ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground text-center mb-1">
-              No wallet detected. Install one, then come back:
+          <div className="mt-4 text-center">
+            <p className="text-xs text-muted-foreground mb-2">
+              Prefer a browser extension? Install one, then come back:
             </p>
             <div className="flex gap-2">
               <a
                 href="https://metamask.io/download/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl glass text-primary hover:bg-secondary/50 transition-colors font-medium text-sm press-effect"
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl glass text-primary hover:bg-secondary/50 transition-colors font-medium text-sm press-effect"
               >
                 MetaMask
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -143,7 +167,7 @@ export function ConnectWalletModal() {
                 href="https://www.coinbase.com/wallet"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl glass text-primary hover:bg-secondary/50 transition-colors font-medium text-sm press-effect"
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl glass text-primary hover:bg-secondary/50 transition-colors font-medium text-sm press-effect"
               >
                 Coinbase
                 <ExternalLink className="w-3.5 h-3.5" />
