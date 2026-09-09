@@ -10,6 +10,7 @@ import { useSongOwnership } from '@/hooks/useSongOwnership';
 import { cn } from '@/lib/utils';
 import { SpinningSongArt } from './SpinningSongArt';
 import { ShareSongButton } from './ShareSongButton';
+import { SongMenu } from './song/SongMenu';
 import { OwnershipBadge } from './OwnershipBadge';
 import { OnchainVerifiedBadge } from './OnchainVerifiedBadge';
 import { earnedPlacement } from '@/lib/placement';
@@ -302,6 +303,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             >
               <Heart className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4", liked && "fill-current")} />
             </motion.button>
+            <SongMenu song={song} />
           </div>
         </motion.div>
         
@@ -460,6 +462,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             >
               <Heart className={cn("w-4 h-4", liked && "fill-current")} />
             </motion.button>
+            <SongMenu song={song} className="glass flex-shrink-0 rounded-xl" />
           </div>
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -634,6 +637,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             >
               <Heart className={cn("w-4 h-4", liked && "fill-current")} />
             </motion.button>
+            <SongMenu song={song} />
           </div>
         </div>
       </div>

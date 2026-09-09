@@ -73,14 +73,10 @@ serve(async (req) => {
       });
     }
 
+    // The row is the submission. The email is a courtesy copy for the inbox,
+    // and it used to be the other way round: no mail key meant a 503 with
+    // nothing saved, and a failed insert was logged and then told "Sent!".
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    if (!RESEND_API_KEY) {
-      console.error("RESEND_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Submissions are temporarily unavailable" }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -104,6 +100,18 @@ serve(async (req) => {
     });
     if (insertErr) {
       console.error("Failed to persist artist application:", insertErr);
+      return new Response(
+        JSON.stringify({ error: "We could not save your submission. Try again in a moment." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (!RESEND_API_KEY) {
+      console.error("RESEND_API_KEY not configured; application saved without the email copy");
+      return new Response(
+        JSON.stringify({ success: true, emailed: false }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const songsWithLinks = await Promise.all(cleanSongs.map(async (song) => {
@@ -194,14 +202,15 @@ serve(async (req) => {
     if (!emailResponse.ok) {
       const errBody = await emailResponse.text();
       console.error("Resend error:", emailResponse.status, errBody);
+      // Saved, not mailed. The review panel still sees it.
       return new Response(
-        JSON.stringify({ error: "Could not send submission" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ success: true, emailed: false }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, emailed: true }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {

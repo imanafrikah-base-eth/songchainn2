@@ -36,13 +36,17 @@ export default function Social() {
     posts,
     isLoading,
     following,
-    followers,
+    likedArtistIds,
     createPost,
+    deletePost,
+    deleteComment,
     toggleLikePost,
     followUser,
     isFollowing,
     getPostComments,
     addComment,
+    untagSelf,
+    fetchPostById,
     refetchPosts,
   } = useSocial();
   const playerState = useSafePlayerState();
@@ -111,37 +115,86 @@ export default function Social() {
     if (shareSongId) setShowComposer(true);
   }, [shareSongId]);
 
+  /**
+   * A link to one post.
+   *
+   * If it is in the page already loaded, scroll to it. If not, fetch it by
+   * id and pin it above the feed. This used to "load" it by running the same
+   * find that had just failed, so every shared link to a post older than the
+   * latest fifty opened onto the plain feed with no explanation.
+   */
+  const sharedLoadedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!sharedPostId) {
       setSharedPost(null);
       setIsLoadingSharedPost(false);
+      sharedLoadedRef.current = null;
       return;
     }
+    if (isLoading) return;
     const idx = posts.findIndex((p) => p.id === sharedPostId);
     if (idx >= 0) {
       setSharedPost(null);
+      sharedLoadedRef.current = null;
       const container = feedRef.current;
       if (container) {
         container.scrollTo({ top: idx * container.clientHeight, behavior: 'auto' });
       }
       return;
     }
+    // Already pinned; a feed refresh behind it is no reason to fetch again.
+    if (sharedLoadedRef.current === sharedPostId) return;
+
+    let cancelled = false;
     const load = async () => {
       setIsLoadingSharedPost(true);
       try {
-        setSharedPost(posts.find((p) => p.id === sharedPostId) || null);
+        const post = await fetchPostById(sharedPostId);
+        if (cancelled) return;
+        if (!post) {
+          toast({ title: 'That post is gone' });
+          navigate('/social', { replace: true });
+          return;
+        }
+        sharedLoadedRef.current = sharedPostId;
+        setSharedPost(post);
       } finally {
-        setIsLoadingSharedPost(false);
+        if (!cancelled) setIsLoadingSharedPost(false);
       }
     };
     void load();
-  }, [posts, sharedPostId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [posts, sharedPostId, isLoading, fetchPostById, navigate]);
 
   const filteredPosts = feedType === 'following'
-    ? posts.filter((p) => following.includes(p.user_id) || p.user_id === user?.id)
+    ? posts.filter((p) =>
+        following.includes(p.user_id)
+        || p.user_id === user?.id
+        || (!!p.artist_id && likedArtistIds.includes(p.artist_id)))
     : posts;
 
-  const postsToRender = sharedPost ? [sharedPost] : filteredPosts;
+  const postsToRender = sharedPost
+    ? [sharedPost, ...filteredPosts.filter((p) => p.id !== sharedPost.id)]
+    : filteredPosts;
+
+  const backToFeed = useCallback(() => {
+    navigate('/social', { replace: true });
+  }, [navigate]);
+
+  const handleDeletePost = useCallback(async (postId: string) => {
+    const ok = await deletePost(postId);
+    if (ok && sharedLoadedRef.current === postId) backToFeed();
+  }, [deletePost, backToFeed]);
+
+  const handleDeleteComment = useCallback(async (commentId: string) => {
+    const postId = commentSheet.postId;
+    if (!postId) return false;
+    const ok = await deleteComment(postId, commentId);
+    if (ok) setCurrentComments((prev) => prev.filter((c) => c.id !== commentId));
+    return ok;
+  }, [commentSheet.postId, deleteComment]);
   postsToRenderRef.current = postsToRender;
   const effectiveIsLoading = isLoading || isLoadingSharedPost;
 
@@ -364,6 +417,8 @@ export default function Social() {
                 onFollow={followUser}
                 isFollowing={isFollowing(post.user_id)}
                 onComment={() => handleOpenComments(post.id)}
+                onDelete={handleDeletePost}
+                onUntagSelf={untagSelf}
               />
             </div>
           ))
@@ -377,16 +432,32 @@ export default function Social() {
             <div className="flex items-center justify-between pointer-events-auto">
               {/* Back + title */}
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
-                >
-                  <ArrowLeft className="w-4 h-4 text-white" />
-                </button>
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-white/80" />
-                  <span className="font-semibold text-white">Feed</span>
-                </div>
+                {sharedPost ? (
+                  /* Arrived on one post from a link. The way out is the feed,
+                     not the browser history, which may be another site. */
+                  <button
+                    type="button"
+                    onClick={backToFeed}
+                    className="h-8 pl-2 pr-3 rounded-full bg-white/10 backdrop-blur-sm flex items-center gap-1.5 text-sm font-medium text-white"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to feed
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => navigate(-1)}
+                      aria-label="Go back"
+                      className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-white" />
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-white/80" />
+                      <span className="font-semibold text-white">Feed</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Feed tabs + discover */}
@@ -566,6 +637,7 @@ export default function Social() {
         comments={currentComments}
         isLoading={loadingComments}
         onAddComment={handleAddComment}
+        onDeleteComment={handleDeleteComment}
         commentsCount={currentComments.length}
       />
     </div>

@@ -155,8 +155,22 @@ export const AudioPlayer = memo(function AudioPlayer() {
       navigator.mediaSession.setActionHandler('pause', isRoomMode ? null : togglePlay);
       navigator.mediaSession.setActionHandler('previoustrack', isRoomMode ? null : playPrevious);
       navigator.mediaSession.setActionHandler('nexttrack', isRoomMode ? null : playNext);
+      try {
+        navigator.mediaSession.setActionHandler(
+          'seekto',
+          isRoomMode
+            ? null
+            : (details) => {
+                if (typeof details.seekTime === 'number' && Number.isFinite(details.seekTime)) {
+                  seekTo(details.seekTime);
+                }
+              },
+        );
+      } catch {
+        // Older browsers throw on unknown actions.
+      }
     }
-  }, [currentSong, isRoomMode, togglePlay, playPrevious, playNext]);
+  }, [currentSong, isRoomMode, togglePlay, playPrevious, playNext, seekTo]);
 
   useEffect(() => {
     if ('mediaSession' in navigator) {
@@ -248,6 +262,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
               <div
                 role="button"
                 tabIndex={0}
+                aria-label="Open full screen player"
                 onClick={handleOpenFullScreen}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenFullScreen(); } }}
                 className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 text-left group cursor-pointer"
@@ -303,6 +318,8 @@ export const AudioPlayer = memo(function AudioPlayer() {
               {/* Controls - more prominent on mobile */}
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
+                  type="button"
+                  aria-label="Previous track"
                   onClick={isRoomMode ? undefined : playPrevious}
                   className="p-2 hover:bg-secondary/80 rounded-full transition-colors press-effect hidden sm:flex disabled:opacity-40 disabled:hover:bg-transparent"
                   disabled={isRoomMode}
@@ -311,6 +328,9 @@ export const AudioPlayer = memo(function AudioPlayer() {
                 </button>
 
                 <motion.button
+                  type="button"
+                  aria-label={isPlaying ? 'Pause' : 'Play'}
+                  aria-pressed={isPlaying}
                   onClick={isRoomMode ? undefined : togglePlay}
                   disabled={isRoomMode}
                   className="p-3 sm:p-3 gradient-primary-artwork rounded-full shadow-glow-artwork press-effect disabled:opacity-40"
@@ -345,6 +365,8 @@ export const AudioPlayer = memo(function AudioPlayer() {
                 </motion.button>
 
                 <button
+                  type="button"
+                  aria-label="Next track"
                   onClick={isRoomMode ? undefined : playNext}
                   disabled={isRoomMode}
                   className="p-2 hover:bg-secondary/80 rounded-full transition-colors press-effect disabled:opacity-40 disabled:hover:bg-transparent"
@@ -367,6 +389,9 @@ export const AudioPlayer = memo(function AudioPlayer() {
 
                 <div className="flex items-center gap-2 w-28">
                   <button
+                    type="button"
+                    aria-label={volume === 0 ? 'Unmute' : 'Mute'}
+                    aria-pressed={volume === 0}
                     onClick={handleVolumeToggle}
                     className="p-1 hover:bg-secondary/80 rounded transition-colors"
                   >
@@ -377,6 +402,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                     )}
                   </button>
                   <Slider
+                    aria-label="Volume"
                     value={[volume * 100]}
                     onValueChange={handleVolumeChange}
                     max={100}

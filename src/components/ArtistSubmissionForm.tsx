@@ -138,7 +138,12 @@ export function ArtistSubmissionForm() {
         throw new Error(error?.message || (data as any)?.error || 'Something went wrong.');
       }
 
-      toast.success("Sent! We'll be in touch soon.");
+      toast.success('Sent. It is in the review queue.', {
+        description: user?.email
+          ? `We listen to every submission and reply to ${user.email}. Nothing you sent is public until it is approved.`
+          : 'We listen to every submission and reply by email. Nothing you sent is public until it is approved.',
+        duration: 8000,
+      });
       setRealName('');
       setArtistName('');
       setLocation('');

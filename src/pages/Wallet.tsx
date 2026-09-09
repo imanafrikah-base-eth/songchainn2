@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Wallet as WalletIcon, ArrowLeft, ExternalLink, Coins, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Wallet as WalletIcon, ArrowLeft, ExternalLink, Coins, Loader2, Receipt } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { useAuth } from '@/context/AuthContext';
@@ -26,10 +28,41 @@ import { Button } from '@/components/ui/button';
  * at you the moment you look at your balance is the exact thing that makes
  * people stop opening it.
  */
+interface PurchaseRow {
+  id: string;
+  song_id: string;
+  copies: number;
+  usd_paid: number;
+  eth_paid: string | number | null;
+  tx_hash: string | null;
+  purchased_at: string;
+}
+
+/**
+ * The receipts this person holds, newest first. Same table and client pattern
+ * as useSongCopies; RLS scopes the rows to the signed-in user.
+ */
+function useMyPurchases(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['my-purchases', userId],
+    enabled: !!userId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('song_purchases' as never)
+        .select('id, song_id, copies, usd_paid, eth_paid, tx_hash, purchased_at')
+        .order('purchased_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as PurchaseRow[];
+    },
+  });
+}
+
 export default function Wallet() {
   const { user, walletAddress } = useAuth();
   const { balance, isLoading: balanceLoading } = useWalletBalance(walletAddress);
   const { ownedSongs, isLoading: ownedLoading } = useOwnedSongs();
+  const { data: purchases = [], isLoading: purchasesLoading } = useMyPurchases(user?.id);
 
   const ownedWithTitles = useMemo(
     () =>
@@ -48,7 +81,7 @@ export default function Wallet() {
           <h1 className="mb-2 font-heading text-2xl font-bold">Your wallet</h1>
           <p className="mb-6 text-sm text-muted-foreground">Sign in to see what you hold.</p>
           <Link
-            to="/auth"
+            to="/?auth=signin"
             className="inline-flex items-center rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground"
           >
             Sign in
@@ -149,6 +182,83 @@ export default function Wallet() {
             </section>
           </>
         )}
+
+        {/* What was paid, and when. A receipt per purchase, newest first. */}
+        <section className="mb-8">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Your purchases
+          </h2>
+          {purchasesLoading ? (
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Finding your receipts
+            </div>
+          ) : purchases.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+              No purchases yet. Every copy you buy shows up here with what you paid.
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {purchases.map((p) => {
+                const song = SONGS.find((s) => s.id === String(p.song_id)) ?? null;
+                const copies = Number(p.copies ?? 0);
+                const usd = Number(p.usd_paid ?? 0);
+                const when = p.purchased_at ? new Date(p.purchased_at) : null;
+                return (
+                  <li
+                    key={p.id}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
+                  >
+                    {song?.coverImage ? (
+                      <img
+                        src={song.coverImage}
+                        alt=""
+                        className="h-11 w-11 rounded-lg object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted">
+                        <Receipt className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      </div>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-foreground">
+                        {song ? (
+                          <Link to={`/song/${song.id}`} className="hover:text-primary">{song.title}</Link>
+                        ) : (
+                          'A song'
+                        )}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {when && !Number.isNaN(when.getTime())
+                          ? when.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                          : ''}
+                        {song?.artist ? ` · ${song.artist}` : ''}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-sm font-semibold tabular-nums text-foreground">
+                        ${usd.toFixed(2)}
+                      </span>
+                      <span className="block text-xs tabular-nums text-muted-foreground">
+                        {copies} {copies === 1 ? 'copy' : 'copies'}
+                      </span>
+                      {p.tx_hash && (
+                        <a
+                          href={`https://basescan.org/tx/${p.tx_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          On chain <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
         {/* Quiet, and only two. */}
         <section>

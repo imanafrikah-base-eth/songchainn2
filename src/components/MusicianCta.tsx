@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
  *
  * Until now the only way onto SONGCHAINN was an application form, so artists
  * had no reason to think this was for them. This says the opposite: you can
- * release here today, for free, and nobody has to approve you.
+ * release here, for free. The one gate is claiming the page (an admin confirms
+ * it is really you); after that no record is ever approved by hand.
  *
  * It used to say it as a flyer: an eyebrow pill, a 5xl black headline, a
  * paragraph, three icon-heading-paragraph blocks, a button and a footnote, all
@@ -30,7 +31,8 @@ export function MusicianCta({ onSignUp }: { onSignUp?: () => void }) {
       <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
         Release here first, then everywhere. Keep your distributor for the stores; this is where the
         fans who care can hold your records, walk into your world and pay you directly, with no one in
-        between. Send a finished record and, if it meets the standard, it is live the same minute.
+        between. Claim your page once, and from then on every finished record you send is live the
+        same minute.
       </p>
 
       <ul className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground sm:text-sm">

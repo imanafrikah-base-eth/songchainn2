@@ -1,7 +1,7 @@
 import { type ChangeEvent, type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive, Plus, Lock, Globe, Trash2, Flame } from 'lucide-react';
+import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive, Plus, Lock, Globe, Trash2, Flame, Download, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AccountNotice } from '@/components/AccountNotice';
 import { Input } from '@/components/ui/input';
@@ -22,10 +22,23 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { InviteFriends } from '@/components/InviteFriends';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { ChangePassword } from '@/components/ChangePassword';
+import { ChangeEmail } from '@/components/ChangeEmail';
+import { LikedActivity } from '@/components/LikedActivity';
+import { MusicActivity } from '@/components/MusicActivity';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { BlockedPeople } from '@/components/BlockedPeople';
 import { DeleteAccount } from '@/components/DeleteAccount';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 const logo = '/songchainn-logo.webp';
@@ -58,6 +71,44 @@ const normalizeUrl = (value: string) => {
   if (!trimmed) return null;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return `https://${trimmed}`;
+};
+
+// The artist links live in their own audience_profiles columns. Kept as one
+// list so the state, the form, the validation and the payload agree.
+const ARTIST_LINK_FIELDS = [
+  { key: 'spotify_url', label: 'Spotify', placeholder: 'https://open.spotify.com/artist/...' },
+  { key: 'instagram_url', label: 'Instagram', placeholder: 'https://instagram.com/yourhandle' },
+  { key: 'youtube_url', label: 'YouTube', placeholder: 'https://youtube.com/@yourchannel' },
+  { key: 'tiktok_url', label: 'TikTok', placeholder: 'https://tiktok.com/@yourhandle' },
+  { key: 'soundcloud_url', label: 'SoundCloud', placeholder: 'https://soundcloud.com/yourname' },
+  { key: 'apple_music_url', label: 'Apple Music', placeholder: 'https://music.apple.com/artist/...' },
+] as const;
+type ArtistLinkKey = (typeof ARTIST_LINK_FIELDS)[number]['key'];
+type ArtistLinks = Record<ArtistLinkKey, string>;
+
+const readArtistLinks = (profile: unknown): ArtistLinks => {
+  const p = (profile || {}) as Record<string, unknown>;
+  const out = {} as ArtistLinks;
+  ARTIST_LINK_FIELDS.forEach(({ key }) => {
+    out[key] = typeof p[key] === 'string' ? (p[key] as string) : '';
+  });
+  return out;
+};
+
+// Artist links must be https. Anything without a scheme gets one; http is
+// upgraded rather than rejected, since that is what people paste.
+const normalizeHttpsUrl = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  if (/^http:\/\//i.test(trimmed)) return 'https://' + trimmed.slice(7);
+  return 'https://' + trimmed;
+};
+
+const formatBytes = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return null;
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
 
 const isMissingColumnError = (error: unknown) => {
@@ -99,7 +150,9 @@ export default function Profile() {
   const [playlistName, setPlaylistName] = useState('');
   const [playlistDescription, setPlaylistDescription] = useState('');
   const [playlistIsPublic, setPlaylistIsPublic] = useState(false);
-  const { storageUsedBytes } = useOfflineAudio();
+  const { storageUsedBytes, cachedSongs, removeCachedSong } = useOfflineAudio();
+  // Deleting a playlist is one tap on a trash icon, so it asks first.
+  const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string; name: string } | null>(null);
   const { isOnline: isProfileOnline, lastSeenAt: profileLastSeenAt } = useUserPresence(
     audienceProfile?.user_id ?? audienceProfile?.id,
     { includeLastSeen: true }
@@ -140,6 +193,7 @@ export default function Profile() {
   } | null>(null);
   
   const navigate = useNavigate();
+  const wantsSettings = new URLSearchParams(useLocation().search).has('settings');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -168,6 +222,8 @@ export default function Profile() {
   const [xProfileLink, setXProfileLink] = useState(audienceProfile?.twitter_url || audienceProfile?.x_profile_link || '');
   const [baseProfileLink, setBaseProfileLink] = useState(audienceProfile?.base_profile_link || audienceProfile?.wallet_address || '');
   const [interests, setInterests] = useState((((audienceProfile as any)?.interests || (audienceProfile as any)?.genre || '') as string));
+  const [artistLinks, setArtistLinks] = useState<ArtistLinks>(() => readArtistLinks(audienceProfile));
+  const [bookingEmail, setBookingEmail] = useState(((audienceProfile as any)?.booking_email || '') as string);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [pendingProfileSnapshot, setPendingProfileSnapshot] = useState<{
     display_name: string;
@@ -196,6 +252,8 @@ export default function Profile() {
       setXProfileLink(audienceProfile.twitter_url || audienceProfile.x_profile_link || '');
       setBaseProfileLink(audienceProfile.base_profile_link || audienceProfile.wallet_address || '');
       setInterests((((audienceProfile as any)?.interests || (audienceProfile as any)?.genre || '') as string));
+      setArtistLinks(readArtistLinks(audienceProfile));
+      setBookingEmail(((audienceProfile as any)?.booking_email || '') as string);
       setFieldErrors({});
       setPendingProfileSnapshot(null);
     }
@@ -531,6 +589,33 @@ export default function Profile() {
       }
     }
 
+    // Artist links: only checked, and only saved, for artist accounts.
+    const nextArtistLinks: Partial<Record<ArtistLinkKey, string | null>> = {};
+    let nextBookingEmail: string | null = null;
+    if (isArtist) {
+      ARTIST_LINK_FIELDS.forEach(({ key, label }) => {
+        const normalized = normalizeHttpsUrl(artistLinks[key]);
+        nextArtistLinks[key] = normalized;
+        if (!normalized) return;
+        try {
+          const parsed = new URL(normalized);
+          if (parsed.protocol !== 'https:' || !parsed.hostname.includes('.')) {
+            nextErrors[key] = label + ' link must be a full https:// address.';
+          }
+        } catch {
+          nextErrors[key] = 'Enter a valid ' + label + ' URL.';
+        }
+      });
+      const cleanBooking = bookingEmail.trim();
+      if (cleanBooking) {
+        if (!cleanBooking.includes('@') || cleanBooking.startsWith('@') || cleanBooking.endsWith('@')) {
+          nextErrors.booking_email = 'Enter a valid booking email.';
+        } else {
+          nextBookingEmail = cleanBooking;
+        }
+      }
+    }
+
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors);
       toast({
@@ -581,6 +666,9 @@ export default function Profile() {
         interests: trimOrNull(nextInterests),
         genre: trimOrNull(nextInterests),
       };
+      if (isArtist) {
+        updatePayload = { ...updatePayload, ...nextArtistLinks, booking_email: nextBookingEmail };
+      }
 
       while (true) {
         const { error } = await (supabase as any)
@@ -642,7 +730,11 @@ export default function Profile() {
     refetchInterval: 15000,
   });
 
-  if (isArtist && artistId) {
+  // An artist's /profile is their artist page. Their account settings still
+  // live here (wallet, links, email, password, library, blocked people), so
+  // the artist page and the Studio open this with ?settings=1 rather than
+  // bouncing them straight back.
+  if (isArtist && artistId && !wantsSettings) {
     return <Navigate to={`/artist/${artistId}`} replace />;
   }
 
@@ -1079,6 +1171,8 @@ export default function Profile() {
                     setXProfileLink(profileXLink);
                     setBaseProfileLink(profileBaseLink);
                     setInterests(profileInterests);
+                    setArtistLinks(readArtistLinks(audienceProfile));
+                    setBookingEmail(((audienceProfile as any)?.booking_email || '') as string);
                     setFieldErrors({});
                   }}
                   disabled={isSaving}
@@ -1215,6 +1309,43 @@ export default function Profile() {
                 />
                 {fieldErrors.interests && <p className="text-xs text-destructive">{fieldErrors.interests}</p>}
               </div>
+
+              {isArtist && (
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Artist links</p>
+                    <p className="text-xs text-muted-foreground">Where people can find you elsewhere. Shown on your artist page.</p>
+                  </div>
+                  {ARTIST_LINK_FIELDS.map(({ key, label, placeholder }) => (
+                    <div key={key} className="space-y-1.5">
+                      <Label htmlFor={'profile-' + key}>{label}</Label>
+                      <Input
+                        id={'profile-' + key}
+                        type="url"
+                        inputMode="url"
+                        value={artistLinks[key]}
+                        onChange={(e) => setArtistLinks((prev) => ({ ...prev, [key]: e.target.value }))}
+                        placeholder={placeholder}
+                        maxLength={300}
+                      />
+                      {fieldErrors[key] && <p className="text-xs text-destructive">{fieldErrors[key]}</p>}
+                    </div>
+                  ))}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="profile-booking-email">Booking email</Label>
+                    <Input
+                      id="profile-booking-email"
+                      type="email"
+                      inputMode="email"
+                      value={bookingEmail}
+                      onChange={(e) => setBookingEmail(e.target.value)}
+                      placeholder="bookings@yourlabel.com"
+                      maxLength={160}
+                    />
+                    {fieldErrors.booking_email && <p className="text-xs text-destructive">{fieldErrors.booking_email}</p>}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -1354,6 +1485,84 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* What this person has liked, played and kept. Same components the
+            public profile uses, pointed at the signed-in account. */}
+        <div className="mb-8 space-y-8">
+          <h2 className="font-heading text-lg font-semibold text-foreground">Your library</h2>
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Likes and follows</h3>
+            <LikedActivity userId={user?.id} isOwnProfile />
+          </section>
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Listening</h3>
+            <MusicActivity userId={user?.id} isOwnProfile displayName={profileDisplayName} />
+          </section>
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Downloaded
+              <span className="ml-2 font-normal normal-case tracking-normal">{cachedSongs.length}</span>
+            </h3>
+            {cachedSongs.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-4 text-center">
+                <Download className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Nothing kept on this device yet. Play a song once, then tap Keep this to have it offline.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {[...cachedSongs]
+                  .sort((a, b) => (b.cachedAt || 0) - (a.cachedAt || 0))
+                  .map((cached) => {
+                    const known = SONGS.find((s) => s.id === cached.songId);
+                    const title = cached.title || known?.title || 'A song';
+                    const artistName = cached.artist || known?.artist || '';
+                    const size = formatBytes(Number(cached.sizeBytes ?? 0));
+                    return (
+                      <div
+                        key={cached.songId}
+                        className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5"
+                      >
+                        <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-muted">
+                          {known?.coverImage ? (
+                            <img src={known.coverImage} alt="" loading="lazy" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <Music className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          {known ? (
+                            <Link to={'/song/' + known.id} className="block truncate text-sm font-semibold text-foreground hover:text-primary">
+                              {title}
+                            </Link>
+                          ) : (
+                            <p className="truncate text-sm font-semibold text-foreground">{title}</p>
+                          )}
+                          <p className="truncate text-xs text-muted-foreground">
+                            {artistName}
+                            {size ? ' · ' + size : ''}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          aria-label={'Remove ' + title + ' from this device'}
+                          onClick={() => void removeCachedSong(cached.songId)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </section>
+        </div>
+
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-lg font-semibold text-foreground">
@@ -1435,7 +1644,8 @@ export default function Profile() {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => deletePlaylist(playlist.id)}
+                        aria-label={'Delete ' + playlist.name}
+                        onClick={() => setPlaylistToDelete({ id: playlist.id, name: playlist.name })}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -1504,6 +1714,7 @@ export default function Profile() {
             </Button>
           </div>
           <ChangePassword />
+          <ChangeEmail />
           <BlockedPeople />
           <DeleteAccount />
           <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
@@ -1547,6 +1758,29 @@ export default function Profile() {
 
       <Navigation />
       <InviteFriends isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} />
+
+      <AlertDialog open={playlistToDelete !== null} onOpenChange={(open) => { if (!open) setPlaylistToDelete(null); }}>
+        <AlertDialogContent className="max-w-sm w-[95vw] sm:w-full">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this playlist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {playlistToDelete ? playlistToDelete.name : 'This playlist'} and its track list will be removed. The songs themselves stay in the catalog.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (playlistToDelete) void deletePlaylist(playlistToDelete.id);
+                setPlaylistToDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
         <DialogContent className="max-w-sm w-[95vw] sm:w-full">

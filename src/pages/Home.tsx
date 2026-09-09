@@ -34,6 +34,7 @@ import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
 import { ZABAL_GAMEZ_ENABLED, WORLDS_ENABLED } from '@/lib/features';
 import { WorldsPhase3 } from '@/components/worlds/WorldsPhase3';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -110,13 +111,16 @@ export default function Home() {
     isListening: Boolean(playerState?.isRoomMode),
   });
 
-  const { songs: publishedSongs } = usePublishedCatalog();
+  const { songs: publishedSongs, isLoading: catalogLoading } = usePublishedCatalog();
   const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
   const songById = useMemo(() => indexSongs(allSongs), [allSongs]);
   const catalogs = useMemo(
     () => (publishedSongs.length ? buildCatalogs(allSongs) : CATALOGS),
     [allSongs, publishedSongs.length],
   );
+  // Only while the published catalog is still on its way and the static one
+  // has nothing to show in the meantime.
+  const showCatalogSkeleton = catalogLoading && catalogs.length === 0;
   const catalogBySongId = useMemo(() => {
     const map = new Map<string, Catalog>();
     catalogs.forEach((catalog) => {
@@ -659,6 +663,24 @@ export default function Home() {
                   </div>
                 </div>
               </motion.section>
+
+            {showCatalogSkeleton && (
+              <motion.section variants={itemVariants} aria-busy="true" aria-label="Loading new releases">
+                <div className="mb-3 sm:mb-4">
+                  <Skeleton className="h-7 w-40 mb-2" />
+                  <Skeleton className="h-4 w-56" />
+                </div>
+                <CatalogGrid>
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="aspect-square w-full rounded-2xl" />
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  ))}
+                </CatalogGrid>
+              </motion.section>
+            )}
 
             {newReleases.length > 0 && (
               <motion.section variants={itemVariants}>

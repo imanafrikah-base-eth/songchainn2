@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music, Flame, HardDrive, Play } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CATALOGS, SONGS, GENRES, Genre, type Catalog, buildCatalogs } from '@/data/musicData';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTodayHotSongs } from '@/hooks/usePopularity';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { catalogEarnedPlacement, indexSongs } from '@/lib/placement';
@@ -58,8 +59,31 @@ function useUserLikes() {
   });
 }
 
+// `/discover?genre=Afrobeats` opens with that chip selected. Anything that is
+// not a real genre is ignored rather than trusted.
+function genreFromParam(value: string | null): Genre | 'all' {
+  if (!value) return 'all';
+  const match = (GENRES as readonly string[]).find((g) => g.toLowerCase() === value.trim().toLowerCase());
+  return (match as Genre | undefined) ?? 'all';
+}
+
 export default function Discover() {
-  const [selectedGenre, setSelectedGenre] = useState<Genre | 'all'>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const genreParam = searchParams.get('genre');
+  const [selectedGenre, setSelectedGenreState] = useState<Genre | 'all'>(() => genreFromParam(genreParam));
+  useEffect(() => {
+    setSelectedGenreState(genreFromParam(genreParam));
+  }, [genreParam]);
+  // Selecting a chip keeps the URL in step so the page can be shared or re-opened.
+  const setSelectedGenre = useCallback((next: Genre | 'all') => {
+    setSelectedGenreState(next);
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (next === 'all') params.delete('genre');
+      else params.set('genre', next);
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [sortMode, setSortMode] = useState<'trending' | 'newest'>('trending');
   const [showFilters, setShowFilters] = useState(true);
   const { user } = useAuth();
@@ -73,13 +97,14 @@ export default function Discover() {
     viewerUserId: user?.id,
     isListening: Boolean(playerState?.isRoomMode),
   });
-  const { songs: publishedSongs } = usePublishedCatalog();
+  const { songs: publishedSongs, isLoading: catalogLoading } = usePublishedCatalog();
   const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
   const songById = useMemo(() => indexSongs(allSongs), [allSongs]);
   const catalogs = useMemo(
     () => (publishedSongs.length ? buildCatalogs(allSongs) : CATALOGS),
     [allSongs, publishedSongs.length],
   );
+  const showCatalogSkeleton = catalogLoading && catalogs.length === 0;
 
   // Get user's preferred genres based on likes
   const preferredGenres = useMemo(() => {
@@ -652,6 +677,20 @@ export default function Discover() {
                     </div>
                   </motion.div>
 
+                  {showCatalogSkeleton && (
+                    <div className="mb-4" aria-busy="true" aria-label="Loading catalogs">
+                      <CatalogGrid>
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                          <div key={i} className="space-y-2">
+                            <Skeleton className="aspect-square w-full rounded-2xl" />
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                          </div>
+                        ))}
+                      </CatalogGrid>
+                    </div>
+                  )}
+
                   <div className="max-h-[520px] overflow-y-auto pr-2">
                     <AnimatePresence mode="popLayout">
                       <CatalogGrid>
@@ -671,7 +710,7 @@ export default function Discover() {
                     </AnimatePresence>
                   </div>
 
-                  {sortedCatalogs.length === 0 && (
+                  {sortedCatalogs.length === 0 && !showCatalogSkeleton && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}

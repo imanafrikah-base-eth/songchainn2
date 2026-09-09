@@ -27,6 +27,8 @@ import { measure } from './_audio.mjs';
 import { judge, STANDARD, DELIVERY, GATE, TIER_LABEL } from './_standard.mjs';
 
 const MAX_DOWNLOAD = 105 * 1024 * 1024; // a shade over the 100 MB upload cap
+// Keep in step with AUDITION_STALE_MS in src/hooks/useArtistStudio.ts.
+const STALE_AFTER_MS = 20 * 60 * 1000;
 
 export const config = { maxDuration: 300 };
 
@@ -61,16 +63,28 @@ export default async function handler(req, res) {
 
   const { data: song, error: songErr } = await db
     .from('songs')
-    .select('id, title, artist_name, owner_id, status, audio_url, storage_key')
+    .select('id, title, artist_name, owner_id, status, audio_url, storage_key, audition, created_at')
     .eq('id', songId)
     .single();
 
   if (songErr || !song) return send(res, 404, { error: 'Track not found.' });
   if (song.owner_id !== user.id) return send(res, 403, { error: 'That is not your track.' });
   if (song.status === 'published') return send(res, 409, { error: 'This one is already out.' });
-  if (song.status === 'auditioning') return send(res, 409, { error: 'The judges are still listening.' });
 
-  await db.from('songs').update({ status: 'auditioning' }).eq('id', songId);
+  // "Still listening" is only true for twenty minutes. Past that the tab
+  // closed on it or the function died, and the artist can ask again rather
+  // than stare at "With the judges" forever.
+  if (song.status === 'auditioning') {
+    const startedAt = Date.parse(song.audition?.stage === 'listening' ? song.audition?.at : song.created_at) || 0;
+    if (Date.now() - startedAt < STALE_AFTER_MS) {
+      return send(res, 409, { error: 'The judges are still listening.' });
+    }
+  }
+
+  await db
+    .from('songs')
+    .update({ status: 'auditioning', audition: { ok: false, stage: 'listening', at: new Date().toISOString() } })
+    .eq('id', songId);
 
   /* --------------------------------------------------------- measure --- */
 

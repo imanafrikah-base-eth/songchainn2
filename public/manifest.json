@@ -8,6 +8,30 @@
   "orientation": "portrait",
   "background_color": "#101113",
   "theme_color": "#101113",
+  "categories": ["music", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Discover",
+      "short_name": "Discover",
+      "description": "Find new music",
+      "url": "/discover",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Playlists",
+      "short_name": "Playlists",
+      "description": "Your playlists",
+      "url": "/playlists",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Your profile",
+      "short_name": "Profile",
+      "description": "Your library and settings",
+      "url": "/profile",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

@@ -11,6 +11,7 @@ import { SongCard } from '@/components/SongCard';
 import { ArtistCard } from '@/components/ArtistCard';
 import { Navigation } from '@/components/Navigation';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { ArtistLinks } from '@/components/ArtistLinks';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -797,7 +798,7 @@ export default function ArtistDetail() {
                     <p className="text-xs text-muted-foreground mt-2">
                       Hold ${HOLDER_PERK_USD.toFixed(2)} of {artist.name}'s coin to see when {artist.name} is online.{' '}
                       {!holding.wallet ? (
-                        <Link to="/profile" className="underline underline-offset-4 hover:text-foreground">Link a wallet</Link>
+                        <Link to="/profile?settings=1" className="underline underline-offset-4 hover:text-foreground">Link a wallet</Link>
                       ) : !isNativeApp() ? (
                         <>
                           <button type="button" onClick={() => setKeyOpen(true)} className="underline underline-offset-4 hover:text-foreground">Get the coin</button>
@@ -813,6 +814,7 @@ export default function ArtistDetail() {
                       ) : null}
                     </p>
                   ) : null}
+                  <ArtistLinks profile={artistProfile as Record<string, unknown> | null} className="mt-3" />
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {/*
@@ -889,6 +891,11 @@ export default function ArtistDetail() {
                           >
                             <Edit3 className="w-4 h-4 mr-2" />
                             Edit
+                          </Button>
+                          <Button asChild variant="outline">
+                            <Link to="/profile?settings=1" aria-label="Account settings: wallet, links, email and password">
+                              Settings
+                            </Link>
                           </Button>
                         </>
                       )}
@@ -1118,8 +1125,14 @@ export default function ArtistDetail() {
               }
             });
 
+            // A release the artist numbered plays in track order; anything
+            // else, newest first, as before.
+            const inReleaseOrder = (songs: typeof artistSongs) =>
+              songs.some((s) => s.trackNumber)
+                ? [...songs].sort((a, b) => (a.trackNumber ?? 999) - (b.trackNumber ?? 999))
+                : sortByRecent(songs);
             const sections = Array.from(groups.entries())
-              .map(([label, songs]) => ({ label, songs: sortByRecent(songs) }))
+              .map(([label, songs]) => ({ label, songs: inReleaseOrder(songs) }))
               .sort((a, b) => {
                 const timeA = a.songs[0]?.addedAt ? new Date(a.songs[0].addedAt!).getTime() : 0;
                 const timeB = b.songs[0]?.addedAt ? new Date(b.songs[0].addedAt!).getTime() : 0;

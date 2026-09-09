@@ -12,13 +12,21 @@ export function NotificationSettings() {
     unsubscribe
   } = usePushNotifications();
 
+  /* Honest copy. In-app notifications are real and always on. Push has never
+     reached a server (the subscription only ever lands in localStorage), so
+     it must not be described as if it did. The toggle stays: it holds the
+     browser permission for the day push is wired up. */
+  const alwaysOn = 'In-app notifications for follows, likes, comments, tags and new releases are always on.';
+
   if (!isSupported) {
     return (
       <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
         <BellOff className="w-5 h-5 text-muted-foreground" />
         <div className="flex-1">
-          <p className="text-sm font-medium text-foreground">Push Notifications</p>
-          <p className="text-xs text-muted-foreground">Not supported in this browser</p>
+          <p className="text-sm font-medium text-foreground">Notifications</p>
+          <p className="text-xs text-muted-foreground">
+            {alwaysOn} Push alerts on this device are coming, and this browser cannot show them yet.
+          </p>
         </div>
       </div>
     );
@@ -45,13 +53,14 @@ export function NotificationSettings() {
         )}
       </div>
       <div className="flex-1">
-        <p className="text-sm font-medium text-foreground">Push Notifications</p>
+        <p className="text-sm font-medium text-foreground">Notifications</p>
         <p className="text-xs text-muted-foreground">
-          {isSubscribed 
-            ? 'Receiving notifications for likes, comments, and follows'
+          {alwaysOn}{' '}
+          {isSubscribed
+            ? 'Push alerts on this device are coming; this device is ready for them.'
             : permission === 'denied'
-            ? 'Blocked - enable in browser settings'
-            : 'Get notified about activity on your posts'}
+            ? 'Push alerts on this device are coming. They are blocked in your browser settings.'
+            : 'Push alerts on this device are coming. Turn this on to be ready for them.'}
         </p>
       </div>
       <Button

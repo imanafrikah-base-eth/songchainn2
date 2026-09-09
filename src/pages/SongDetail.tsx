@@ -1,6 +1,6 @@
 ﻿import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play, Pause, Heart, Music, ListMusic, Lock, Globe } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Heart, Music, ListMusic, ListPlus, Clock, Headphones } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { Navigation } from '@/components/Navigation';
@@ -17,28 +17,26 @@ import { ShareSongButton } from '@/components/ShareSongButton';
 import { OnchainVerifiedBadge } from '@/components/OnchainVerifiedBadge';
 import { SongInfoSections } from '@/components/song/SongInfoSections';
 import { SongActivity } from '@/components/song/SongActivity';
+import { AddToPlaylistDialog } from '@/components/song/AddToPlaylistDialog';
 import { earnedPlacement } from '@/lib/placement';
+import { useSongDetails } from '@/lib/songDetails';
+import { toast } from '@/hooks/use-toast';
 import { useMemo, useEffect, useCallback, useState } from 'react';
-import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return mins + ':' + secs.toString().padStart(2, '0');
+}
 
 export default function SongDetail() {
   const { id } = useParams<{ id: string }>();
   const { currentSong, isPlaying } = usePlayerState();
-  const { playSong, togglePlay } = usePlayerActions();
+  const { playSong, togglePlay, addToQueue } = usePlayerActions();
   const { toggleLike, isLiked } = useEngagement();
   const { data: popularityData } = useSongPopularity();
-  const { playlists, addSongToPlaylist, createPlaylist } = useAudienceInteractions();
 
   const [isPlaylistDialogOpen, setIsPlaylistDialogOpen] = useState(false);
-  const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [newPlaylistDescription, setNewPlaylistDescription] = useState('');
-  const [newPlaylistIsPublic, setNewPlaylistIsPublic] = useState(false);
-  const [isSubmittingPlaylist, setIsSubmittingPlaylist] = useState(false);
 
   const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
   const song = SONGS.find(s => s.id === id) ?? publishedSongs.find(s => s.id === id);
@@ -46,46 +44,20 @@ export default function SongDetail() {
   const isCurrentSong = currentSong?.id === song?.id;
   const liked = song ? isLiked(song.id) : false;
   const { coinAddress } = useSongOwnership(song?.id ?? '');
+  // The record's facts (the explicit flag among them) come from song_details.
+  const { data: songDetails } = useSongDetails(song?.id ?? '');
+  const isExplicit = Boolean(songDetails?.explicit);
+  // Song.duration is seconds. Songs without one (most of the catalog until the
+  // catalog hook fills `duration`) simply do not show it.
+  const durationSeconds = song && typeof song.duration === 'number' && Number.isFinite(song.duration) && song.duration > 0
+    ? song.duration
+    : null;
 
-  const handleAddToExistingPlaylist = useCallback(async (playlistId: string) => {
-    if (!song || isSubmittingPlaylist) return;
-    setIsSubmittingPlaylist(true);
-    try {
-      await addSongToPlaylist(playlistId, song.id);
-      setIsPlaylistDialogOpen(false);
-    } finally {
-      setIsSubmittingPlaylist(false);
-    }
-  }, [addSongToPlaylist, isSubmittingPlaylist, song]);
-
-  const handleCreatePlaylistAndAdd = useCallback(async () => {
-    if (!song || !newPlaylistName.trim() || isSubmittingPlaylist) return;
-    setIsSubmittingPlaylist(true);
-    try {
-      const playlist = await createPlaylist(
-        newPlaylistName.trim(),
-        newPlaylistDescription.trim() || undefined,
-        newPlaylistIsPublic,
-      );
-      if (playlist) {
-        await addSongToPlaylist(playlist.id, song.id);
-        setIsPlaylistDialogOpen(false);
-        setNewPlaylistName('');
-        setNewPlaylistDescription('');
-        setNewPlaylistIsPublic(false);
-      }
-    } finally {
-      setIsSubmittingPlaylist(false);
-    }
-  }, [
-    addSongToPlaylist,
-    createPlaylist,
-    newPlaylistDescription,
-    newPlaylistIsPublic,
-    newPlaylistName,
-    isSubmittingPlaylist,
-    song,
-  ]);
+  const handleAddToQueue = useCallback(() => {
+    if (!song) return;
+    addToQueue(song);
+    toast({ title: 'Added to queue', description: song.title + ' will play after the current queue.' });
+  }, [addToQueue, song]);
 
   // Update document meta tags for sharing
   useEffect(() => {
@@ -135,10 +107,11 @@ export default function SongDetail() {
 
   // Get real stats from database
   const songStats = useMemo(() => {
-    if (!song) return { likes: 0 };
+    if (!song) return { likes: 0, plays: 0 };
     const data = popularityData?.find(p => p.song_id === song.id);
     return {
       likes: data?.like_count || 0,
+      plays: data?.play_count || 0,
     };
   }, [popularityData, song]);
 
@@ -225,9 +198,29 @@ export default function SongDetail() {
             <div className="flex-1">
               <p className="text-sm text-muted-foreground mb-2 uppercase tracking-wide">Song</p>
               <div className="flex items-start justify-between gap-4 mb-4">
-                <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground">
-                  {song.title}
-                </h1>
+                <div className="min-w-0">
+                  <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground">
+                    {song.title}
+                  </h1>
+                  {(isExplicit || durationSeconds !== null) && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {isExplicit && (
+                        <span
+                          className="inline-flex items-center rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                          title="Explicit content"
+                        >
+                          Explicit
+                        </span>
+                      )}
+                      {durationSeconds !== null && (
+                        <span className="inline-flex items-center gap-1 text-sm text-muted-foreground tabular-nums">
+                          <Clock className="w-3.5 h-3.5" />
+                          {formatDuration(durationSeconds)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {song.isTokenGated && (
                   <Link
                     to="/marketplace"
@@ -263,17 +256,25 @@ export default function SongDetail() {
               )}
 
               {/* Stats */}
-              <div className="flex items-center gap-6 mb-6">
+              <div className="flex flex-wrap items-center gap-6 mb-6">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Headphones className="w-5 h-5" />
+                  <span className="text-lg font-medium tabular-nums">{songStats.plays.toLocaleString()} plays</span>
+                </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Heart className="w-5 h-5" />
-                  <span className="text-lg font-medium">{songStats.likes.toLocaleString()} likes</span>
+                  <span className="text-lg font-medium tabular-nums">{songStats.likes.toLocaleString()} likes</span>
                 </div>
               </div>
 
-              {/* Genre Badge */}
-              <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-border mb-6">
+              {/* Genre Badge: opens Discover with this genre selected */}
+              <Link
+                to={'/discover?genre=' + encodeURIComponent(song.genre)}
+                className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-border mb-6 transition-colors hover:bg-primary/20"
+                aria-label={'Discover more ' + song.genre}
+              >
                 <span className="text-sm text-primary font-medium">{song.genre}</span>
-              </div>
+              </Link>
 
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-4">
@@ -293,6 +294,17 @@ export default function SongDetail() {
                       Play
                     </>
                   )}
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleAddToQueue}
+                  variant="outline"
+                  size="lg"
+                  className="gap-2"
+                >
+                  <ListPlus className="w-5 h-5" />
+                  Add to queue
                 </Button>
 
                 <Button
@@ -359,118 +371,11 @@ export default function SongDetail() {
         )}
       </main>
 
-      <Dialog open={isPlaylistDialogOpen} onOpenChange={setIsPlaylistDialogOpen}>
-        <DialogContent className="max-w-sm w-[95vw] sm:w-full">
-          <DialogHeader>
-            <DialogTitle>Add to playlist</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {playlists.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  Choose one of your playlists
-                </p>
-                <ScrollArea className="max-h-48 pr-2">
-                  <div className="space-y-2">
-                    {playlists.map((playlist) => (
-                      <Button
-                        key={playlist.id}
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-between"
-                        onClick={() => void handleAddToExistingPlaylist(playlist.id)}
-                        disabled={isSubmittingPlaylist}
-                      >
-                        <span className="truncate">{playlist.name}</span>
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          {playlist.is_public ? (
-                            <>
-                              <Globe className="w-3 h-3" />
-                              Public
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="w-3 h-3" />
-                              Private
-                            </>
-                          )}
-                        </span>
-                      </Button>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="new-playlist-name">Or create a new playlist</Label>
-              <Input
-                id="new-playlist-name"
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                maxLength={80}
-                placeholder="Give your playlist a name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-playlist-description">Description</Label>
-              <Textarea
-                id="new-playlist-description"
-                value={newPlaylistDescription}
-                onChange={(e) => setNewPlaylistDescription(e.target.value)}
-                rows={3}
-                maxLength={200}
-                placeholder="Add a short description (optional)"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Visibility</Label>
-              <div className="inline-flex items-center gap-2 rounded-lg bg-muted p-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={newPlaylistIsPublic ? 'ghost' : 'default'}
-                  className="flex-1"
-                  onClick={() => setNewPlaylistIsPublic(false)}
-                >
-                  <Lock className="w-4 h-4 mr-1" />
-                  Private
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={newPlaylistIsPublic ? 'default' : 'ghost'}
-                  className="flex-1"
-                  onClick={() => setNewPlaylistIsPublic(true)}
-                >
-                  <Globe className="w-4 h-4 mr-1" />
-                  Public
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Private playlists are only visible to you. Public playlists can be shared.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setIsPlaylistDialogOpen(false)}
-              disabled={isSubmittingPlaylist}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleCreatePlaylistAndAdd()}
-              disabled={!newPlaylistName.trim() || isSubmittingPlaylist}
-            >
-              Save to playlist
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddToPlaylistDialog
+        open={isPlaylistDialogOpen}
+        onOpenChange={setIsPlaylistDialogOpen}
+        songId={song.id}
+      />
 
       <AudioPlayer />
     </div>

@@ -372,13 +372,80 @@ export function useAudienceInteractions() {
       toast({ title: 'Playlist deleted' });
       return;
     }
-    await supabase.from('playlist_songs').delete().eq('playlist_id', playlistId);
-    await supabase.from('playlists').delete().eq('id', playlistId).eq('user_id', user.id);
-    const next = playlists.filter((p) => p.id !== playlistId);
-    setPlaylists(next);
+    // Optimistic removal, reverted if either delete fails.
+    const previousPlaylists = playlists;
+    const previousPublic = publicPlaylists;
+    setPlaylists(playlists.filter((p) => p.id !== playlistId));
     setPublicPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
+
+    const { error: songsError } = await supabase.from('playlist_songs').delete().eq('playlist_id', playlistId);
+    const { error: playlistError } = songsError
+      ? { error: songsError }
+      : await supabase.from('playlists').delete().eq('id', playlistId).eq('user_id', user.id);
+    if (songsError || playlistError) {
+      setPlaylists(previousPlaylists);
+      setPublicPlaylists(previousPublic);
+      toast({
+        title: 'Could not delete playlist',
+        description: (songsError || playlistError)?.message || 'Please try again in a moment.',
+        variant: 'destructive',
+      });
+      return;
+    }
     toast({ title: 'Playlist deleted' });
-  }, [user, toast, playlists]);
+  }, [user, toast, playlists, publicPlaylists]);
+
+  // Rename or re-describe a playlist (owner only, enforced by RLS too)
+  const updatePlaylist = useCallback(
+    async (playlistId: string, changes: { name?: string; description?: string | null }) => {
+      if (!user) return false;
+      const cleanName = typeof changes.name === 'string' ? changes.name.trim() : undefined;
+      if (cleanName !== undefined && !cleanName) {
+        toast({ title: 'A playlist needs a name', variant: 'destructive' });
+        return false;
+      }
+      const patch: { name?: string; description?: string | null } = {};
+      if (cleanName !== undefined) patch.name = cleanName;
+      if (changes.description !== undefined) patch.description = changes.description?.trim() || null;
+      if (Object.keys(patch).length === 0) return true;
+
+      if (!isSupabaseConfigured) {
+        const existing = listPlaylists(user.id);
+        const next = existing.map((p) => (p.id === playlistId ? { ...p, ...patch } : p));
+        savePlaylists(user.id, next);
+        setPlaylists(next);
+        setPublicPlaylists(next.filter((p) => p.is_public));
+        toast({ title: 'Playlist updated' });
+        return true;
+      }
+
+      // Optimistic local update, reverted on failure.
+      const previousPlaylists = playlists;
+      const previousPublic = publicPlaylists;
+      setPlaylists((prev) => prev.map((p) => (p.id === playlistId ? { ...p, ...patch } : p)));
+      setPublicPlaylists((prev) => prev.map((p) => (p.id === playlistId ? { ...p, ...patch } : p)));
+
+      const { error } = await supabase
+        .from('playlists')
+        .update(patch as any)
+        .eq('id', playlistId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        setPlaylists(previousPlaylists);
+        setPublicPlaylists(previousPublic);
+        toast({
+          title: 'Could not update playlist',
+          description: error.message || 'Please try again in a moment.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+      toast({ title: 'Playlist updated' });
+      return true;
+    },
+    [user, toast, playlists, publicPlaylists],
+  );
 
   const updatePlaylistVisibility = useCallback(
     async (playlistId: string, isPublic: boolean) => {
@@ -535,16 +602,29 @@ export function useAudienceInteractions() {
   }, [user, toast]);
 
   // Remove Song from Playlist
-  const removeSongFromPlaylist = useCallback(async (playlistId: string, songId: string) => {
-    if (!user) return;
+  const removeSongFromPlaylist = useCallback(async (playlistId: string, songId: string): Promise<boolean> => {
+    if (!user) return false;
     if (!isSupabaseConfigured) {
       const songIds = getLocalPlaylistSongs(playlistId);
       setPlaylistSongs(playlistId, songIds.filter((id) => id !== songId));
       toast({ title: 'Song removed from playlist' });
-      return;
+      return true;
     }
-    await supabase.from('playlist_songs').delete().eq('playlist_id', playlistId).eq('song_id', songId);
+    const { error } = await supabase
+      .from('playlist_songs')
+      .delete()
+      .eq('playlist_id', playlistId)
+      .eq('song_id', songId);
+    if (error) {
+      toast({
+        title: 'Could not remove song',
+        description: error.message || 'Please try again in a moment.',
+        variant: 'destructive',
+      });
+      return false;
+    }
     toast({ title: 'Song removed from playlist' });
+    return true;
   }, [user, toast]);
 
   // Get Playlist Songs
@@ -561,10 +641,12 @@ export function useAudienceInteractions() {
   }, []);
 
   // Reorder Playlist Songs — bulk-updates `position` to match orderedSongIds
-  const reorderPlaylistSongs = useCallback(async (playlistId: string, orderedSongIds: string[]) => {
+  // Returns false when any position write failed so the caller can put the
+  // rows back where they were.
+  const reorderPlaylistSongs = useCallback(async (playlistId: string, orderedSongIds: string[]): Promise<boolean> => {
     if (!isSupabaseConfigured) {
       setPlaylistSongs(playlistId, orderedSongIds);
-      return;
+      return true;
     }
     const results = await Promise.all(
       orderedSongIds.map((songId, index) =>
@@ -578,7 +660,9 @@ export function useAudienceInteractions() {
     const failed = results.some((r) => r.error);
     if (failed) {
       toast({ title: 'Could not save track order', variant: 'destructive' });
+      return false;
     }
+    return true;
   }, [toast]);
 
   // Get Playlist Collaborators (joined with audience_profiles, same pattern as useSocial)
@@ -687,6 +771,7 @@ export function useAudienceInteractions() {
     isCatalogSaved,
     createPlaylist,
     deletePlaylist,
+    updatePlaylist,
     addSongToPlaylist,
     addSongsToPlaylist,
     removeSongFromPlaylist,

@@ -331,7 +331,11 @@ const SONG_META: Record<string, SongMeta> = {
 export default async function handler(req: any, res: any) {
   const id = String(req.query?.id || "").trim();
 
-  if (!id || !/^\d+$/.test(id)) {
+  // Founding catalog ids are numbers; every uploaded record is a uuid. Both
+  // are real songs, and the uuid ones are exactly the ones the DB lookup
+  // below exists for.
+  const looksLikeId = /^\d+$/.test(id) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  if (!id || !looksLikeId) {
     res.statusCode = 302;
     res.setHeader("Location", "/");
     res.end();

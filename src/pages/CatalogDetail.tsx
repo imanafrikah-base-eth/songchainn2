@@ -101,7 +101,9 @@ export default function CatalogDetail() {
             </div>
 
             <div className="flex-1">
-              <p className="text-sm text-muted-foreground mb-2 uppercase tracking-wide">Catalog</p>
+              <p className="text-sm text-muted-foreground mb-2 uppercase tracking-wide">
+                {catalog.kind === 'album' ? 'Album' : catalog.kind === 'ep' ? 'EP' : catalog.kind === 'single' ? 'Single' : 'Catalog'}
+              </p>
               <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground mb-4">
                 {catalog.title}
               </h1>

@@ -3,8 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, Play, Pause, Music,
   UserPlus, Check, Disc3, Copy, PartyPopper, Sparkles, Flame, UserCheck,
-  ListMusic, Headphones,
+  ListMusic, Headphones, MoreHorizontal, Trash2, Flag, UserMinus, Link2,
 } from 'lucide-react';
+import { ReportDialog } from '@/components/ReportDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SocialPostWithProfile } from '@/types/social';
 import { SONGS, ARTISTS } from '@/data/musicData';
@@ -31,15 +42,21 @@ interface MusicFeedCardProps {
   onFollow: (userId: string) => void;
   isFollowing: boolean;
   onComment: () => void;
+  /** Own posts only. Optional so existing callers keep working. */
+  onDelete?: (postId: string) => void | Promise<unknown>;
+  /** Take your own name off somebody else's post. */
+  onUntagSelf?: (postId: string) => Promise<boolean> | void;
 }
 
-export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }: MusicFeedCardProps) {
+export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, onDelete, onUntagSelf }: MusicFeedCardProps) {
   const { user } = useAuth();
   const { currentSong, isPlaying, playSong, pause, play } = usePlayer();
   const navigate = useNavigate();
   const { shareSong, sharePost, copied, getSongShareUrl, getShareUrl, copyToClipboard } = useShare();
   const { data: pulseCounts } = usePulseCounts();
   const [imgErr, setImgErr] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const song       = post.song_id    ? SONGS.find(s => s.id === post.song_id)      : null;
   const artist     = song            ? ARTISTS.find(a => a.id === song.artistId)    : null;
@@ -48,6 +65,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
   const activeSong = song ?? artistSong;
 
   const isOwnPost          = user?.id === post.user_id;
+  const isTaggedHere       = !!user?.id && (post.tagged ?? []).some((t) => t.user_id === user.id);
   const isThisSongPlaying  = activeSong ? currentSong?.id === activeSong.id && isPlaying : false;
   const isWelcomePost      = post.post_type === 'welcome';
   const isSongLikePost     = post.post_type === 'song_like';
@@ -111,6 +129,11 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
       ? getSongShareUrl({ id: activeSong.id, title: activeSong.title, artist: activeSong.artist })
       : getShareUrl('post', post.id);
     copyToClipboard(url);
+  };
+
+  /** The post itself, whatever song is in it. */
+  const handleCopyPostLink = () => {
+    copyToClipboard(`${window.location.origin}/post/${post.id}`);
   };
 
   return (
@@ -354,6 +377,49 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* The post's own menu. The full-screen card had no way to delete,
+            report or untag anything; those lived only on the older PostCard,
+            which the main feed does not use. Delete stays yours alone; report
+            is for everyone else's. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="More options"
+              className="flex flex-col items-center gap-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                <MoreHorizontal className="w-6 h-6 text-white" />
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={handleCopyPostLink} className="gap-2">
+              {copied ? <Check className="w-4 h-4 text-green-500" /> : <Link2 className="w-4 h-4" />}
+              Copy post link
+            </DropdownMenuItem>
+            {isOwnPost && onDelete && (
+              <DropdownMenuItem onClick={() => setConfirmingDelete(true)} className="gap-2 text-destructive focus:text-destructive">
+                <Trash2 className="w-4 h-4" />
+                Delete post
+              </DropdownMenuItem>
+            )}
+            {!isOwnPost && isTaggedHere && onUntagSelf && (
+              <DropdownMenuItem onClick={() => void onUntagSelf(post.id)} className="gap-2">
+                <UserMinus className="w-4 h-4" />
+                Take my name off this
+              </DropdownMenuItem>
+            )}
+            {!isOwnPost && (
+              <DropdownMenuItem onClick={() => setReporting(true)} className="gap-2">
+                <Flag className="w-4 h-4" />
+                Report this post
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <motion.div
           animate={isThisSongPlaying ? { rotate: 360 } : {}}
           transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
@@ -507,6 +573,35 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment }
           {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
         </p>
       </div>
+
+      {reporting && (
+        <ReportDialog
+          targetType="post"
+          targetId={post.id}
+          targetUser={post.user_id}
+          onClose={() => setReporting(false)}
+        />
+      )}
+
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It goes for good, along with its likes and comments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void onDelete?.(post.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

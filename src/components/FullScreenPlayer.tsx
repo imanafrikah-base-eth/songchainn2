@@ -2,7 +2,16 @@ import { memo, useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, ListMusic, Shuffle, Repeat, Repeat1, GripVertical } from 'lucide-react';
+import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, ListMusic, Shuffle, Repeat, Repeat1, GripVertical, Moon } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { clearSleepTimer, isSleepTimerActive, setSleepTimerAtSongEnd, setSleepTimerMinutes, useSleepTimer } from '@/lib/sleepTimer';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
 import { Slider } from '@/components/ui/slider';
@@ -35,7 +44,7 @@ interface FullScreenPlayerProps {
 export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose }: FullScreenPlayerProps) {
   const { currentSong, isPlaying, queue, isRoomMode } = usePlayerState();
   const { currentTime, duration } = usePlayerTime();
-  const { togglePlay, seekTo, setVolume, playNext, playPrevious, volume, repeatMode, setRepeatMode, shuffleMode, toggleShuffle, jumpToIndex, removeFromQueue, reorderQueue } = usePlayerActions();
+  const { togglePlay, seekTo, setVolume, playNext, playPrevious, pause, volume, repeatMode, setRepeatMode, shuffleMode, toggleShuffle, jumpToIndex, removeFromQueue, reorderQueue } = usePlayerActions();
   const prefersReducedMotion = usePrefersReducedMotion();
 
   const { toggleLike, isLiked, sendPulse } = useEngagement();
@@ -50,6 +59,49 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | undefined>(user?.user_metadata?.wallet_address);
+
+  // Sleep timer. The state lives in a module store so it survives the page
+  // changes that remount this component; this is where it fires.
+  const sleep = useSleepTimer();
+  const sleepActive = isSleepTimerActive(sleep);
+  const [sleepRemainingMs, setSleepRemainingMs] = useState(0);
+
+  useEffect(() => {
+    const endsAt = sleep.endsAt;
+    if (endsAt === null) {
+      setSleepRemainingMs(0);
+      return;
+    }
+    const tick = () => {
+      const left = endsAt - Date.now();
+      if (left <= 0) {
+        pause();
+        clearSleepTimer();
+        setSleepRemainingMs(0);
+        toast({ title: 'Sleep timer ended', description: 'Playback paused.' });
+        return;
+      }
+      setSleepRemainingMs(left);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [sleep.endsAt, pause]);
+
+  useEffect(() => {
+    if (!sleep.atSongEnd || !sleep.armedSongId) return;
+    if (currentSong && currentSong.id === sleep.armedSongId) return;
+    // The song it was armed on has finished (or been skipped): stop here.
+    pause();
+    clearSleepTimer();
+    toast({ title: 'Sleep timer ended', description: 'Playback paused.' });
+  }, [currentSong, sleep.atSongEnd, sleep.armedSongId, pause]);
+
+  const sleepLabel = sleep.atSongEnd
+    ? 'Sleep at end of this song'
+    : sleep.endsAt !== null
+      ? `Sleep in ${formatTime(Math.ceil(sleepRemainingMs / 1000))}`
+      : null;
 
   const {
     status: ownershipStatus,
@@ -607,7 +659,57 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   coverImage={currentSong.coverImage}
                   className="p-3 glass hover:bg-secondary/50 press-effect"
                 />
+
+                {/* Sleep timer */}
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={sleepActive ? `Sleep timer on. ${sleepLabel}` : 'Sleep timer'}
+                      aria-pressed={sleepActive}
+                      className={cn(
+                        "p-3 rounded-full glass transition-all press-effect",
+                        sleepActive ? "bg-primary/20 text-primary" : "hover:bg-secondary/50 text-muted-foreground"
+                      )}
+                    >
+                      <Moon className="w-5 h-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuLabel>{sleepLabel ?? 'Sleep timer'}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {[15, 30, 45, 60].map((minutes) => (
+                      <DropdownMenuItem key={minutes} onSelect={() => setSleepTimerMinutes(minutes)}>
+                        {minutes} minutes
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuItem onSelect={() => setSleepTimerAtSongEnd(currentSong.id)}>
+                      End of this song
+                    </DropdownMenuItem>
+                    {sleepActive && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => clearSleepTimer()} className="text-destructive focus:text-destructive">
+                          Cancel timer
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </motion.div>
+              {sleepLabel && (
+                <div className="mt-3 flex items-center justify-center gap-2 text-xs text-primary" aria-live="polite">
+                  <Moon className="w-3.5 h-3.5" />
+                  <span>{sleepLabel}</span>
+                  <button
+                    type="button"
+                    onClick={() => clearSleepTimer()}
+                    className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
               <div className="mt-6 w-full max-w-[320px] text-xs text-muted-foreground text-center">
                 {queue.length > 1 && (
                   (() => {

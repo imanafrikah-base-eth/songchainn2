@@ -70,7 +70,17 @@ export interface Song {
    *   raw      out and playable, still short of clean delivery
    */
   qualityTier?: 'master' | 'release' | 'raw';
-  volume?: 'Vol1' | 'Vol2' | 'Vol3' | 'Vol4' | 'Vol5' | 'Vol6' | 'Vol7' | '3.0' | "ER'TING FLEX" | 'Lovers EP' | 'LIKE,COMMENT,SUBSCRIBE' | '7USHIMI' | 'HIGH-BRED' | 'Single';
+  /**
+   * The release this track sits on, by title. The founding catalog names its
+   * volumes here; an uploaded track carries the title of its releases row.
+   */
+  volume?: string;
+  /** The releases row behind `volume`, when there is one. */
+  releaseId?: string;
+  releaseKind?: 'single' | 'ep' | 'album';
+  /** Position on the release, 1-based. Unset means "in the order it arrived". */
+  trackNumber?: number;
+  explicit?: boolean;
 }
 
 export interface Catalog {
@@ -81,6 +91,8 @@ export interface Catalog {
   coverImage?: string;
   songIds: string[];
   volume?: Song['volume'];
+  releaseId?: string;
+  kind?: 'single' | 'ep' | 'album';
   addedAt?: string;
   genre: Genre;
   totalPlays: number;
@@ -217,7 +229,10 @@ const ARTWORK_BY_ARTIST: Record<string, string> = {
 export function buildCatalogs(songs: Song[]): Catalog[] {
   const grouped = new Map<string, Song[]>();
   songs.forEach((song) => {
-    const key = `${song.artistId}-${song.volume ?? 'Singles'}`;
+    // A releases row is the grouping when there is one, so two EPs that
+    // happen to share a title stay two EPs. The founding catalog groups by
+    // its volume names as it always has.
+    const key = song.releaseId ? `${song.artistId}-r-${song.releaseId}` : `${song.artistId}-${song.volume ?? 'Singles'}`;
     const entry = grouped.get(key);
     if (entry) {
       entry.push(song);
@@ -241,14 +256,21 @@ export function buildCatalogs(songs: Song[]): Catalog[] {
     const totalPlays = group.reduce((sum, song) => sum + (song.plays || 0), 0);
     const totalLikes = group.reduce((sum, song) => sum + (song.likes || 0), 0);
     const displayVolume = top.volume ?? 'Vol1';
+    // Track order when the artist set one; arrival order otherwise.
+    const numbered = group.some((song) => song.trackNumber);
+    const inOrder = numbered
+      ? [...group].sort((a, b) => (a.trackNumber ?? 999) - (b.trackNumber ?? 999))
+      : group;
     return {
       id: key,
       title: displayVolume,
       artist: top.artist,
       artistId: top.artistId,
       coverImage,
-      songIds: group.map((song) => song.id),
+      songIds: inOrder.map((song) => song.id),
       volume: displayVolume,
+      releaseId: top.releaseId,
+      kind: top.releaseKind ?? (group.length === 1 ? 'single' : undefined),
       addedAt,
       genre: top.genre,
       totalPlays,

@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 
-interface CachedSong {
+export interface CachedSong {
   songId: string;
   title?: string;
   artist?: string;
   duration?: number;
   audioUrl?: string;
+  /** Bytes on disk when the service worker reported them; absent otherwise. */
+  sizeBytes?: number;
   cachedAt: number;
 }
 
@@ -31,6 +33,7 @@ export function useOfflineAudio() {
               artist: (s as CachedSong).artist,
               duration: (s as CachedSong).duration,
               audioUrl: (s as CachedSong).audioUrl,
+              sizeBytes: (s as CachedSong).sizeBytes,
               cachedAt: (s as CachedSong).cachedAt ?? Date.now(),
             }))
           : [];
@@ -79,8 +82,12 @@ export function useOfflineAudio() {
       if (!data || typeof data !== 'object') return;
       if (data.type === 'AUDIO_CACHED') {
         const { songId } = data;
-        const newCachedSong: CachedSong = { songId, cachedAt: Date.now() };
+        const sizeBytes = typeof data.bytes === 'number' ? data.bytes : undefined;
         setCachedSongs(prev => {
+          // Keep the title, artist and URL recorded when caching started; the
+          // worker only knows the id.
+          const existing = prev.find(s => s.songId === songId);
+          const newCachedSong: CachedSong = { ...(existing ?? {}), songId, sizeBytes: sizeBytes ?? existing?.sizeBytes, cachedAt: Date.now() };
           const updated = [...prev.filter(s => s.songId !== songId), newCachedSong];
           localStorage.setItem(CACHED_SONGS_KEY, JSON.stringify(updated));
           return updated;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SocialPostWithProfile, PostComment, TaggedPerson, SongCardData } from '@/types/social';
@@ -17,6 +18,188 @@ function isSyntheticId(id: string | null | undefined): boolean {
 let socialChannelSeq = 0;
 const nextSocialChannelId = () => ++socialChannelSeq;
 
+const PROFILE_COLUMNS = 'id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio,is_official';
+
+/** PostgREST `in.(...)` wants text values quoted; artist ids are free text. */
+const quoteList = (ids: string[]) => ids.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+
+/**
+ * Turn raw social_posts rows into what the feed renders.
+ *
+ * One place for the shape, so the feed, a single post opened from a link and
+ * a person's profile all agree on what a post looks like. Counts, the
+ * viewer's own like, the poster's profile, playlist names and tags are all
+ * resolved here.
+ */
+async function enrichPostRows(rows: any[], viewerId: string | null): Promise<SocialPostWithProfile[]> {
+  if (rows.length === 0) return [];
+
+  const postIds = rows.map((p) => p.id);
+  const userIds = Array.from(new Set(rows.map((p) => p.user_id).filter(Boolean)));
+  const playlistIds = Array.from(new Set(
+    rows
+      .filter((p) => p.post_type === 'activity' && (p as any).activity_type === 'playlist_created' && p.playlist_id)
+      .map((p) => p.playlist_id)
+  ));
+
+  // Single profile query covering both id and user_id columns, minimal columns only
+  const [profilesRes, likesRes, commentsRes, userLikesRes, playlistsRes, tagsRes] = await Promise.all([
+    supabase
+      .from('audience_profiles')
+      .select(PROFILE_COLUMNS)
+      .or(`id.in.(${userIds.join(',')}),user_id.in.(${userIds.join(',')})`),
+    supabase.from('post_likes').select('post_id').in('post_id', postIds),
+    supabase.from('post_comments').select('post_id').in('post_id', postIds),
+    viewerId && !isSyntheticId(viewerId)
+      ? supabase.from('post_likes').select('post_id').eq('user_id', viewerId).in('post_id', postIds)
+      : Promise.resolve({ data: [] as any[] }),
+    playlistIds.length > 0
+      ? supabase.from('playlists').select('id,name').in('id', playlistIds)
+      : Promise.resolve({ data: [] as any[] }),
+    supabase.from('post_tags' as never).select('post_id, tagged_user_id').in('post_id', postIds),
+  ]);
+
+  const playlistNamesMap = new Map<string, string>();
+  ((playlistsRes.data || []) as any[]).forEach((p: any) => {
+    if (p?.id) playlistNamesMap.set(String(p.id), p.name);
+  });
+
+  const profilesMap = new Map<string, AudienceProfile>();
+  ((profilesRes.data || []) as any[]).forEach((p: any) => {
+    profilesMap.set(String(p.id), p as any);
+    if (p?.user_id) profilesMap.set(String(p.user_id), p as any);
+  });
+
+  const likesCount = new Map<string, number>();
+  ((likesRes.data || []) as any[]).forEach((l) => {
+    const pid = String(l.post_id);
+    likesCount.set(pid, (likesCount.get(pid) || 0) + 1);
+  });
+
+  const commentsCount = new Map<string, number>();
+  (commentsRes.data || []).forEach((c: any) => {
+    const pid = String(c.post_id);
+    commentsCount.set(pid, (commentsCount.get(pid) || 0) + 1);
+  });
+
+  const userLikedPosts = new Set<string>(((userLikesRes as any).data || []).map((l: any) => String(l.post_id)));
+
+  /* Who was tagged in what.
+     The people tagged are usually not the people who posted, so their
+     profiles were not in the first lookup. Fetch only the ones actually
+     missing rather than widening the query for every feed load. */
+  const tagRows = ((tagsRes as any)?.data || []) as { post_id: string; tagged_user_id: string }[];
+  const taggedIds = Array.from(new Set(tagRows.map((t) => String(t.tagged_user_id))));
+  const missingTagged = taggedIds.filter((id) => !profilesMap.has(id));
+  if (missingTagged.length) {
+    const { data: extra } = await supabase
+      .from('audience_profiles')
+      .select(PROFILE_COLUMNS)
+      .or(`id.in.(${missingTagged.join(',')}),user_id.in.(${missingTagged.join(',')})`);
+    ((extra || []) as any[]).forEach((p: any) => {
+      profilesMap.set(String(p.id), p as any);
+      if (p?.user_id) profilesMap.set(String(p.user_id), p as any);
+    });
+  }
+
+  const taggedByPost = new Map<string, TaggedPerson[]>();
+  tagRows.forEach((t) => {
+    const pid = String(t.post_id);
+    const prof = profilesMap.get(String(t.tagged_user_id)) as any;
+    const list = taggedByPost.get(pid) ?? [];
+    list.push({
+      user_id: String(t.tagged_user_id),
+      display_name: prof?.display_name || prof?.profile_name || prof?.username || 'Someone',
+      username: prof?.username ?? null,
+      avatar_url: prof?.profile_picture_url || prof?.avatar_url || null,
+    });
+    taggedByPost.set(pid, list);
+  });
+
+  return rows.map((post) => ({
+    id: post.id,
+    user_id: post.user_id,
+    content: post.content,
+    song_id: post.song_id,
+    // artist_id: stored directly on the row OR in metadata
+    artist_id: (post as any).artist_id ?? (post as any).metadata?.artist_id ?? null,
+    playlist_id: post.playlist_id,
+    image_url: (post as any).image_url ?? null,
+    image_path: (post as any).image_path ?? null,
+    media_url: (post as any).media_url ?? null,
+    media_source: (post as any).media_source ?? null,
+    songcard: (post as any).songcard ?? null,
+    media_kind: (post as any).media_kind ?? null,
+    media_poster_url: (post as any).media_poster_url ?? null,
+    media_id: (post as any).media_id ?? null,
+    post_type: post.post_type,
+    activity_type: (post as any).activity_type ?? null,
+    metadata: (post as any).metadata ?? null,
+    created_at: post.created_at,
+    updated_at: post.updated_at,
+    profile: profilesMap.get(String(post.user_id)),
+    likes_count: likesCount.get(String(post.id)) || 0,
+    comments_count: commentsCount.get(String(post.id)) || 0,
+    is_liked: userLikedPosts.has(String(post.id)),
+    artist_is_verified: null,
+    playlist_name: post.playlist_id ? playlistNamesMap.get(String(post.playlist_id)) ?? null : null,
+    tagged: taggedByPost.get(String(post.id)) ?? [],
+  }));
+}
+
+/**
+ * One post by id, shaped exactly like the feed shapes it.
+ *
+ * Null when it does not exist, was deleted, or the viewer is not allowed to
+ * see it: row level security makes all three look the same from here, and
+ * for the person holding the link they are the same thing.
+ */
+export async function fetchPostById(postId: string, viewerId: string | null): Promise<SocialPostWithProfile | null> {
+  if (!postId) return null;
+  const { data, error } = await supabase
+    .from('social_posts')
+    .select('*')
+    .eq('id', postId)
+    .eq('is_deleted', false)
+    .maybeSingle();
+  if (error || !data) return null;
+  const [post] = await enrichPostRows([data], viewerId);
+  return post ?? null;
+}
+
+/**
+ * Everything one person has posted, for their profile page.
+ *
+ * The profile used to filter the viewer's own fifty-post feed by author,
+ * which meant a stranger's profile showed whatever of theirs happened to be
+ * in the viewer's most recent page, and the Posts count counted the same.
+ */
+export function useUserPosts(userId: string | null | undefined) {
+  const { user } = useAuth();
+  const enabled = !!userId && !isSyntheticId(userId);
+  const query = useQuery({
+    queryKey: ['user-posts', userId, user?.id ?? null],
+    enabled,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('social_posts')
+        .select('*')
+        .eq('user_id', userId as string)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return enrichPostRows((data as any[]) || [], user?.id ?? null);
+    },
+  });
+  return {
+    posts: query.data ?? [],
+    isLoading: enabled ? query.isLoading : false,
+    refetch: query.refetch,
+  };
+}
+
 export function useSocial() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -24,7 +207,9 @@ export function useSocial() {
   const [isLoading, setIsLoading] = useState(true);
   const [following, setFollowing] = useState<string[]>([]);
   const [followers, setFollowers] = useState<string[]>([]);
+  const [likedArtistIds, setLikedArtistIds] = useState<string[]>([]);
   const followingRef = useRef<string[]>([]);
+  const likedArtistsRef = useRef<string[]>([]);
   // Ref so callbacks don't need user in their deps array — prevents re-renders on token refresh
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = user?.id ?? null;
@@ -49,15 +234,21 @@ export function useSocial() {
       return;
     }
 
-    const [followingRes, followersRes] = await Promise.all([
+    const [followingRes, followersRes, likedArtistsRes] = await Promise.all([
       supabase.from('user_follows').select('following_id').eq('follower_id', uid),
       supabase.from('user_follows').select('follower_id').eq('following_id', uid),
+      // Following an artist is a liked_artists row, not a user_follows row,
+      // and the Following feed has to honour both.
+      supabase.from('liked_artists').select('artist_id').eq('user_id', uid),
     ]);
 
     const newFollowing = (followingRes.data || []).map((r: any) => r.following_id).filter(Boolean);
     followingRef.current = newFollowing;
     setFollowing(newFollowing);
     setFollowers((followersRes.data || []).map((r: any) => r.follower_id).filter(Boolean));
+    const newLikedArtists = (likedArtistsRes.data || []).map((r: any) => String(r.artist_id)).filter(Boolean);
+    likedArtistsRef.current = newLikedArtists;
+    setLikedArtistIds(newLikedArtists);
   }, []); // stable — reads uid from ref
 
   const fetchPosts = useCallback(async (feedType: 'all' | 'following' = 'all') => {
@@ -70,8 +261,9 @@ export function useSocial() {
     setIsLoading(true);
 
     const currentFollowing = followingRef.current;
+    const currentLikedArtists = likedArtistsRef.current;
 
-    if (feedType === 'following' && currentFollowing.length === 0) {
+    if (feedType === 'following' && currentFollowing.length === 0 && currentLikedArtists.length === 0) {
       setPosts([]);
       setIsLoading(false);
       return;
@@ -84,128 +276,24 @@ export function useSocial() {
         .order('created_at', { ascending: false })
         .limit(50);
 
+      /* Following means two things: people you follow (user_follows) and
+         artists you follow (liked_artists). One query, one OR, so the page
+         stays a single ordered fifty rather than two lists stitched together. */
+      const peopleIds = Array.from(new Set([uid, ...currentFollowing]));
+      const followingFilter = [
+        `user_id.in.(${peopleIds.join(',')})`,
+        currentLikedArtists.length > 0 ? `artist_id.in.(${quoteList(currentLikedArtists)})` : null,
+      ].filter(Boolean).join(',');
+
       const { data: postsData, error: postsError } =
         feedType === 'following'
-          ? await baseQuery.in('user_id', Array.from(new Set([uid, ...currentFollowing])))
+          ? await baseQuery.or(followingFilter)
           : await baseQuery;
 
       if (postsError) throw postsError;
 
       const rows = (postsData as any[]) || [];
-      if (rows.length === 0) {
-        setPosts([]);
-        return;
-      }
-
-      const postIds = rows.map((p) => p.id);
-      const userIds = Array.from(new Set(rows.map((p) => p.user_id).filter(Boolean)));
-      const playlistIds = Array.from(new Set(
-        rows
-          .filter((p) => p.post_type === 'activity' && (p as any).activity_type === 'playlist_created' && p.playlist_id)
-          .map((p) => p.playlist_id)
-      ));
-
-      // Single profile query covering both id and user_id columns, minimal columns only
-      const [profilesRes, likesRes, commentsRes, userLikesRes, playlistsRes, tagsRes] = await Promise.all([
-        supabase
-          .from('audience_profiles')
-          .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
-          .or(`id.in.(${userIds.join(',')}),user_id.in.(${userIds.join(',')})`),
-        supabase.from('post_likes').select('post_id').in('post_id', postIds),
-        supabase.from('post_comments').select('post_id').in('post_id', postIds),
-        supabase.from('post_likes').select('post_id').eq('user_id', uid).in('post_id', postIds),
-        playlistIds.length > 0
-          ? supabase.from('playlists').select('id,name').in('id', playlistIds)
-          : Promise.resolve({ data: [] as any[] }),
-        supabase.from('post_tags' as never).select('post_id, tagged_user_id').in('post_id', postIds),
-      ]);
-
-      const playlistNamesMap = new Map<string, string>();
-      ((playlistsRes.data || []) as any[]).forEach((p: any) => {
-        if (p?.id) playlistNamesMap.set(String(p.id), p.name);
-      });
-
-      const profilesMap = new Map<string, AudienceProfile>();
-      ((profilesRes.data || []) as any[]).forEach((p: any) => {
-        profilesMap.set(String(p.id), p as any);
-        if (p?.user_id) profilesMap.set(String(p.user_id), p as any);
-      });
-
-      const likesCount = new Map<string, number>();
-      ((likesRes.data || []) as any[]).forEach((l) => {
-        const pid = String(l.post_id);
-        likesCount.set(pid, (likesCount.get(pid) || 0) + 1);
-      });
-
-      const commentsCount = new Map<string, number>();
-      (commentsRes.data || []).forEach((c: any) => {
-        const pid = String(c.post_id);
-        commentsCount.set(pid, (commentsCount.get(pid) || 0) + 1);
-      });
-
-      const userLikedPosts = new Set<string>((userLikesRes.data || []).map((l: any) => String(l.post_id)));
-
-      /* Who was tagged in what.
-         The people tagged are usually not the people who posted, so their
-         profiles were not in the first lookup. Fetch only the ones actually
-         missing rather than widening the query for every feed load. */
-      const tagRows = ((tagsRes as any)?.data || []) as { post_id: string; tagged_user_id: string }[];
-      const taggedIds = Array.from(new Set(tagRows.map((t) => String(t.tagged_user_id))));
-      const missingTagged = taggedIds.filter((id) => !profilesMap.has(id));
-      if (missingTagged.length) {
-        const { data: extra } = await supabase
-          .from('audience_profiles')
-          .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
-          .or(`id.in.(${missingTagged.join(',')}),user_id.in.(${missingTagged.join(',')})`);
-        ((extra || []) as any[]).forEach((p: any) => {
-          profilesMap.set(String(p.id), p as any);
-          if (p?.user_id) profilesMap.set(String(p.user_id), p as any);
-        });
-      }
-
-      const taggedByPost = new Map<string, TaggedPerson[]>();
-      tagRows.forEach((t) => {
-        const pid = String(t.post_id);
-        const prof = profilesMap.get(String(t.tagged_user_id)) as any;
-        const list = taggedByPost.get(pid) ?? [];
-        list.push({
-          user_id: String(t.tagged_user_id),
-          display_name: prof?.display_name || prof?.profile_name || prof?.username || 'Someone',
-          username: prof?.username ?? null,
-          avatar_url: prof?.profile_picture_url || prof?.avatar_url || null,
-        });
-        taggedByPost.set(pid, list);
-      });
-
-      const enriched: SocialPostWithProfile[] = rows.map((post) => ({
-        id: post.id,
-        user_id: post.user_id,
-        content: post.content,
-        song_id: post.song_id,
-        // artist_id: stored directly on the row OR in metadata
-        artist_id: (post as any).artist_id ?? (post as any).metadata?.artist_id ?? null,
-        playlist_id: post.playlist_id,
-        image_url: (post as any).image_url ?? null,
-        image_path: (post as any).image_path ?? null,
-        media_url: (post as any).media_url ?? null,
-        media_source: (post as any).media_source ?? null,
-        songcard: (post as any).songcard ?? null,
-        media_kind: (post as any).media_kind ?? null,
-        media_poster_url: (post as any).media_poster_url ?? null,
-        media_id: (post as any).media_id ?? null,
-        post_type: post.post_type,
-        activity_type: (post as any).activity_type ?? null,
-        metadata: (post as any).metadata ?? null,
-        created_at: post.created_at,
-        updated_at: post.updated_at,
-        profile: profilesMap.get(String(post.user_id)),
-        likes_count: likesCount.get(String(post.id)) || 0,
-        comments_count: commentsCount.get(String(post.id)) || 0,
-        is_liked: userLikedPosts.has(String(post.id)),
-        artist_is_verified: null,
-        playlist_name: post.playlist_id ? playlistNamesMap.get(String(post.playlist_id)) ?? null : null,
-        tagged: taggedByPost.get(String(post.id)) ?? [],
-      }));
+      const enriched = await enrichPostRows(rows, uid);
 
       setPosts(enriched);
     } catch (err) {
@@ -412,22 +500,60 @@ export function useSocial() {
     [toast, fetchPosts, notifyTagged]
   );
 
-  const deletePost = useCallback(async (postId: string) => {
-    if (!user) return;
+  const deletePost = useCallback(async (postId: string): Promise<boolean> => {
+    if (!user) return false;
 
-    const [, , { error }] = await Promise.all([
-      supabase.from('post_likes').delete().eq('post_id', postId),
-      supabase.from('post_comments').delete().eq('post_id', postId),
-      supabase.from('social_posts').delete().eq('id', postId).eq('user_id', user.id),
-    ]);
+    /* The post goes first, and alone. This used to fire the post, its likes
+       and its comments off together, so a refused post delete (not yours, or
+       offline) still stripped a live post of every like and comment it had.
+       Only once the post is really gone do the children follow. */
+    const { error } = await supabase
+      .from('social_posts')
+      .delete()
+      .eq('id', postId)
+      .eq('user_id', user.id);
 
     if (error) {
       toast({ title: 'Could not delete post', description: error.message, variant: 'destructive' });
-      return;
+      return false;
     }
+
+    await Promise.all([
+      supabase.from('post_likes').delete().eq('post_id', postId),
+      supabase.from('post_comments').delete().eq('post_id', postId),
+    ]);
 
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     toast({ title: 'Post deleted' });
+    return true;
+  }, [user, toast]);
+
+  /**
+   * Delete one of your own comments.
+   *
+   * Scoped to your own user_id on the client as well as by policy, so a bad
+   * id can never reach anyone else's words. The count on the post comes down
+   * with it.
+   */
+  const deleteComment = useCallback(async (postId: string, commentId: string): Promise<boolean> => {
+    if (!user) return false;
+
+    const { error } = await supabase
+      .from('post_comments')
+      .delete()
+      .eq('id', commentId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      toast({ title: 'Could not delete comment', description: error.message, variant: 'destructive' });
+      return false;
+    }
+
+    setPosts((prev) => prev.map((p) =>
+      p.id === postId ? { ...p, comments_count: Math.max(0, p.comments_count - 1) } : p
+    ));
+    toast({ title: 'Comment deleted' });
+    return true;
   }, [user, toast]);
 
   const toggleLikePost = useCallback(async (postId: string) => {
@@ -575,7 +701,7 @@ export function useSocial() {
     const userIds = Array.from(new Set(rows.map((c) => c.user_id).filter(Boolean)));
     const { data: profileData } = await supabase
       .from('audience_profiles')
-      .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,bio')
+      .select(PROFILE_COLUMNS)
       .or(`id.in.(${userIds.join(',')}),user_id.in.(${userIds.join(',')})`);
     const profilesMap = new Map<string, AudienceProfile>();
     ((profileData || []) as any[]).forEach((p: any) => {
@@ -717,19 +843,27 @@ export function useSocial() {
     return true;
   }, [user?.id, fetchPosts]);
 
+  const getPostById = useCallback(
+    (postId: string) => fetchPostById(postId, userIdRef.current),
+    []
+  );
+
   return {
     posts,
     isLoading,
     following,
     followers,
+    likedArtistIds,
     createPost,
     deletePost,
+    deleteComment,
     toggleLikePost,
     followUser,
     isFollowing,
     getPostComments,
     addComment,
     untagSelf,
+    fetchPostById: getPostById,
     refetchPosts: fetchPostsTracked
   };
 }

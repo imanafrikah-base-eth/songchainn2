@@ -4,12 +4,6 @@ import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
 // OAuth client IDs are public identifiers (they ship in every page load),
 // so a baked-in fallback is safe and avoids a hard Vercel env dependency.
-// The fallback is the SAME client Supabase's Google provider is configured
-// with. It has to be: the id_token this button hands to signInWithIdToken is
-// only accepted when its audience is that client, and Google only serves the
-// button at all on origins that client lists. The old fallback was a second
-// client with no registered origin, so every phone got "Access blocked:
-// Authorization Error, no registered origin" the moment it tapped Google.
 const GOOGLE_CLIENT_ID =
   (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ||
   '541798318088-t7i3uqpdihatrf3530p58qgqpuvdej4n.apps.googleusercontent.com';
@@ -18,11 +12,46 @@ const GSI_SRC = 'https://accounts.google.com/gsi/client';
 
 /**
  * How long Google's script gets before we stop waiting for it and draw our
- * own button. Long enough for a slow phone on a slow network to load 200KB;
- * short enough that a person on a browser that blocks the script is not left
- * looking at a hole.
+ * own button. Long enough for a slow phone on a slow network to load 200KB
+ * (a 50 KB/s LTE link in Lusaka needs a good ten seconds); short enough that
+ * a person on a browser that blocks the script is not left looking at a hole.
+ * A blocked script rejects at once and never waits this long, so the timer
+ * only ever fires for the slow case, where the redirect button is the worse
+ * answer: it walks a page navigation through the auth server on the same
+ * slow link, and that is the one place a raw "site can't be reached" page
+ * can appear. If the script arrives after this fires, the proper button
+ * replaces the redirect one.
  */
-const GSI_PATIENCE_MS = 4000;
+const GSI_PATIENCE_MS = 12000;
+
+/** How long the auth server gets to answer a probe before we call the link down. */
+const REACH_TIMEOUT_MS = 8000;
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+
+/**
+ * Before leaving the page for the redirect flow, make sure the auth server
+ * can be reached from this phone right now. The redirect is a page
+ * navigation, and if the link cannot carry it the browser shows its own
+ * "took too long to respond" page with the Supabase hostname on it; nothing
+ * we render can catch that. A probe from here fails inside the app instead,
+ * where the message is ours and the person can simply try again.
+ */
+async function authServerReachable(): Promise<boolean> {
+  if (!SUPABASE_URL) return true;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), REACH_TIMEOUT_MS);
+  try {
+    // 401 is the healthy answer without an apikey; any HTTP answer means the
+    // link carries.
+    await fetch(`${SUPABASE_URL}/auth/v1/health`, { signal: controller.signal, cache: 'no-store' });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
 
 declare global {
   interface Window {
@@ -116,6 +145,11 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
   const redirectSignIn = useCallback(async () => {
     setVerifying(true);
     try {
+      if (!(await authServerReachable())) {
+        onError?.('The sign-in server is not answering on this connection. Check your signal and try again, or sign in with your email and password.');
+        setVerifying(false);
+        return;
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: `${window.location.origin}/` },

@@ -5,13 +5,11 @@ import { useAuth } from '@/context/AuthContext';
 /**
  * Does the signed-in person run an artist page, and are they verified?
  *
- * This is the first time the app can actually answer that. AuthContext has an
- * `isArtist` flag but it is hardcoded to false in every code path, because the
- * table it would have read never existed. Now it does.
- *
- * Someone counts as an artist here if they own a catalog page OR they have
- * released a track through the Studio, so a brand new artist is treated as one
- * from their very first upload rather than only after claiming a page.
+ * One definition, the same one the server uses: a row in artist_accounts.
+ * This hook used to also count "has uploaded a song", which the upload
+ * policy and the is_artist() predicate never did, so it could call someone
+ * an artist whom the server then refused. Since 7 Sep 2026 an account is
+ * granted through Admin > Claims and nothing else.
  */
 export function useArtistOwnership() {
   const { user } = useAuth();
@@ -46,7 +44,7 @@ export function useArtistOwnership() {
     artistId: data?.artistId ?? null,
     isVerified: data?.isVerified ?? false,
     hasReleases: data?.hasReleases ?? false,
-    isArtist: !!data?.artistId || !!data?.hasReleases,
+    isArtist: !!data?.artistId,
     isLoading,
   };
 }

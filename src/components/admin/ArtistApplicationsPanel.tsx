@@ -152,11 +152,14 @@ function SongRow({
         audio_url: audioPublic.publicUrl,
         cover_art_url: coverPublicUrl ?? linkedArtist?.profileImage ?? null,
         artist_image_url: linkedArtist?.profileImage ?? null,
+        // is_published is derived from status by a trigger; setting the
+        // boolean alone left every admin-published song invisible forever.
+        status: 'published',
         is_published: true,
         genre,
         town_square: townSquare,
         artist_id: artistId,
-      });
+      } as never);
       if (insertErr) throw insertErr;
 
       await updateSongStatus('published', newSongId);

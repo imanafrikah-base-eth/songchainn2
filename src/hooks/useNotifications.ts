@@ -4,19 +4,56 @@ import { useAuth } from '@/context/AuthContext';
 import { AudienceProfile } from '@/types/database';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
+/**
+ * Every kind of notification the app knows how to draw.
+ *
+ * 'follow', 'like', 'comment', 'new_release' and 'artist_claim' are written by
+ * database triggers; 'post_tag' and 'comment_like' by the client. The open
+ * string at the end is deliberate: a type the database learns before the app
+ * does must fall through to a sensible default, never crash the tray.
+ */
+export type KnownNotificationType =
+  | 'follow'
+  | 'like'
+  | 'comment'
+  | 'mention'
+  | 'playlist'
+  | 'announcement'
+  | 'post_tag'
+  | 'comment_like'
+  | 'new_release'
+  | 'artist_claim';
+
+export type NotificationType = KnownNotificationType | (string & {});
+
+export interface NotificationMetadata {
+  cta_path?: string;
+  post_id?: string;
+  comment_id?: string;
+  song_id?: string;
+  artist_id?: string;
+  artist_name?: string;
+  title?: string;
+  status?: 'approved' | 'rejected' | string;
+  playlist_id?: string;
+  [key: string]: unknown;
+}
+
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'follow' | 'like' | 'comment' | 'mention' | 'playlist' | 'announcement';
+  type: NotificationType;
   from_user_id: string | null;
   post_id: string | null;
   message: string | null;
   title?: string | null;
-  metadata?: { cta_path?: string; [key: string]: unknown } | null;
+  metadata?: NotificationMetadata | null;
   is_read: boolean;
   created_at: string;
   from_profile?: AudienceProfile;
 }
+
+const PROFILE_COLUMNS = 'id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,is_official';
 
 const notificationChannelsByUser = new Map<string, RealtimeChannel>();
 const notificationConsumersByUser = new Map<string, number>();
@@ -66,8 +103,13 @@ export function useNotifications() {
     if (notificationsData && notificationsData.length > 0) {
       const fromUserIds = [...new Set(notificationsData.map(n => n.from_user_id).filter((id): id is string => !!id))];
 
+      // from_user_id is an auth user id. Profiles key it as user_id, with id
+      // usually equal, so look up by both the way the feed does.
       const { data: profilesData } = fromUserIds.length > 0
-        ? await supabase.from('audience_profiles').select('*').in('id', fromUserIds)
+        ? await supabase
+            .from('audience_profiles')
+            .select(PROFILE_COLUMNS)
+            .or(`id.in.(${fromUserIds.join(',')}),user_id.in.(${fromUserIds.join(',')})`)
         : { data: [] as AudienceProfile[] };
 
       const normalizedProfiles = ((profilesData as any[]) || []).map((p) => ({
@@ -75,14 +117,16 @@ export function useNotifications() {
         user_id: p?.user_id ?? p?.id,
       })) as AudienceProfile[];
 
-      const profilesMap = new Map(
-        normalizedProfiles.map((p) => [p.user_id, p])
-      );
+      const profilesMap = new Map<string, AudienceProfile>();
+      normalizedProfiles.forEach((p) => {
+        profilesMap.set(String(p.id), p);
+        if (p.user_id) profilesMap.set(String(p.user_id), p);
+      });
 
       const enrichedNotifications: Notification[] = notificationsData.map(n => ({
         id: n.id,
         user_id: n.user_id,
-        type: n.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist' | 'announcement',
+        type: n.type as NotificationType,
         from_user_id: n.from_user_id,
         post_id: n.post_id,
         message: n.message,
@@ -90,7 +134,7 @@ export function useNotifications() {
         metadata: (n as any).metadata ?? null,
         is_read: n.is_read,
         created_at: n.created_at,
-        from_profile: profilesMap.get(n.from_user_id),
+        from_profile: n.from_user_id ? profilesMap.get(String(n.from_user_id)) : undefined,
       }));
 
       setNotifications(enrichedNotifications);
@@ -135,7 +179,7 @@ export function useNotifications() {
 
   const createNotification = useCallback(async (
     toUserId: string,
-    type: 'follow' | 'like' | 'comment' | 'mention' | 'playlist',
+    type: 'follow' | 'like' | 'comment' | 'mention' | 'playlist' | 'post_tag' | 'comment_like',
     postId?: string,
     message?: string
   ) => {
@@ -194,16 +238,20 @@ export function useNotifications() {
     const channel = ensureNotificationsChannel(userId, async (payload) => {
       const newNotification = payload.new as Notification;
 
-      // Fetch the from_user's profile
-      const { data: profileData } = await supabase
-        .from('audience_profiles')
-        .select('*')
-        .eq('id', newNotification.from_user_id)
-        .single();
+      // Fetch the from_user's profile. A trigger-written release or claim
+      // notice has no sender at all, so there is nothing to look up.
+      const { data: profileData } = newNotification.from_user_id
+        ? await supabase
+            .from('audience_profiles')
+            .select(PROFILE_COLUMNS)
+            .or(`id.eq.${newNotification.from_user_id},user_id.eq.${newNotification.from_user_id}`)
+            .limit(1)
+            .maybeSingle()
+        : { data: null };
 
       const enrichedNotification: Notification = {
         ...newNotification,
-        type: newNotification.type as 'follow' | 'like' | 'comment' | 'mention' | 'playlist' | 'announcement',
+        type: newNotification.type as NotificationType,
         from_profile: profileData
           ? ({
               ...(profileData as any),

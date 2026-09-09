@@ -35,6 +35,9 @@ export interface SongDetails {
   pro: string | null;
   distribution: Distribution;
   onchain_requested_at: string | null;
+  /** The EP or album this track sits on, if any, and where on it. */
+  release_id: string | null;
+  track_number: number | null;
 }
 
 export const EMPTY_DETAILS: SongDetails = {
@@ -51,10 +54,50 @@ export const EMPTY_DETAILS: SongDetails = {
   pro: null,
   distribution: 'app',
   onchain_requested_at: null,
+  release_id: null,
+  track_number: null,
 };
 
 const COLUMNS =
-  'lyrics, description, credits, splits, isrc, iswc, language, explicit, release_date, publisher, pro, distribution, onchain_requested_at';
+  'lyrics, description, credits, splits, isrc, iswc, language, explicit, release_date, publisher, pro, distribution, onchain_requested_at, release_id, track_number';
+
+/**
+ * An ISRC is two letters of country, three of registrant, two of year and
+ * five of designation: twelve characters once the dashes are gone.
+ */
+export const ISRC_PATTERN = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
+
+export function normaliseIsrc(raw: string | null): string | null {
+  const t = (raw ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return t.length ? t : null;
+}
+
+export function isValidIsrc(raw: string | null): boolean {
+  const t = normaliseIsrc(raw);
+  return !t || ISRC_PATTERN.test(t);
+}
+
+/** Whole-percent splits either add up to 100 or there are none. */
+export function splitsAddUp(splits: Split[]): boolean {
+  const named = splits.filter((s) => s.name.trim());
+  if (!named.length) return true;
+  return named.reduce((sum, s) => sum + (Number(s.share) || 0), 0) === 100;
+}
+
+/**
+ * Everything that stops a save, in the artist's words. Empty when the
+ * details are fine to write.
+ */
+export function detailProblems(d: SongDetails): string[] {
+  const problems: string[] = [];
+  if (!isValidIsrc(d.isrc)) problems.push('That ISRC is not the right shape. It is 12 characters, like ZMA012600001.');
+  if (!splitsAddUp(d.splits)) problems.push('The splits have to add up to exactly 100 percent.');
+  if (d.track_number !== null && d.track_number !== undefined && (!Number.isInteger(d.track_number) || d.track_number < 1)) {
+    problems.push('A track number is a whole number starting at 1.');
+  }
+  if (d.release_date && Number.isNaN(Date.parse(d.release_date))) problems.push('That release date is not a real date.');
+  return problems;
+}
 
 function normalise(row: Record<string, unknown> | null): SongDetails {
   if (!row) return EMPTY_DETAILS;
@@ -74,6 +117,8 @@ function normalise(row: Record<string, unknown> | null): SongDetails {
     pro: (row.pro as string | null) ?? null,
     distribution: row.distribution === 'onchain' ? 'onchain' : 'app',
     onchain_requested_at: (row.onchain_requested_at as string | null) ?? null,
+    release_id: (row.release_id as string | null) ?? null,
+    track_number: typeof row.track_number === 'number' ? row.track_number : null,
   };
 }
 
@@ -108,16 +153,20 @@ export function cleanDetails(d: SongDetails): SongDetails {
     splits: d.splits
       .map((s) => ({ name: s.name.trim(), role: s.role.trim(), share: Math.max(0, Math.min(100, Math.round(Number(s.share) || 0))) }))
       .filter((s) => s.name),
-    isrc: text(d.isrc)?.toUpperCase().replace(/[^A-Z0-9]/g, '') ?? null,
+    isrc: normaliseIsrc(d.isrc),
     iswc: text(d.iswc)?.toUpperCase().replace(/\s+/g, '') ?? null,
     language: text(d.language),
     release_date: text(d.release_date),
     publisher: text(d.publisher),
     pro: text(d.pro),
+    release_id: text(d.release_id),
+    track_number: d.track_number && d.track_number > 0 ? Math.round(d.track_number) : null,
   };
 }
 
 export async function saveSongDetails(songId: string, details: SongDetails): Promise<void> {
+  const problems = detailProblems(details);
+  if (problems.length) throw new Error(problems[0]);
   const clean = cleanDetails(details);
   const { error } = await supabase
     .from('songs')
@@ -134,8 +183,25 @@ export async function saveSongDetails(songId: string, details: SongDetails): Pro
       publisher: clean.publisher,
       pro: clean.pro,
       distribution: clean.distribution,
+      release_id: clean.release_id,
+      track_number: clean.track_number,
       details_updated_at: new Date().toISOString(),
     } as never)
+    .eq('id', songId);
+  if (error) throw error;
+}
+
+/**
+ * The record's name and genre, which the upload form sets once and used to
+ * be frozen forever. A typo in a title is the most common thing an artist
+ * wants to fix the minute after they press send.
+ */
+export async function saveSongCore(songId: string, core: { title: string; genre: string | null }): Promise<void> {
+  const title = core.title.trim();
+  if (!title) throw new Error('A record needs a title.');
+  const { error } = await supabase
+    .from('songs')
+    .update({ title, genre: core.genre?.trim() || null, details_updated_at: new Date().toISOString() } as never)
     .eq('id', songId);
   if (error) throw error;
 }

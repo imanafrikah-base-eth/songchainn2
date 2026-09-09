@@ -8,6 +8,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Navigation } from '@/components/Navigation';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
@@ -30,6 +40,8 @@ export default function Playlists() {
   const [playlistDescription, setPlaylistDescription] = useState('');
   const [playlistIsPublic, setPlaylistIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Deleting is one tap on a trash icon, so it asks first.
+  const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string; name: string } | null>(null);
   const communityPlaylists = publicPlaylists.filter((playlist) => playlist.user_id !== user?.id);
 
   const handleCreatePlaylist = async () => {
@@ -180,7 +192,8 @@ export default function Playlists() {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => deletePlaylist(playlist.id)}
+                        aria-label={`Delete ${playlist.name}`}
+                        onClick={() => setPlaylistToDelete({ id: playlist.id, name: playlist.name })}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -243,6 +256,29 @@ export default function Playlists() {
           )}
         </section>
       </main>
+
+      <AlertDialog open={playlistToDelete !== null} onOpenChange={(open) => { if (!open) setPlaylistToDelete(null); }}>
+        <AlertDialogContent className="max-w-sm w-[95vw] sm:w-full">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this playlist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {playlistToDelete ? playlistToDelete.name : 'This playlist'} and its track list will be removed. The songs themselves stay in the catalog.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (playlistToDelete) void deletePlaylist(playlistToDelete.id);
+                setPlaylistToDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
         <DialogContent className="max-w-sm w-[95vw] sm:w-full">

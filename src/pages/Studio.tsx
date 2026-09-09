@@ -4,8 +4,13 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, UploadCloud, Loader2, CheckCircle2, Wrench, Music4, Wallet, Coins, AlertCircle,
-  Image as ImageIcon, Globe2,
+  Image as ImageIcon, Globe2, Trash2, RefreshCw, CalendarClock, X, ListMusic,
 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { GENRES } from '@/data/musicData';
 import { Navigation } from '@/components/Navigation';
 import { ConsentNotice } from '@/components/ConsentNotice';
 import { useCompliance } from '@/hooks/useCompliance';
@@ -16,7 +21,8 @@ import { useBecomeArtist } from '@/hooks/useBecomeArtist';
 import { WORLD_BUILDER_ENABLED } from '@/lib/features';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  useArtistReleases, useTrackUpload, TIER_LABEL, type ArtistRelease, type ReleaseTier,
+  useArtistReleases, useBatchUpload, useReleaseActions, isScheduled, AUDITION_STALE_MS, UPLOADS_PER_DAY,
+  TIER_LABEL, type ArtistRelease, type ReleaseTier, type QueuedTrack, type BatchMeta,
 } from '@/hooks/useArtistStudio';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -24,12 +30,54 @@ import { ChevronDown, Pencil } from 'lucide-react';
 import { SongDetailsFields, DistributionChoice } from '@/components/studio/SongDetailsFields';
 import { SongDetailsDialog } from '@/components/studio/SongDetailsDialog';
 import { ActivityBoard } from '@/components/studio/ActivityBoard';
-import { EMPTY_DETAILS, requestOnchain, type SongDetails } from '@/lib/songDetails';
+import { EMPTY_DETAILS, detailProblems, requestOnchain, type SongDetails } from '@/lib/songDetails';
 import { useSongCoin } from '@/hooks/useSongCoins';
 
 // A WAV master runs about 10.6 MB a minute, so this has to be generous enough
 // that a full lossless record fits. Keep in step with MAX_BYTES in upload-url.
 const MAX_MB = 100;
+// Keep in step with MAX_COVER_BYTES in upload-url.
+const MAX_COVER_MB = 8;
+// Stores want square art. Under this it is soft on a phone; under 600 it is
+// unusable and gets stopped here rather than at the server.
+const COVER_GOOD_PX = 1400;
+const COVER_MIN_PX = 600;
+
+/** What is wrong with a cover before a byte of it leaves the phone. */
+async function checkCover(file: File): Promise<{ block: string | null; warn: string | null }> {
+  if (file.size > MAX_COVER_MB * 1024 * 1024) {
+    return { block: `That image is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Covers are ${MAX_COVER_MB} MB at most.`, warn: null };
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => reject(new Error('unreadable'));
+      img.src = url;
+    });
+    const shortest = Math.min(width, height);
+    const ratio = width / height;
+    if (ratio > 1.1 || ratio < 0.9) {
+      return { block: `That image is ${width} by ${height}. Covers have to be square; crop it first.`, warn: null };
+    }
+    if (shortest < COVER_MIN_PX) {
+      return { block: `That image is only ${shortest} pixels across. It needs at least ${COVER_MIN_PX}, and ${COVER_GOOD_PX} looks right.`, warn: null };
+    }
+    if (shortest < COVER_GOOD_PX) {
+      return { block: null, warn: `${shortest} pixels across will look soft on a big screen. ${COVER_GOOD_PX} or more is the store standard.` };
+    }
+    return { block: null, warn: null };
+  } catch {
+    return { block: 'We could not read that image. Send a JPG, PNG or WEBP.', warn: null };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Under this the judges send it to the workshop anyway (a snippet), so say
+// so before a 90 MB upload rather than after it.
+const MIN_SECONDS = 30;
 
 const TIER_CHIP: Record<ReleaseTier, string> = {
   master: 'bg-primary/15 text-primary',
@@ -42,7 +90,13 @@ const STATUS_LABEL: Record<string, string> = {
   auditioning: 'With the judges',
   published: 'Live',
   workshop: 'In the workshop',
+  scheduled: 'Scheduled',
 };
+
+function prettyDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 function useMyProfile() {
   const { user } = useAuth();
@@ -66,20 +120,20 @@ const Studio = () => {
   const { becomeArtist, pending: becoming } = useBecomeArtist();
   const { data: profile } = useMyProfile();
   const { data: releases = [], isLoading } = useArtistReleases();
-  const { phase, progress, error, result, upload, reset } = useTrackUpload();
+  const { tracks, busy, finished, add, remove, setTitle, setTrackNumber, numberAll, start, askAgain, reset } = useBatchUpload();
   const { cannotUpload } = useCompliance();
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [title, setTitle] = useState('');
   const [artistName, setArtistName] = useState('');
   const [genre, setGenre] = useState('');
   const [cover, setCover] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverCheck, setCoverCheck] = useState<{ block: string | null; warn: string | null }>({ block: null, warn: null });
   const coverRef = useRef<HTMLInputElement>(null);
-  /** Lyrics, credits, identifiers and where the record lives. All optional. */
+  /** Credits, paperwork, the release and where the records live. Shared by the batch. All optional. */
   const [details, setDetails] = useState<SongDetails>(EMPTY_DETAILS);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     if (!artistName && profile) {
@@ -87,37 +141,82 @@ const Studio = () => {
     }
   }, [profile, artistName]);
 
-  const busy = phase === 'preparing' || phase === 'uploading' || phase === 'auditioning';
   const hasWallet = !!profile?.wallet_address;
 
-  const { live, workshop, pending } = useMemo(() => ({
-    live: releases.filter((r) => r.status === 'published'),
+  const { live, workshop, pending, scheduled } = useMemo(() => ({
+    live: releases.filter((r) => r.status === 'published' && !isScheduled(r)),
+    scheduled: releases.filter((r) => isScheduled(r)),
     workshop: releases.filter((r) => r.status === 'workshop'),
     pending: releases.filter((r) => r.status === 'uploading' || r.status === 'auditioning'),
   }), [releases]);
 
-  const tooBig = file ? file.size > MAX_MB * 1024 * 1024 : false;
-  const canSubmit = !!file && !tooBig && title.trim().length > 0 && artistName.trim().length > 0 && !busy && !cannotUpload;
+  // What upload-url will let through today, so a ten-track album is told
+  // here rather than refused on track seven.
+  const sentToday = useMemo(() => {
+    const since = Date.now() - 24 * 60 * 60 * 1000;
+    return releases.filter((r) => new Date(r.created_at).getTime() > since).length;
+  }, [releases]);
+  const leftToday = Math.max(0, UPLOADS_PER_DAY - sentToday);
+  const queued = tracks.filter((t) => t.phase === 'queued' || (t.phase === 'error' && !t.songId));
+  const overCap = queued.length > leftToday;
+
+  const detailProblem = detailProblems({ ...details, track_number: null })[0] ?? null;
+  const onRelease = !!details.release_id;
+
+  /** What stops this one row from being sent, in the artist's words. */
+  const trackProblem = (t: QueuedTrack): string | null => {
+    if (t.file.size > MAX_MB * 1024 * 1024) return `That file is ${(t.file.size / (1024 * 1024)).toFixed(1)} MB. The limit is ${MAX_MB} MB.`;
+    if (t.seconds !== null && t.seconds < MIN_SECONDS) return `That runs ${Math.round(t.seconds)} seconds. A record has to be at least ${MIN_SECONDS}; anything shorter goes straight to the workshop as a snippet.`;
+    if (!t.title.trim()) return 'Give it a title.';
+    if (onRelease && (!t.trackNumber || t.trackNumber < 1)) return 'Give it a track number on the release.';
+    return null;
+  };
+  const sameTitleOf = (t: QueuedTrack): ArtistRelease | null => {
+    const title = t.title.trim().toLowerCase();
+    return title ? releases.find((r) => (r.title ?? '').trim().toLowerCase() === title) ?? null : null;
+  };
+  const twiceInQueue = (t: QueuedTrack): boolean => {
+    const title = t.title.trim().toLowerCase();
+    return !!title && tracks.some((o) => o.key !== t.key && o.title.trim().toLowerCase() === title);
+  };
+
+  const canSubmit =
+    queued.length > 0 && queued.every((t) => !trackProblem(t)) && !coverCheck.block && !detailProblem
+    && artistName.trim().length > 0 && !busy && !cannotUpload && !overCap;
+
+  const meta = (): BatchMeta => ({
+    artistName: artistName.trim(),
+    genre: genre.trim() || undefined,
+    cover,
+    details,
+  });
+
+  const addFiles = (incoming: FileList | File[] | null) => {
+    const files = Array.from(incoming ?? []).filter(
+      (f) => /\.(wav|mp3)$/i.test(f.name) || /^audio\/(wav|x-wav|mpeg)$/.test(f.type),
+    );
+    if (!files.length) return;
+    add(files, { onRelease });
+  };
+
+  /** Turning a release on numbers the queue in order; turning it off clears the numbers. */
+  const changeDetails = (next: SongDetails) => {
+    if (!!next.release_id !== !!details.release_id) numberAll(!!next.release_id);
+    setDetails(next);
+  };
 
   const submit = async () => {
-    if (!file || !canSubmit) return;
-    await upload(file, {
-      title: title.trim(),
-      artistName: artistName.trim(),
-      genre: genre.trim() || undefined,
-      cover,
-      details,
-    });
+    if (!canSubmit) return;
+    await start(meta());
   };
 
   const startOver = () => {
     reset();
-    setFile(null);
-    setTitle('');
     setGenre('');
     setDetails(EMPTY_DETAILS);
     setMoreOpen(false);
     setCover(null);
+    setCoverCheck({ block: null, warn: null });
     setCoverPreview((url) => {
       if (url) URL.revokeObjectURL(url);
       return null;
@@ -125,6 +224,11 @@ const Studio = () => {
     if (fileRef.current) fileRef.current.value = '';
     if (coverRef.current) coverRef.current.value = '';
   };
+
+  const doneCount = tracks.filter((t) => t.phase === 'done' && t.result?.passed).length;
+  const workshopCount = tracks.filter((t) => t.phase === 'done' && !t.result?.passed).length;
+  const stuckCount = tracks.filter((t) => t.phase === 'error' && !!t.songId).length;
+  const sentCount = tracks.filter((t) => t.phase === 'done' || t.phase === 'error' || t.phase === 'auditioning').length;
 
   if (!user) {
     return (
@@ -183,7 +287,7 @@ const Studio = () => {
           <h1 className="font-heading text-3xl font-bold text-foreground">Studio</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-8">
-          Send a finished record. $HIKULU and NAKULU read how it was mastered and it goes live to New Releases the same minute. Only a broken file is held back. Everything else publishes, and how it was finished decides which rung it lands on: mastered to standard, release ready, or out with room to tighten. Nobody approves it by hand.
+          Send a finished record. $HIKULU and NAKULU read how it was mastered and it goes live to New Releases the same minute. Only a broken file is held back. Everything else publishes, and how it was finished decides which rung it lands on: mastered to standard, release ready, or out with room to tighten. Once your page is yours, no record is approved by hand.
         </p>
 
         {/* ------------------------------------------------------- world --- */}
@@ -208,45 +312,70 @@ const Studio = () => {
 
         {/* ------------------------------------------------------ upload --- */}
 
-        {phase !== 'done' && (
+        {!finished && (
           <div className="rounded-2xl border border-border bg-card p-5 mb-8">
-            <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Audio file</span>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg"
-                disabled={busy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  setFile(f);
-                  if (f && !title) setTitle(f.name.replace(/\.[^.]+$/, ''));
-                }}
-                className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-primary/15 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/25"
-              />
-            </label>
-            <p className="mt-2 text-xs text-muted-foreground">
-              WAV or MP3, up to {MAX_MB} MB. Export from your session, not from a streaming rip.
-            </p>
-            {tooBig && (
+            <div
+              onDragOver={(e) => { e.preventDefault(); if (!busy) setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setDragging(false); if (!busy) addFiles(e.dataTransfer.files); }}
+              className={`rounded-xl border border-dashed p-3 transition-colors ${dragging ? 'border-primary bg-primary/5' : 'border-border'}`}
+            >
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {tracks.length > 0 ? 'Add more audio files' : 'Audio files'}
+                </span>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg"
+                  disabled={busy}
+                  onChange={(e) => {
+                    addFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-primary/15 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/25"
+                />
+              </label>
+              <p className="mt-2 text-xs text-muted-foreground">
+                WAV or MP3, up to {MAX_MB} MB each. One record or a whole EP at once: pick several files, or drop them here on a computer. Export from your session, not from a streaming rip.
+              </p>
+            </div>
+
+            {tracks.length > 0 && (
+              <ul className="mt-4 space-y-2" aria-label="Tracks to send">
+                {tracks.map((t) => (
+                  <TrackRow
+                    key={t.key}
+                    track={t}
+                    onRelease={onRelease}
+                    problem={trackProblem(t)}
+                    sameTitle={sameTitleOf(t)}
+                    twice={twiceInQueue(t)}
+                    busy={busy}
+                    onTitle={(v) => setTitle(t.key, v)}
+                    onNumber={(v) => setTrackNumber(t.key, v)}
+                    onRemove={() => remove(t.key)}
+                    onRetry={() => void start(meta(), t.key)}
+                    onAskAgain={() => void askAgain(t.key)}
+                    retryReady={!trackProblem(t) && !coverCheck.block && !detailProblem && artistName.trim().length > 0 && !cannotUpload && leftToday > 0}
+                  />
+                ))}
+              </ul>
+            )}
+            {tracks.length > 1 && !busy && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                They go up one after the other and each one is judged the moment it lands. Titles come from the file names; fix any that look wrong before you send.
+              </p>
+            )}
+            {overCap && (
               <p className="mt-2 text-xs text-destructive">
-                That file is {(file!.size / (1024 * 1024)).toFixed(1)} MB. The limit is {MAX_MB} MB.
+                That is {queued.length} to send and you have {leftToday} left today. The door lets {UPLOADS_PER_DAY} through a day; take some out or send the rest tomorrow.
               </p>
             )}
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title</span>
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  disabled={busy}
-                  maxLength={120}
-                  placeholder="Song title"
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
-                />
-              </label>
-              <label className="block">
+              <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Artist name</span>
                 <input
                   value={artistName}
@@ -258,7 +387,9 @@ const Studio = () => {
                 />
               </label>
               <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cover art <span className="normal-case font-normal">(optional, but it should not be)</span></span>
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Cover art <span className="normal-case font-normal">{tracks.length > 1 ? '(one for the whole batch; optional, but it should not be)' : '(optional, but it should not be)'}</span>
+                </span>
                 <div className="flex items-center gap-3">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
                     {coverPreview
@@ -273,6 +404,8 @@ const Studio = () => {
                     onChange={(e) => {
                       const f = e.target.files?.[0] ?? null;
                       setCover(f);
+                      setCoverCheck({ block: null, warn: null });
+                      if (f) void checkCover(f).then(setCoverCheck);
                       setCoverPreview((old) => {
                         if (old) URL.revokeObjectURL(old);
                         return f ? URL.createObjectURL(f) : null;
@@ -281,21 +414,33 @@ const Studio = () => {
                     className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-foreground"
                   />
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Square JPG, PNG or WEBP, under 8 MB. Without it your record shows up blank next to everyone else.
-                </p>
+                {coverCheck.block ? (
+                  <p className="mt-2 text-xs text-destructive">{coverCheck.block}</p>
+                ) : coverCheck.warn ? (
+                  <p className="mt-2 text-xs text-amber-500">{coverCheck.warn}</p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Square JPG, PNG or WEBP, {COVER_GOOD_PX} pixels or more, under {MAX_COVER_MB} MB. Without it your record shows up blank next to everyone else.
+                  </p>
+                )}
               </label>
 
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Genre <span className="normal-case font-normal">(optional)</span></span>
-                <input
+                <select
                   value={genre}
                   onChange={(e) => setGenre(e.target.value)}
                   disabled={busy}
-                  maxLength={60}
-                  placeholder="Afrobeats, Amapiano, Hip Hop..."
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
-                />
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                >
+                  <option value="">Pick the closest one</option>
+                  {GENRES.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  This is where the record files in Discover. Pick the nearest fit; you can change it later.
+                </span>
               </label>
 
               <div className="sm:col-span-2">
@@ -315,45 +460,31 @@ const Studio = () => {
                   className="flex w-full items-center justify-between px-3 py-2.5 text-left"
                 >
                   <span>
-                    <span className="block text-sm font-semibold text-foreground">Lyrics, credits and paperwork</span>
-                    <span className="block text-xs text-muted-foreground">Optional now, editable any time from your catalog.</span>
+                    <span className="block text-sm font-semibold text-foreground">
+                      {tracks.length > 1 ? 'EP or album, credits and paperwork' : 'Lyrics, credits and paperwork'}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {tracks.length > 1 ? 'Put these tracks on one release. Optional now, editable any time.' : 'Optional now, editable any time from your catalog.'}
+                    </span>
                   </span>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {moreOpen && (
                   <div className="border-t border-border p-3">
-                    <SongDetailsFields value={details} onChange={setDetails} disabled={busy} />
+                    <SongDetailsFields value={details} onChange={changeDetails} disabled={busy} artistId={artistId} shared={tracks.length > 1} />
                   </div>
                 )}
               </div>
             </div>
 
-            {busy && (
-              <div className="mt-5">
-                <div className="mb-2 flex items-center gap-2 text-sm text-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  {phase === 'preparing' && 'Getting things ready'}
-                  {phase === 'uploading' && `Sending your track, ${progress}%`}
-                  {phase === 'auditioning' && 'The judges are listening'}
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-300"
-                    style={{ width: `${phase === 'auditioning' ? 100 : progress}%` }}
-                  />
-                </div>
-                {phase === 'auditioning' && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    This takes a moment. They are measuring the master properly, not guessing.
-                  </p>
-                )}
-              </div>
+            {detailProblem && (
+              <p className="mt-4 text-xs text-destructive">{detailProblem}</p>
             )}
 
-            {error && (
-              <div className="mt-5 flex gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3">
-                <AlertCircle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
-                <p className="text-sm text-foreground">{error}</p>
+            {busy && tracks.length > 1 && (
+              <div className="mt-5 flex items-center gap-2 text-sm text-foreground">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                {sentCount} of {tracks.length} sent. Keep this page open until the last one is with the judges; after that they finish without you.
               </div>
             )}
 
@@ -377,61 +508,42 @@ const Studio = () => {
               className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-              {busy ? 'Working' : 'Send it in'}
+              {busy ? 'Working' : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in'}
             </button>
           </div>
         )}
 
         {/* ------------------------------------------------------ result --- */}
 
-        {phase === 'done' && result && (
-          <div className={`mb-8 rounded-2xl border p-5 ${result.passed ? 'border-primary/40 bg-primary/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
-            <div className="mb-4 flex items-center gap-2">
-              {result.passed
-                ? <CheckCircle2 className="h-5 w-5 text-primary" />
-                : <Wrench className="h-5 w-5 text-amber-500" />}
-              <div>
-                <h2 className="font-heading text-lg font-bold text-foreground">
-                  {result.passed ? 'It is live' : 'One more pass in the studio'}
-                </h2>
-                {result.passed && result.tier && (
-                  <p className="text-xs text-muted-foreground">
-                    {result.tier === 'master'
-                      ? 'It meets the full SONGCHAINN standard. That is the top rung and it is rare.'
-                      : result.tier === 'release'
-                        ? 'Clean delivery. It is out and it is eligible for featured placement.'
-                        : 'It is out and people can play it now. Tighten the notes below and it climbs.'}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {result.hikulu && (
-              <div className="mb-3 rounded-xl border border-accent/30 bg-accent/5 p-3">
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-accent">$HIKULU</p>
-                <p className="text-sm text-foreground">{result.hikulu}</p>
+        {finished && (
+          <div className="mb-8 space-y-4">
+            {tracks.length > 1 && (
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <div className="flex items-center gap-2">
+                  <ListMusic className="h-5 w-5 text-primary" />
+                  <h2 className="font-heading text-lg font-bold text-foreground">
+                    {doneCount === tracks.length ? `All ${tracks.length} are in` : `${sentCount} of ${tracks.length} sent`}
+                  </h2>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {[
+                    doneCount ? `${doneCount} live` : null,
+                    workshopCount ? `${workshopCount} in the workshop` : null,
+                    stuckCount ? `${stuckCount} waiting on the judges` : null,
+                  ].filter(Boolean).join(', ')}.
+                  {details.release_id ? ' They sit together on the release, in track order.' : ''}
+                </p>
               </div>
             )}
-            {result.nakulu && (
-              <div className="mb-3 rounded-xl border border-rose-400/30 bg-rose-400/5 p-3">
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-rose-400">NAKULU</p>
-                <p className="text-sm text-foreground">{result.nakulu}</p>
-              </div>
-            )}
-
-            <AuditionDetail
-              failures={result.failures}
-              advisories={result.advisories}
-              shortfalls={result.shortfalls}
-              published={result.passed}
-            />
-
+            {tracks.map((t) => (
+              <ResultCard key={t.key} track={t} many={tracks.length > 1} releaseDate={details.release_date} onAskAgain={() => void askAgain(t.key)} />
+            ))}
             <button
               type="button"
               onClick={startOver}
-              className="mt-5 inline-flex items-center justify-center gap-2 rounded-full border border-border px-5 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-5 py-2 text-sm font-semibold text-foreground hover:bg-muted"
             >
-              Send another
+              {tracks.length > 1 ? 'Send more' : 'Send another'}
             </button>
           </div>
         )}
@@ -446,7 +558,7 @@ const Studio = () => {
               <p className="mt-1 text-sm text-muted-foreground">
                 You never need a wallet to release on SONGCHAINN. You need one to coin a track, so the earnings land somewhere that belongs to you and nobody else.
               </p>
-              <Link to="/profile" className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+              <Link to="/profile?settings=1" className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
                 <Coins className="h-4 w-4" /> Connect a wallet
               </Link>
             </div>
@@ -487,14 +599,24 @@ const Studio = () => {
           </p>
         ) : (
           <div className="space-y-8">
-            {pending.length > 0 && <ReleaseGroup title="In progress" items={pending} hasWallet={hasWallet} />}
-            {live.length > 0 && <ReleaseGroup title="Live on SONGCHAINN" items={live} hasWallet={hasWallet} />}
+            {pending.length > 0 && <ReleaseGroup title="In progress" items={pending} hasWallet={hasWallet} artistId={artistId} />}
+            {scheduled.length > 0 && (
+              <ReleaseGroup
+                title="Scheduled"
+                note="Only you can see these until their day. They go public at midnight and your followers hear about it then."
+                items={scheduled}
+                hasWallet={hasWallet}
+                artistId={artistId}
+              />
+            )}
+            {live.length > 0 && <ReleaseGroup title="Live on SONGCHAINN" items={live} hasWallet={hasWallet} artistId={artistId} />}
             {workshop.length > 0 && (
               <ReleaseGroup
                 title="Your workshop"
                 note="Only you can see this. Nothing lands here unless something on the file is actually broken, and there is no limit on sending a track back once you have fixed it."
                 items={workshop}
                 hasWallet={hasWallet}
+                artistId={artistId}
               />
             )}
           </div>
@@ -513,29 +635,260 @@ const Studio = () => {
   );
 };
 
-function ReleaseGroup({ title, note, items, hasWallet }: { title: string; note?: string; items: ArtistRelease[]; hasWallet: boolean }) {
+function mmss(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
+}
+
+/** One record in the queue: its title, what is wrong with it, and how far along it is. */
+function TrackRow({
+  track: t, onRelease, problem, sameTitle, twice, busy, retryReady, onTitle, onNumber, onRemove, onRetry, onAskAgain,
+}: {
+  track: QueuedTrack;
+  onRelease: boolean;
+  problem: string | null;
+  sameTitle: ArtistRelease | null;
+  twice: boolean;
+  busy: boolean;
+  retryReady: boolean;
+  onTitle: (v: string) => void;
+  onNumber: (v: number | null) => void;
+  onRemove: () => void;
+  onRetry: () => void;
+  onAskAgain: () => void;
+}) {
+  const editable = t.phase === 'queued' || (t.phase === 'error' && !t.songId);
+  const mb = (t.file.size / (1024 * 1024)).toFixed(1);
+  return (
+    <li className="rounded-xl border border-border p-3">
+      <div className="flex items-start gap-2">
+        {onRelease && (
+          <input
+            type="number"
+            min={1}
+            max={99}
+            value={t.trackNumber ?? ''}
+            disabled={!editable}
+            aria-label="Track number"
+            placeholder="#"
+            onChange={(e) => onNumber(e.target.value ? Number(e.target.value) : null)}
+            className="w-14 shrink-0 rounded-xl border border-border bg-background px-2 py-2 text-center text-sm tabular-nums text-foreground focus:border-primary focus:outline-none disabled:opacity-60"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <input
+            value={t.title}
+            onChange={(e) => onTitle(e.target.value)}
+            disabled={!editable}
+            maxLength={120}
+            placeholder="Song title"
+            aria-label="Song title"
+            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none disabled:opacity-60"
+          />
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            {t.file.name}{t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}, {mb} MB
+          </p>
+          {problem && editable && <p className="mt-1 text-xs text-destructive">{problem}</p>}
+          {!problem && editable && twice && (
+            <p className="mt-1 text-xs text-amber-500">Two tracks in this batch have this title.</p>
+          )}
+          {!problem && editable && !twice && sameTitle && (
+            <p className="mt-1 text-xs text-amber-500">
+              You already have a record called this ({STATUS_LABEL[sameTitle.status] ?? sameTitle.status}). Send it anyway if this is a different version, or edit the other one instead.
+            </p>
+          )}
+          {(t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'auditioning') && (
+            <div className="mt-2">
+              <div className="mb-1.5 flex items-center gap-2 text-xs text-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                {t.phase === 'preparing' && 'Getting things ready'}
+                {t.phase === 'uploading' && `Sending your track, ${t.progress}%`}
+                {t.phase === 'auditioning' && 'The judges are listening'}
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-300"
+                  style={{ width: `${t.phase === 'auditioning' ? 100 : t.progress}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {t.phase === 'done' && t.result && (
+            <p className={`mt-2 inline-flex items-center gap-1.5 text-xs font-semibold ${t.result.passed ? 'text-primary' : 'text-amber-500'}`}>
+              {t.result.passed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Wrench className="h-3.5 w-3.5" />}
+              {t.result.passed ? (t.result.tier ? `Live. ${TIER_LABEL[t.result.tier]}` : 'Live') : 'In the workshop'}
+            </p>
+          )}
+          {t.phase === 'error' && t.error && (
+            <div className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2.5">
+              <p className="text-xs text-foreground">{t.error}</p>
+              <button
+                type="button"
+                onClick={t.songId ? onAskAgain : onRetry}
+                disabled={busy || (!t.songId && !retryReady)}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                <RefreshCw className="h-3 w-3" /> {t.songId ? 'Ask the judges again' : 'Try again'}
+              </button>
+            </div>
+          )}
+        </div>
+        {editable && !busy && (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${t.title || t.file.name}`}
+            className="shrink-0 rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** What the judges said about one record, once the batch is through. */
+function ResultCard({ track: t, many, releaseDate, onAskAgain }: { track: QueuedTrack; many: boolean; releaseDate: string | null; onAskAgain: () => void }) {
+  const result = t.result;
+  if (t.phase === 'error' || !result) {
+    return (
+      <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 p-5">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" />
+          <h2 className="font-heading text-lg font-bold text-foreground">{t.title}: the file is in, the judges are not done</h2>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">{t.error || 'The audition did not finish.'}</p>
+        <button
+          type="button"
+          onClick={onAskAgain}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> Ask the judges again
+        </button>
+      </div>
+    );
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const heading = result.passed
+    ? (releaseDate && releaseDate > today ? `It is in. It goes public on ${prettyDate(releaseDate)}` : 'It is live')
+    : 'One more pass in the studio';
+  return (
+    <div className={`rounded-2xl border p-5 ${result.passed ? 'border-primary/40 bg-primary/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
+      <div className="mb-4 flex items-center gap-2">
+        {result.passed
+          ? <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
+          : <Wrench className="h-5 w-5 shrink-0 text-amber-500" />}
+        <div className="min-w-0">
+          <h2 className="font-heading text-lg font-bold text-foreground">
+            {many ? `${t.title}: ${heading.charAt(0).toLowerCase()}${heading.slice(1)}` : heading}
+          </h2>
+          {result.passed && result.tier && (
+            <p className="text-xs text-muted-foreground">
+              {result.tier === 'master'
+                ? 'It meets the full SONGCHAINN standard. That is the top rung and it is rare.'
+                : result.tier === 'release'
+                  ? 'Clean delivery. It is out and it is eligible for featured placement.'
+                  : 'It is out and people can play it now. Tighten the notes below and it climbs.'}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {result.hikulu && (
+        <div className="mb-3 rounded-xl border border-accent/30 bg-accent/5 p-3">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-accent">$HIKULU</p>
+          <p className="text-sm text-foreground">{result.hikulu}</p>
+        </div>
+      )}
+      {result.nakulu && (
+        <div className="mb-3 rounded-xl border border-rose-400/30 bg-rose-400/5 p-3">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-rose-400">NAKULU</p>
+          <p className="text-sm text-foreground">{result.nakulu}</p>
+        </div>
+      )}
+
+      <AuditionDetail
+        failures={result.failures}
+        advisories={result.advisories}
+        shortfalls={result.shortfalls}
+        published={result.passed}
+      />
+
+      {result.warnings && result.warnings.length > 0 && (
+        <ul className="mt-3 space-y-1.5 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3">
+          {result.warnings.map((w) => (
+            <li key={w} className="flex gap-2 text-sm text-foreground">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              {w}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ReleaseGroup({ title, note, items, hasWallet, artistId }: { title: string; note?: string; items: ArtistRelease[]; hasWallet: boolean; artistId: string | null }) {
   return (
     <section>
       <h2 className="font-heading text-lg font-bold text-foreground">{title}</h2>
       {note && <p className="mt-1 mb-3 text-xs text-muted-foreground">{note}</p>}
       <div className={`space-y-3 ${note ? '' : 'mt-3'}`}>
-        {items.map((r) => <ReleaseCard key={r.id} release={r} hasWallet={hasWallet} />)}
+        {items.map((r) => <ReleaseCard key={r.id} release={r} hasWallet={hasWallet} artistId={artistId} />)}
       </div>
     </section>
   );
 }
 
-function ReleaseCard({ release, hasWallet }: { release: ArtistRelease; hasWallet: boolean }) {
+function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease; hasWallet: boolean; artistId: string | null }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [asking, setAsking] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [working, setWorking] = useState(false);
   const queryClient = useQueryClient();
+  const { deleteRelease, reaudition } = useReleaseActions();
   const coin = useSongCoin(release.id);
   const a = release.audition;
   const tier = a?.tier;
   const hasNote = !!(a && (a.hikulu || a.nakulu || a.failures?.length || a.shortfalls?.length || a.plain));
   const minted = coin?.mint_status === 'minted';
   const requested = release.distribution === 'onchain' || Boolean(release.onchain_requested_at);
+  const scheduled = isScheduled(release);
+  const statusKey = scheduled ? 'scheduled' : release.status;
+  // A record that has sat with the judges past the window is stuck, not busy:
+  // the tab closed on it, or the audition fell over. It can be asked again.
+  const stuck =
+    (release.status === 'auditioning' || release.status === 'uploading')
+    && Date.now() - new Date(release.created_at).getTime() > AUDITION_STALE_MS;
+  const canDelete = release.status !== 'published';
+
+  const remove = async () => {
+    setWorking(true);
+    try {
+      await deleteRelease(release.id);
+      toast('Removed', { description: `${release.title || 'That record'} is gone from your Studio.` });
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Could not remove it. Try again.');
+    } finally {
+      setWorking(false);
+      setConfirmDelete(false);
+    }
+  };
+
+  const askAgain = async () => {
+    setWorking(true);
+    try {
+      const r = await reaudition(release.id);
+      toast(r.passed ? 'It is live' : 'Back to the workshop', {
+        description: r.hikulu || r.plain || (r.passed ? 'The judges are done with it.' : 'See what the judges said on the card.'),
+      });
+    } catch (err) {
+      toast.error((err as Error)?.message || 'The judges could not be reached. Try again in a minute.');
+    } finally {
+      setWorking(false);
+    }
+  };
 
   /* "Take it onchain": the artist's wish is recorded on the row and lands in
      the admin coin queue; the mint itself runs from the platform signer. */
@@ -558,11 +911,47 @@ function ReleaseCard({ release, hasWallet }: { release: ArtistRelease; hasWallet
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
-      <SongDetailsDialog songId={release.id} title={release.title || 'Untitled'} open={editing} onOpenChange={setEditing} />
+      <SongDetailsDialog
+        songId={release.id}
+        title={release.title || 'Untitled'}
+        genre={release.genre}
+        artistId={artistId}
+        open={editing}
+        onOpenChange={setEditing}
+      />
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {release.title || 'this record'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The file and everything you typed for it go with it. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working}>Keep it</AlertDialogCancel>
+            <AlertDialogAction disabled={working} onClick={(e) => { e.preventDefault(); void remove(); }}>
+              {working ? 'Removing' : 'Remove'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-semibold text-foreground">{release.title || 'Untitled'}</p>
-          <p className="truncate text-xs text-muted-foreground">{release.artist_name}</p>
+          <p className="truncate font-semibold text-foreground">
+            {release.track_number ? <span className="mr-1.5 tabular-nums text-muted-foreground">{release.track_number}.</span> : null}
+            {release.title || 'Untitled'}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {release.artist_name}
+            {release.genre ? ` · ${release.genre}` : ''}
+            {release.explicit ? ' · Explicit' : ''}
+            {release.duration_seconds ? ` · ${Math.floor(release.duration_seconds / 60)}:${String(Math.round(release.duration_seconds % 60)).padStart(2, '0')}` : ''}
+          </p>
+          {scheduled && release.release_date && (
+            <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">
+              <CalendarClock className="h-3.5 w-3.5" /> Goes public on {prettyDate(release.release_date)}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           {tier && release.status === 'published' && (
@@ -571,11 +960,12 @@ function ReleaseCard({ release, hasWallet }: { release: ArtistRelease; hasWallet
             </span>
           )}
           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-            release.status === 'published' ? 'bg-primary/15 text-primary'
-              : release.status === 'workshop' ? 'bg-amber-500/15 text-amber-500'
+            statusKey === 'published' ? 'bg-primary/15 text-primary'
+              : statusKey === 'scheduled' ? 'bg-primary/10 text-primary'
+              : statusKey === 'workshop' ? 'bg-amber-500/15 text-amber-500'
               : 'bg-muted text-muted-foreground'
           }`}>
-            {STATUS_LABEL[release.status] ?? release.status}
+            {STATUS_LABEL[statusKey] ?? statusKey}
           </span>
         </div>
       </div>
@@ -606,7 +996,33 @@ function ReleaseCard({ release, hasWallet }: { release: ArtistRelease; hasWallet
             <Coins className="h-3.5 w-3.5" /> Take it onchain
           </button>
         ) : null}
+        {stuck && (
+          <button
+            type="button"
+            onClick={askAgain}
+            disabled={working}
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-500 hover:bg-amber-500/25 disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${working ? 'animate-spin' : ''}`} /> Ask the judges again
+          </button>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            disabled={working}
+            aria-label={`Remove ${release.title || 'this record'}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-60"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Remove
+          </button>
+        )}
       </div>
+      {stuck && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          This one has been with the judges longer than it should. Usually the tab closed on it. Ask again and it picks up where it left off.
+        </p>
+      )}
 
       {hasNote && (
         <>

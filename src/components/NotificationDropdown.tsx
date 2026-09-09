@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, type ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, Flame, Heart, MessageCircle, UserPlus, X, ListMusic, Sparkles } from 'lucide-react';
+import {
+  Bell, Check, Flame, Heart, MessageCircle, UserPlus, X, ListMusic, Sparkles,
+  AtSign, Tag, Music, BadgeCheck,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -13,25 +16,54 @@ import { useNotifications, Notification } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { supabase } from '@/integrations/supabase/client';
 
-const notificationIcons = {
+type IconComponent = ComponentType<{ className?: string }>;
+
+/**
+ * Every type the tray can receive, with a fallback for the ones it cannot.
+ *
+ * This used to be indexed straight by type with no default, so a 'post_tag'
+ * or 'comment_like' row (both written by the client for months) resolved to
+ * undefined and React threw on rendering <undefined />. One tag notification
+ * took the whole tray down.
+ */
+const notificationIcons: Record<string, IconComponent> = {
   follow: UserPlus,
   like: Heart,
   comment: MessageCircle,
-  mention: MessageCircle,
+  mention: AtSign,
   playlist: ListMusic,
   announcement: Sparkles,
+  post_tag: Tag,
+  comment_like: Heart,
+  new_release: Music,
+  artist_claim: BadgeCheck,
 };
 
-const notificationMessages = {
-  follow: 'started following you',
-  like: 'liked your post',
-  comment: 'commented on your post',
-  mention: 'mentioned you in a post',
-  playlist: 'shared a new playlist',
-  announcement: '',
-};
+const iconFor = (type: string): IconComponent => notificationIcons[type] ?? Bell;
+
+function defaultMessage(notification: Notification): string {
+  const meta = notification.metadata ?? {};
+  switch (notification.type) {
+    case 'follow': return 'started following you';
+    case 'like': return 'liked your post';
+    case 'comment': return 'commented on your post';
+    case 'mention': return 'mentioned you in a post';
+    case 'playlist': return 'shared a new playlist';
+    case 'post_tag': return 'tagged you in a post';
+    case 'comment_like': return 'liked your comment';
+    case 'new_release': {
+      const who = typeof meta.artist_name === 'string' && meta.artist_name ? meta.artist_name : 'An artist you follow';
+      const what = typeof meta.title === 'string' && meta.title ? ` "${meta.title}"` : ' something new';
+      return `${who} just released${what}`;
+    }
+    case 'artist_claim':
+      return meta.status === 'approved'
+        ? 'Your artist page is yours. Open the Studio to get started.'
+        : 'Your artist claim was not approved this time.';
+    default: return '';
+  }
+}
 
 function extractBattleRoute(message?: string | null) {
   if (!message) return null;
@@ -51,28 +83,69 @@ function readableMessage(message?: string | null) {
   return message.replace(/BATTLE_LIVE::[a-zA-Z0-9-]+::/g, '').replace(/\bis now LIVE\b/g, 'is now live').trim();
 }
 
-function NotificationItem({ 
-  notification, 
-  onRead, 
+/** Where a tap on this notification should land. */
+function routeFor(notification: Notification): string {
+  const battleRoute = extractBattleRoute(notification.message);
+  if (battleRoute) return battleRoute;
+
+  const meta = notification.metadata ?? {};
+  const postId = notification.post_id || (typeof meta.post_id === 'string' ? meta.post_id : null);
+
+  switch (notification.type) {
+    case 'announcement':
+      return typeof meta.cta_path === 'string' && meta.cta_path ? meta.cta_path : '/marketplace';
+    case 'follow':
+      return notification.from_user_id ? `/audience/${notification.from_user_id}` : '/social';
+    case 'like':
+    case 'comment':
+    case 'mention':
+    case 'post_tag':
+    case 'comment_like':
+      return postId ? `/post/${postId}` : '/social';
+    case 'new_release':
+      if (typeof meta.song_id === 'string' && meta.song_id) return `/song/${meta.song_id}`;
+      if (typeof meta.artist_id === 'string' && meta.artist_id) return `/artist/${meta.artist_id}`;
+      return '/';
+    case 'artist_claim':
+      return meta.status === 'approved' ? '/studio' : '/claim';
+    case 'playlist':
+      return typeof meta.playlist_id === 'string' && meta.playlist_id ? `/playlist/${meta.playlist_id}` : '/playlists';
+    default:
+      return postId ? `/post/${postId}` : '/social';
+  }
+}
+
+function senderName(profile: Notification['from_profile']): string | null {
+  if (!profile) return null;
+  const p = profile as { display_name?: string | null; profile_name?: string; username?: string | null };
+  return p.display_name || p.profile_name || p.username || null;
+}
+
+function NotificationItem({
+  notification,
+  onRead,
   onDelete,
   onNavigate,
-}: { 
-  notification: Notification; 
+}: {
+  notification: Notification;
   onRead: (id: string) => void;
   onDelete: (id: string) => void;
-  onNavigate: (notification: Notification) => void | Promise<void>;
+  onNavigate: (notification: Notification) => void;
 }) {
   const battleRoute = extractBattleRoute(notification.message);
-  const isAnnouncement = notification.type === 'announcement';
-  const Icon = battleRoute ? Flame : notificationIcons[notification.type];
-  const message = readableMessage(notification.message) || notificationMessages[notification.type];
+  const Icon = battleRoute ? Flame : iconFor(notification.type);
+  const message = readableMessage(notification.message) || defaultMessage(notification);
   const profile = notification.from_profile;
+  const name = senderName(profile);
+  const avatarSrc = (profile as { profile_picture_url?: string | null; avatar_url?: string | null } | undefined);
 
   const handleClick = () => {
+    // One tap marks ONE notification read. Opening the tray used to mark all
+    // of them, which threw the unread badge away before anything was seen.
     if (!notification.is_read) {
       onRead(notification.id);
     }
-    void onNavigate(notification);
+    onNavigate(notification);
   };
 
   return (
@@ -88,15 +161,15 @@ function NotificationItem({
       )}
       onClick={handleClick}
     >
-      {isAnnouncement ? (
+      {!profile ? (
         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-          <Sparkles className="w-5 h-5 text-primary" />
+          <Icon className="w-5 h-5 text-primary" />
         </div>
       ) : (
         <Avatar className="w-10 h-10 flex-shrink-0">
-          <AvatarImage src={profile?.profile_picture_url || undefined} />
+          <AvatarImage src={avatarSrc?.profile_picture_url || avatarSrc?.avatar_url || undefined} />
           <AvatarFallback className="bg-primary/20 text-primary">
-            {profile?.profile_name?.[0]?.toUpperCase() || '?'}
+            {name?.[0]?.toUpperCase() || '?'}
           </AvatarFallback>
         </Avatar>
       )}
@@ -107,7 +180,7 @@ function NotificationItem({
               through to the sender branch used to print the literal word "Someone"
               and throw the title away, which is how a moderation notice reached
               people reading "Someone" above a message with no heading. */}
-          {isAnnouncement || !profile ? (
+          {!profile ? (
             <p className="text-sm">
               {notification.title && (
                 <span className="font-semibold text-foreground block">{notification.title}</span>
@@ -117,12 +190,14 @@ function NotificationItem({
           ) : (
             <p className="text-sm">
               <span className="font-semibold text-foreground">
-                {profile?.profile_name || 'Someone'}
+                {name || 'Someone'}
               </span>{' '}
               <span className="text-muted-foreground">{message}</span>
             </p>
           )}
           <button
+            type="button"
+            aria-label="Dismiss notification"
             onClick={(e) => {
               e.stopPropagation();
               onDelete(notification.id);
@@ -150,13 +225,13 @@ export function NotificationDropdown() {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'social' | 'playlists'>('all');
   const navigate = useNavigate();
-  const { 
-    notifications, 
-    unreadCount, 
-    isLoading, 
-    markAsRead, 
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    markAsRead,
     markAllAsRead,
-    deleteNotification 
+    deleteNotification
   } = useNotifications();
 
   const filteredNotifications = filter === 'all'
@@ -168,67 +243,24 @@ export function NotificationDropdown() {
         return notification.type !== 'playlist';
       });
 
-  const handleNotificationNavigate = async (notification: Notification) => {
+  const handleNotificationNavigate = (notification: Notification) => {
     setOpen(false);
-    const battleRoute = extractBattleRoute(notification.message);
-    if (battleRoute) {
-      if (/^https?:\/\//i.test(battleRoute)) {
-        window.open(battleRoute, '_blank', 'noopener,noreferrer');
-      } else {
-        navigate(battleRoute);
-      }
+    const route = routeFor(notification);
+    if (/^https?:\/\//i.test(route)) {
+      window.open(route, '_blank', 'noopener,noreferrer');
       return;
     }
-    
-    switch (notification.type) {
-      case 'announcement':
-        navigate(notification.metadata?.cta_path || '/marketplace');
-        break;
-      case 'follow':
-        // Navigate to the follower's profile
-        if (notification.from_user_id) {
-          const { data } = await (supabase as any)
-            .from('artist_accounts')
-            .select('artist_id')
-            .eq('user_id', notification.from_user_id)
-            .maybeSingle();
-          if (data?.artist_id) {
-            navigate(`/artist/${data.artist_id}`);
-            return;
-          }
-          navigate(`/audience/${notification.from_user_id}`);
-        }
-        break;
-      case 'like':
-      case 'comment':
-      case 'mention':
-        // Navigate to the social feed (post context)
-        if (notification.post_id) {
-          navigate('/social');
-        } else {
-          navigate('/social');
-        }
-        break;
-      default:
-        navigate('/social');
-    }
-  };
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    // Opening the tray clears the badge, matching standard app behavior
-    if (nextOpen && unreadCount > 0) {
-      void markAllAsRead();
-    }
+    navigate(route);
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           className="relative"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
@@ -242,8 +274,8 @@ export function NotificationDropdown() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-80 p-0 glass-surface border-border/50" 
+      <PopoverContent
+        className="w-80 p-0 glass-surface border-border/50"
         align="end"
         sideOffset={8}
       >
@@ -253,7 +285,7 @@ export function NotificationDropdown() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={markAllAsRead}
+              onClick={() => void markAllAsRead()}
               className="text-xs text-primary hover:text-primary/80"
             >
               <Check className="w-3 h-3 mr-1" />
@@ -281,7 +313,7 @@ export function NotificationDropdown() {
             className={cn(
               'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
               filter === 'social'
-                ? 'bg-primary/10 text-primary border-primary/40'
+                ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
                 : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
             )}
           >

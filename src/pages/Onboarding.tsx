@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 const logo = '/songchainn-logo.webp';
 import { z } from 'zod';
 import { useNavigate, Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { uploadPublicImage } from '../lib/storage';
 import { MIN_AGE, POLICY_VERSIONS } from '@/legal/policies';
 import { yearsSince } from '@/hooks/useCompliance';
@@ -38,6 +39,7 @@ export default function Onboarding() {
   const { user, refreshProfile, refreshArtistStatus, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -272,6 +274,10 @@ export default function Onboarding() {
       }
 
       await refreshProfile();
+      /* The age answer was cached as unknown before this form saved it, so
+         without this the Studio greets a brand-new musician with the age
+         prompt over the Send button. Seen on production, 9 Sep 2026. */
+      await queryClient.invalidateQueries({ queryKey: ['compliance', authedUserId] });
 
       /* Two different people finish this form, and sending both to the feed
          wastes the one moment a musician is most ready to act. Somebody who
@@ -279,9 +285,10 @@ export default function Onboarding() {
          already filled in; everybody else goes to the music.
 
          Note what this deliberately does NOT do: it does not mark them an
-         artist. Saying you make music is an intention. Releasing a record is
-         what writes the artist_accounts row, and that happens on first publish
-         in upload-url. Nobody gets an artist page for ticking a box. */
+         artist. Saying you make music is an intention. The artist_accounts row
+         is written when an admin approves their claim (Admin > Claims), and
+         until then the Studio and upload-url both refuse them. Nobody gets an
+         artist page for ticking a box. */
       if (makesMusic) {
         // Saying you make music IS the application. The account gets a page
         // of its own right now (become_artist) and the Studio is the first
@@ -581,8 +588,9 @@ export default function Onboarding() {
             </div>
             {makesMusic && (
               <p className="live-surface rounded-lg border border-border/60 bg-card px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-                We will take you to the Studio when you are done. Release one record and your
-                artist page builds itself. No fee, no wallet needed, and nobody approves it.
+                Your Studio opens the moment you finish this form, and every record you send
+                goes live the same minute. No fee, no wallet needed. Already have a page on
+                SONGCHAINN? Claim it from your profile and we hand it over once we confirm it is you.
               </p>
             )}
           </div>

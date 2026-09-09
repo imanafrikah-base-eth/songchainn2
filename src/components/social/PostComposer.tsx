@@ -17,6 +17,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+export const POST_MAX_LENGTH = 1000;
+const POST_COUNTER_FROM = 800;
+
 export interface PostExtras {
   mediaUrl?: string | null;
   mediaKind?: 'image' | 'video' | null;
@@ -152,9 +155,22 @@ export function PostComposer({ onPost, initialType = 'text', initialSongId }: Po
           <Textarea
             placeholder="Share what you're listening to..."
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            maxLength={POST_MAX_LENGTH}
+            onChange={(e) => setContent(e.target.value.slice(0, POST_MAX_LENGTH))}
             className="min-h-[80px] resize-none bg-background/50 border-border/50"
           />
+          {/* The count only appears once it matters. A counter from the first
+              character reads as a limit before anyone has hit one. */}
+          {content.length > POST_COUNTER_FROM && (
+            <p
+              className={`text-right text-xs tabular-nums ${
+                content.length >= POST_MAX_LENGTH ? 'text-destructive' : 'text-muted-foreground'
+              }`}
+              aria-live="polite"
+            >
+              {content.length}/{POST_MAX_LENGTH}
+            </p>
+          )}
           
           {postType === 'song_share' && (
             <Select value={selectedSong} onValueChange={setSelectedSong}>

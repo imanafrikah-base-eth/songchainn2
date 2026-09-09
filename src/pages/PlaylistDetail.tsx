@@ -1,7 +1,17 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Headphones, ListMusic, Music, Pause, Play, Lock, Globe, Plus, GripVertical, X, Users, UserPlus } from 'lucide-react';
+import { ArrowLeft, Headphones, ListMusic, Music, Pause, Play, Lock, Globe, Plus, GripVertical, X, Users, UserPlus, Pencil, Share2, MoreVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useShare } from '@/hooks/useShare';
 import { SONGS, type Song } from '@/data/musicData';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { Navigation } from '@/components/Navigation';
@@ -9,7 +19,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SongCard } from '@/components/SongCard';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
@@ -37,10 +47,12 @@ export default function PlaylistDetail() {
     addPlaylistCollaborator,
     removePlaylistCollaborator,
     updatePlaylistCollaborative,
+    updatePlaylist,
     searchUsersByUsername,
   } = useAudienceInteractions();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { nativeShare } = useShare();
   const { songs: publishedSongs } = usePublishedCatalog();
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
@@ -55,6 +67,10 @@ export default function PlaylistDetail() {
   const [isSearchingCollaborators, setIsSearchingCollaborators] = useState(false);
   const [isAddSongOpen, setIsAddSongOpen] = useState(false);
   const [addSongQuery, setAddSongQuery] = useState('');
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -198,21 +214,62 @@ export default function PlaylistDetail() {
     }
   };
 
+  // Optimistic reorder; if any position write fails the rows go back where
+  // they were, so the screen never disagrees with the server.
   const handleReorder = async (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
+    if (toIndex < 0 || toIndex >= songs.length) return;
+    const previous = songs;
     const next = [...songs];
     const [moved] = next.splice(fromIndex, 1);
     next.splice(toIndex, 0, moved);
     setSongs(next);
     if (playlist) {
-      await reorderPlaylistSongs(playlist.id, next.map((s) => s.id));
+      const ok = await reorderPlaylistSongs(playlist.id, next.map((s) => s.id));
+      if (!ok) setSongs(previous);
     }
   };
 
   const handleRemoveSong = async (songId: string) => {
     if (!playlist) return;
-    await removeSongFromPlaylist(playlist.id, songId);
-    setSongs((prev) => prev.filter((s) => s.id !== songId));
+    const ok = await removeSongFromPlaylist(playlist.id, songId);
+    if (ok) setSongs((prev) => prev.filter((s) => s.id !== songId));
+  };
+
+  const openEdit = () => {
+    if (!playlist) return;
+    setEditName(playlist.name);
+    setEditDescription(playlist.description || '');
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!playlist || isSavingEdit) return;
+    const name = editName.trim();
+    if (!name) {
+      toast({ title: 'A playlist needs a name', variant: 'destructive' });
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      const ok = await updatePlaylist(playlist.id, { name, description: editDescription });
+      if (ok) {
+        setPlaylist((prev) => (prev ? { ...prev, name, description: editDescription.trim() || null } : prev));
+        setIsEditOpen(false);
+      }
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!playlist) return;
+    const url = window.location.origin + '/playlist/' + playlist.id;
+    await nativeShare({
+      title: playlist.name + ' on $ongChainn',
+      text: 'Listen to the playlist "' + playlist.name + '" on $ongChainn',
+      url,
+    });
   };
 
   const addableSongs = useMemo(() => {
@@ -358,9 +415,23 @@ export default function PlaylistDetail() {
 
             <div className="flex-1">
               <p className="text-sm text-muted-foreground mb-2 uppercase tracking-wide">Playlist</p>
-              <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground mb-3">
-                {playlist.name}
-              </h1>
+              <div className="flex items-start gap-3 mb-3">
+                <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground min-w-0">
+                  {playlist.name}
+                </h1>
+                {isOwner && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="mt-2 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Rename or edit playlist"
+                    onClick={openEdit}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
               {playlist.description && (
                 <p className="text-muted-foreground mb-5 max-w-xl">
                   {playlist.description}
@@ -503,6 +574,16 @@ export default function PlaylistDetail() {
                     Collaborators
                   </Button>
                 )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="gap-2"
+                  onClick={() => void handleShare()}
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </Button>
               </div>
             </div>
           </div>
@@ -558,14 +639,35 @@ export default function PlaylistDetail() {
                   <SongCard song={song} index={index} variant="compact" />
                 </div>
                 {canEdit && (
-                  <button
-                    type="button"
-                    aria-label="Remove from playlist"
-                    onClick={() => void handleRemoveSong(song.id)}
-                    className="p-1.5 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={'Options for ' + song.title}
+                        className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors flex-shrink-0"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem disabled={index === 0} onSelect={() => void handleReorder(index, index - 1)}>
+                        <ChevronUp className="w-4 h-4 mr-2" />
+                        Move up
+                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled={index === songs.length - 1} onSelect={() => void handleReorder(index, index + 1)}>
+                        <ChevronDown className="w-4 h-4 mr-2" />
+                        Move down
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => void handleRemoveSong(song.id)}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Remove from playlist
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             ))
@@ -574,6 +676,48 @@ export default function PlaylistDetail() {
       </main>
 
       <AudioPlayer />
+
+      {isOwner && (
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="max-w-sm w-[95vw] sm:w-full">
+            <DialogHeader>
+              <DialogTitle>Edit playlist</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-playlist-name">Name</Label>
+                <Input
+                  id="edit-playlist-name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  maxLength={80}
+                  placeholder="Give your playlist a name"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-playlist-description">Description</Label>
+                <Textarea
+                  id="edit-playlist-description"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={3}
+                  maxLength={200}
+                  placeholder="Add a short description (optional)"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)} disabled={isSavingEdit}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void handleSaveEdit()} disabled={isSavingEdit || !editName.trim()}>
+                {isSavingEdit ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={isAddSongOpen} onOpenChange={setIsAddSongOpen}>
         <DialogContent className="max-w-md w-[95vw] sm:w-full">

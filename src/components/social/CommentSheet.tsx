@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect, useMemo, type SyntheticEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Heart, MoreHorizontal, Reply, CheckCircle2 } from 'lucide-react';
+import { X, Send, Heart, MoreHorizontal, Reply, Trash2, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ReportDialog } from '@/components/ReportDialog';
+import { useAuth } from '@/context/AuthContext';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,9 +29,13 @@ interface CommentSheetProps {
   comments: PostComment[];
   isLoading: boolean;
   onAddComment: (content: string) => void;
+  /** Your own comments only. Resolves true when it is really gone. */
+  onDeleteComment?: (commentId: string) => Promise<boolean> | void;
   commentsCount: number;
   onCommentsUpdate?: (comments: PostComment[]) => void;
 }
+
+export const COMMENT_MAX_LENGTH = 500;
 
 interface ReplyingTo {
   userId: string;
@@ -36,13 +48,32 @@ export function CommentSheet({
   comments, 
   isLoading, 
   onAddComment,
+  onDeleteComment,
   commentsCount,
   onCommentsUpdate
 }: CommentSheetProps) {
+  const { user } = useAuth();
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<ReplyingTo | null>(null);
   const [localComments, setLocalComments] = useState<PostComment[]>([]);
   const [likingCommentId, setLikingCommentId] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<{ id: string; userId: string } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!onDeleteComment || deletingId) return;
+    setDeletingId(commentId);
+    try {
+      const ok = await onDeleteComment(commentId);
+      if (ok) {
+        const remaining = localComments.filter((c) => c.id !== commentId);
+        setLocalComments(remaining);
+        onCommentsUpdate?.(remaining);
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { fetchCommentLikesData, toggleCommentLike } = useCommentLikes();
@@ -223,6 +254,9 @@ export function CommentSheet({
                     const displayName = artist?.name || comment.profile?.profile_name || 'Anonymous';
                     const isVerifiedArtist = !!comment.artist_is_verified;
                     const avatarSrc = isArtistComment ? (artist?.profileImage || comment.profile?.profile_picture_url || '') : (comment.profile?.profile_picture_url || '');
+                    const isOwnComment = !!user?.id && comment.user_id === user.id;
+                    // A comment still on its way up has no real id to act on yet.
+                    const isPending = comment.id.startsWith('pending-');
 
                     return (
                       <motion.div
@@ -257,9 +291,36 @@ export function CommentSheet({
                                 {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                               </span>
                             </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
+                            {/* This button used to do nothing at all. Delete is
+                                yours alone; report is for everyone else's. */}
+                            {!isPending && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Comment options">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {isOwnComment ? (
+                                    onDeleteComment && (
+                                      <DropdownMenuItem
+                                        disabled={deletingId === comment.id}
+                                        onClick={() => void handleDeleteComment(comment.id)}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete comment
+                                      </DropdownMenuItem>
+                                    )
+                                  ) : (
+                                    <DropdownMenuItem onClick={() => setReporting({ id: comment.id, userId: comment.user_id })}>
+                                      <Flag className="w-4 h-4 mr-2" />
+                                      Report this comment
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                           <p className="text-sm text-foreground/90 mt-1">
                             {renderCommentContent(comment.content)}
@@ -323,7 +384,8 @@ export function CommentSheet({
                   ref={inputRef}
                   placeholder={replyingTo ? `Reply to @${replyingTo.userName}...` : "Add a comment..."}
                   value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
+                  maxLength={COMMENT_MAX_LENGTH}
+                  onChange={(e) => setNewComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
                   onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                   className="flex-1 h-11 rounded-full bg-muted border-0"
                 />
@@ -338,6 +400,15 @@ export function CommentSheet({
               </div>
             </div>
           </motion.div>
+
+          {reporting && (
+            <ReportDialog
+              targetType="comment"
+              targetId={reporting.id}
+              targetUser={reporting.userId}
+              onClose={() => setReporting(null)}
+            />
+          )}
         </>
       )}
     </AnimatePresence>

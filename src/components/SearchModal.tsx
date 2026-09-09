@@ -155,6 +155,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKind>('all');
   const [recentSearches, setRecentSearches] = useState<string[]>(() => loadRecentSearches());
   const inputRef = useRef<HTMLInputElement>(null);
+  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
   const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
   const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
   const allArtists = useMemo(() => [...ARTISTS, ...publishedArtists], [publishedArtists]);
@@ -185,6 +186,14 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
   useEffect(() => {
     setActiveIndex(0);
   }, [query, activeFilter]);
+
+  // Keep the active row on screen as the arrow keys move it.
+  useEffect(() => {
+    const row = rowRefs.current[activeIndex];
+    if (row && typeof row.scrollIntoView === 'function') {
+      row.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex]);
 
   const recordSearch = useCallback((rawQuery: string) => {
     const trimmed = rawQuery.trim();
@@ -230,7 +239,10 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'ArrowDown') {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onOpenChange(false);
+      } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         setActiveIndex((i) => Math.min(i + 1, filteredResults.length - 1));
       } else if (e.key === 'ArrowUp') {
@@ -244,7 +256,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
         }
       }
     },
-    [activeIndex, handleSelect, filteredResults, query, recordSearch],
+    [activeIndex, handleSelect, filteredResults, query, recordSearch, onOpenChange],
   );
 
   const trending = useMemo(
@@ -272,6 +284,11 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search songs, artists, catalogs…"
+            role="combobox"
+            aria-expanded={displayList.length > 0}
+            aria-controls="search-results"
+            aria-activedescendant={query.trim() && displayList[activeIndex] ? `search-option-${displayList[activeIndex].kind}-${displayList[activeIndex].id}` : undefined}
+            aria-autocomplete="list"
             className="flex-1 bg-transparent text-base text-foreground placeholder:text-muted-foreground outline-none"
             autoComplete="off"
             autoCorrect="off"
@@ -353,14 +370,21 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
               No results for &quot;{query}&quot;
             </div>
           ) : (
-            <ul className="py-1">
+            <ul className="py-1" role="listbox" id="search-results" aria-label="Search results">
               {displayList.map((result, i) => {
                 const Icon = KIND_ICON[result.kind];
                 const isActive = i === activeIndex && query.trim().length > 0;
                 return (
-                  <li key={`${result.kind}-${result.id}`}>
+                  <li
+                    key={`${result.kind}-${result.id}`}
+                    id={`search-option-${result.kind}-${result.id}`}
+                    role="option"
+                    aria-selected={isActive}
+                    ref={(el) => { rowRefs.current[i] = el; }}
+                  >
                     <button
                       type="button"
+                      tabIndex={-1}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-primary/5 ${isActive ? 'bg-primary/8' : ''}`}
                       onMouseEnter={() => setActiveIndex(i)}
                       onClick={() => handleSelect(result)}

@@ -41,6 +41,53 @@ interface PlayerActionsContext {
   showRoom: () => void;
 }
 
+// The volume you set last time is the volume you get this time. Stored as a
+// 0..1 number; anything unreadable falls back to the 0.8 default.
+const VOLUME_STORAGE_KEY = 'songchainn:volume';
+const DEFAULT_VOLUME = 0.8;
+
+function readStoredVolume(): number {
+  if (typeof window === 'undefined') return DEFAULT_VOLUME;
+  try {
+    const raw = localStorage.getItem(VOLUME_STORAGE_KEY);
+    if (raw === null) return DEFAULT_VOLUME;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return DEFAULT_VOLUME;
+    return Math.max(0, Math.min(1, parsed));
+  } catch {
+    return DEFAULT_VOLUME;
+  }
+}
+
+function writeStoredVolume(value: number) {
+  try {
+    localStorage.setItem(VOLUME_STORAGE_KEY, String(value));
+  } catch {
+    void 0;
+  }
+}
+
+// Tells the OS where playback is so lock screens and earbuds can show a
+// scrubber. Guarded and swallowed: an unsupported browser or a NaN duration
+// must never take the player down.
+function reportPositionState(audio: HTMLAudioElement) {
+  if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+  const session = navigator.mediaSession as MediaSession & { setPositionState?: (state?: MediaPositionState) => void };
+  if (typeof session.setPositionState !== 'function') return;
+  const duration = audio.duration;
+  const position = audio.currentTime;
+  if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(position)) return;
+  try {
+    session.setPositionState({
+      duration,
+      playbackRate: 1,
+      position: Math.max(0, Math.min(duration, position)),
+    });
+  } catch {
+    void 0;
+  }
+}
+
 const PlayerStateCtx = createContext<PlayerStateContext | undefined>(undefined);
 const PlayerTimeCtx = createContext<PlayerTimeContext | undefined>(undefined);
 const PlayerActionsCtx = createContext<PlayerActionsContext | undefined>(undefined);
@@ -91,7 +138,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolumeState] = useState(0.8);
+  const [volume, setVolumeState] = useState(() => readStoredVolume());
   const [queue, setQueue] = useState<Song[]>(SONGS);
   const [isCrossfading, setIsCrossfading] = useState(false);
   const [audioVersion, setAudioVersion] = useState(0);
@@ -112,7 +159,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const playNextRef = useRef<() => void>(() => {});
   const crossfadeTriggeredRef = useRef(false);
   const isCrossfadingRef = useRef(false);
-  const volumeRef = useRef(0.8);
+  const volumeRef = useRef(readStoredVolume());
+  // Where the volume was before M muted it, so M again brings it back.
+  const lastAudibleVolumeRef = useRef(volumeRef.current > 0 ? volumeRef.current : DEFAULT_VOLUME);
   const queueRef = useRef<Song[]>(SONGS);
   const currentSongRef = useRef<Song | null>(null);
   const playHistoryRef = useRef<Set<string>>(new Set());
@@ -196,6 +245,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const handleLoadedMetadata = () => {
       setDuration(audio.duration || 0);
       crossfadeTriggeredRef.current = false;
+      reportPositionState(audio);
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -210,7 +260,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
-      
+      reportPositionState(audio);
+
       // Trigger crossfade when approaching end of song
       const timeRemaining = audio.duration - audio.currentTime;
       if (
@@ -548,12 +599,90 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setVolume = useCallback((newVolume: number) => {
-    volumeRef.current = newVolume;
-    setVolumeState(newVolume);
+    const clamped = Math.max(0, Math.min(1, Number.isFinite(newVolume) ? newVolume : DEFAULT_VOLUME));
+    if (clamped > 0) lastAudibleVolumeRef.current = clamped;
+    volumeRef.current = clamped;
+    setVolumeState(clamped);
+    writeStoredVolume(clamped);
     if (!isCrossfading) {
-      if (audioRef.current) audioRef.current.volume = newVolume;
+      if (audioRef.current) audioRef.current.volume = clamped;
     }
   }, [isCrossfading]);
+
+  // Global keyboard shortcuts: Space toggles play, ArrowLeft/ArrowRight seek
+  // ten seconds, M mutes. Nothing fires while you are typing, while a dialog
+  // is open, or with a modifier held (so browser shortcuts keep working).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const isTypingTarget = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el || typeof el.closest !== 'function') return false;
+      const tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (el.isContentEditable) return true;
+      return Boolean(el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]'));
+    };
+
+    // Space and the arrows already mean something on a focused control: Space
+    // presses a button, the arrows move a slider or a listbox. A keyboard user
+    // on the Follow button expects Follow, not the player.
+    const isControlTarget = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el || typeof el.closest !== 'function') return false;
+      return Boolean(
+        el.closest('button, a[href], [role="button"], [role="slider"], [role="option"], [role="menuitem"], [role="tab"], [role="switch"], [role="checkbox"], summary'),
+      );
+    };
+
+    const isDialogOpen = () =>
+      Boolean(
+        document.querySelector(
+          '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"]',
+        ),
+      );
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isTypingTarget(event.target)) return;
+      if (isDialogOpen()) return;
+      const audio = audioRef.current;
+      if (!audio || !currentSongRef.current) return;
+
+      const key = event.key;
+      if ((key === ' ' || key === 'Spacebar' || key === 'ArrowLeft' || key === 'ArrowRight') && isControlTarget(event.target)) return;
+      if (key === ' ' || key === 'Spacebar') {
+        event.preventDefault();
+        if (isRoomModeRef.current) return;
+        if (audio.paused) {
+          audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        } else {
+          audio.pause();
+          nextAudioRef.current?.pause();
+          setIsPlaying(false);
+        }
+        return;
+      }
+      if (key === 'ArrowLeft' || key === 'ArrowRight') {
+        if (isRoomModeRef.current) return;
+        event.preventDefault();
+        const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+        const delta = key === 'ArrowLeft' ? -10 : 10;
+        const next = Math.max(0, duration > 0 ? Math.min(duration, audio.currentTime + delta) : audio.currentTime + delta);
+        audio.currentTime = next;
+        setCurrentTime(next);
+        return;
+      }
+      if (key === 'm' || key === 'M') {
+        event.preventDefault();
+        setVolume(volumeRef.current === 0 ? lastAudibleVolumeRef.current : 0);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [setVolume]);
 
   const fadeVolume = useCallback((from: number, to: number, durationMs: number) => {
     const audio = audioRef.current;

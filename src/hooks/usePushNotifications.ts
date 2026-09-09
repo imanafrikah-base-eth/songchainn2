@@ -49,8 +49,8 @@ export function usePushNotifications() {
       
       if (result === 'granted') {
         toast({
-          title: 'Notifications Enabled',
-          description: 'You will now receive push notifications.'
+          title: 'This device is ready',
+          description: 'In-app notifications are always on. Push alerts on this device are coming.'
         });
         return true;
       } else if (result === 'denied') {
@@ -93,13 +93,14 @@ export function usePushNotifications() {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
 
-      // Store subscription in localStorage (in a real app, send to server)
+      // The subscription stays on this device for now. Nothing server-side
+      // sends to it yet, so the copy below must not promise that it does.
       localStorage.setItem('pushSubscription', JSON.stringify(subscription));
       setIsSubscribed(true);
-      
+
       toast({
-        title: 'Subscribed!',
-        description: 'You will receive notifications for likes, comments, and follows.'
+        title: 'This device is ready',
+        description: 'In-app notifications for follows, likes, comments, tags and new releases are always on. Push alerts on this device are coming.'
       });
       
       return true;
@@ -130,8 +131,8 @@ export function usePushNotifications() {
       setIsSubscribed(false);
       
       toast({
-        title: 'Unsubscribed',
-        description: 'You will no longer receive push notifications.'
+        title: 'Push turned off on this device',
+        description: 'In-app notifications stay on.'
       });
       
       return true;

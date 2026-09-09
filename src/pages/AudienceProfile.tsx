@@ -23,7 +23,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Navigation } from '@/components/Navigation';
 import { PostCard } from '@/components/social/PostCard';
 import { BlockButton } from '@/components/social/BlockButton';
-import { useSocial } from '@/hooks/useSocial';
+import { FollowListSheet, type FollowListMode } from '@/components/social/FollowListSheet';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { OfficialBadge } from '@/components/OfficialBadge';
+import { useSocial, useUserPosts } from '@/hooks/useSocial';
 import { useConversations } from '@/hooks/useDirectMessages';
 import { MusicActivity } from '@/components/MusicActivity';
 import { LikedActivity } from '@/components/LikedActivity';
@@ -44,10 +47,6 @@ export default function AudienceProfile() {
   const [openingChat, setOpeningChat] = useState(false);
   const { user, audienceProfile: myProfile, isArtist, artistId } = useAuth();
   const {
-    posts,
-    isLoading: postsLoading,
-    following,
-    followers,
     toggleLikePost,
     deletePost,
     followUser,
@@ -56,12 +55,18 @@ export default function AudienceProfile() {
     addComment,
     untagSelf
   } = useSocial();
+  /* This person's posts, all of them. The page used to filter the viewer's
+     own fifty-post feed by author, so a stranger's profile showed only what
+     of theirs happened to be recent, and the Posts count counted the same. */
+  const { posts: userPosts, isLoading: postsLoading, refetch: refetchUserPosts } = useUserPosts(userId);
 
   const [profile, setProfile] = useState<AudienceProfileType | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileFollowers, setProfileFollowers] = useState<string[]>([]);
   const [profileFollowing, setProfileFollowing] = useState<string[]>([]);
   const [likedSongsCount, setLikedSongsCount] = useState(0);
+  const [isVerifiedArtist, setIsVerifiedArtist] = useState(false);
+  const [followList, setFollowList] = useState<FollowListMode | null>(null);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const { isOnline: isProfileOnline, lastSeenAt: profileLastSeenAt } = useUserPresence(
@@ -127,6 +132,16 @@ export default function AudienceProfile() {
 
     setLikedSongsCount(count || 0);
 
+    // Same one-row lookup the comment sheet already makes to route to an
+    // artist page; artist_accounts is publicly readable.
+    const { data: artistAccount } = await supabase
+      .from('artist_accounts')
+      .select('is_verified')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    setIsVerifiedArtist(Boolean(artistAccount?.is_verified));
+
     setLoading(false);
   }, [userId]);
 
@@ -191,8 +206,20 @@ export default function AudienceProfile() {
     };
   }, [userId, fetchProfile]);
 
-  const userPosts = posts.filter((p) => p.user_id === userId);
+  // Set by hand in the database on one row only. Never self-declared.
+  const isOfficial = Boolean((profile as { is_official?: boolean } | null)?.is_official);
   const profilePoints = Number((profile as any)?.engagement_points ?? (profile as any)?.points ?? 0);
+
+  const handleDeletePost = useCallback(async (postId: string) => {
+    const ok = await deletePost(postId);
+    if (ok) void refetchUserPosts();
+  }, [deletePost, refetchUserPosts]);
+
+  const handleUntagSelf = useCallback(async (postId: string) => {
+    const ok = await untagSelf(postId);
+    if (ok) void refetchUserPosts();
+    return ok;
+  }, [untagSelf, refetchUserPosts]);
   const profileStreak = Number((profile as any)?.current_streak ?? 0);
 
   const handleProfilePictureChange = useCallback(
@@ -355,6 +382,13 @@ export default function AudienceProfile() {
           <div className="flex items-center justify-center gap-2 mt-4">
             <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
             <h1 className="text-2xl font-bold">{profile.profile_name}</h1>
+            {/* The official mark wins over the artist tick, the same rule the
+                feed card uses: two badges reads as noise. */}
+            {isOfficial ? (
+              <OfficialBadge size={20} />
+            ) : (
+              isVerifiedArtist && <VerifiedBadge size={20} />
+            )}
           </div>
           {profile.bio && (
             <p className="text-muted-foreground mt-2 max-w-md mx-auto">{profile.bio}</p>
@@ -396,14 +430,22 @@ export default function AudienceProfile() {
               <p className="text-xl font-bold">{userPosts.length}</p>
               <p className="text-sm text-muted-foreground">Posts</p>
             </div>
-            <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setFollowList('followers')}
+              className="text-center rounded-lg px-2 py-1 -mx-2 -my-1 hover:bg-muted transition-colors"
+            >
               <p className="text-xl font-bold">{profileFollowers.length}</p>
               <p className="text-sm text-muted-foreground">Followers</p>
-            </div>
-            <div className="text-center">
+            </button>
+            <button
+              type="button"
+              onClick={() => setFollowList('following')}
+              className="text-center rounded-lg px-2 py-1 -mx-2 -my-1 hover:bg-muted transition-colors"
+            >
               <p className="text-xl font-bold">{profileFollowing.length}</p>
               <p className="text-sm text-muted-foreground">Following</p>
-            </div>
+            </button>
             <div className="text-center">
               <p className="text-xl font-bold">{likedSongsCount}</p>
               <p className="text-sm text-muted-foreground">Liked</p>
@@ -511,12 +553,12 @@ export default function AudienceProfile() {
                   key={post.id}
                   post={post}
                   onLike={toggleLikePost}
-                  onDelete={deletePost}
+                  onDelete={handleDeletePost}
                   onFollow={followUser}
                   isFollowing={isFollowing(post.user_id)}
                   onGetComments={getPostComments}
                   onAddComment={addComment}
-                  onUntagSelf={untagSelf}
+                  onUntagSelf={handleUntagSelf}
                 />
               ))
             )}
@@ -535,6 +577,10 @@ export default function AudienceProfile() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {userId && (
+        <FollowListSheet userId={userId} mode={followList} onClose={() => setFollowList(null)} />
+      )}
 
       <Navigation />
     </div>

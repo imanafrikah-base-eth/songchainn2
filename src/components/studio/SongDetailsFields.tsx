@@ -1,5 +1,6 @@
 import { Plus, X } from 'lucide-react';
-import type { Credit, Split, SongDetails } from '@/lib/songDetails';
+import { isValidIsrc, type Credit, type Split, type SongDetails } from '@/lib/songDetails';
+import { ReleasePicker } from '@/components/studio/ReleasePicker';
 
 const input =
   'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none disabled:opacity-60';
@@ -18,10 +19,20 @@ export function SongDetailsFields({
   value,
   onChange,
   disabled = false,
+  artistId,
+  shared = false,
 }: {
   value: SongDetails;
   onChange: (next: SongDetails) => void;
   disabled?: boolean;
+  /** When known, the track can be placed on one of this artist's releases. */
+  artistId?: string | null;
+  /**
+   * The same details for a batch of records at once. Lyrics, the description
+   * and the identifiers belong to one record each, so they are left out here
+   * and added per track from the catalog.
+   */
+  shared?: boolean;
 }) {
   const set = <K extends keyof SongDetails>(key: K, v: SongDetails[K]) => onChange({ ...value, [key]: v });
   const setCredit = (i: number, patch: Partial<Credit>) =>
@@ -29,15 +40,30 @@ export function SongDetailsFields({
   const setSplit = (i: number, patch: Partial<Split>) =>
     set('splits', value.splits.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   const splitTotal = value.splits.reduce((sum, s) => sum + (Number(s.share) || 0), 0);
+  const isrcOk = isValidIsrc(value.isrc);
+  const today = new Date().toISOString().slice(0, 10);
+  const scheduled = Boolean(value.release_date && value.release_date > today);
 
   return (
     <div className="space-y-5">
       <p className="text-xs text-muted-foreground">
-        Everything here is optional and can be changed later. Lyrics and credits show on the song page; the
-        identifiers are what a distributor, a publisher or a sync desk asks for.
+        {shared
+          ? 'Everything here is optional, applies to every track in this batch, and can be changed per record later. Lyrics, the write-up, ISRC and ISWC belong to one record each: add those from Edit details once the tracks land.'
+          : 'Everything here is optional and can be changed later. Lyrics and credits show on the song page; the identifiers are what a distributor, a publisher or a sync desk asks for.'}
       </p>
 
-      <label className="block">
+      {artistId && (
+        <ReleasePicker
+          artistId={artistId}
+          releaseId={value.release_id}
+          trackNumber={value.track_number}
+          disabled={disabled}
+          hideTrackNumber={shared}
+          onChange={(next) => onChange({ ...value, ...next })}
+        />
+      )}
+
+      {!shared && <label className="block">
         <span className={label}>Lyrics</span>
         <textarea
           value={value.lyrics ?? ''}
@@ -48,9 +74,9 @@ export function SongDetailsFields({
           placeholder="Paste the words as they are sung. Line breaks are kept."
           className={`${input} min-h-[9rem] resize-y font-mono text-[13px] leading-relaxed`}
         />
-      </label>
+      </label>}
 
-      <label className="block">
+      {!shared && <label className="block">
         <span className={label}>About this record</span>
         <textarea
           value={value.description ?? ''}
@@ -61,7 +87,7 @@ export function SongDetailsFields({
           placeholder="Where it was made, who was in the room, what it is about. A few lines."
           className={`${input} resize-y`}
         />
-      </label>
+      </label>}
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">
@@ -122,15 +148,31 @@ export function SongDetailsFields({
         <label className="block">
           <span className={label}>Release date</span>
           <input type="date" value={value.release_date ?? ''} disabled={disabled} onChange={(e) => set('release_date', e.target.value || null)} className={input} />
+          <span className={`mt-1 block text-xs ${scheduled ? 'text-primary' : 'text-muted-foreground'}`}>
+            {scheduled
+              ? 'A date ahead schedules it: the record stays yours alone until that day, then goes public and your followers hear about it.'
+              : 'Leave it blank to go out the minute the judges are done. A date ahead schedules it.'}
+          </span>
         </label>
-        <label className="block">
+        {!shared && <label className="block">
           <span className={label}>ISRC</span>
-          <input value={value.isrc ?? ''} disabled={disabled} maxLength={15} placeholder="e.g. ZMA012600001" onChange={(e) => set('isrc', e.target.value)} className={`${input} font-mono uppercase`} />
-        </label>
-        <label className="block">
+          <input
+            value={value.isrc ?? ''}
+            disabled={disabled}
+            maxLength={15}
+            placeholder="e.g. ZMA012600001"
+            onChange={(e) => set('isrc', e.target.value)}
+            aria-invalid={!isrcOk}
+            className={`${input} font-mono uppercase ${isrcOk ? '' : 'border-destructive'}`}
+          />
+          {!isrcOk && (
+            <span className="mt-1 block text-xs text-destructive">Twelve characters: country, registrant, year, number. Dashes are fine.</span>
+          )}
+        </label>}
+        {!shared && <label className="block">
           <span className={label}>ISWC</span>
           <input value={value.iswc ?? ''} disabled={disabled} maxLength={15} placeholder="e.g. T-123.456.789-0" onChange={(e) => set('iswc', e.target.value)} className={`${input} font-mono uppercase`} />
-        </label>
+        </label>}
         <label className="block">
           <span className={label}>Publisher</span>
           <input value={value.publisher ?? ''} disabled={disabled} maxLength={120} placeholder="Who administers the song, if anyone" onChange={(e) => set('publisher', e.target.value)} className={input} />
@@ -202,8 +244,8 @@ export function SongDetailsFields({
                 </li>
               ))}
             </ul>
-            <p className={`mt-1.5 text-xs tabular-nums ${splitTotal === 100 ? 'text-muted-foreground' : 'text-amber-500'}`}>
-              {splitTotal}% of 100
+            <p className={`mt-1.5 text-xs tabular-nums ${splitTotal === 100 ? 'text-muted-foreground' : 'text-destructive'}`}>
+              {splitTotal}% of 100{splitTotal !== 100 ? '. The shares have to add up to exactly 100 before this saves.' : ''}
             </p>
           </>
         )}
