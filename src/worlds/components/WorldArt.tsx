@@ -129,7 +129,10 @@ export function WorldArt({
           loop
           playsInline
           preload="none"
-          className={`absolute inset-0 ${className}`}
+          // The artist's whole loop, fitted to the frame. The still underneath
+          // covers the frame, so a loop of a different shape sits on its own
+          // picture rather than being cut down to the middle of it.
+          className={`absolute inset-0 ${className.split('object-cover').join('object-contain')}`}
           style={objectPosition ? { objectPosition } : undefined}
         />
       )}

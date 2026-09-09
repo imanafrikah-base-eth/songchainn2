@@ -170,7 +170,7 @@ export function ArtPicker({
       <div className={`mt-2 overflow-hidden rounded-md bg-black/30 ${aspect}`}>
         {value ? (
           kind === 'video' ? (
-            <video src={value} muted loop playsInline autoPlay className="h-full w-full object-cover" />
+            <video src={value} muted loop playsInline autoPlay className="h-full w-full object-contain" />
           ) : (
             <img src={value} alt="" className="h-full w-full object-cover" loading="lazy" />
           )
