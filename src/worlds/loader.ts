@@ -42,6 +42,9 @@ interface WorldRow {
   hero_video?: string | null;
   entrance_poster?: string | null;
   entrance_video?: string | null;
+  ad_kind?: string | null;
+  ad_image?: string | null;
+  ad_video?: string | null;
   room_video?: unknown;
   city_video?: unknown;
   depth?: unknown;
@@ -157,6 +160,11 @@ export function rowsToWorldConfig(
     roomVideo: asRecord(world.room_video),
     cityVideo: asRecord(world.city_video),
     entrance: world.entrance_poster ? { poster: world.entrance_poster, video: world.entrance_video ?? undefined } : undefined,
+    ad: {
+      kind: world.ad_kind === 'hero' || world.ad_kind === 'custom' ? world.ad_kind : 'entrance',
+      image: world.ad_image ?? undefined,
+      video: world.ad_video ?? undefined,
+    },
     depth: (() => {
       const d = asRecord(world.depth);
       return d.sky || d.facade || d.ground ? { sky: d.sky, facade: d.facade, ground: d.ground } : undefined;
@@ -176,7 +184,7 @@ export async function fetchWorldBySlug(slug: string | undefined): Promise<WorldC
   const { data: world, error } = await supabase
     .from('worlds')
     .select(
-      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth',
+      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video',
     )
     .eq('slug', slug.trim().toLowerCase())
     .maybeSingle();
@@ -187,11 +195,11 @@ export async function fetchWorldBySlug(slug: string | undefined): Promise<WorldC
     supabase
       .from('world_cities')
       .select('slug, name, kind, tagline, teaser, empty_line, hue, sort_order, buildings')
-      .eq('world_id', world.id),
+      .eq('world_id', (world as unknown as WorldRow).id),
     supabase
       .from('world_streets')
       .select('slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id')
-      .eq('world_id', world.id),
+      .eq('world_id', (world as unknown as WorldRow).id),
   ]);
 
   return rowsToWorldConfig(
@@ -211,7 +219,7 @@ export async function fetchPublishedWorlds(): Promise<WorldConfig[]> {
   const { data, error } = await supabase
     .from('worlds')
     .select(
-      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth',
+      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video',
     )
     .eq('status', 'published')
     .order('world_number', { ascending: true });
@@ -233,7 +241,7 @@ export async function fetchMyWorlds(): Promise<Array<WorldConfig & { id: string;
   const { data, error } = await supabase
     .from('worlds')
     .select(
-      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth',
+      'id, slug, world_number, artist_id, artist_name, token_symbol, chain, swap_url, farcaster_url, positioning, story, featured_song_ids, accent, hero_image, room_art, city_art, status, hero_video, entrance_poster, entrance_video, room_video, city_video, depth, ad_kind, ad_image, ad_video',
     )
     .order('created_at', { ascending: false });
 

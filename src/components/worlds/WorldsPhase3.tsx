@@ -87,19 +87,22 @@ export function WorldsPhase3({
         turn below. Push the doors and see.
       </p>
 
-      {/* 1. THE DOORS. Every open world, sliding on its own. */}
+      {/* 1. THE DOOR. World #001's brass doors, exactly as they always opened
+          here; every world an artist opens takes its turn in the same slot
+          with whatever its artist chose to show. */}
       <div className="mt-5">
-        <WorldsSlideshow />
-        <div className="mt-3">
-          {isGuest ? (
-            <DoorwayCtaGuest
-              onSignUp={() => onSignUp?.()}
-              onSignIn={() => onSignIn?.()}
-            />
-          ) : (
-            <DoorwayCtaMember />
-          )}
-        </div>
+        <WorldsSlideshow
+          cta={
+            isGuest ? (
+              <DoorwayCtaGuest
+                onSignUp={() => onSignUp?.()}
+                onSignIn={() => onSignIn?.()}
+              />
+            ) : (
+              <DoorwayCtaMember />
+            )
+          }
+        />
       </div>
 
       {/* 2. WHAT IS REAL */}

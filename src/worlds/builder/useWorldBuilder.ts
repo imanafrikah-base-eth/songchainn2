@@ -44,6 +44,10 @@ export interface DraftWorld {
   /** The artist's Zora account: profile or creator coin link, and the wallet it pays. Required to publish. */
   zora_profile_url: string | null;
   zora_wallet_address: string | null;
+  /** The advert on Home: the gate loop (default), the hero loop, or a clip made for it. */
+  ad_kind: 'entrance' | 'hero' | 'custom';
+  ad_image: string | null;
+  ad_video: string | null;
 }
 
 export interface DraftCity {
@@ -123,7 +127,7 @@ export function useWorldBuilder(worldId?: string) {
         const { data: w, error: we } = await supabase
           .from('worlds')
           .select(
-            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth, zora_profile_url, zora_wallet_address',
+            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth, zora_profile_url, zora_wallet_address, ad_kind, ad_image, ad_video',
           )
           .eq('id', id)
           .maybeSingle();

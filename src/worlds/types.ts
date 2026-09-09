@@ -128,6 +128,12 @@ export interface WorldConfig {
    */
   entrance?: { poster: string; video?: string };
   /**
+   * What this world shows in its advert on Home and the landing page. The
+   * artist's choice: the gate (entrance loop, the default), the hero loop, or
+   * a clip made for the slot. Absent means the gate.
+   */
+  ad?: { kind: 'entrance' | 'hero' | 'custom'; image?: string; video?: string };
+  /**
    * Textures for the world with depth. Absent means the 3D city falls back
    * to the flat colours it has always used, which is a valid world, just a
    * barer one.

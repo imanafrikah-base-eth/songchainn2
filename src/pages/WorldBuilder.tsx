@@ -705,6 +705,37 @@ export default function WorldBuilder() {
               </div>
             </details>
 
+            {/* What the world shows in its advert on Home. World #001 shows its
+                brass doors opening; every artist decides what theirs shows. */}
+            <div className="rounded-lg border border-border bg-card p-3">
+              <p className="text-sm font-semibold text-foreground">Your advert on Home</p>
+              <p className="mt-1 text-xs text-muted-foreground">What people see of your world before they walk in.</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {([
+                  ['entrance', 'The gate'],
+                  ['hero', 'The hero'],
+                  ['custom', 'A clip of my own'],
+                ] as const).map(([v, t]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => b.saveWorld({ ad_kind: v })}
+                    className={`h-9 rounded-full px-3.5 text-xs font-medium focus-ring ${
+                      (b.world.ad_kind ?? 'entrance') === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              {(b.world.ad_kind ?? 'entrance') === 'custom' ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <ArtPicker label="Advert still" help="Wide." value={b.world.ad_image} onChange={(v) => b.saveWorld({ ad_image: v })} />
+                  <ArtPicker label="Advert loop" help="Silent, a few seconds." kind="video" value={b.world.ad_video} onChange={(v) => b.saveWorld({ ad_video: v })} />
+                </div>
+              ) : null}
+            </div>
+
             <Button onClick={() => setStep('key')} size="lg" className="h-11 w-full rounded-full">
               Set the key
               <ArrowRight className="ml-2 h-4 w-4" />
