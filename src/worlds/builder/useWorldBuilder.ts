@@ -41,6 +41,9 @@ export interface DraftWorld {
   city_art: Record<string, string>;
   city_video: Record<string, string>;
   depth: { sky?: string; facade?: string; ground?: string };
+  /** The artist's Zora account: profile or creator coin link, and the wallet it pays. Required to publish. */
+  zora_profile_url: string | null;
+  zora_wallet_address: string | null;
 }
 
 export interface DraftCity {
@@ -120,7 +123,7 @@ export function useWorldBuilder(worldId?: string) {
         const { data: w, error: we } = await supabase
           .from('worlds')
           .select(
-            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth',
+            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth, zora_profile_url, zora_wallet_address',
           )
           .eq('id', id)
           .maybeSingle();

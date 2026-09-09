@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Glasses, Hammer, KeyRound, MessageSquare, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { WorldDoorway, DoorwayCtaGuest, DoorwayCtaMember } from './WorldDoorway';
+import { DoorwayCtaGuest, DoorwayCtaMember } from './WorldDoorway';
+import { WorldsSlideshow } from './WorldsSlideshow';
 import { useWorldsStanding, FOUNDING_PLACES } from '@/hooks/useWorldsStanding';
 import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
 
@@ -82,24 +83,23 @@ export function WorldsPhase3({
       </h2>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
         Streets you walk, rooms that open on a key, a stage built for live moments. World
-        #001 is {IMAN_AFRIKAH_WORLD.artistName}, and it is open right now. Push
-        the doors and see.
+        #001 is {IMAN_AFRIKAH_WORLD.artistName}, and every world an artist opens takes its
+        turn below. Push the doors and see.
       </p>
 
-      {/* 1. THE DOOR */}
+      {/* 1. THE DOORS. Every open world, sliding on its own. */}
       <div className="mt-5">
-        <WorldDoorway
-          cta={
-            isGuest ? (
-              <DoorwayCtaGuest
-                onSignUp={() => onSignUp?.()}
-                onSignIn={() => onSignIn?.()}
-              />
-            ) : (
-              <DoorwayCtaMember />
-            )
-          }
-        />
+        <WorldsSlideshow />
+        <div className="mt-3">
+          {isGuest ? (
+            <DoorwayCtaGuest
+              onSignUp={() => onSignUp?.()}
+              onSignIn={() => onSignIn?.()}
+            />
+          ) : (
+            <DoorwayCtaMember />
+          )}
+        </div>
       </div>
 
       {/* 2. WHAT IS REAL */}

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Flame, Gift, Menu, X, LogOut, Wallet, Headphones, Sparkles, Disc3, Bot, Lightbulb, Bug, Search, MoreHorizontal, ChevronDown, type LucideIcon } from 'lucide-react';
+import { Flame, Gift, Menu, X, LogOut, Wallet, Headphones, Sparkles, Disc3, Bot, Lightbulb, Bug, Search, MoreHorizontal, ChevronDown, RefreshCw, type LucideIcon } from 'lucide-react';
+import { useSyncExternalStore } from 'react';
+import { applyAppUpdate, subscribeAppUpdate, getAppUpdate } from '@/lib/appUpdate';
 import { useEngagement } from '@/context/EngagementContext';
 import { useUserPoints } from '@/hooks/useUserPoints';
 import { useAuth } from '@/context/AuthContext';
@@ -259,6 +261,8 @@ export function Navigation() {
               </div>
 
               <WalletChip />
+
+              <UpdateButton />
 
               <NotificationDropdown />
 
@@ -684,5 +688,27 @@ function MoreRow({
       <Icon className="h-4 w-4 flex-shrink-0 text-primary" />
       <span className="font-medium">{label}</span>
     </button>
+  );
+}
+
+/**
+ * A newer build is waiting. Stays in the bar after the banner is put away,
+ * and goes with the reload that applies the update.
+ */
+function UpdateButton() {
+  const update = useSyncExternalStore(subscribeAppUpdate, getAppUpdate, getAppUpdate);
+  if (!update.available) return null;
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.95 }}
+      onClick={() => applyAppUpdate()}
+      disabled={update.applying}
+      aria-label="Update the app"
+      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-glow disabled:opacity-70"
+    >
+      <RefreshCw className={`h-4 w-4 ${update.applying ? 'animate-spin' : ''}`} />
+      <span>{update.applying ? 'Updating' : 'Update'}</span>
+    </motion.button>
   );
 }

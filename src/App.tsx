@@ -58,6 +58,7 @@ const Inbox = lazyWithRecovery(() => import("./pages/Inbox"));
 const BetterCallZaal = lazyWithRecovery(() => import("./pages/BetterCallZaal"));
 const SlugResolver = lazyWithRecovery(() => import("./pages/SlugResolver"));
 const World = lazyWithRecovery(() => import("./pages/World"));
+const Worlds = lazyWithRecovery(() => import("./pages/Worlds"));
 const WorldBuilder = lazyWithRecovery(() => import("@/pages/WorldBuilder"));
 const Studio = lazyWithRecovery(() => import("./pages/Studio"));
 const Launch = lazyWithRecovery(() => import("./pages/Launch"));
@@ -215,6 +216,7 @@ function AppShell() {
                 <Route path="/room" element={<Room />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/bettercallzaal" element={<BetterCallZaal />} />
+                {WORLDS_ENABLED && <Route path="/worlds" element={<Worlds />} />}
                 {WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
                 {WORLD_BUILDER_ENABLED && <Route path="/world-builder" element={<WorldBuilder />} />}
                 {WORLD_BUILDER_ENABLED && <Route path="/w/:slug" element={<World />} />}
@@ -251,7 +253,7 @@ function AppShell() {
 const PUBLIC_PATTERNS = [
   '/about', '/artists', '/artist/:id', '/catalog/:id', '/song/:id', '/delete-account', '/license', '/license/:songId', '/keys',
   '/wavewarz-africa', '/wavewarz-africa/*', '/install', '/reset-password', '/bettercallzaal',
-  ...(WORLDS_ENABLED ? ['/world/:worldSlug', '/world/:worldSlug/:roomSlug'] : []),
+  ...(WORLDS_ENABLED ? ['/worlds', '/world/:worldSlug', '/world/:worldSlug/:roomSlug'] : []),
   // A world an artist built and shared is the whole point of building one. It
   // used to fall through to the not-found page for anyone not signed in.
   ...(WORLD_BUILDER_ENABLED ? ['/w/:slug'] : []),
@@ -292,7 +294,8 @@ function AppContent() {
                 <Route path="/install" element={<Install />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/bettercallzaal" element={<BetterCallZaal />} />
-                {WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
+                {WORLDS_ENABLED && <Route path="/worlds" element={<Worlds />} />}
+{WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
                 {WORLDS_ENABLED && <Route path="/world/:worldSlug/:roomSlug" element={<World />} />}
                 <Route path="*" element={<PageLoader />} />
               </Routes>
@@ -339,7 +342,8 @@ function AppContent() {
                   <Route path="/install" element={<Install />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/bettercallzaal" element={<BetterCallZaal />} />
-                  {WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
+                  {WORLDS_ENABLED && <Route path="/worlds" element={<Worlds />} />}
+{WORLDS_ENABLED && <Route path="/world/:worldSlug" element={<World />} />}
                   {WORLDS_ENABLED && <Route path="/world/:worldSlug/:roomSlug" element={<World />} />}
                   {WORLD_BUILDER_ENABLED && <Route path="/w/:slug" element={<World />} />}
                   {/* Known auth-required routes → landing */}

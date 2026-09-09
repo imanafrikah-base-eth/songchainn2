@@ -218,6 +218,9 @@ export default function WorldBuilder() {
     }
   }, [b, draft, setParams, toast]);
 
+  const zoraLinkOk = /^https?:\/\/([a-z0-9-]+\.)*zora\.co\//i.test(b.world?.zora_profile_url ?? '');
+  const zoraWalletOk = /^0x[0-9a-fA-F]{40}$/.test(b.world?.zora_wallet_address ?? '');
+
   const doPublish = useCallback(async () => {
     const res = await b.publish();
     toast({
@@ -935,6 +938,7 @@ export default function WorldBuilder() {
                 { ok: true, label: 'A key is set' },
                 { ok: (b.world.story?.length ?? 0) > 0, label: 'A story on the gate' },
                 { ok: filledStreets >= 3, label: `Something on three streets (${filledStreets} so far)` },
+                { ok: zoraLinkOk && zoraWalletOk, label: 'Your Zora account is on the world' },
               ].map((r) => (
                 <li
                   key={r.label}
@@ -971,7 +975,51 @@ export default function WorldBuilder() {
               </div>
             ) : null}
 
-            <Button onClick={doPublish} size="lg" className="h-11 w-full rounded-full">
+            {/* The artist's Zora account. Every world's key is a coin and every
+                coin pays somewhere; both are written on the world before the
+                doors open, so nobody has to chase them later. */}
+            <div className="rounded-lg border border-border bg-card p-3.5">
+              <h2 className="text-sm font-medium text-foreground">Your Zora account</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Paste your Zora profile or creator coin link, and the wallet address that account pays to. Both are needed to open the doors.
+              </p>
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label htmlFor="zora-link" className="mb-1.5 block text-sm font-medium text-foreground">
+                    Zora profile or creator coin link
+                  </label>
+                  <input
+                    id="zora-link"
+                    className={`${input} text-xs`}
+                    placeholder="https://zora.co/@yourname"
+                    inputMode="url"
+                    value={b.world.zora_profile_url ?? ''}
+                    onChange={(e) => b.saveWorld({ zora_profile_url: e.target.value.trim() || null })}
+                  />
+                  {b.world.zora_profile_url && !zoraLinkOk ? (
+                    <p className="mt-1 text-xs text-destructive">That is not a zora.co link.</p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="zora-wallet" className="mb-1.5 block text-sm font-medium text-foreground">
+                    Zora wallet address
+                  </label>
+                  <input
+                    id="zora-wallet"
+                    className={`${input} font-mono text-xs`}
+                    placeholder="0x..."
+                    spellCheck={false}
+                    value={b.world.zora_wallet_address ?? ''}
+                    onChange={(e) => b.saveWorld({ zora_wallet_address: e.target.value.trim() || null })}
+                  />
+                  {b.world.zora_wallet_address && !zoraWalletOk ? (
+                    <p className="mt-1 text-xs text-destructive">A wallet address is 0x followed by 40 characters.</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={doPublish} size="lg" className="h-11 w-full rounded-full" disabled={!zoraLinkOk || !zoraWalletOk}>
               Open the doors
             </Button>
             <p className="text-center text-xs text-muted-foreground">

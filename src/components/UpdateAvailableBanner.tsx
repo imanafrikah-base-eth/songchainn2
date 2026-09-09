@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { markUpdateAvailable, applyAppUpdate, subscribeAppUpdate, getAppUpdate } from '@/lib/appUpdate';
+import { useSyncExternalStore } from 'react';
 
 // Pathname of the entry script this running session was booted from
 // (e.g. /assets/index-VHTG525f.js). A deploy changes the hash, so comparing
@@ -18,9 +20,12 @@ function getRunningEntryPath(): string | null {
 }
 
 export function UpdateAvailableBanner() {
-  const [showUpdate, setShowUpdate] = useState(false);
-  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
+  // The fact that an update exists lives in one store shared with the
+  // navigation, which keeps an Update button up after this banner is put away.
+  const update = useSyncExternalStore(subscribeAppUpdate, getAppUpdate, getAppUpdate);
+  const [dismissed, setDismissed] = useState(false);
+  const showUpdate = update.available && !dismissed;
+  const isUpdating = update.applying;
 
   // Deploy detection: ask the server (bypassing every cache) which entry
   // bundle it currently serves and compare with the one we're running.
@@ -40,7 +45,7 @@ export function UpdateAvailableBanner() {
         const html = await res.text();
         const match = html.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/);
         if (match && match[0] !== runningEntry && !cancelled) {
-          setShowUpdate(true);
+          markUpdateAvailable();
         }
       } catch {
         // Offline or flaky network — try again on the next trigger.
@@ -68,8 +73,7 @@ export function UpdateAvailableBanner() {
 
     const handleUpdate = (registration: ServiceWorkerRegistration) => {
       if (registration.waiting) {
-        setWaitingWorker(registration.waiting);
-        setShowUpdate(true);
+        markUpdateAvailable(registration.waiting);
       }
     };
 
@@ -87,8 +91,7 @@ export function UpdateAvailableBanner() {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
               // New version available
-              setWaitingWorker(newWorker);
-              setShowUpdate(true);
+              markUpdateAvailable(newWorker);
             }
           });
         }
@@ -114,23 +117,11 @@ export function UpdateAvailableBanner() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleUpdate = () => {
-    setIsUpdating(true);
+  const handleUpdate = () => applyAppUpdate();
 
-    if (waitingWorker) {
-      // Tell the waiting worker to skip waiting; controllerchange reloads.
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-      return;
-    }
-
-    // New deploy detected: a plain reload is enough — index.html always
-    // revalidates and the new HTML pulls the new hashed bundles.
-    window.location.reload();
-  };
-
-  const handleDismiss = () => {
-    setShowUpdate(false);
-  };
+  // Put the banner away. The Update button in the navigation stays until
+  // the update is taken, so "Later" never means "never".
+  const handleDismiss = () => setDismissed(true);
 
   return (
     <AnimatePresence>
