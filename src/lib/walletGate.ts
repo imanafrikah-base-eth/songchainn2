@@ -91,7 +91,50 @@ export function resolveWalletGate(address: string | null, provider: WalletProvid
   resolve?.(address);
 }
 
+/**
+ * The wallet this account already uses, if it is still unlocked and still
+ * says so. Returns null when there is nothing to reuse.
+ *
+ * This is the answer to the loudest complaint about the whole app: every
+ * button that touched money opened the connect sheet again, even for
+ * somebody who had connected minutes earlier, because nothing ever asked
+ * "are we already connected?".
+ */
+async function alreadyConnected(): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return null;
+    const { data } = await supabase
+      .from('user_wallets' as never)
+      .select('address')
+      .eq('user_id', session.session.user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+    const saved = (data as { address?: string } | null)?.address;
+    if (!saved) return null;
+
+    // Saved is not the same as reachable: the wallet may be locked, or the
+    // person may have switched accounts inside it. Ask the provider, and
+    // only reuse the address when it still answers with that account.
+    const provider = (typeof window !== 'undefined' ? (window as any).ethereum : null) as
+      | { request: (args: { method: string }) => Promise<unknown> }
+      | null;
+    if (!provider?.request) return null;
+    const accounts = (await provider.request({ method: 'eth_accounts' })) as string[] | undefined;
+    const live = (accounts ?? []).map((a) => a.toLowerCase());
+    return live.includes(saved.toLowerCase()) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function requestWalletConnection(): Promise<string | null> {
+  // Fast path 0: they already connected this wallet and it is still there.
+  // Nothing is asked, nothing pops up; the thing they wanted just happens.
+  const known = await alreadyConnected();
+  if (known) return known;
+
   // Fast path 1: inside a Farcaster / Base miniapp use the frame wallet.
   const frameAddress = await connectViaFarcasterFrame();
   if (frameAddress) {
