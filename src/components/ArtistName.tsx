@@ -41,8 +41,7 @@ export function ArtistName({
   const mark = verified ?? (isVerifiedArtist(artistId) || isVerifiedUser(userId));
   return (
     <span className={`inline-flex max-w-full items-center gap-1 align-bottom ${className}`}>
-      {prefix}
-      <span className={`min-w-0 truncate ${nameClassName}`}>{name}</span>
+      <span className={`min-w-0 truncate ${nameClassName}`}>{prefix}{name}</span>
       {mark && <VerifiedBadge size={size} tone={tone} className="shrink-0" />}
     </span>
   );

@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
 import { Search, Music, User, Disc3, X, TrendingUp, Clock } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { SONGS, ARTISTS, CATALOGS, buildCatalogs, type Song, type Artist, type Catalog } from '@/data/musicData';
 import { usePlayerActions } from '@/context/PlayerContext';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
@@ -280,6 +280,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 gap-0 max-w-lg w-[95vw] overflow-hidden rounded-2xl border-border/60 bg-background shadow-2xl">
+        <DialogTitle className="sr-only">Search</DialogTitle>
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40">
           <Search className="w-5 h-5 text-muted-foreground shrink-0" />

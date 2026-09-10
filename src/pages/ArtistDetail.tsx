@@ -816,7 +816,7 @@ export default function ArtistDetail() {
                   ) : null}
                   <ArtistLinks profile={artistProfile as Record<string, unknown> | null} className="mt-3" />
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex flex-wrap items-center gap-2">
                   {/*
                     The claim door is closed. "This is my page" showed on every
                     artist to every visitor, which made ownership look like one

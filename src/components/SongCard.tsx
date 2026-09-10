@@ -204,6 +204,10 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           )}
           style={artworkGlowStyle}
           onClick={handlePlay}
+          role="button"
+          tabIndex={0}
+          aria-label={`${isCurrentSong && isPlaying ? "Pause" : "Play"} ${song.title} by ${song.artist}`}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (e.currentTarget as HTMLElement).click(); } }}
         >
           <div className="relative w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl bg-secondary flex items-center justify-center flex-shrink-0 overflow-hidden shadow-soft shine-overlay">
             {isCurrentSong ? (
@@ -356,6 +360,10 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           whileHover={{ y: -4, scale: 1.02 }}
           className="group relative overflow-hidden rounded-2xl glass-card cursor-pointer shine-overlay"
           onClick={handlePlay}
+          role="button"
+          tabIndex={0}
+          aria-label={`${isCurrentSong && isPlaying ? "Pause" : "Play"} ${song.title} by ${song.artist}`}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (e.currentTarget as HTMLElement).click(); } }}
         >
           {/* Token badge */}
           {isTokenGated && (
@@ -504,6 +512,10 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
       className="group relative glass-card rounded-2xl overflow-hidden hover:shadow-float transition-all duration-300 cursor-pointer shine-overlay"
       style={artworkGlowStyle}
       onClick={handlePlay}
+      role="button"
+      tabIndex={0}
+      aria-label={`${isCurrentSong && isPlaying ? "Pause" : "Play"} ${song.title} by ${song.artist}`}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (e.currentTarget as HTMLElement).click(); } }}
     >
       <div className="aspect-square bg-secondary relative overflow-hidden">
         {isCurrentSong ? (
