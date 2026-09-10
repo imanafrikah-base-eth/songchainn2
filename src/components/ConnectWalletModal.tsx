@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Wallet, ExternalLink, Loader2, ChevronRight, X } from 'lucide-react';
 import { connectWallet, prefetchSdkWallets } from '@/lib/baseWallet';
 import { rememberReturnPath } from '@/lib/deviceGuards';
+import { ProfileConnections } from '@/components/ProfileConnections';
 import { useWalletOptions } from '@/hooks/useDiscoveredWallets';
 import { isWalletGateOpen, subscribeWalletGate, resolveWalletGate } from '@/lib/walletGate';
 
@@ -128,6 +129,9 @@ export function ConnectWalletModal() {
             Approve it in your wallet. This page waits for you.
           </p>
         )}
+
+        {/* Farcaster and Zora, connected the same way: one row, one tap. */}
+        {!connectingRdns && <ProfileConnections compact />}
 
         {mobile ? (
           <details className="mt-4">

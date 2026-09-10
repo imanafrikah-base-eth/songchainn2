@@ -23,6 +23,9 @@ import { CatalogCard } from '@/components/CatalogCard';
 import { CatalogGrid } from '@/components/CatalogGrid';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { InviteFriends } from '@/components/InviteFriends';
+import { ProfileConnections } from '@/components/ProfileConnections';
+import { safeHref, type SocialLink } from '@/components/ArtistLinks';
+import { Plus as PlusIcon, Trash2 as TrashIcon } from 'lucide-react';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { ChangePassword } from '@/components/ChangePassword';
 import { ChangeEmail } from '@/components/ChangeEmail';
@@ -88,6 +91,21 @@ const ARTIST_LINK_FIELDS = [
 ] as const;
 type ArtistLinkKey = (typeof ARTIST_LINK_FIELDS)[number]['key'];
 type ArtistLinks = Record<ArtistLinkKey, string>;
+
+const readExtraLinks = (profile: unknown): SocialLink[] => {
+  const raw = (profile as { social_links?: unknown } | null | undefined)?.social_links;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((l) => ({ label: typeof (l as SocialLink)?.label === 'string' ? (l as SocialLink).label : '', url: typeof (l as SocialLink)?.url === 'string' ? (l as SocialLink).url : '' }))
+    .filter((l) => l.url);
+};
+
+/** Only links that resolve, named or not, at most thirty of them. */
+const cleanExtraLinks = (list: SocialLink[]): SocialLink[] =>
+  list
+    .map((l) => ({ label: l.label.trim().slice(0, 40), url: safeHref(l.url) ?? '' }))
+    .filter((l) => l.url)
+    .slice(0, 30);
 
 const readArtistLinks = (profile: unknown): ArtistLinks => {
   const p = (profile || {}) as Record<string, unknown>;
@@ -210,6 +228,8 @@ export default function Profile() {
   const [interests, setInterests] = useState((((audienceProfile as any)?.interests || (audienceProfile as any)?.genre || '') as string));
   const [artistLinks, setArtistLinks] = useState<ArtistLinks>(() => readArtistLinks(audienceProfile));
   const [bookingEmail, setBookingEmail] = useState(((audienceProfile as any)?.booking_email || '') as string);
+  /* Every other door the artist wants on their page. Shown bundled, never as a wall. */
+  const [extraLinks, setExtraLinks] = useState<SocialLink[]>(() => readExtraLinks(audienceProfile));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [pendingProfileSnapshot, setPendingProfileSnapshot] = useState<{
     display_name: string;
@@ -240,6 +260,7 @@ export default function Profile() {
       setInterests((((audienceProfile as any)?.interests || (audienceProfile as any)?.genre || '') as string));
       setArtistLinks(readArtistLinks(audienceProfile));
       setBookingEmail(((audienceProfile as any)?.booking_email || '') as string);
+      setExtraLinks(readExtraLinks(audienceProfile));
       setFieldErrors({});
       setPendingProfileSnapshot(null);
     }
@@ -508,6 +529,7 @@ export default function Profile() {
         bio: trimOrNull(nextBio),
         location: trimOrNull(nextLocation),
         website_url: nextWebsite,
+        social_links: cleanExtraLinks(extraLinks),
         website: nextWebsite,
         twitter_url: nextXLink,
         x_profile_link: nextXLink,
@@ -1052,6 +1074,52 @@ export default function Profile() {
                       {fieldErrors[key] && <p className="text-xs text-destructive">{fieldErrors[key]}</p>}
                     </div>
                   ))}
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">More links</p>
+                      <p className="text-xs text-muted-foreground">Anything else: Audiomack, Boomplay, Threads, a merch store, a WhatsApp line. As many as you like; the page shows the first few and folds the rest behind one tap.</p>
+                    </div>
+                    {extraLinks.map((l, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <Input
+                          aria-label="Link name"
+                          value={l.label}
+                          onChange={(e) => setExtraLinks((prev) => prev.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+                          placeholder="Name"
+                          maxLength={40}
+                          className="w-28 shrink-0"
+                        />
+                        <Input
+                          aria-label="Link address"
+                          type="url"
+                          inputMode="url"
+                          value={l.url}
+                          onChange={(e) => setExtraLinks((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
+                          placeholder="https://"
+                          maxLength={300}
+                          className="min-w-0 flex-1"
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Remove ${l.label || 'link'}`}
+                          onClick={() => setExtraLinks((prev) => prev.filter((_, j) => j !== i))}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => setExtraLinks((prev) => [...prev, { label: '', url: '' }])}>
+                      <PlusIcon className="mr-1.5 h-4 w-4" /> Add a link
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Connections</p>
+                      <p className="text-xs text-muted-foreground">Farcaster and Zora, shown with your links.</p>
+                    </div>
+                    <ProfileConnections />
+                  </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="profile-booking-email">Booking email</Label>
                     <Input
