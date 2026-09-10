@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { shrinkImage } from '@/lib/shrinkImage';
 
 /**
  * An artist's visual work: artwork, photographs, video.
@@ -116,14 +117,19 @@ export function useMediaUpload() {
       setState({ phase: 'preparing', progress: 0, error: null, item: null });
 
       try {
+        // A phone camera writes eight megabytes of detail that nothing here
+        // displays. Shrinking first is what makes an upload feel fast on a
+        // phone; a video, or a picture already small, is left alone.
+        const sending = await shrinkImage(file);
+
         const { data: ticket, error: ticketError } = await supabase.functions.invoke('upload-url', {
           body: {
             purpose: 'visual',
             title: meta.title ?? file.name.replace(/\.[^.]+$/, ''),
             caption: meta.caption ?? null,
-            fileName: file.name,
-            contentType: file.type,
-            fileBytes: file.size,
+            fileName: sending.name,
+            contentType: sending.type,
+            fileBytes: sending.size,
           },
         });
 
@@ -137,13 +143,13 @@ export function useMediaUpload() {
         }
 
         setState((s) => ({ ...s, phase: 'uploading', progress: 0 }));
-        await putWithProgress(ticket.uploadUrl, file, (progress) =>
+        await putWithProgress(ticket.uploadUrl, sending, (progress) =>
           setState((s) => (s.phase === 'uploading' ? { ...s, progress } : s)),
         );
 
         // Measure it now that the file is in hand. A gallery that knows the
         // shape of a picture before it loads does not jump about as it fills.
-        const dims = await measure(file, ticket.kind as MediaKind).catch(() => null);
+        const dims = await measure(sending, ticket.kind as MediaKind).catch(() => null);
 
         // Published only now, once the bytes are genuinely in the bucket.
         const { data: row, error: publishError } = await supabase

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { shrinkCover } from '@/lib/shrinkImage';
 
 /**
  * Cover art rules, in one place, because every door a record can come
@@ -57,11 +58,14 @@ export async function checkCover(file: File): Promise<CoverCheck> {
  * and resolve to its URL. Throws with a plain sentence when it does not land.
  */
 export async function landCover(cover: File, onProgress?: (pct: number) => void): Promise<string> {
+  // Square and crisp, but no bigger than anything shows it. A four thousand
+  // pixel cover is minutes of a phone's upload spent on detail nobody sees.
+  const sending = await shrinkCover(cover);
   const { data: ticket, error } = await supabase.functions.invoke('upload-url', {
-    body: { purpose: 'visual', title: 'Cover', fileName: cover.name, contentType: cover.type, fileBytes: cover.size },
+    body: { purpose: 'visual', title: 'Cover', fileName: sending.name, contentType: sending.type, fileBytes: sending.size },
   });
   if (error || !ticket?.uploadUrl) throw new Error('The cover art could not start uploading. Check your connection and try again.');
-  await putFile(ticket.uploadUrl, cover, onProgress);
+  await putFile(ticket.uploadUrl, sending, onProgress);
   const { data: row } = await supabase
     .from('artist_media' as never)
     .update({ is_published: false, updated_at: new Date().toISOString() } as never)
