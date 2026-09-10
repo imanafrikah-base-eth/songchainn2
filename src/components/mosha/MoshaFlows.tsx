@@ -347,10 +347,10 @@ function EditGalleryFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
                   <p className="text-[10px] text-muted-foreground">{item.kind === 'video' ? 'Clip' : 'Picture'}{item.is_published ? '' : ' · Hidden'}</p>
                 </div>
                 <div className="flex shrink-0 gap-1">
-                  <button type="button" aria-label={`Rename ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => setRenaming({ id: item.id, title: item.title ?? '', caption: item.caption ?? '' })} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50"><Pencil className="h-3.5 w-3.5" /></button>
-                  <button type="button" aria-label={item.is_published ? `Hide ${item.title || 'this piece'}` : `Show ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => void toggle(item)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50">{item.is_published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</button>
-                  <button type="button" aria-label={`Replace ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => { setReplacing(item); replaceRef.current?.click(); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50">{busy === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}</button>
-                  <button type="button" aria-label={`Delete ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => void del(item)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                  <button type="button" aria-label={`Rename ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => setRenaming({ id: item.id, title: item.title ?? '', caption: item.caption ?? '' })} className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" aria-label={item.is_published ? `Hide ${item.title || 'this piece'}` : `Show ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => void toggle(item)} className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50">{item.is_published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</button>
+                  <button type="button" aria-label={`Replace ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => { setReplacing(item); replaceRef.current?.click(); }} className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50">{busy === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}</button>
+                  <button type="button" aria-label={`Delete ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => void del(item)} className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               </div>
               {renaming?.id === item.id && (
@@ -633,7 +633,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
     return (
       <div className="space-y-3">
         <div className="flex gap-1.5">
-          <button type="button" onClick={() => setTab('streets')} className="h-8 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground">Streets</button>
+          <button type="button" onClick={() => setTab('streets')} className="h-10 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground">Streets</button>
           <button type="button" className="h-10 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">Settings</button>
         </div>
 
@@ -650,10 +650,10 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
                   <option value="council">Council</option>
                   <option value="event">Event</option>
                 </select>
-                <button type="button" aria-label={s.hidden ? 'Show' : 'Hide'} onClick={() => { void b.saveStreet(s.id, { hidden: !s.hidden }); done(`${s.name} ${s.hidden ? 'shown' : 'hidden'}`); }} className={`rounded-full p-1.5 ${s.hidden ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                <button type="button" aria-label={s.hidden ? 'Show' : 'Hide'} onClick={() => { void b.saveStreet(s.id, { hidden: !s.hidden }); done(`${s.name} ${s.hidden ? 'shown' : 'hidden'}`); }} className={`rounded-full p-1.5 ${s.hidden ? 'text-amber-500' : 'text-muted-foreground'} min-h-11 min-w-11 inline-flex items-center justify-center`}>
                   {s.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
-                <button type="button" aria-label="Delete street" onClick={() => { void b.removeStreet(s.id); done(`${s.name} deleted`); }} className="rounded-full p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" aria-label="Delete street" onClick={() => { void b.removeStreet(s.id); done(`${s.name} deleted`); }} className="rounded-full p-1.5 text-muted-foreground hover:text-destructive min-h-11 min-w-11 inline-flex items-center justify-center"><Trash2 className="h-4 w-4" /></button>
               </li>
             ))}
             {b.cities.map((c) => (
@@ -669,7 +669,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Who may post</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {([['off', 'Only me'], ['members', 'People past the key'], ['everyone', 'Anyone']] as const).map(([v, t]) => (
-              <button key={v} type="button" onClick={() => { void b.saveWorld({ visitor_posts: v }); done(`Posting: ${t}`); }} className={`h-8 rounded-full px-3 text-xs font-medium ${(w.visitor_posts ?? 'off') === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
+              <button key={v} type="button" onClick={() => { void b.saveWorld({ visitor_posts: v }); done(`Posting: ${t}`); }} className={`h-10 rounded-full px-3 text-xs font-medium ${(w.visitor_posts ?? 'off') === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
             ))}
           </div>
         </div>
@@ -678,7 +678,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">The key</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {([['songchainn', '$ONGCHAINN'], ['points', 'Loyalty points'], ['pass', 'A pass'], ['token', zoraCoin ? 'My creator coin' : 'My own token']] as const).map(([v, t]) => (
-              <button key={v} type="button" disabled={v === 'token' && !zoraCoin && !b.gate.token_address} onClick={() => { void b.saveGate({ kind: v, ...(v === 'token' && zoraCoin ? { token_address: zoraCoin[1] } : {}) }); done(`Key: ${t}`); }} className={`h-8 rounded-full px-3 text-xs font-medium disabled:opacity-40 ${b.gate.kind === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
+              <button key={v} type="button" disabled={v === 'token' && !zoraCoin && !b.gate.token_address} onClick={() => { void b.saveGate({ kind: v, ...(v === 'token' && zoraCoin ? { token_address: zoraCoin[1] } : {}) }); done(`Key: ${t}`); }} className={`h-10 rounded-full px-3 text-xs font-medium disabled:opacity-40 ${b.gate.kind === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
             ))}
           </div>
           <div className="mt-1.5 grid grid-cols-2 gap-1.5">
@@ -691,7 +691,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Advert on Home</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {([['entrance', 'The gate'], ['hero', 'The hero'], ['custom', 'A clip of my own']] as const).map(([v, t]) => (
-              <button key={v} type="button" onClick={() => { void b.saveWorld({ ad_kind: v }); done(`Advert: ${t}`); }} className={`h-8 rounded-full px-3 text-xs font-medium ${(w.ad_kind ?? 'entrance') === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
+              <button key={v} type="button" onClick={() => { void b.saveWorld({ ad_kind: v }); done(`Advert: ${t}`); }} className={`h-10 rounded-full px-3 text-xs font-medium ${(w.ad_kind ?? 'entrance') === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
             ))}
           </div>
           {w.ad_kind === 'custom' ? <p className="mt-1 text-[11px] text-muted-foreground">Add the clip itself from the builder's Art step.</p> : null}
@@ -714,11 +714,11 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
     <div className="space-y-2">
       <div className="flex gap-1.5">
         <button type="button" className="h-10 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">Streets</button>
-        <button type="button" onClick={() => setTab('settings')} className="inline-flex h-8 items-center gap-1 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground"><Settings2 className="h-3.5 w-3.5" /> Settings</button>
+        <button type="button" onClick={() => setTab('settings')} className="inline-flex h-10 items-center gap-1 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground"><Settings2 className="h-3.5 w-3.5" /> Settings</button>
       </div>
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
         {b.streets.map((s) => (
-          <button key={s.id} type="button" onClick={() => setStreetId(s.id)} className={`h-8 shrink-0 rounded-full px-3 text-xs font-medium ${street?.id === s.id ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{s.name}</button>
+          <button key={s.id} type="button" onClick={() => setStreetId(s.id)} className={`h-10 shrink-0 rounded-full px-3 text-xs font-medium ${street?.id === s.id ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{s.name}</button>
         ))}
       </div>
       {street && (
@@ -728,9 +728,9 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
               {blocks.map((blk, i) => (
                 <li key={blk.id} className="flex items-center gap-1 rounded-xl border border-border px-2.5 py-1.5 text-sm">
                   <span className="min-w-0 flex-1 truncate">{getBlockType(blk.block_type)?.name ?? blk.block_type}</span>
-                  <button type="button" aria-label="Move up" disabled={i === 0} onClick={() => void b.moveBlock(street.id, blk.id, -1)} className="rounded-full p-1 text-muted-foreground disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
-                  <button type="button" aria-label="Move down" disabled={i === blocks.length - 1} onClick={() => void b.moveBlock(street.id, blk.id, 1)} className="rounded-full p-1 text-muted-foreground disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
-                  <button type="button" aria-label="Delete" onClick={() => { void b.removeBlock(street.id, blk.id); toast('Gone', { description: `Removed from ${street.name}.` }); }} className="rounded-full p-1 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  <button type="button" aria-label="Move up" disabled={i === 0} onClick={() => void b.moveBlock(street.id, blk.id, -1)} className="rounded-full p-1 text-muted-foreground disabled:opacity-30 min-h-11 min-w-11 inline-flex items-center justify-center"><ChevronUp className="h-4 w-4" /></button>
+                  <button type="button" aria-label="Move down" disabled={i === blocks.length - 1} onClick={() => void b.moveBlock(street.id, blk.id, 1)} className="rounded-full p-1 text-muted-foreground disabled:opacity-30 min-h-11 min-w-11 inline-flex items-center justify-center"><ChevronDown className="h-4 w-4" /></button>
+                  <button type="button" aria-label="Delete" onClick={() => { void b.removeBlock(street.id, blk.id); toast('Gone', { description: `Removed from ${street.name}.` }); }} className="rounded-full p-1 text-muted-foreground hover:text-destructive min-h-11 min-w-11 inline-flex items-center justify-center"><Trash2 className="h-4 w-4" /></button>
                 </li>
               ))}
             </ul>

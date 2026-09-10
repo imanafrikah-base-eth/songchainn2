@@ -351,7 +351,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
                   <button
                     type="button"
                     onClick={() => removeRecentSearch(term)}
-                    className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                    className="text-muted-foreground hover:text-foreground transition-colors p-0.5 min-h-11 min-w-11 inline-flex items-center justify-center"
                     aria-label={`Remove "${term}" from recent searches`}
                   >
                     <X className="w-3 h-3" />

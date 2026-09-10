@@ -81,7 +81,7 @@ export function ArtPicker({
           {help ? <p className="text-xs text-muted-foreground">{help}</p> : null}
         </div>
         {value ? (
-          <button type="button" onClick={() => { onChange(null); onFit?.(null); setFraming(false); }} aria-label={`Clear ${label}`} className="rounded-full p-1 text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={() => { onChange(null); onFit?.(null); setFraming(false); }} aria-label={`Clear ${label}`} className="rounded-full p-1 text-muted-foreground hover:text-foreground min-h-11 min-w-11 inline-flex items-center justify-center">
             <Trash2 className="h-4 w-4" />
           </button>
         ) : null}

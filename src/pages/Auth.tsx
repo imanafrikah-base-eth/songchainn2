@@ -840,7 +840,7 @@ export default function Auth() {
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors text-xs"
+                className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors text-xs"
                 aria-label="Search"
               >
                 <Search className="w-3.5 h-3.5" />
@@ -963,7 +963,7 @@ export default function Auth() {
             <section id="hot-today" className="mb-7 lg:hidden">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-heading text-foreground">Hot Today</h2>
-                <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
+                <button type="button" onClick={handleBrowseWithoutAuthModal} className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
               <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
               <div className="grid grid-cols-2 gap-3">
@@ -1139,7 +1139,7 @@ export default function Auth() {
             <section id="featured-catalogs" className="mb-7">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-heading text-foreground">Today’s Featured Catalogs</h2>
-                <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
+                <button type="button" onClick={handleBrowseWithoutAuthModal} className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
               <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -1252,7 +1252,7 @@ export default function Auth() {
             <section id="trending-artists" className="mb-7">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-heading text-foreground">Trending Artists</h2>
-                <button type="button" onClick={handleBrowseWithoutAuthModal} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
+                <button type="button" onClick={handleBrowseWithoutAuthModal} className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
               <div className="max-h-[340px] overflow-y-auto pr-1 sm:pr-2">
               <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">

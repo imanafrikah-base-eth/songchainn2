@@ -258,7 +258,7 @@ export function DropCard({
                   type="button"
                   aria-label="Fewer copies"
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  className={`flex h-9 w-9 items-center justify-center ${text}`}
+                  className={`flex h-11 w-11 items-center justify-center ${text}`}
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
@@ -267,7 +267,7 @@ export function DropCard({
                   type="button"
                   aria-label="More copies"
                   onClick={() => setQty((q) => Math.min(drop.per_wallet ?? 20, q + 1))}
-                  className={`flex h-9 w-9 items-center justify-center ${text}`}
+                  className={`flex h-11 w-11 items-center justify-center ${text}`}
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
@@ -275,7 +275,7 @@ export function DropCard({
               <Button
                 onClick={() => void collect()}
                 disabled={stage != null}
-                className="h-9 flex-1 rounded-full font-semibold"
+                className="h-10 flex-1 rounded-full font-semibold"
               >
                 {stage ? (
                   <>

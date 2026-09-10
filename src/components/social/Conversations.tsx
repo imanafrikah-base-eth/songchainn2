@@ -114,7 +114,7 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
         <div className="relative">
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            className="rounded-lg p-1.5 hover:bg-muted"
+            className="rounded-lg p-1.5 hover:bg-muted min-h-11 min-w-11 inline-flex items-center justify-center"
             aria-label="Conversation options"
           >
             <MoreVertical size={18} />

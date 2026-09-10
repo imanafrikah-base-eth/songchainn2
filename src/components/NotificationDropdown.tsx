@@ -203,7 +203,7 @@ function NotificationItem({
               e.stopPropagation();
               onDelete(notification.id);
             }}
-            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/20 rounded transition-all"
+            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/20 rounded transition-all min-h-11 min-w-11 inline-flex items-center justify-center"
           >
             <X className="w-3 h-3 text-muted-foreground" />
           </button>

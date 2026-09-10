@@ -330,7 +330,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
           </button>
           {!isOwnPost && (
             <button onClick={(e) => { e.stopPropagation(); onFollow(post.user_id); }}
-              className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-lg transition-colors ${isFollowing ? 'bg-white/30' : 'bg-primary'}`}>
+              className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white shadow-lg transition-colors ${isFollowing ? 'bg-white/30' : 'bg-primary'}`}>
               {isFollowing ? <Check className="w-3 h-3" /> : <UserPlus className="w-3 h-3" />}
             </button>
           )}

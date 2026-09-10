@@ -188,7 +188,7 @@ export function FeatureRequestsPanel() {
                         pr_url: drafts[r.id]?.pr_url?.trim() || null,
                       })
                     }
-                    className="h-9 gap-1"
+                    className="h-10 gap-1"
                   >
                     {saving === r.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

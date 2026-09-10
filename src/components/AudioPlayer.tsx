@@ -388,7 +388,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                   aria-label="Close the player"
                   title="Close"
                   onClick={(e) => { e.stopPropagation(); stop(); }}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary/50 hover:text-foreground transition-colors"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary/50 hover:text-foreground transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>

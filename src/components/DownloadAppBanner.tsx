@@ -304,7 +304,7 @@ export function DownloadAppBanner() {
                 </div>
                 <button
                   onClick={() => setShowInstallConfirm(false)}
-                  className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground flex-shrink-0"
+                  className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground flex-shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -445,7 +445,7 @@ export function DownloadAppBanner() {
                             size="sm" 
                             onClick={() => setShowInstallConfirm(true)}
                             disabled={installState !== 'idle'}
-                            className="gradient-primary text-xs h-8 gap-1.5"
+                            className="gradient-primary text-xs h-10 gap-1.5"
                           >
                             {getButtonContent()}
                           </Button>

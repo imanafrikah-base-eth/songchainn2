@@ -449,7 +449,7 @@ export default function Social() {
                     <button
                       onClick={() => navigate(-1)}
                       aria-label="Go back"
-                      className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
+                      className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
                     >
                       <ArrowLeft className="w-4 h-4 text-white" />
                     </button>

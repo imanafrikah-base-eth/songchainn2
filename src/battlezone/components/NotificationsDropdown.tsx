@@ -131,7 +131,9 @@ const NotificationsDropdown = () => {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-2 rounded-lg hover:bg-muted transition-colors"
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+        aria-expanded={open}
+        className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 hover:bg-muted transition-colors"
       >
         <Bell className="h-5 w-5 text-muted-foreground" />
         {unreadCount > 0 && (
@@ -178,7 +180,7 @@ const NotificationsDropdown = () => {
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); void dismiss(n.id); }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-all shrink-0"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-all shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center"
                       >
                         <X className="h-3 w-3 text-muted-foreground" />
                       </button>

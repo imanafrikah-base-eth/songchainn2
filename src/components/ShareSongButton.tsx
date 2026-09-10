@@ -262,7 +262,7 @@ export function ShareSongButton({
                 <button
                   type="button"
                   onClick={() => setShowSheet(false)}
-                  className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/15 transition-colors"
+                  className="w-11 h-11 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/15 transition-colors"
                 >
                   <X className="w-4 h-4 text-white/70" />
                 </button>

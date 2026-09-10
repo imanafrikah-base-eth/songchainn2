@@ -855,7 +855,7 @@ export default function PlaylistDetail() {
                               type="button"
                               aria-label="Remove collaborator"
                               onClick={() => void handleRemoveCollaborator(c.user_id)}
-                              className="p-1 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              className="p-1 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
                             >
                               <X className="w-4 h-4" />
                             </button>

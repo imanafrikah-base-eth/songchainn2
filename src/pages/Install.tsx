@@ -182,7 +182,7 @@ export default function Install() {
                   </div>
                   <button
                     onClick={() => setShowIOSInstructions(false)}
-                    className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground flex-shrink-0"
+                    className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground flex-shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center"
                   >
                     <Plus className="w-4 h-4 rotate-45" />
                   </button>
@@ -250,7 +250,7 @@ export default function Install() {
                 </div>
                 <button
                   onClick={() => setShowInstallConfirm(false)}
-                  className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground flex-shrink-0"
+                  className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground flex-shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center"
                 >
                   <Plus className="w-4 h-4 rotate-45" />
                 </button>

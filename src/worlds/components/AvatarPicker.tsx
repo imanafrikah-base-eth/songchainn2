@@ -127,7 +127,7 @@ export function AvatarPicker({
             aria-label={s.id}
             aria-pressed={citizen.avatar.skin === s.id}
             onClick={() => set({ skin: s.id })}
-            className={`h-9 w-9 rounded-full border-2 transition ${
+            className={`h-11 w-11 rounded-full border-2 transition ${
               citizen.avatar.skin === s.id ? 'border-amber-400' : 'border-white/15 hover:border-white/40'
             }`}
             style={{ backgroundColor: s.hex }}

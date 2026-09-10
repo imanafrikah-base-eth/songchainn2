@@ -868,7 +868,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                             type="button"
                             aria-label="Remove from queue"
                             onClick={(e) => { e.stopPropagation(); removeFromQueue(index); }}
-                            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors flex-shrink-0"
+                            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors flex-shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center"
                           >
                             <X className="w-4 h-4" />
                           </button>

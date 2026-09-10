@@ -128,7 +128,7 @@ export function MoshaSuggest({ step, b }: { step: Step; b: Builder }) {
             </Button>
           </div>
         </div>
-        <button type="button" onClick={() => setDismissed(suggestion.id)} aria-label="Put this away" className="rounded-full p-1 text-muted-foreground hover:text-foreground">
+        <button type="button" onClick={() => setDismissed(suggestion.id)} aria-label="Put this away" className="rounded-full p-1 text-muted-foreground hover:text-foreground min-h-11 min-w-11 inline-flex items-center justify-center">
           <X className="h-4 w-4" />
         </button>
       </div>

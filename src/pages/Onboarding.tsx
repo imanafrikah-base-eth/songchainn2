@@ -407,7 +407,7 @@ export default function Onboarding() {
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center hover:bg-secondary/60 transition-colors"
+                  className="absolute -bottom-1 -right-1 w-11 h-11 rounded-full bg-background border border-border flex items-center justify-center hover:bg-secondary/60 transition-colors"
                   disabled={isLoading}
                 >
                   <Camera className="w-3 h-3" />

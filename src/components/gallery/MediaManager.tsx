@@ -208,7 +208,7 @@ export function MediaManager({ walletAddress }: Props) {
                   title={item.is_published ? 'Hide from your page' : 'Show on your page'}
                   aria-label={item.is_published ? 'Hide from your page' : 'Show on your page'}
                   onClick={() => void update.mutateAsync({ id: item.id, is_published: !item.is_published })}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground"
                 >
                   {item.is_published ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 </button>
@@ -226,7 +226,7 @@ export function MediaManager({ walletAddress }: Props) {
                           'It is queued to be coined. Nothing is on chain until the coin actually exists, and the page will say so when it does.',
                       });
                     }}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40"
                   >
                     <Coins className="h-4 w-4" />
                   </button>
@@ -240,7 +240,7 @@ export function MediaManager({ walletAddress }: Props) {
                     if (!window.confirm('Delete this? It comes off your page for good.')) return;
                     void remove.mutateAsync(item.id);
                   }}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

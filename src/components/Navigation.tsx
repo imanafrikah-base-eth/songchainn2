@@ -234,7 +234,7 @@ export function Navigation() {
               {!user && (
                 <button
                   onClick={() => navigate('/auth')}
-                  className="inline-flex items-center h-9 px-4 rounded-xl gradient-primary text-primary-foreground font-semibold text-sm shadow-glow"
+                  className="inline-flex items-center h-10 px-4 rounded-xl gradient-primary text-primary-foreground font-semibold text-sm shadow-glow"
                 >
                   Join
                 </button>

@@ -113,7 +113,7 @@ export function GenreExplorer({ songs, onPlay, isLocked }: GenreExplorerProps) {
                 type="button"
                 onClick={() => setActive(g.name)}
                 aria-pressed={current === g.name}
-                className={`h-9 whitespace-nowrap rounded-full px-3.5 text-xs font-medium transition-colors focus-ring ${
+                className={`h-10 whitespace-nowrap rounded-full px-3.5 text-xs font-medium transition-colors focus-ring ${
                   current === g.name
                     ? 'bg-primary text-primary-foreground'
                     : 'border border-border text-muted-foreground hover:text-foreground'

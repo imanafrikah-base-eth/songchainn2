@@ -812,7 +812,7 @@ const HostCreate = () => {
                 <button
                   type="button"
                   onClick={() => setShowCoHostDropdown(!showCoHostDropdown)}
-                  className="p-1 rounded hover:bg-muted transition-colors"
+                  className="p-1 rounded hover:bg-muted transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
                   disabled={selectedCoHosts.length >= 4}
                 >
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showCoHostDropdown ? 'rotate-180' : ''}`} />

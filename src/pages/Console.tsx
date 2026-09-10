@@ -254,7 +254,7 @@ export default function Console() {
             type="button"
             onClick={() => void load()}
             aria-label="Refresh"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted-foreground"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -333,7 +333,7 @@ export default function Console() {
                         type="button"
                         disabled={busy === r.id}
                         onClick={() => void act(r, k.id)}
-                        className="h-9 rounded-full border border-border px-3 text-xs text-foreground disabled:opacity-40"
+                        className="h-10 rounded-full border border-border px-3 text-xs text-foreground disabled:opacity-40"
                       >
                         {k.label}
                       </button>
@@ -342,7 +342,7 @@ export default function Console() {
                       type="button"
                       disabled={busy === r.id}
                       onClick={() => void dismiss(r)}
-                      className="flex h-9 items-center gap-1 rounded-full border border-border px-3 text-xs text-muted-foreground"
+                      className="flex h-10 items-center gap-1 rounded-full border border-border px-3 text-xs text-muted-foreground"
                     >
                       {busy === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
                       Nothing wrong
@@ -374,7 +374,7 @@ export default function Console() {
                   type="button"
                   disabled={busy === a.id}
                   onClick={() => void lift(a)}
-                  className="mt-2 flex h-9 items-center gap-1 rounded-full border border-border px-3 text-xs text-foreground"
+                  className="mt-2 flex h-10 items-center gap-1 rounded-full border border-border px-3 text-xs text-foreground"
                 >
                   {busy === a.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                   Lift it
@@ -394,7 +394,7 @@ export default function Console() {
                     type="button"
                     disabled={busy === ap.id}
                     onClick={() => void decideAppeal(ap, false)}
-                    className="h-9 flex-1 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground"
+                    className="h-10 flex-1 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground"
                   >
                     They were right, lift it
                   </button>
@@ -402,7 +402,7 @@ export default function Console() {
                     type="button"
                     disabled={busy === ap.id}
                     onClick={() => void decideAppeal(ap, true)}
-                    className="h-9 flex-1 rounded-full border border-border px-3 text-xs text-foreground"
+                    className="h-10 flex-1 rounded-full border border-border px-3 text-xs text-foreground"
                   >
                     It stands
                   </button>

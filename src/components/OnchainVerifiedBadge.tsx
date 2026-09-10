@@ -27,7 +27,7 @@ const EXPLORER_BASE = 'https://basescan.org/address/';
  * is where they were going to check it anyway.
  */
 export function OnchainVerifiedBadge({ coinAddress, className, size = 'sm' }: OnchainVerifiedBadgeProps) {
-  const sizeClasses = size === 'sm' ? 'text-[10px] px-2 py-0.5 gap-1' : 'text-xs px-2.5 py-1 gap-1.5';
+  const sizeClasses = size === 'sm' ? 'min-h-8 text-[10px] px-2.5 py-0.5 gap-1' : 'min-h-9 text-xs px-3 py-1 gap-1.5';
   const iconSize = size === 'sm' ? 10 : 12;
   const truncated = `${coinAddress.slice(0, 6)}...${coinAddress.slice(-4)}`;
 

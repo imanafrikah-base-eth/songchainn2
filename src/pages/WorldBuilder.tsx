@@ -274,7 +274,7 @@ export default function WorldBuilder() {
                     type="button"
                     disabled={!reachable}
                     onClick={() => setStep(s.id)}
-                    className={`h-9 rounded-full px-3.5 text-xs font-medium transition-colors focus-ring ${
+                    className={`h-10 rounded-full px-3.5 text-xs font-medium transition-colors focus-ring ${
                       current
                         ? 'bg-primary text-primary-foreground'
                         : reachable
@@ -476,7 +476,7 @@ export default function WorldBuilder() {
                     <button
                       type="button"
                       onClick={() => b.saveStreet(s.id, { hidden: !s.hidden })}
-                      className={`h-9 rounded-full border px-3 text-xs font-medium focus-ring ${s.hidden ? 'border-amber-500/50 text-amber-500' : 'border-border text-muted-foreground'}`}
+                      className={`h-10 rounded-full border px-3 text-xs font-medium focus-ring ${s.hidden ? 'border-amber-500/50 text-amber-500' : 'border-border text-muted-foreground'}`}
                     >
                       {s.hidden ? 'Hidden. Show it' : 'Hide'}
                     </button>
@@ -532,7 +532,7 @@ export default function WorldBuilder() {
                     key={s.id}
                     type="button"
                     onClick={() => setActiveStreet(s.id)}
-                    className={`h-9 rounded-full px-3.5 text-xs font-medium focus-ring ${
+                    className={`h-10 rounded-full px-3.5 text-xs font-medium focus-ring ${
                       street?.id === s.id
                         ? 'bg-secondary text-foreground'
                         : 'border border-border text-muted-foreground'
@@ -765,7 +765,7 @@ export default function WorldBuilder() {
                     key={v}
                     type="button"
                     onClick={() => b.saveWorld({ ad_kind: v })}
-                    className={`h-9 rounded-full px-3.5 text-xs font-medium focus-ring ${
+                    className={`h-10 rounded-full px-3.5 text-xs font-medium focus-ring ${
                       (b.world.ad_kind ?? 'entrance') === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'
                     }`}
                   >
@@ -945,7 +945,7 @@ export default function WorldBuilder() {
                     key={v.id}
                     type="button"
                     onClick={() => setView(v.id)}
-                    className={`h-9 rounded-full px-3.5 text-xs font-medium focus-ring ${
+                    className={`h-10 rounded-full px-3.5 text-xs font-medium focus-ring ${
                       view === v.id
                         ? 'bg-primary text-primary-foreground'
                         : 'border border-border text-muted-foreground'
@@ -964,7 +964,7 @@ export default function WorldBuilder() {
                     key={s.id}
                     type="button"
                     onClick={() => setActiveStreet(s.id)}
-                    className={`h-9 rounded-full px-3.5 text-xs font-medium focus-ring ${
+                    className={`h-10 rounded-full px-3.5 text-xs font-medium focus-ring ${
                       street?.id === s.id
                         ? 'bg-secondary text-foreground'
                         : 'border border-border text-muted-foreground'

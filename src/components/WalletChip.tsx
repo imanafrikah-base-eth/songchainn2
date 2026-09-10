@@ -47,7 +47,7 @@ export function WalletChip() {
         onClick={() => void connect()}
         disabled={connecting}
         aria-label="Connect a wallet"
-        className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+        className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
       >
         {connecting ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -71,7 +71,7 @@ export function WalletChip() {
     <button
       onClick={() => navigate('/wallet')}
       aria-label="Your wallet"
-      className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
+      className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
     >
       <Wallet className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
       <span className="tabular-nums">{shown}</span>

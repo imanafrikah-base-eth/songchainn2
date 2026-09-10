@@ -204,7 +204,7 @@ export const SpeakerManagement: React.FC<SpeakerManagementProps> = ({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleToggleMute(participant.user_id, participant.is_muted)}
-                    className="p-1 rounded hover:bg-muted transition-colors"
+                    className="p-1 rounded hover:bg-muted transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
                     title={participant.is_muted ? 'Unmute' : 'Mute'}
                   >
                     {participant.is_muted ? <MicOff className="h-4 w-4 text-muted-foreground" /> : <Mic className="h-4 w-4 text-green-600" />}
@@ -212,7 +212,7 @@ export const SpeakerManagement: React.FC<SpeakerManagementProps> = ({
                   {(participant.role === 'speaker') && (
                     <button
                       onClick={() => handleRemoveSpeaker(participant.user_id)}
-                      className="p-1 rounded hover:bg-muted transition-colors"
+                      className="p-1 rounded hover:bg-muted transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
                       title="Remove from speakers"
                     >
                       <UserX className="h-4 w-4 text-red-600" />

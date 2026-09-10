@@ -72,7 +72,7 @@ export function WorldsSlideshow({ cta, className = '' }: { cta: ReactNode; class
             type="button"
             onClick={() => setIndex((i) => (i - 1 + count) % count)}
             aria-label="Previous world"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-foreground"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -93,7 +93,7 @@ export function WorldsSlideshow({ cta, className = '' }: { cta: ReactNode; class
             type="button"
             onClick={() => setIndex((i) => (i + 1) % count)}
             aria-label="Next world"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-foreground"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground"
           >
             <ChevronRight className="h-4 w-4" />
           </button>

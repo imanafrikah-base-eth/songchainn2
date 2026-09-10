@@ -105,7 +105,7 @@ export function PhaseTwoBetaPanel() {
                 type="button"
                 onClick={() => setRating(value)}
                 aria-label={`Rate ${value} of 5`}
-                className="p-0.5"
+                className="p-0.5 min-h-11 min-w-11 inline-flex items-center justify-center"
               >
                 <Star
                   className={cn(

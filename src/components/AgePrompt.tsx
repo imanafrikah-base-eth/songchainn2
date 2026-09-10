@@ -31,7 +31,7 @@ export function AgePrompt() {
           type="button"
           onClick={() => setPutOff(true)}
           aria-label="Not now"
-          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+          className="absolute right-2 top-2 z-10 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
         >
           <X className="h-4 w-4" />
         </button>
