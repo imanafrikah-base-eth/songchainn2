@@ -109,6 +109,10 @@ export default function Wallet() {
           <h1 className="font-heading text-3xl font-bold text-foreground">Your wallet</h1>
         </div>
 
+        {/* Which wallets are here, and which one pays. Shown either way:
+            somebody with none needs the same door as somebody with three. */}
+        <MyWalletsPanel className="mb-6 mt-6" />
+
         {!walletAddress ? (
           <div className="live-surface mt-6 rounded-2xl border border-border bg-card p-5">
             <p className="text-sm font-medium text-foreground">No wallet connected.</p>
@@ -122,8 +126,7 @@ export default function Wallet() {
           </div>
         ) : (
           <>
-            {/* Which wallets are here, and which one pays. */}
-            <MyWalletsPanel className="mb-6" />
+
 
             {/* The music comes first. */}
             <section className="mb-6">

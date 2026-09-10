@@ -37,6 +37,15 @@ export function Navigation() {
   const [showSuggestionDialog, setShowSuggestionDialog] = useState(false);
   const [showBugReport, setShowBugReport] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  /* The drawer covers the right edge, which is where Mo$ha's tab lives. It
+     says so on the body so the tab can step out of the way rather than
+     sitting on top of the menu. */
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.dataset.menuOpen = mobileMenuOpen ? 'true' : 'false';
+    return () => { document.body.dataset.menuOpen = 'false'; };
+  }, [mobileMenuOpen]);
   const [showOfflineSaveAnnouncement, setShowOfflineSaveAnnouncement] = useState(false);
   const [showProfilePhotoAnnouncement, setShowProfilePhotoAnnouncement] = useState(false);
   const [pulseBanner, setPulseBanner] = useState<{ songId: string; title: string } | null>(null);
