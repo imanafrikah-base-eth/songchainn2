@@ -439,7 +439,7 @@ export default function Social() {
                   <button
                     type="button"
                     onClick={backToFeed}
-                    className="h-8 pl-2 pr-3 rounded-full bg-white/10 backdrop-blur-sm flex items-center gap-1.5 text-sm font-medium text-white"
+                    className="h-10 pl-2 pr-3 rounded-full bg-white/10 backdrop-blur-sm flex items-center gap-1.5 text-sm font-medium text-white"
                   >
                     <ArrowLeft className="w-4 h-4" />
                     Back to feed
@@ -489,7 +489,7 @@ export default function Social() {
                 {/* Discover */}
                 <Sheet>
                   <SheetTrigger asChild>
-                    <button className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                    <button className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
                       <Search className="w-4 h-4 text-white" />
                     </button>
                   </SheetTrigger>

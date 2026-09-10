@@ -82,7 +82,7 @@ export function ReportDialog({ targetType, targetId, targetUser, onClose }: Prop
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>

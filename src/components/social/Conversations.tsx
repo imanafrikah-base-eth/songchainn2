@@ -98,7 +98,7 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-        <button onClick={onBack} className="rounded-lg p-1.5 hover:bg-muted" aria-label="Back to messages">
+        <button onClick={onBack} className="rounded-lg p-1.5 hover:bg-muted min-h-11 min-w-11 inline-flex items-center justify-center" aria-label="Back to messages">
           <ArrowLeft size={18} />
         </button>
         <Link to={`/audience/${conversation.other_user_id}`} className="flex min-w-0 flex-1 items-center gap-2">

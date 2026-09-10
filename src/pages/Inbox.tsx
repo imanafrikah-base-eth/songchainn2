@@ -271,7 +271,7 @@ export default function Inbox() {
                         key={`${message.id}-${cta.label}-${cta.route}`}
                         type="button"
                         size="sm"
-                        className="h-8 px-3 text-xs"
+                        className="h-10 px-3 text-xs"
                         onClick={() => openCtaRoute(cta.route)}
                       >
                         {cta.label}

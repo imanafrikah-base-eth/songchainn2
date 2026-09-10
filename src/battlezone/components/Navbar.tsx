@@ -88,7 +88,7 @@ const Navbar = () => {
                 </span>
                 <button
                   onClick={signOut}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
                   title="Sign out"
                 >
                   <LogOut className="h-4 w-4" />

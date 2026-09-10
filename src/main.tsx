@@ -14,6 +14,7 @@ import { installImageFallback } from "./lib/imageFallback";
 import { installStorageShim } from "./lib/storageShim";
 import { capturePendingReferralCode } from "./hooks/useReferrals";
 import { installLoadErrorRecovery } from "./lib/chunkRecovery";
+import { installMediaProtection, restoreReturnPath } from "./lib/deviceGuards";
 
 // FIRST, ahead of every other line in this file.
 //
@@ -30,6 +31,12 @@ installImageFallback();
 // Stash ?ref=CODE before anything can navigate it away, so an invite survives
 // the whole sign-up round trip and is redeemed once there is a session.
 capturePendingReferralCode();
+
+// Back to the page a wallet app took the person away from, before the router
+// reads the address; and the ordinary doors to saving an artist's media, shut.
+restoreReturnPath();
+installMediaProtection();
+
 
 declare global {
   interface Window {

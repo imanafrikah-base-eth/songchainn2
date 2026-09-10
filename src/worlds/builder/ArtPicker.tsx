@@ -132,26 +132,26 @@ export function ArtPicker({
           className="hidden"
           onChange={(e) => void onFile(e.target.files?.[0])}
         />
-        <Button type="button" size="sm" variant={value ? 'outline' : 'default'} className="h-8 rounded-full text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
+        <Button type="button" size="sm" variant={value ? 'outline' : 'default'} className="h-10 rounded-full text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
           {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1 h-3.5 w-3.5" />}
           {busy ? `${progress}%` : value ? 'Replace' : 'Upload'}
         </Button>
         {value && onFit ? (
-          <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" disabled={busy} onClick={() => setFraming((f) => !f)}>
+          <Button type="button" size="sm" variant="outline" className="h-10 rounded-full text-xs" disabled={busy} onClick={() => setFraming((f) => !f)}>
             <Move className="mr-1 h-3.5 w-3.5" /> {framing ? 'Close' : 'Frame'}
           </Button>
         ) : null}
         {value && kind === 'video' && lastFile ? (
-          <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" disabled={busy} onClick={() => setClipping((c) => !c)}>
+          <Button type="button" size="sm" variant="outline" className="h-10 rounded-full text-xs" disabled={busy} onClick={() => setClipping((c) => !c)}>
             <Scissors className="mr-1 h-3.5 w-3.5" /> Cut a loop
           </Button>
         ) : null}
         {mine.length > 0 ? (
-          <Button type="button" size="sm" variant="ghost" className="h-8 rounded-full text-xs" onClick={() => setPicking((p) => !p)}>
+          <Button type="button" size="sm" variant="ghost" className="h-10 rounded-full text-xs" onClick={() => setPicking((p) => !p)}>
             Gallery
           </Button>
         ) : null}
-        <Button type="button" size="sm" variant="ghost" className="h-8 rounded-full text-xs" onClick={() => setPicking((p) => !p)}>
+        <Button type="button" size="sm" variant="ghost" className="h-10 rounded-full text-xs" onClick={() => setPicking((p) => !p)}>
           <Link2 className="mr-1 h-3.5 w-3.5" /> Link
         </Button>
       </div>
@@ -188,7 +188,7 @@ export function ArtPicker({
             <Button
               type="button"
               size="sm"
-              className="h-8 rounded-full text-xs"
+              className="h-10 rounded-full text-xs"
               disabled={!/^https?:\/\//.test(link.trim())}
               onClick={() => { onChange(link.trim()); onFit?.(null); setLink(''); setPicking(false); }}
             >

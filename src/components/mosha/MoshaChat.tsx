@@ -198,7 +198,7 @@ export function MoshaChat({
           <span className="rounded border border-current/40 px-1 text-[9px] font-semibold uppercase tracking-wide opacity-80" title="An AI guide. Replies are generated.">AI</span>
         </span>
         {onClose && (
-          <button type="button" onClick={onClose} aria-label="Hide Mo$ha" title="Hide. Your chat stays." className="rounded-full p-1 text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label="Hide Mo$ha" title="Hide. Your chat stays." className="rounded-full p-1 text-muted-foreground hover:text-foreground min-h-11 min-w-11 inline-flex items-center justify-center">
             <X className="h-4 w-4" />
           </button>
         )}

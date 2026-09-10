@@ -155,10 +155,10 @@ export function MediaManager({ walletAddress }: Props) {
                       className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary"
                     />
                     <div className="flex gap-2">
-                      <Button size="sm" className="h-8 gap-1" onClick={() => void saveEdit(item.id)}>
+                      <Button size="sm" className="h-10 gap-1" onClick={() => void saveEdit(item.id)}>
                         <Check className="h-3.5 w-3.5" /> Save
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-8 gap-1" onClick={() => setEditing(null)}>
+                      <Button size="sm" variant="ghost" className="h-10 gap-1" onClick={() => setEditing(null)}>
                         <X className="h-3.5 w-3.5" /> Cancel
                       </Button>
                     </div>

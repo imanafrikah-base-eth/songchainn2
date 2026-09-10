@@ -186,14 +186,14 @@ export function ClipVideo({
       )}
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-1.5">
-        <Button type="button" size="sm" className="h-8 rounded-full text-xs" disabled={!duration || cutting !== null || !supported} onClick={() => void cut()}>
+        <Button type="button" size="sm" className="h-10 rounded-full text-xs" disabled={!duration || cutting !== null || !supported} onClick={() => void cut()}>
           {cutting !== null ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Scissors className="mr-1 h-3.5 w-3.5" />}
           {cutting !== null ? `Cutting ${cutting}%` : 'Cut this loop'}
         </Button>
-        <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" disabled={cutting !== null} onClick={() => onDone(file)}>
+        <Button type="button" size="sm" variant="outline" className="h-10 rounded-full text-xs" disabled={cutting !== null} onClick={() => onDone(file)}>
           <Film className="mr-1 h-3.5 w-3.5" /> Use the whole video
         </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-8 rounded-full text-xs" disabled={cutting !== null} onClick={() => onDone(null)}>
+        <Button type="button" size="sm" variant="ghost" className="h-10 rounded-full text-xs" disabled={cutting !== null} onClick={() => onDone(null)}>
           Cancel
         </Button>
       </div>

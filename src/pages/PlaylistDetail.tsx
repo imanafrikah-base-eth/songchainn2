@@ -645,7 +645,7 @@ export default function PlaylistDetail() {
                       <button
                         type="button"
                         aria-label={'Options for ' + song.title}
-                        className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors flex-shrink-0"
+                        className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors flex-shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center"
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>

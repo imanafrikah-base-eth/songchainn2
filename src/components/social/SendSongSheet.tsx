@@ -111,7 +111,7 @@ export function SendSongSheet({
             <h2 className="text-base font-bold text-foreground">Send this song</h2>
             <p className="truncate text-xs text-muted-foreground">{songTitle}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted" aria-label="Close">
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted min-h-11 min-w-11 inline-flex items-center justify-center" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>

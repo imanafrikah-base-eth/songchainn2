@@ -453,7 +453,7 @@ export function DownloadAppBanner() {
                             size="sm" 
                             variant="ghost"
                             onClick={handleDismiss}
-                            className="text-xs h-8 text-muted-foreground"
+                            className="text-xs h-10 text-muted-foreground"
                           >
                             Not Now
                           </Button>
@@ -466,7 +466,7 @@ export function DownloadAppBanner() {
                 {installState !== 'installing' && installState !== 'complete' && (
                   <button
                     onClick={handleDismiss}
-                    className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground"
+                    className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground min-h-11 min-w-11 inline-flex items-center justify-center"
                   >
                     <X className="w-4 h-4" />
                   </button>

@@ -56,7 +56,7 @@ export function ZabalGamezPromo({ variant }: { variant: 'strip' | 'card' }) {
         type="button"
         onClick={dismiss}
         aria-label="Dismiss"
-        className="absolute top-2 right-2 p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+        className="absolute top-2 right-2 p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
       >
         <X className="w-4 h-4" />
       </button>

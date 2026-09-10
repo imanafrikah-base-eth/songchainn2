@@ -168,7 +168,7 @@ export function PostCard({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-xs"
+                    className="h-10 px-2 text-xs"
                     onClick={() => {
                       if (!post.artist_id) return;
                       void toggleLikeArtist(post.artist_id);
@@ -180,7 +180,7 @@ export function PostCard({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-xs"
+                    className="h-10 px-2 text-xs"
                     onClick={() => onFollow(post.user_id)}
                   >
                     {isFollowing ? 'Following' : 'Follow'}
@@ -201,7 +201,7 @@ export function PostCard({
             everyone else's. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-11 w-11">
               <MoreHorizontal className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>

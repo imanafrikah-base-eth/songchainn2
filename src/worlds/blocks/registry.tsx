@@ -103,7 +103,7 @@ function CatalogListBlock({ props, ctx }: BlockProps) {
         <Button
           size="sm"
           variant="secondary"
-          className="h-9 rounded-full px-4 text-xs font-semibold"
+          className="h-10 rounded-full px-4 text-xs font-semibold"
           onClick={() => playQueue(songs)}
         >
           <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />

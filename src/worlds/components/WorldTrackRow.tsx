@@ -57,7 +57,7 @@ export function WorldTrackRow({
         type="button"
         onClick={handlePlay}
         aria-label={isPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
-        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+        className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
       >
         {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
       </button>

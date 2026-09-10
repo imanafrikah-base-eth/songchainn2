@@ -57,7 +57,7 @@ export function PhaseTwoAnnouncement() {
 
             <button
               onClick={dismiss}
-              className="absolute top-3 right-3 p-1.5 rounded-full bg-background/50 hover:bg-background/80 transition-colors z-10"
+              className="absolute top-3 right-3 p-1.5 rounded-full bg-background/50 hover:bg-background/80 transition-colors z-10 min-h-11 min-w-11 inline-flex items-center justify-center"
               aria-label="Dismiss"
             >
               <X className="w-4 h-4" />
@@ -83,11 +83,11 @@ export function PhaseTwoAnnouncement() {
                 </p>
 
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={explore} className="gradient-primary text-primary-foreground text-xs h-8 gap-1.5">
+                  <Button size="sm" onClick={explore} className="gradient-primary text-primary-foreground text-xs h-10 gap-1.5">
                     <Coins className="w-3.5 h-3.5" />
                     Explore Marketplace
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={dismiss} className="text-xs h-8">
+                  <Button size="sm" variant="ghost" onClick={dismiss} className="text-xs h-10">
                     Maybe later
                   </Button>
                 </div>

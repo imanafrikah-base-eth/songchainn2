@@ -198,7 +198,7 @@ export function PostComposer({ onPost, initialType = 'text', initialSongId }: Po
                 type="button"
                 onClick={clearAttachment}
                 aria-label="Remove this attachment"
-                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white"
+                className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/70 text-white"
               >
                 <X className="h-4 w-4" />
               </button>

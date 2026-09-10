@@ -566,21 +566,21 @@ export default function WorldBuilder() {
                             </span>
                           </button>
                           <Button
-                            variant="ghost" size="icon" className="h-9 w-9 shrink-0"
+                            variant="ghost" size="icon" className="h-11 w-11 shrink-0"
                             aria-label="Move up" disabled={i === 0}
                             onClick={() => b.moveBlock(street.id, blk.id, -1)}
                           >
                             <ChevronUp className="h-4 w-4" />
                           </Button>
                           <Button
-                            variant="ghost" size="icon" className="h-9 w-9 shrink-0"
+                            variant="ghost" size="icon" className="h-11 w-11 shrink-0"
                             aria-label="Move down" disabled={i === blocks.length - 1}
                             onClick={() => b.moveBlock(street.id, blk.id, 1)}
                           >
                             <ChevronDown className="h-4 w-4" />
                           </Button>
                           <Button
-                            variant="ghost" size="icon" className="h-9 w-9 shrink-0"
+                            variant="ghost" size="icon" className="h-11 w-11 shrink-0"
                             aria-label="Remove block"
                             onClick={() => b.removeBlock(street.id, blk.id)}
                           >

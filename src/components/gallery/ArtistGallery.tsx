@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Play, ChevronLeft, ChevronRight, Coins, ImageIcon, Clapperboard, Images, MoreHorizontal, Pencil, Eye, EyeOff, RefreshCw, Trash2, Loader2 } from 'lucide-react';
+import { X, Play, ChevronLeft, ChevronRight, Coins, ImageIcon, Clapperboard, Images, MoreHorizontal, Pencil, Eye, EyeOff, RefreshCw, Trash2, Loader2, Download, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { useArtistGallery, useMyMedia, useMediaActions, useMediaUpload, type ArtistMediaItem } from '@/hooks/useArtistMedia';
@@ -195,6 +195,18 @@ function OwnerMenu({ item }: { item: ArtistMediaItem }) {
     }
   };
 
+  const toggleDownload = async () => {
+    setBusy('download');
+    try {
+      await update.mutateAsync({ id: item.id, allow_download: !item.allow_download });
+      toast(item.allow_download ? 'Downloads off. Fans can look, not save.' : 'Downloads on for this piece.');
+    } catch (e) {
+      toast.error((e as Error)?.message || 'That did not save.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const saveEdit = async () => {
     setBusy('edit');
     try {
@@ -259,7 +271,7 @@ function OwnerMenu({ item }: { item: ArtistMediaItem }) {
           <button
             type="button"
             aria-label={`Options for ${item.title || (item.kind === 'video' ? 'this clip' : 'this picture')}`}
-            className="absolute right-1.5 top-1.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
+            className="absolute right-1.5 top-1.5 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
           </button>
@@ -274,6 +286,10 @@ function OwnerMenu({ item }: { item: ArtistMediaItem }) {
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => replaceRef.current?.click()} className="gap-2">
             <RefreshCw className="h-4 w-4" /> Replace
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => void toggleDownload()} className="gap-2">
+            {item.allow_download ? <Lock className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+            {item.allow_download ? 'Stop downloads' : 'Allow downloads'}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setConfirming(true)} className="gap-2 text-destructive focus:text-destructive">
             <Trash2 className="h-4 w-4" /> Delete
@@ -354,7 +370,7 @@ function Lightbox({
   }, [index, items.length, onIndex, onClose]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black/95" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black/95" role="dialog" aria-modal="true" data-protect="" {...(item.allow_download ? { 'data-download-ok': '' } : {})}>
       <div className="flex items-center justify-between px-4 py-3">
         <span className="text-xs text-white/60">
           {index + 1} of {items.length}
@@ -377,6 +393,8 @@ function Lightbox({
             poster={item.poster_url ?? undefined}
             className="max-h-full max-w-full"
             controls
+            controlsList={item.allow_download ? undefined : 'nodownload noremoteplayback'}
+            disablePictureInPicture={!item.allow_download}
             autoPlay
             playsInline
           />
@@ -391,6 +409,13 @@ function Lightbox({
             {item.title && <p className="text-sm font-semibold text-white">{item.title}</p>}
             {item.caption && <p className="mt-1 text-xs text-white/70">{item.caption}</p>}
           </div>
+        )}
+        {item.allow_download && (
+          <p className="mt-3 text-center">
+            <a href={item.public_url} download target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-1.5 rounded-full border border-white/20 px-4 text-xs font-semibold text-white">
+              <Download className="h-4 w-4" /> Save
+            </a>
+          </p>
         )}
         {item.zora_coin_address && item.coin_status === 'minted' && (
           <p className="mt-3 text-center">

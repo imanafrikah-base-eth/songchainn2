@@ -151,7 +151,7 @@ export function UpdateAvailableBanner() {
                     size="sm" 
                     onClick={handleUpdate}
                     disabled={isUpdating}
-                    className="gradient-primary text-xs h-8 gap-1.5"
+                    className="gradient-primary text-xs h-10 gap-1.5"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
                     {isUpdating ? 'Updating...' : 'Update Now'}
@@ -160,7 +160,7 @@ export function UpdateAvailableBanner() {
                     size="sm" 
                     variant="ghost"
                     onClick={handleDismiss}
-                    className="text-xs h-8 text-muted-foreground"
+                    className="text-xs h-10 text-muted-foreground"
                   >
                     Later
                   </Button>
@@ -169,7 +169,7 @@ export function UpdateAvailableBanner() {
               
               <button
                 onClick={handleDismiss}
-                className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground"
+                className="p-1 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground min-h-11 min-w-11 inline-flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>

@@ -40,13 +40,15 @@ export interface ArtistMediaItem {
   zora_coin_address: string | null;
   coin_status: CoinStatus;
   coined_at: string | null;
+  /** The artist said fans may save this file. Off by default. */
+  allow_download: boolean;
   created_at: string;
 }
 
 const SELECT =
   'id, user_id, artist_id, kind, title, caption, public_url, poster_url, mime_type, bytes, ' +
   'width, height, duration_seconds, is_published, sort_order, zora_coin_address, coin_status, ' +
-  'coined_at, created_at';
+  'coined_at, allow_download, created_at';
 
 /** Everything one artist has published, for their public gallery. */
 export function useArtistGallery(artistId: string | null | undefined) {

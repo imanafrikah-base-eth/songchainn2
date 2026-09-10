@@ -88,7 +88,7 @@ export function ReportBug({ onClose }: { onClose: () => void }) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted min-h-11 min-w-11 inline-flex items-center justify-center"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>

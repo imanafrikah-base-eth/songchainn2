@@ -121,10 +121,10 @@ export function MediaFramer({
         <span className="w-10 text-right font-mono text-foreground">{live.scale.toFixed(1)}x</span>
       </label>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        <Button type="button" size="sm" className="h-8 rounded-full text-xs" onClick={onDone}>
+        <Button type="button" size="sm" className="h-10 rounded-full text-xs" onClick={onDone}>
           <Check className="mr-1 h-3.5 w-3.5" /> Done
         </Button>
-        <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={() => set(DEFAULT_FIT)}>
+        <Button type="button" size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => set(DEFAULT_FIT)}>
           <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
         </Button>
       </div>

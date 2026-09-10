@@ -57,7 +57,7 @@ export function NotificationBanner() {
                   <Button 
                     size="sm" 
                     onClick={handleEnable}
-                    className="gradient-primary text-xs h-8"
+                    className="gradient-primary text-xs h-10"
                     disabled={permission === 'denied'}
                   >
                     Enable Notifications

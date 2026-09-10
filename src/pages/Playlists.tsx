@@ -182,7 +182,7 @@ export default function Playlists() {
                         type="button"
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        className="h-11 w-11 text-muted-foreground hover:text-primary"
                         onClick={() => updatePlaylistVisibility(playlist.id, !playlist.is_public)}
                       >
                         {playlist.is_public ? <Lock className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
@@ -191,7 +191,7 @@ export default function Playlists() {
                         type="button"
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        className="h-11 w-11 text-muted-foreground hover:text-destructive"
                         aria-label={`Delete ${playlist.name}`}
                         onClick={() => setPlaylistToDelete({ id: playlist.id, name: playlist.name })}
                       >

@@ -613,7 +613,7 @@ export function VibeAgent() {
             type="button"
             onClick={() => setChatOpen(true)}
             aria-label="Open Mo$ha"
-            className="agent-tab-button border border-border bg-background/90 backdrop-blur text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors flex items-center gap-1"
+            className="agent-tab-button border border-primary/50 bg-primary text-primary-foreground font-semibold shadow-xl shadow-primary/30 hover:bg-primary/90 active:scale-[0.98] transition-colors flex items-center gap-1"
           >
             <Sparkles className="w-3 h-3" />
             Mo$ha
@@ -627,7 +627,7 @@ export function VibeAgent() {
           type="button"
           onClick={() => setChatOpen(true)}
           aria-label={`Open Mo$ha, ${modeLabel(mode)}`}
-          className="agent-tab-button border border-border bg-background/90 backdrop-blur text-[11px] sm:text-xs text-primary shadow-xl hover:bg-primary/10 transition-colors"
+          className="agent-tab-button border border-primary/50 bg-primary text-primary-foreground font-semibold shadow-xl shadow-primary/30 hover:bg-primary/90 active:scale-[0.98] transition-colors"
         >
           Mo$ha
         </button>
@@ -675,22 +675,22 @@ export function VibeAgent() {
                 <p className="text-sm text-foreground">Hey {displayName}, want to vibe-chat, explore WaveWarz, or just play music?</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" className="h-9 text-xs" onClick={() => setStep('mode-picker')}>
+                <Button type="button" className="h-10 text-xs" onClick={() => setStep('mode-picker')}>
                   Vibe chat
                 </Button>
-                <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => chooseVibe('music')}>
+                <Button type="button" variant="outline" className="h-10 text-xs" onClick={() => chooseVibe('music')}>
                   Play Music
                 </Button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => navigate('/dj-shuffle')}>
+                <Button type="button" variant="outline" className="h-10 text-xs" onClick={() => navigate('/dj-shuffle')}>
                   Call DJ Shuffle
                 </Button>
-                <Button type="button" variant="outline" className="h-9 text-xs" onClick={openWaveWarzPrimer}>
+                <Button type="button" variant="outline" className="h-10 text-xs" onClick={openWaveWarzPrimer}>
                   WaveWarz Info
                 </Button>
               </div>
-              <Button type="button" variant="outline" className="h-9 w-full text-xs" onClick={() => window.dispatchEvent(new CustomEvent('songchainn:open-suggestion-form'))}>
+              <Button type="button" variant="outline" className="h-10 w-full text-xs" onClick={() => window.dispatchEvent(new CustomEvent('songchainn:open-suggestion-form'))}>
                 Suggest improvement
               </Button>
             </div>
@@ -702,11 +702,11 @@ export function VibeAgent() {
                 <p className="text-sm text-foreground">Pick your mood mode:</p>
               </div>
               <div className="grid grid-cols-1 gap-2">
-                <Button type="button" className="h-8 text-xs" onClick={() => chooseVibe('chill')}>🌊 Chill / Vibe</Button>
-                <Button type="button" className="h-8 text-xs" onClick={() => chooseVibe('turnup')}>🔥 Turn up</Button>
-                <Button type="button" className="h-8 text-xs" onClick={() => chooseVibe('focus')}>🧠 Focus</Button>
-                <Button type="button" className="h-8 text-xs" onClick={() => chooseVibe('feelings')}>💔 In my feelings</Button>
-                <Button type="button" className="h-8 text-xs" onClick={() => chooseVibe('explore')}>🌍 Explore new sounds</Button>
+                <Button type="button" className="h-10 text-xs" onClick={() => chooseVibe('chill')}>🌊 Chill / Vibe</Button>
+                <Button type="button" className="h-10 text-xs" onClick={() => chooseVibe('turnup')}>🔥 Turn up</Button>
+                <Button type="button" className="h-10 text-xs" onClick={() => chooseVibe('focus')}>🧠 Focus</Button>
+                <Button type="button" className="h-10 text-xs" onClick={() => chooseVibe('feelings')}>💔 In my feelings</Button>
+                <Button type="button" className="h-10 text-xs" onClick={() => chooseVibe('explore')}>🌍 Explore new sounds</Button>
               </div>
             </div>
           )}
@@ -723,9 +723,9 @@ export function VibeAgent() {
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <Button type="button" className="h-8 text-[11px]" onClick={() => answerMood('loving')}>Loving it</Button>
-                <Button type="button" variant="outline" className="h-8 text-[11px]" onClick={() => answerMood('cool')}>It&apos;s cool</Button>
-                <Button type="button" variant="outline" className="h-8 text-[11px]" onClick={() => answerMood('not_my_vibe')}>Not my vibe</Button>
+                <Button type="button" className="h-10 text-[11px]" onClick={() => answerMood('loving')}>Loving it</Button>
+                <Button type="button" variant="outline" className="h-10 text-[11px]" onClick={() => answerMood('cool')}>It&apos;s cool</Button>
+                <Button type="button" variant="outline" className="h-10 text-[11px]" onClick={() => answerMood('not_my_vibe')}>Not my vibe</Button>
               </div>
             </div>
           )}
@@ -743,8 +743,8 @@ export function VibeAgent() {
               </div>
               <p className="text-xs text-primary">{toneLead}</p>
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" className="h-8 text-xs" onClick={acceptNextSong}>Yes, play it</Button>
-                <Button type="button" variant="outline" className="h-8 text-xs" onClick={skipNextSong}>Skip</Button>
+                <Button type="button" className="h-10 text-xs" onClick={acceptNextSong}>Yes, play it</Button>
+                <Button type="button" variant="outline" className="h-10 text-xs" onClick={skipNextSong}>Skip</Button>
               </div>
             </div>
           )}
@@ -780,29 +780,29 @@ export function VibeAgent() {
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" className="h-8 text-xs" onClick={makeLanePlaylist} disabled={isBuildingLane}>
+                <Button type="button" className="h-10 text-xs" onClick={makeLanePlaylist} disabled={isBuildingLane}>
                   {isBuildingLane ? 'Building...' : 'Build playlist'}
                 </Button>
                 {lanePlaylist ? (
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-8 text-xs"
+                    className="h-10 text-xs"
                     onClick={() => navigate(`/playlist/${lanePlaylist.id}`)}
                   >
                     Open playlist
                   </Button>
                 ) : (
-                  <Button type="button" variant="outline" className="h-8 text-xs" onClick={() => setStep(null)}>
+                  <Button type="button" variant="outline" className="h-10 text-xs" onClick={() => setStep(null)}>
                     Close
                   </Button>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" variant="outline" className="h-8 text-xs" onClick={() => navigate('/dj-shuffle')}>
+                <Button type="button" variant="outline" className="h-10 text-xs" onClick={() => navigate('/dj-shuffle')}>
                   Want DJ Shuffle?
                 </Button>
-                <Button type="button" variant="outline" className="h-8 text-xs" onClick={openWaveWarzPrimer}>
+                <Button type="button" variant="outline" className="h-10 text-xs" onClick={openWaveWarzPrimer}>
                   Tell me about WaveWarz
                 </Button>
               </div>
@@ -811,14 +811,14 @@ export function VibeAgent() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-8 text-xs"
+                    className="h-10 text-xs"
                     onClick={async () => {
                       await updatePlaylistVisibility(lanePlaylist.id, !lanePlaylist.is_public);
                     }}
                   >
                     {lanePlaylist.is_public ? 'Make private' : 'Make public'}
                   </Button>
-                  <Button type="button" variant="outline" className="h-8 text-xs" onClick={() => setStep(null)}>
+                  <Button type="button" variant="outline" className="h-10 text-xs" onClick={() => setStep(null)}>
                     Keep vibing
                   </Button>
                 </div>
@@ -839,7 +839,7 @@ export function VibeAgent() {
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  className="h-8 text-xs"
+                  className="h-10 text-xs"
                   onClick={() => {
                     setStep(null);
                     navigate('/room');
@@ -850,7 +850,7 @@ export function VibeAgent() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-8 text-xs"
+                  className="h-10 text-xs"
                   onClick={() => {
                     setStep(null);
                     setRoomInvite(null);
@@ -872,7 +872,7 @@ export function VibeAgent() {
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  className="h-8 text-xs"
+                  className="h-10 text-xs"
                   onClick={() => {
                     setStep('taste-lane');
                   }}
@@ -882,7 +882,7 @@ export function VibeAgent() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-8 text-xs"
+                  className="h-10 text-xs"
                   onClick={() => {
                     setStep(null);
                     setDiscoveryArtistName(null);
@@ -900,10 +900,10 @@ export function VibeAgent() {
                 <p className="text-sm text-foreground">You have been in this vibe for a while. Switch energy or stay here?</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" className="h-8 text-xs" onClick={() => setStep('mode-picker')}>
+                <Button type="button" className="h-10 text-xs" onClick={() => setStep('mode-picker')}>
                   Switch up
                 </Button>
-                <Button type="button" variant="outline" className="h-8 text-xs" onClick={() => setStep(null)}>
+                <Button type="button" variant="outline" className="h-10 text-xs" onClick={() => setStep(null)}>
                   Stay here
                 </Button>
               </div>
@@ -919,7 +919,7 @@ export function VibeAgent() {
                 {externalPrompt.ctaLabel && externalPrompt.ctaPath ? (
                   <Button
                     type="button"
-                    className="h-8 text-xs"
+                    className="h-10 text-xs"
                     onClick={() => {
                       const path = externalPrompt.ctaPath!;
                       if (/^https?:\/\//i.test(path)) {
@@ -933,14 +933,14 @@ export function VibeAgent() {
                     {externalPrompt.ctaLabel}
                   </Button>
                 ) : (
-                  <Button type="button" className="h-8 text-xs" onClick={() => setStep(null)}>
+                  <Button type="button" className="h-10 text-xs" onClick={() => setStep(null)}>
                     Nice
                   </Button>
                 )}
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-8 text-xs"
+                  className="h-10 text-xs"
                   onClick={() => setStep(null)}
                 >
                   Close

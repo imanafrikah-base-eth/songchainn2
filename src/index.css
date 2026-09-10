@@ -855,9 +855,12 @@ body[data-feed-open='true'] .agent-dock {
 
 .agent-tab-button {
   writing-mode: vertical-rl;
-  min-height: 5.5rem;
-  width: 1.75rem;
-  padding: 0.75rem 0;
+  /* Big enough to hit with a thumb on any phone, sized to the screen. */
+  min-height: clamp(6.5rem, 22vh, 8rem);
+  width: clamp(2.5rem, 7vw, 2.9rem);
+  padding: 1rem 0;
+  font-size: clamp(0.75rem, 2.8vw, 0.85rem);
+  touch-action: manipulation;
   border-right: 0;
   border-radius: 9999px 0 0 9999px;
   justify-content: center;
@@ -866,7 +869,7 @@ body[data-feed-open='true'] .agent-dock {
 
 @media (min-width: 768px) {
   .agent-tab-button {
-    width: 2rem;
+    width: 2.9rem;
   }
 }
 

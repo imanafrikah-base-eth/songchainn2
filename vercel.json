@@ -26,6 +26,28 @@
       "destination": "/api/site-og?path=/about"
     },
     {
+      "source": "/wavewarz-africa/battle/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/battle-og?id=:id"
+    },
+    {
+      "source": "/audience/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/profile-og?id=:id"
+    },
+    {
       "source": "/song/:id",
       "has": [
         {

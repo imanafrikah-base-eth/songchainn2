@@ -376,7 +376,7 @@ export default function Discover() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs border-sky-400/40 text-sky-100 bg-sky-500/10 hover:bg-sky-500/20"
+                      className="h-10 text-xs border-sky-400/40 text-sky-100 bg-sky-500/10 hover:bg-sky-500/20"
                       onClick={() => playQueue(todayHotSongs.map((entry) => entry.song))}
                     >
                       <Play className="w-3.5 h-3.5 mr-1.5" />
@@ -472,7 +472,7 @@ export default function Discover() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20"
+                    className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20"
                     onClick={() => playQueue(songsFromCatalogs(newReleases))}
                   >
                     <Play className="w-3.5 h-3.5 mr-1.5" />
@@ -584,7 +584,7 @@ export default function Discover() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20"
+                        className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20"
                         onClick={() => playQueue(songsFromCatalogs(recommendedCatalogs))}
                       >
                         <Play className="w-3.5 h-3.5 mr-1.5" />
@@ -645,7 +645,7 @@ export default function Discover() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20"
+                          className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20"
                           onClick={() => playQueue(songsFromCatalogs(sortedCatalogs))}
                         >
                           <Play className="w-3.5 h-3.5 mr-1.5" />

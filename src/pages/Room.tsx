@@ -1710,7 +1710,7 @@ export default function Room() {
               <Button
                 type="button"
                 variant="ghost"
-                className="h-9 px-3 text-zinc-300 hover:text-zinc-100"
+                className="h-10 px-3 text-zinc-300 hover:text-zinc-100"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

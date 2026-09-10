@@ -543,7 +543,7 @@ export default function Home() {
                     <button
                       type="button"
                       aria-label="What this button does"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/80 text-primary hover:bg-primary/10 transition-colors"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-background/80 text-primary hover:bg-primary/10 transition-colors"
                     >
                       <Info className="h-4 w-4" />
                     </button>
@@ -561,7 +561,7 @@ export default function Home() {
                   <button
                     type="button"
                     aria-label="What this button does"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/80 text-primary hover:bg-primary/10 transition-colors"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-background/80 text-primary hover:bg-primary/10 transition-colors"
                   >
                     <Info className="h-4 w-4" />
                   </button>
@@ -574,7 +574,7 @@ export default function Home() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="mt-2 h-8 w-full text-xs"
+                    className="mt-2 h-10 w-full text-xs"
                     onClick={() => setMoshaInfoOpen(false)}
                   >
                     Close
@@ -625,7 +625,7 @@ export default function Home() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" className="h-8 text-xs border-sky-400/40 text-sky-100 bg-sky-500/10 hover:bg-sky-500/20" onClick={handlePlayAllHotToday}>
+                        <Button size="sm" variant="outline" className="h-10 text-xs border-sky-400/40 text-sky-100 bg-sky-500/10 hover:bg-sky-500/20" onClick={handlePlayAllHotToday}>
                           <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
                           Play All
                         </Button>
@@ -697,7 +697,7 @@ export default function Home() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-primary">
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllNewReleases}>
+                      <Button size="sm" variant="outline" className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllNewReleases}>
                         <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
                         Play All
                       </Button>
@@ -763,7 +763,7 @@ export default function Home() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-primary">
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllFeatured}>
+                      <Button size="sm" variant="outline" className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllFeatured}>
                         <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
                         Play All
                       </Button>
@@ -805,7 +805,7 @@ export default function Home() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllCatalogs}>
+                      <Button size="sm" variant="outline" className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllCatalogs}>
                         <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
                         Play All
                       </Button>

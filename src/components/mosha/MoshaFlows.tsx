@@ -46,7 +46,7 @@ export function MoshaFlow({ flow, onClose }: { flow: MoshaFlowName; onClose?: ()
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-primary">{FLOW_LABEL[current]}</span>
         {onClose && (
-          <button type="button" onClick={onClose} aria-label="Close this" className="rounded-full p-1 text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label="Close this" className="rounded-full p-1 text-muted-foreground hover:text-foreground min-h-11 min-w-11 inline-flex items-center justify-center">
             <X className="h-4 w-4" />
           </button>
         )}
@@ -72,8 +72,8 @@ function BecomeArtistFlow({ onArtist }: { onArtist: () => void }) {
       <div className="space-y-2">
         <p className="text-sm">This is an artist account. The Studio is open.</p>
         <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" className="h-9 rounded-full text-xs" onClick={onArtist}><Upload className="mr-1 h-3.5 w-3.5" /> Put a record out here</Button>
-          <Button asChild size="sm" variant="outline" className="h-9 rounded-full text-xs"><Link to="/studio">Open the Studio</Link></Button>
+          <Button size="sm" className="h-10 rounded-full text-xs" onClick={onArtist}><Upload className="mr-1 h-3.5 w-3.5" /> Put a record out here</Button>
+          <Button asChild size="sm" variant="outline" className="h-10 rounded-full text-xs"><Link to="/studio">Open the Studio</Link></Button>
         </div>
       </div>
     );
@@ -83,7 +83,7 @@ function BecomeArtistFlow({ onArtist }: { onArtist: () => void }) {
       <p className="text-sm">One tap and this same account becomes your artist account. Your page, your Studio, your world.</p>
       <Button
         size="sm"
-        className="h-9 rounded-full text-xs"
+        className="h-10 rounded-full text-xs"
         disabled={pending}
         onClick={async () => {
           const ok = await becomeArtist({ quiet: true, to: window.location.pathname + window.location.search });
@@ -105,7 +105,7 @@ function ConnectWalletFlow() {
     <div className="space-y-2">
       <p className="text-sm">{address ? `Connected: ${address.slice(0, 6)}…${address.slice(-4)}` : 'Your wallet, on this device. You come straight back here.'}</p>
       {!address && (
-        <Button size="sm" className="h-9 rounded-full text-xs" disabled={busy} onClick={async () => { setBusy(true); try { setAddress(await requestWalletConnection()); } finally { setBusy(false); } }}>
+        <Button size="sm" className="h-10 rounded-full text-xs" disabled={busy} onClick={async () => { setBusy(true); try { setAddress(await requestWalletConnection()); } finally { setBusy(false); } }}>
           {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Wallet className="mr-1 h-3.5 w-3.5" />} Connect a wallet
         </Button>
       )}
@@ -132,7 +132,7 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
     return (
       <div className="space-y-2">
         <p className="text-sm">Records come from artist accounts. Yours can be one right now.</p>
-        <Button size="sm" className="h-9 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>
+        <Button size="sm" className="h-10 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>
       </div>
     );
   }
@@ -155,10 +155,10 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
           <input ref={fileRef} type="file" multiple accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg" className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
           <input ref={coverRef} type="file" accept={COVER_ACCEPT} className="hidden" onChange={(e) => { void pickCover(e.target.files?.[0] ?? null); e.target.value = ''; }} />
           <div className="flex flex-wrap gap-1.5">
-            <Button size="sm" variant={tracks.length ? 'outline' : 'default'} className="h-9 rounded-full text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
+            <Button size="sm" variant={tracks.length ? 'outline' : 'default'} className="h-10 rounded-full text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
               <Music4 className="mr-1 h-3.5 w-3.5" /> {tracks.length ? 'Add more' : 'Pick the audio'}
             </Button>
-            <Button size="sm" variant="outline" className="h-9 rounded-full text-xs" disabled={busy} onClick={() => coverRef.current?.click()}>
+            <Button size="sm" variant="outline" className="h-10 rounded-full text-xs" disabled={busy} onClick={() => coverRef.current?.click()}>
               {cover ? 'Cover: ' + cover.name.slice(0, 14) : 'Cover art (needed)'}
             </Button>
           </div>
@@ -181,8 +181,8 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
         )
       ) : (
         <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" variant="outline" className="h-9 rounded-full text-xs" onClick={() => { reset(); setCover(null); }}>Send another</Button>
-          <Button asChild size="sm" variant="ghost" className="h-9 rounded-full text-xs"><Link to="/studio">See it in the Studio</Link></Button>
+          <Button size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => { reset(); setCover(null); }}>Send another</Button>
+          <Button asChild size="sm" variant="ghost" className="h-10 rounded-full text-xs"><Link to="/studio">See it in the Studio</Link></Button>
         </div>
       )}
       <p className="text-[11px] text-muted-foreground">WAV or MP3, up to 100 MB each, and a square cover: nothing goes live without it. Lyrics, credits and the artwork can be changed any time from the Studio.</p>
@@ -197,7 +197,7 @@ function FlowTrack({ track: t, busy, onTitle, onRemove }: { track: QueuedTrack; 
       <div className="flex items-center gap-2">
         <input value={t.title} onChange={(e) => onTitle(e.target.value)} disabled={!editable} placeholder="Song title" className={`${input} py-1.5`} />
         {editable && !busy && (
-          <button type="button" onClick={onRemove} aria-label={`Remove ${t.title}`} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onRemove} aria-label={`Remove ${t.title}`} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground min-h-11 min-w-11 inline-flex items-center justify-center"><X className="h-4 w-4" /></button>
         )}
       </div>
       {t.phase !== 'queued' && t.phase !== 'error' && <UploadProgress phase={t.phase} progress={t.progress} passed={t.result?.passed} compact />}
@@ -231,7 +231,7 @@ function EditGalleryFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
     return (
       <div className="space-y-2">
         <p className="text-sm">A gallery comes with an artist account. Yours can be one right now.</p>
-        <Button size="sm" className="h-9 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>
+        <Button size="sm" className="h-10 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>
       </div>
     );
   }
@@ -323,7 +323,7 @@ function EditGalleryFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
       <p className="text-sm">Your gallery. Rename, hide, replace or delete anything here; add more with one tap.</p>
       <input ref={addRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm" className="hidden" onChange={(e) => void add(e.target.files?.[0])} />
       <input ref={replaceRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm" className="hidden" onChange={(e) => void replaceFile(e.target.files?.[0])} />
-      <Button size="sm" className="h-9 rounded-full text-xs" disabled={busy === 'add'} onClick={() => addRef.current?.click()}>
+      <Button size="sm" className="h-10 rounded-full text-xs" disabled={busy === 'add'} onClick={() => addRef.current?.click()}>
         {busy === 'add' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="mr-1 h-3.5 w-3.5" />}
         {upload.phase === 'uploading' ? `Uploading ${upload.progress}%` : 'Add a picture or a clip'}
       </Button>
@@ -358,8 +358,8 @@ function EditGalleryFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
                   <input value={renaming.title} onChange={(e) => setRenaming({ ...renaming, title: e.target.value })} placeholder="Title" maxLength={120} className={input} />
                   <input value={renaming.caption} onChange={(e) => setRenaming({ ...renaming, caption: e.target.value })} placeholder="Say something about it" maxLength={300} className={input} />
                   <div className="flex gap-1.5">
-                    <Button size="sm" className="h-8 rounded-full text-xs" disabled={!!busy} onClick={() => void saveRename()}><Check className="mr-1 h-3.5 w-3.5" /> Save</Button>
-                    <Button size="sm" variant="ghost" className="h-8 rounded-full text-xs" disabled={!!busy} onClick={() => setRenaming(null)}>Cancel</Button>
+                    <Button size="sm" className="h-10 rounded-full text-xs" disabled={!!busy} onClick={() => void saveRename()}><Check className="mr-1 h-3.5 w-3.5" /> Save</Button>
+                    <Button size="sm" variant="ghost" className="h-10 rounded-full text-xs" disabled={!!busy} onClick={() => setRenaming(null)}>Cancel</Button>
                   </div>
                 </div>
               )}
@@ -437,7 +437,7 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
     return (
       <div className="space-y-2">
         <p className="text-sm">Worlds belong to artist accounts. Yours can be one right now.</p>
-        <Button size="sm" className="h-9 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>
+        <Button size="sm" className="h-10 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>
       </div>
     );
   }
@@ -525,7 +525,7 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="World name" className={input} maxLength={60} />
       <input value={artistName} onChange={(e) => setArtistName(e.target.value)} placeholder="Artist name" className={input} maxLength={80} />
       <input value={line} onChange={(e) => setLine(e.target.value)} placeholder="One line about it, in your words" className={input} maxLength={200} />
-      <Button size="sm" className="h-9 rounded-full text-xs" disabled={!name.trim()} onClick={() => setStep('cities')}>Next <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
+      <Button size="sm" className="h-10 rounded-full text-xs" disabled={!name.trim()} onClick={() => setStep('cities')}>Next <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
     </div>
   );
 
@@ -534,8 +534,8 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
       <p className="text-sm">Name your cities, comma separated. Leave it blank for the classic five.</p>
       <input value={cityText} onChange={(e) => setCityText(e.target.value)} placeholder="Music City, Canvas City, Film City" className={input} />
       <div className="flex gap-1.5">
-        <Button size="sm" variant="ghost" className="h-9 rounded-full text-xs" onClick={() => setStep('about')}>Back</Button>
-        <Button size="sm" className="h-9 rounded-full text-xs" onClick={() => setStep('pictures')}>Next <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
+        <Button size="sm" variant="ghost" className="h-10 rounded-full text-xs" onClick={() => setStep('about')}>Back</Button>
+        <Button size="sm" className="h-10 rounded-full text-xs" onClick={() => setStep('pictures')}>Next <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
       </div>
     </div>
   );
@@ -547,8 +547,8 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
         <PictureSlot key={s.key} label={s.label} value={pics[s.key] ?? { url: null, busy: false, pct: 0 }} onFile={(f) => void pick(s.key, f)} hint={s.key === 'gate' ? 'The doors people walk through' : s.key === 'hero' ? 'Behind the map, wide' : 'The tower on the map'} />
       ))}
       <div className="flex gap-1.5">
-        <Button size="sm" variant="ghost" className="h-9 rounded-full text-xs" onClick={() => setStep('cities')}>Back</Button>
-        <Button size="sm" className="h-9 rounded-full text-xs" disabled={Object.values(pics).some((p) => p.busy)} onClick={() => setStep('zora')}>Next <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
+        <Button size="sm" variant="ghost" className="h-10 rounded-full text-xs" onClick={() => setStep('cities')}>Back</Button>
+        <Button size="sm" className="h-10 rounded-full text-xs" disabled={Object.values(pics).some((p) => p.busy)} onClick={() => setStep('zora')}>Next <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
       </div>
     </div>
   );
@@ -561,8 +561,8 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
       <input value={wallet} onChange={(e) => setWallet(e.target.value)} placeholder="0x wallet address" spellCheck={false} className={`${input} font-mono text-xs`} />
       {wallet && !walletOk && <p className="text-xs text-destructive">A wallet address is 0x followed by 40 characters.</p>}
       <div className="flex gap-1.5">
-        <Button size="sm" variant="ghost" className="h-9 rounded-full text-xs" onClick={() => setStep('pictures')}>Back</Button>
-        <Button size="sm" className="h-9 rounded-full text-xs" onClick={() => void build()}><Hammer className="mr-1 h-3.5 w-3.5" /> Build it</Button>
+        <Button size="sm" variant="ghost" className="h-10 rounded-full text-xs" onClick={() => setStep('pictures')}>Back</Button>
+        <Button size="sm" className="h-10 rounded-full text-xs" onClick={() => void build()}><Hammer className="mr-1 h-3.5 w-3.5" /> Build it</Button>
       </div>
       <p className="text-[11px] text-muted-foreground">Both are needed to open the doors; you can build now and add them before publishing.</p>
     </div>
@@ -579,9 +579,9 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
       <p className="text-sm font-semibold">Your world is built.</p>
       <p className="text-xs text-muted-foreground">Walk it, change anything in the builder, or open the doors now.</p>
       <div className="flex flex-wrap gap-1.5">
-        <Button asChild size="sm" className="h-9 rounded-full text-xs"><Link to={`/w/${slug}`}><Globe2 className="mr-1 h-3.5 w-3.5" /> Preview</Link></Button>
-        <Button asChild size="sm" variant="outline" className="h-9 rounded-full text-xs"><Link to="/world-builder"><Hammer className="mr-1 h-3.5 w-3.5" /> Edit</Link></Button>
-        <Button size="sm" variant="outline" className="h-9 rounded-full text-xs" disabled={!b.world || !zoraLinkOk || !walletOk} onClick={() => void publish()}>Open the doors</Button>
+        <Button asChild size="sm" className="h-10 rounded-full text-xs"><Link to={`/w/${slug}`}><Globe2 className="mr-1 h-3.5 w-3.5" /> Preview</Link></Button>
+        <Button asChild size="sm" variant="outline" className="h-10 rounded-full text-xs"><Link to="/world-builder"><Hammer className="mr-1 h-3.5 w-3.5" /> Edit</Link></Button>
+        <Button size="sm" variant="outline" className="h-10 rounded-full text-xs" disabled={!b.world || !zoraLinkOk || !walletOk} onClick={() => void publish()}>Open the doors</Button>
       </div>
       {!(zoraLinkOk && walletOk) && <p className="text-[11px] text-muted-foreground">Add your Zora link and wallet in the builder's Publish step to open the doors.</p>}
       {publishMsg && <p className="text-sm text-primary">{publishMsg}</p>}
@@ -612,7 +612,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   useEffect(() => { if (!streetId && b.streets[0]) setStreetId(b.streets[0].id); }, [b.streets, streetId]);
 
   if (!isArtist) {
-    return <Button size="sm" className="h-9 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>;
+    return <Button size="sm" className="h-10 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>;
   }
   if (!mine.length) {
     return <p className="text-sm">You have no world yet. Say "build my world" and I will make one with you.</p>;
@@ -620,7 +620,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   if (!worldId) {
     return (
       <div className="flex flex-wrap gap-1.5">
-        {mine.map((w) => <Button key={w.id} size="sm" variant="outline" className="h-9 rounded-full text-xs" onClick={() => setWorldId(w.id)}>{w.artist_name || w.slug} ({w.status})</Button>)}
+        {mine.map((w) => <Button key={w.id} size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => setWorldId(w.id)}>{w.artist_name || w.slug} ({w.status})</Button>)}
       </div>
     );
   }
@@ -634,7 +634,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
       <div className="space-y-3">
         <div className="flex gap-1.5">
           <button type="button" onClick={() => setTab('streets')} className="h-8 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground">Streets</button>
-          <button type="button" className="h-8 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">Settings</button>
+          <button type="button" className="h-10 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">Settings</button>
         </div>
 
         <div>
@@ -703,8 +703,8 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
           </ul>
         )}
         <div className="flex flex-wrap gap-1.5">
-          <Button asChild size="sm" variant="ghost" className="h-8 rounded-full text-xs"><Link to="/world-builder">Full builder</Link></Button>
-          {w.slug && <Button asChild size="sm" variant="ghost" className="h-8 rounded-full text-xs"><Link to={`/w/${w.slug}`}>Walk it</Link></Button>}
+          <Button asChild size="sm" variant="ghost" className="h-10 rounded-full text-xs"><Link to="/world-builder">Full builder</Link></Button>
+          {w.slug && <Button asChild size="sm" variant="ghost" className="h-10 rounded-full text-xs"><Link to={`/w/${w.slug}`}>Walk it</Link></Button>}
         </div>
       </div>
     );
@@ -713,7 +713,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   return (
     <div className="space-y-2">
       <div className="flex gap-1.5">
-        <button type="button" className="h-8 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">Streets</button>
+        <button type="button" className="h-10 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">Streets</button>
         <button type="button" onClick={() => setTab('settings')} className="inline-flex h-8 items-center gap-1 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground"><Settings2 className="h-3.5 w-3.5" /> Settings</button>
       </div>
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
@@ -737,7 +737,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
           )}
           <div className="flex flex-wrap gap-1.5">
             {QUICK_ADD.map((q) => (
-              <Button key={q.id} size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={() => { void b.addBlock(street.id, q.id, q.defaults); toast('Added', { description: `${q.label} is on ${street.name}.` }); }}>
+              <Button key={q.id} size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => { void b.addBlock(street.id, q.id, q.defaults); toast('Added', { description: `${q.label} is on ${street.name}.` }); }}>
                 <Plus className="mr-1 h-3 w-3" /> {q.label}
               </Button>
             ))}
@@ -745,8 +745,8 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
         </>
       )}
       <div className="flex flex-wrap gap-1.5">
-        <Button asChild size="sm" variant="ghost" className="h-8 rounded-full text-xs"><Link to="/world-builder">Full builder</Link></Button>
-        {b.world?.slug && <Button asChild size="sm" variant="ghost" className="h-8 rounded-full text-xs"><Link to={`/w/${b.world.slug}`}>Walk it</Link></Button>}
+        <Button asChild size="sm" variant="ghost" className="h-10 rounded-full text-xs"><Link to="/world-builder">Full builder</Link></Button>
+        {b.world?.slug && <Button asChild size="sm" variant="ghost" className="h-10 rounded-full text-xs"><Link to={`/w/${b.world.slug}`}>Walk it</Link></Button>}
       </div>
     </div>
   );

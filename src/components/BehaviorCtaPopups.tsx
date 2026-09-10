@@ -377,7 +377,7 @@ export function BehaviorCtaPopups() {
             >
               <Button
                 type="button"
-                className="h-8 text-xs"
+                className="h-10 text-xs"
                 onClick={async () => {
                   if (activeItem.kind === 'follow-artist' && activeItem.artistId && !isArtistLiked(activeItem.artistId)) {
                     await toggleLikeArtist(activeItem.artistId);
@@ -391,7 +391,7 @@ export function BehaviorCtaPopups() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-8 text-xs"
+                className="h-10 text-xs"
                 onClick={() => {
                   navigate(activeItem.ctaPath);
                   dismissActive();

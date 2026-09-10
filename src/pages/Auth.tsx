@@ -1326,7 +1326,7 @@ export default function Auth() {
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Button
                     type="button"
-                    className="h-9 text-xs"
+                    className="h-10 text-xs"
                     onClick={() => {
                       setAuthMode('signup');
                       setAuthView('email');
@@ -1337,7 +1337,7 @@ export default function Auth() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9 text-xs border-border text-primary"
+                    className="h-10 text-xs border-border text-primary"
                     onClick={() => handleStartDailyMix('manual')}
                   >
                     Want to have a taste

@@ -402,25 +402,25 @@ export function DropsPanel({
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {(d.status === 'draft' || d.status === 'failed') && (
                       <>
-                        <Button size="sm" className="h-8 rounded-full text-xs" disabled={stage != null} onClick={() => void mint(d)}>
+                        <Button size="sm" className="h-10 rounded-full text-xs" disabled={stage != null} onClick={() => void mint(d)}>
                           <Wallet className="mr-1 h-3.5 w-3.5" /> Mint on Base
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8 rounded-full text-xs" onClick={() => void remove.mutateAsync({ id: d.id, world_slug: worldSlug })}>
+                        <Button size="sm" variant="ghost" className="h-10 rounded-full text-xs" onClick={() => void remove.mutateAsync({ id: d.id, world_slug: worldSlug })}>
                           <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
                         </Button>
                       </>
                     )}
                     {d.status === 'minting' && (
-                      <Button size="sm" variant="outline" className="h-8 rounded-full text-xs" disabled={verify.isPending} onClick={() => void verify.mutateAsync({ id: d.id, world_slug: worldSlug }).then(() => toast.success('Live on Base')).catch((e: Error) => toast.error(e.message))}>
+                      <Button size="sm" variant="outline" className="h-10 rounded-full text-xs" disabled={verify.isPending} onClick={() => void verify.mutateAsync({ id: d.id, world_slug: worldSlug }).then(() => toast.success('Live on Base')).catch((e: Error) => toast.error(e.message))}>
                         <RefreshCw className="mr-1 h-3.5 w-3.5" /> Check the chain again
                       </Button>
                     )}
                     {(d.status === 'live' || d.status === 'paused') && (
                       <>
-                        <Button size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={() => void update.mutateAsync({ id: d.id, status: d.status === 'live' ? 'paused' : 'live' }).catch((e: Error) => toast.error(e.message))}>
+                        <Button size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => void update.mutateAsync({ id: d.id, status: d.status === 'live' ? 'paused' : 'live' }).catch((e: Error) => toast.error(e.message))}>
                           {d.status === 'live' ? 'Pause' : 'Resume'}
                         </Button>
-                        <Button size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={() => void update.mutateAsync({ id: d.id, in_marketplace: !d.in_marketplace })}>
+                        <Button size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => void update.mutateAsync({ id: d.id, in_marketplace: !d.in_marketplace })}>
                           <Store className="mr-1 h-3.5 w-3.5" /> {d.in_marketplace ? 'Take off the marketplace' : 'Put in the marketplace'}
                         </Button>
                         <select

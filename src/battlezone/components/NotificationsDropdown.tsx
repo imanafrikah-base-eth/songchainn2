@@ -142,7 +142,7 @@ const NotificationsDropdown = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-1rem))] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+        <div className="fixed inset-x-2 top-16 z-50 sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[min(24rem,calc(100vw-1rem))] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
           <div className="border-b border-border px-4 py-3 flex items-center justify-between">
             <h3 className="font-bold text-foreground text-sm">Notifications</h3>
             {unreadCount > 0 && (

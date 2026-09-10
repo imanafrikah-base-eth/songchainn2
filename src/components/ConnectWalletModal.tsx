@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Wallet, ExternalLink, Loader2, ChevronRight, X } from 'lucide-react';
 import { connectWallet, prefetchSdkWallets } from '@/lib/baseWallet';
+import { rememberReturnPath } from '@/lib/deviceGuards';
 import { useWalletOptions } from '@/hooks/useDiscoveredWallets';
 import { isWalletGateOpen, subscribeWalletGate, resolveWalletGate } from '@/lib/walletGate';
 
@@ -42,6 +43,8 @@ export function ConnectWalletModal() {
   const handlePick = async (rdns: string) => {
     setError(null);
     setConnectingRdns(rdns);
+    // Wherever the wallet app sends the person back to, this is where they were.
+    rememberReturnPath();
     try {
       const result = await connectWallet(rdns);
       if (result.success && result.address) {

@@ -77,12 +77,28 @@ const HostCreate = () => {
 
   const requiredSongs = form.battleType === "community" ? 3 : 1;
 
+  /* A Main Stage battle is a real one: only artists with a verified account
+     and a payout wallet on file can be in it, and the database refuses any
+     other. Open Mic takes the whole roster. */
+  const [readyIds, setReadyIds] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void supabase.rpc("battle_ready_artists" as never).then(({ data }) => {
+      if (!alive) return;
+      const rows = (data ?? []) as unknown as Array<{ artist_id: string }>;
+      setReadyIds(new Set(rows.map((r) => String(r.artist_id))));
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const artistOptions = useMemo(
     () =>
       [...ARTISTS]
+        .filter((artist) => stage !== "main_stage" || !readyIds || readyIds.has(String(artist.id)))
         .map((artist) => ({ id: artist.id, name: artist.name }))
         .sort((a, b) => a.name.localeCompare(b.name)),
-    []
+    [stage, readyIds]
   );
 
   const artistById = useMemo(() => {
@@ -627,6 +643,11 @@ const HostCreate = () => {
           </div>
 
           {/* Artist and song selection */}
+          {stage === "main_stage" && (
+            <p className="text-xs text-muted-foreground">
+              Main Stage is a real battle: only verified artists with a payout wallet on file can be in it. Open Mic takes everyone.
+            </p>
+          )}
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Artist A</label>

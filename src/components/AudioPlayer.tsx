@@ -412,7 +412,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                     aria-label={volume === 0 ? 'Unmute' : 'Mute'}
                     aria-pressed={volume === 0}
                     onClick={handleVolumeToggle}
-                    className="p-1 hover:bg-secondary/80 rounded transition-colors"
+                    className="p-1 hover:bg-secondary/80 rounded transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
                   >
                     {volume === 0 ? (
                       <VolumeX className="w-4 h-4 text-muted-foreground" />

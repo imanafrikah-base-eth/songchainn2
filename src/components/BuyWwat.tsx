@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Coins, ExternalLink, Loader2 } from 'lucide-react';
+import { Coins, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { buyCoinWithEth } from '@/lib/zoraTrading';
 import { requestWalletConnection } from '@/lib/walletGate';
@@ -8,19 +8,13 @@ import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
 /**
  * Getting hold of $WWAT, one tap from wherever you needed it.
  *
- * Two ways out on purpose. A connected wallet buys in place, and everyone else
- * gets the coin's own page on Zora, which works on any device with any wallet
- * and needs nothing from us. Somebody who wants to host a battle should never
- * hit a dead end because their wallet is on their other phone.
+ * Bought right here, in the person's own wallet, on the same rails as a world
+ * key. No wallet yet? The wallet sheet opens, connects the one on the device
+ * and comes back. Nobody is sent to another site to buy it.
  *
  * Hidden entirely when the coin is not configured, rather than showing a button
  * that cannot do anything.
  */
-
-/** The coin's page on Zora, carrying the SONGCHAINN referrer. */
-const ZORA_URL =
-  `https://zora.co/coin/base:${WWAT_TOKEN_ADDRESS}` +
-  '?referrer=0x5b4613a4deeadc0a8cc8540e35c0c65e52645433';
 
 const AMOUNTS = ['0.002', '0.005', '0.01'] as const;
 
@@ -35,8 +29,8 @@ export function BuyWwat({ compact = false }: { compact?: boolean }) {
     try {
       const address = await requestWalletConnection();
       if (!address) {
-        toast.error('Connect a wallet to buy here', {
-          description: 'Or open the coin on Zora and buy there instead.',
+        toast.error('Connect a wallet to buy $WWAT', {
+          description: 'The wallet on this device works. It comes back here when it is done.',
         });
         return;
       }
@@ -93,15 +87,7 @@ export function BuyWwat({ compact = false }: { compact?: boolean }) {
         ))}
       </div>
 
-      <a
-        href={ZORA_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-      >
-        Buy it on Zora instead
-        <ExternalLink className="h-3 w-3" aria-hidden="true" />
-      </a>
+      <p className="mt-3 text-xs text-muted-foreground">Paid from your own wallet on Base. It never leaves $ongChainn.</p>
     </div>
   );
 }

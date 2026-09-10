@@ -236,7 +236,7 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="w-6 h-6 text-muted-foreground hover:text-destructive"
+                            className="w-11 h-11 text-muted-foreground hover:text-destructive"
                             onClick={() => deleteComment.mutate(comment.id)}
                           >
                             <Trash2 className="w-3 h-3" />

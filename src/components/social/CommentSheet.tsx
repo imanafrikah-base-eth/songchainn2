@@ -297,7 +297,7 @@ export function CommentSheet({
                             {!isPending && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Comment options">
+                                  <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Comment options">
                                     <MoreHorizontal className="w-4 h-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -371,7 +371,7 @@ export function CommentSheet({
                   <span className="text-sm text-muted-foreground">
                     Replying to <span className="text-primary font-medium">@{replyingTo.userName}</span>
                   </span>
-                  <Button variant="ghost" size="sm" onClick={cancelReply} className="h-7 px-2">
+                  <Button variant="ghost" size="sm" onClick={cancelReply} className="h-10 px-2">
                     <X className="w-4 h-4" />
                   </Button>
                 </motion.div>

@@ -119,11 +119,11 @@ export function MoshaSuggest({ step, b }: { step: Step; b: Builder }) {
             </ul>
           )}
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <Button size="sm" className="h-8 rounded-full text-xs" disabled={busy} onClick={() => void run()}>
+            <Button size="sm" className="h-10 rounded-full text-xs" disabled={busy} onClick={() => void run()}>
               {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
               {busy ? 'Doing it' : 'I can do it for you'}
             </Button>
-            <Button size="sm" variant="ghost" className="h-8 rounded-full text-xs" disabled={busy} onClick={() => setDismissed(suggestion.id)}>
+            <Button size="sm" variant="ghost" className="h-10 rounded-full text-xs" disabled={busy} onClick={() => setDismissed(suggestion.id)}>
               Not now
             </Button>
           </div>
