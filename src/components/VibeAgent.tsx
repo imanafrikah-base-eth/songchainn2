@@ -151,20 +151,27 @@ function pickNextSong(params: {
 function useOverlayOpen(): boolean {
   const [open, setOpen] = useState(false);
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    // Only the body's own attributes, and only the three that matter. An
+    // earlier version watched every node in the document, which fired on
+    // each animation frame of a playing app and pegged the main thread hard
+    // enough to leave the page blank. A drawer or a dialog always leaves a
+    // mark on the body, so the body is the only thing worth watching.
     const read = () => {
       const body = document.body;
-      const blocked = body.hasAttribute('data-scroll-locked')
+      setOpen(
+        body.hasAttribute('data-scroll-locked')
         || body.style.pointerEvents === 'none'
-        || body.dataset.menuOpen === 'true'
-        || !!document.querySelector('[role="dialog"][data-state="open"], [data-radix-popper-content-wrapper]');
-      setOpen(blocked);
+        || body.dataset.menuOpen === 'true',
+      );
     };
     read();
     const mo = new MutationObserver(read);
-    mo.observe(document.body, { attributes: true, attributeFilter: ['style', 'data-scroll-locked', 'data-menu-open'], childList: true, subtree: false });
-    const io = new MutationObserver(read);
-    io.observe(document.documentElement, { childList: true, subtree: true });
-    return () => { mo.disconnect(); io.disconnect(); };
+    mo.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['style', 'data-scroll-locked', 'data-menu-open'],
+    });
+    return () => mo.disconnect();
   }, []);
   return open;
 }
