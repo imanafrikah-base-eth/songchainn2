@@ -133,7 +133,7 @@ export function SongCardMaker({ value, onChange }: Props) {
               value.style === style.id
                 ? 'border-primary bg-primary/15 text-primary'
                 : 'border-border text-muted-foreground hover:text-foreground'
-            }`}
+            } min-h-10`}
           >
             {value.style === style.id && <Check className="h-3 w-3" />}
             {style.label}

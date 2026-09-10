@@ -1678,7 +1678,7 @@ export default function Room() {
                 {currentArtist ? (
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-full bg-white/10 hover:bg-white/15 transition-colors px-2 py-0.5 max-w-full"
+                    className="inline-flex items-center gap-1 rounded-full bg-white/10 hover:bg-white/15 transition-colors px-2 py-0.5 max-w-full min-h-10"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2268,7 +2268,7 @@ function SwipeToReplyMessage({
       <button
         type="button"
         onClick={onReply}
-        className="hidden md:inline-flex px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="hidden md:inline-flex px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity min-h-10"
       >
         Reply
       </button>

@@ -18,7 +18,7 @@ const EmbedTopBar = ({ title }: EmbedTopBarProps) => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => openStandalone()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/50 min-h-10"
           >
             Open Full Battle View
             <ExternalLink className="h-3.5 w-3.5" />

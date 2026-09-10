@@ -692,7 +692,7 @@ function TrackRow({
                 type="button"
                 onClick={t.songId ? onAskAgain : onRetry}
                 disabled={busy || (!t.songId && !retryReady)}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50 min-h-10"
               >
                 <RefreshCw className="h-3 w-3" /> {t.songId ? 'Ask the judges again' : 'Try again'}
               </button>
@@ -728,7 +728,7 @@ function ResultCard({ track: t, many, releaseDate, releaseAt, onAskAgain }: { tr
         <button
           type="button"
           onClick={onAskAgain}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground min-h-10"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Ask the judges again
         </button>
@@ -944,7 +944,7 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted min-h-10"
         >
           <Pencil className="h-3.5 w-3.5" /> Edit details
         </button>
@@ -961,7 +961,7 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
             type="button"
             onClick={takeOnchain}
             disabled={asking}
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-60 min-h-10"
           >
             <Coins className="h-3.5 w-3.5" /> Take it onchain
           </button>
@@ -971,7 +971,7 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
             type="button"
             onClick={askAgain}
             disabled={working}
-            className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-500 hover:bg-amber-500/25 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-500 hover:bg-amber-500/25 disabled:opacity-60 min-h-10"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${working ? 'animate-spin' : ''}`} /> Ask the judges again
           </button>
@@ -982,7 +982,7 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
             onClick={() => setConfirmDelete(true)}
             disabled={working}
             aria-label={`Remove ${release.title || 'this record'}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-60 min-h-10"
           >
             <Trash2 className="h-3.5 w-3.5" /> Remove
           </button>

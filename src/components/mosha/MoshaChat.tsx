@@ -210,7 +210,7 @@ export function MoshaChat({
             type="button"
             disabled={pulling}
             onClick={() => void pullEarlier()}
-            className="mx-auto block rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+            className="mx-auto block rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 min-h-10"
           >
             {pulling ? 'Pulling up' : 'Earlier chats'}
           </button>
@@ -251,12 +251,12 @@ export function MoshaChat({
         {turns.length === 0 && !busy && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {STARTERS.map((s) => (
-              <button key={s} type="button" onClick={() => send(s)} className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted">
+              <button key={s} type="button" onClick={() => send(s)} className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted min-h-10">
                 {s}
               </button>
             ))}
             {extraChips?.map((c) => (
-              <button key={c.label} type="button" onClick={c.onClick} className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20">
+              <button key={c.label} type="button" onClick={c.onClick} className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 min-h-10">
                 {c.label}
               </button>
             ))}
@@ -268,7 +268,7 @@ export function MoshaChat({
       {user && (
         <div className="flex gap-1.5 overflow-x-auto border-t border-border px-3 py-1.5 scrollbar-hide">
           {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).map((c) => (
-            <button key={c.flow} type="button" disabled={busy} onClick={() => openFlow(c.flow)} className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50">
+            <button key={c.flow} type="button" disabled={busy} onClick={() => openFlow(c.flow)} className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50 min-h-10">
               {FLOW_LABEL[c.flow]}
             </button>
           ))}

@@ -300,7 +300,7 @@ export function NotificationDropdown() {
             type="button"
             onClick={() => setFilter('all')}
             className={cn(
-              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
+              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all min-h-10',
               filter === 'all'
                 ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
                 : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
@@ -312,7 +312,7 @@ export function NotificationDropdown() {
             type="button"
             onClick={() => setFilter('social')}
             className={cn(
-              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
+              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all min-h-10',
               filter === 'social'
                 ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
                 : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
@@ -324,7 +324,7 @@ export function NotificationDropdown() {
             type="button"
             onClick={() => setFilter('playlists')}
             className={cn(
-              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
+              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all min-h-10',
               filter === 'playlists'
                 ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
                 : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'

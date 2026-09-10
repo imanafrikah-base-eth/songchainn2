@@ -70,7 +70,7 @@ export function SongMenu({
             type="button"
             aria-label="More options"
             className={cn(
-              'p-1.5 sm:p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors',
+              'p-1.5 sm:p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors min-h-11 min-w-11 inline-flex items-center justify-center',
               className,
             )}
           >

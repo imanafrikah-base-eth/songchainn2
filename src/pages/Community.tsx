@@ -622,7 +622,7 @@ export default function Community() {
             <span>{loadError}</span>
             <button
               onClick={() => { setLoadError(null); void fetchUsersRef.current(); }}
-              className="shrink-0 rounded-lg bg-destructive/10 px-3 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors"
+              className="shrink-0 rounded-lg bg-destructive/10 px-3 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors min-h-10"
             >
               Retry
             </button>

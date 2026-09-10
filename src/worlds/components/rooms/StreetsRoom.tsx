@@ -41,7 +41,7 @@ export function StreetsRoom({ world }: { world: WorldConfig }) {
             <button
               type="button"
               onClick={() => playQueue(hot)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-4 py-1.5 text-xs font-bold text-black transition hover:bg-emerald-300"
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-4 py-1.5 text-xs font-bold text-black transition hover:bg-emerald-300 min-h-10"
             >
               <Play className="h-3.5 w-3.5" /> Play the chart
             </button>

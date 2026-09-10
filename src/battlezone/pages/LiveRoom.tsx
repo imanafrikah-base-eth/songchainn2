@@ -608,7 +608,7 @@ const LiveRoom = () => {
             <button
               key={live.id}
               onClick={() => navigate(embedTo(`/room/${live.id}`))}
-              className={`rounded-lg border border-border bg-background font-medium text-foreground hover:border-primary/40 hover:text-primary ${isVerySmallMobile ? "max-w-[140px] px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs"}`}
+              className={`rounded-lg border border-border bg-background font-medium text-foreground hover:border-primary/40 hover:text-primary ${isVerySmallMobile ? "max-w-[140px] px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs"} min-h-10`}
             >
               <span className="block truncate">{live.title}</span>
             </button>

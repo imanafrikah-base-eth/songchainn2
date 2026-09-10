@@ -73,7 +73,7 @@ export function CoinQueuePanel() {
                   {!r.is_published ? ' · not yet published, mint after it passes' : ''}
                 </p>
               </div>
-              <button type="button" onClick={() => copy(r.id)} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-muted">
+              <button type="button" onClick={() => copy(r.id)} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-muted min-h-10">
                 <Copy className="h-3.5 w-3.5" /> song id
               </button>
             </li>

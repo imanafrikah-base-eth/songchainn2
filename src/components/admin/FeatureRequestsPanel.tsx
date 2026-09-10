@@ -153,7 +153,7 @@ export function FeatureRequestsPanel() {
                       r.status === s
                         ? 'border-primary bg-primary/10 text-primary'
                         : 'border-border text-muted-foreground hover:text-foreground'
-                    }`}
+                    } min-h-10`}
                   >
                     {s}
                   </button>

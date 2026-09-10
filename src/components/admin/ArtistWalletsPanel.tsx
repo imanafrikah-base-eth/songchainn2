@@ -187,7 +187,7 @@ export function ArtistWalletsPanel() {
                           onClick={() =>
                             setDrafts((d) => ({ ...d, [r.artist_id]: match?.wallet_address ?? '' }))
                           }
-                          className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 min-h-10"
                           title={disabled ? `${part} has no address on file yet` : `Pay ${part}`}
                         >
                           Pay {part}

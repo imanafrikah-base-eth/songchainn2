@@ -226,7 +226,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                   showRoom();
                   navigate('/room');
                 }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 text-primary text-xs px-3 py-1 font-semibold shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 text-primary text-xs px-3 py-1 font-semibold shadow-[0_0_0_1px_hsl(var(--primary)/0.3)] min-h-10"
               >
                 <Headphones className="w-3.5 h-3.5" />
                 <span>Return to Room</span>

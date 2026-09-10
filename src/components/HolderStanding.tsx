@@ -58,7 +58,7 @@ export function HolderStanding({ className }: { className?: string }) {
         <button
           onClick={onRefresh}
           disabled={refreshing}
-          className="flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 min-h-10"
         >
           <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
           {refreshing ? 'Checking chain' : 'Refresh'}

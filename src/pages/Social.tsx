@@ -470,7 +470,7 @@ export default function Social() {
                       feedType === 'foryou'
                         ? 'bg-white text-black'
                         : 'text-white/70'
-                    }`}
+                    } min-h-10`}
                   >
                     For You
                   </button>
@@ -480,7 +480,7 @@ export default function Social() {
                       feedType === 'following'
                         ? 'bg-white text-black'
                         : 'text-white/70'
-                    }`}
+                    } min-h-10`}
                   >
                     Following
                   </button>

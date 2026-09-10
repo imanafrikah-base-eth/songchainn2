@@ -423,7 +423,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   ref={pulseButtonRef}
                   type="button"
                   onClick={handlePulseButtonClick}
-                  className="relative w-8 h-8 rounded-full bg-primary/10 border border-border flex items-center justify-center shadow-glow-artwork-intense"
+                  className="relative w-11 h-11 rounded-full bg-primary/10 border border-border flex items-center justify-center shadow-glow-artwork-intense"
                   animate={prefersReducedMotion ? {} : { scale: [1, 1.08, 1], boxShadow: [`0 0 0 0 rgba(${glowRgbTriplet},0.0)`, `0 0 18px 4px rgba(${glowRgbTriplet},0.5)`, `0 0 0 0 rgba(${glowRgbTriplet},0.0)`] }}
                   transition={prefersReducedMotion ? undefined : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                 >
@@ -518,7 +518,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                     onClick={handleKeepThis}
                     disabled={isSaved || isSaving}
                     className={cn(
-                      "px-4 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                      "px-4 py-1.5 rounded-full text-xs font-medium border transition-colors min-h-10",
                       isSaved
                         ? "border-primary/30 bg-primary/10 text-primary cursor-default"
                         : "border-border bg-primary text-primary-foreground hover:bg-primary/90",

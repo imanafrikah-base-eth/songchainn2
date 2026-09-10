@@ -111,7 +111,7 @@ export function AvatarPicker({
               citizen.incognito
                 ? 'border-white/35 bg-white/10 text-white'
                 : 'border-white/12 text-white/55 hover:border-white/30'
-            }`}
+            } min-h-10`}
           >
             <EyeOff className="h-3.5 w-3.5" />
             {citizen.incognito ? 'Nobody can see you' : 'Walk unseen'}

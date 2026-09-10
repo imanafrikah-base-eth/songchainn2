@@ -130,7 +130,7 @@ export function TagPeople({ selected, onChange, onClose }: Props) {
               key={p.user_id}
               type="button"
               onClick={() => toggle(p)}
-              className="flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary"
+              className="flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary min-h-10"
             >
               {p.display_name}
               <X className="h-3 w-3" />

@@ -463,7 +463,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
             </p>
             {artistSong && (
               <button onClick={goToArtist}
-                className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors">
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors min-h-10">
                 <img src={postArtist.profileImage ?? ''} className="w-4 h-4 rounded-full object-cover" alt="" onError={(e)=>{e.currentTarget.style.display='none'}} />
                 {postArtist.name} · {postArtist.location}
               </button>
@@ -495,7 +495,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
               just entered the room
             </p>
             <button onClick={(e) => { e.stopPropagation(); navigate('/room'); }}
-              className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors">
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors min-h-10">
               <Headphones className="w-3.5 h-3.5" />
               Join the Room
             </button>
@@ -543,7 +543,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
 
         {battleMatch && (
           <button type="button" onClick={(e) => { e.stopPropagation(); navigate(`/wavewarz-africa/room/${battleMatch[1]}`); }}
-            className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-rose-300/40 bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-100">
+            className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-rose-300/40 bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-100 min-h-10">
             <Flame className="h-3.5 w-3.5" />
             Live on WaveWarz{battleMatch[2]?.trim() ? `: ${battleMatch[2].trim()}` : ''}
           </button>

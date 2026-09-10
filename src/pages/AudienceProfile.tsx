@@ -433,7 +433,7 @@ export default function AudienceProfile() {
             <button
               type="button"
               onClick={() => setFollowList('followers')}
-              className="text-center rounded-lg px-2 py-1 -mx-2 -my-1 hover:bg-muted transition-colors"
+              className="text-center rounded-lg px-2 py-1 -mx-2 -my-1 hover:bg-muted transition-colors min-h-10"
             >
               <p className="text-xl font-bold">{profileFollowers.length}</p>
               <p className="text-sm text-muted-foreground">Followers</p>
@@ -441,7 +441,7 @@ export default function AudienceProfile() {
             <button
               type="button"
               onClick={() => setFollowList('following')}
-              className="text-center rounded-lg px-2 py-1 -mx-2 -my-1 hover:bg-muted transition-colors"
+              className="text-center rounded-lg px-2 py-1 -mx-2 -my-1 hover:bg-muted transition-colors min-h-10"
             >
               <p className="text-xl font-bold">{profileFollowing.length}</p>
               <p className="text-sm text-muted-foreground">Following</p>

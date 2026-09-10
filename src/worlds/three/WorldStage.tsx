@@ -255,7 +255,7 @@ export default function WorldStage({ panels, accentHex, title, onExit }: WorldSt
           <button
             type="button"
             onClick={onExit}
-            className="pointer-events-auto rounded-full border border-border bg-background/80 px-4 py-1.5 text-xs font-medium text-foreground backdrop-blur focus-ring"
+            className="pointer-events-auto rounded-full border border-border bg-background/80 px-4 py-1.5 text-xs font-medium text-foreground backdrop-blur focus-ring min-h-10"
           >
             Back to the page
           </button>

@@ -192,7 +192,7 @@ const NotificationsDropdown = () => {
           </div>
 
           <div className="border-t border-border px-4 py-2.5 text-center">
-            <button className="text-xs text-primary hover:underline">View all notifications</button>
+            <button className="inline-flex min-h-10 items-center px-3 text-xs text-primary hover:underline">View all notifications</button>
           </div>
         </div>
       )}

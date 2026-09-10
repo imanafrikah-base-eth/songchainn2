@@ -183,7 +183,7 @@ export function Navigation() {
                 onClick={() => setIsSearchOpen(true)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-2.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
+                className="inline-flex items-center gap-1.5 h-10 sm:h-10 px-2.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
                 aria-label="Search"
               >
                 <Search className="w-4 h-4" />
@@ -197,7 +197,7 @@ export function Navigation() {
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-primary/15 text-primary text-xs sm:text-sm font-semibold shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-primary/15 text-primary text-xs sm:text-sm font-semibold shadow-[0_0_0_1px_hsl(var(--primary)/0.3)] min-h-10"
                 >
                   <Headphones className="w-4 h-4" />
                   <span>Return to Room</span>
@@ -272,7 +272,7 @@ export function Navigation() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="hidden lg:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
+                    className="hidden lg:inline-flex items-center gap-1.5 h-10 px-2.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
                     aria-label="More"
                   >
                     <MoreHorizontal className="w-4 h-4" />
@@ -713,7 +713,7 @@ function UpdateButton() {
       onClick={() => applyAppUpdate()}
       disabled={update.applying}
       aria-label="Update the app"
-      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-glow disabled:opacity-70"
+      className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-glow disabled:opacity-70"
     >
       <RefreshCw className={`h-4 w-4 ${update.applying ? 'animate-spin' : ''}`} />
       <span>{update.applying ? 'Updating' : 'Update'}</span>

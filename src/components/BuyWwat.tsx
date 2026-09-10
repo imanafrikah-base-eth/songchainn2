@@ -54,7 +54,7 @@ export function BuyWwat({ compact = false }: { compact?: boolean }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted min-h-10"
       >
         <Coins className="h-3.5 w-3.5" aria-hidden="true" />
         Get $WWAT

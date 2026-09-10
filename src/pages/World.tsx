@@ -241,7 +241,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
                   <button
                     type="button"
                     onClick={() => setDressing((d) => !d)}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/85 transition hover:border-white/40 hover:bg-white/10"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/85 transition hover:border-white/40 hover:bg-white/10 min-h-10"
                   >
                     <CitizenAvatar config={citizen.avatar} size={20} />
                     {citizen.displayName ?? 'Your citizen'}

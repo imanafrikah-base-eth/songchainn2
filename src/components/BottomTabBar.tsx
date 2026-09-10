@@ -81,7 +81,7 @@ export function BottomTabBar() {
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
-                className="relative flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all flex-1 min-w-0 text-muted-foreground hover:text-foreground"
+                className="relative flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all flex-1 min-w-0 text-muted-foreground hover:text-foreground min-h-10"
               >
                 <div className="relative">
                   <Search className="w-[18px] h-[18px]" />
@@ -134,7 +134,7 @@ function GroupTab({
           type="button"
           aria-label={group.label}
           className={cn(
-            'relative flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all flex-1 min-w-0',
+            'relative flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all flex-1 min-w-0 min-h-10',
             active || open ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
           )}
         >

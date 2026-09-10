@@ -323,7 +323,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
                 activeFilter === filter.id
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-transparent text-muted-foreground border-border/60 hover:text-foreground hover:border-foreground/30'
-              }`}
+              } min-h-10`}
             >
               {filter.label}
             </button>

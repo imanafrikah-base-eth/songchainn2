@@ -302,7 +302,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               whileTap={{ scale: 0.9 }}
               onClick={handleLike}
               className={cn(
-                "p-1.5 sm:p-2 rounded-full transition-all",
+                "p-1.5 sm:p-2 rounded-full transition-all min-h-11 min-w-11 inline-flex items-center justify-center",
                 liked ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
               )}
             >
@@ -331,7 +331,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   void handleKeepThis();
                 }}
                 disabled={isSaved || isSaving}
-                className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 h-auto"
+                className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 h-auto min-h-10"
               >
                 {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Keep this'}
               </Button>
@@ -622,7 +622,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.96 }}
               onClick={handleShareToFeed}
-              className="px-2 py-1 rounded-full text-[11px] font-medium text-foreground border border-border bg-primary/5"
+              className="px-2 py-1 rounded-full text-[11px] font-medium text-foreground border border-border bg-primary/5 min-h-10"
             >
               Share to feed
             </motion.button>
@@ -632,7 +632,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={handlePulseClick}
-                className="px-2 py-1 rounded-full text-[11px] font-medium text-primary border border-primary/50 bg-primary/10"
+                className="px-2 py-1 rounded-full text-[11px] font-medium text-primary border border-primary/50 bg-primary/10 min-h-10"
               >
                 Pulse
               </motion.button>

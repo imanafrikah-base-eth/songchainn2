@@ -291,7 +291,7 @@ export default function Discover() {
               <Link to="/room" className="flex-shrink-0">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs sm:text-sm px-3 py-1.5"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs sm:text-sm px-3 py-1.5 min-h-10"
                 >
                   <Headphones className="w-3.5 h-3.5" />
                   <span>Jump into Room</span>
@@ -660,7 +660,7 @@ export default function Discover() {
                           sortMode === 'trending'
                             ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
                             : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
-                        }`}
+                        } min-h-10`}
                       >
                         Trending
                       </button>
@@ -671,7 +671,7 @@ export default function Discover() {
                           sortMode === 'newest'
                             ? 'border border-primary/50 bg-primary/15 text-primary shadow-soft'
                             : 'border border-border/40 bg-background/40 text-muted-foreground hover:bg-background/80 hover:text-foreground/90'
-                        }`}
+                        } min-h-10`}
                       >
                         Newest
                       </button>

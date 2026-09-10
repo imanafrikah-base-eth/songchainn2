@@ -207,7 +207,7 @@ export function ShareSongButton({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setShowSheet(true); }}
-        className={cn('inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors', className)}
+        className={cn('inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors min-h-10', className)}
       >
         <Share2 className="w-4 h-4" />
         Share

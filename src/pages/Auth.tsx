@@ -1649,7 +1649,7 @@ export default function Auth() {
                     type="button"
                     onClick={() => setAuthMode('signin')}
                     className={cn(
-                      "flex-1 h-9 rounded-xl text-sm font-medium transition-colors",
+                      "flex-1 h-10 rounded-xl text-sm font-medium transition-colors",
                       authMode === 'signin'
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -1661,7 +1661,7 @@ export default function Auth() {
                     type="button"
                     onClick={() => setAuthMode('signup')}
                     className={cn(
-                      "flex-1 h-9 rounded-xl text-sm font-medium transition-colors",
+                      "flex-1 h-10 rounded-xl text-sm font-medium transition-colors",
                       authMode === 'signup'
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"

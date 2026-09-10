@@ -886,17 +886,16 @@ body[data-feed-open='true'] .agent-tab-button {
   border-radius: 9999px;
 }
 
-/* On a phone the gutter is only 16px, so the tab is cut to 20px on screen
-   (its rounded edge bleeds off the side) and it steps out of the way while
+/* On a phone the tab sits fully on screen at thumb width, and it steps out of the way while
    the page is moving: a thumb that is scrolling is not a thumb that wants
    Mo$ha, and text should never be read through a button. */
 @media (max-width: 767px) {
   .agent-tab {
-    right: -0.25rem;
+    right: 0;
   }
   .agent-tab-button {
-    width: 1.5rem;
-    min-height: 6rem;
+    width: clamp(2.5rem, 7vw, 2.9rem);
+    min-height: clamp(6.5rem, 22vh, 8rem);
   }
 }
 

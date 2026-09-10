@@ -1347,7 +1347,7 @@ export default function Home() {
                                 isSelected
                                   ? 'bg-primary/10 border border-primary/40 text-foreground'
                                   : 'bg-muted/40 border border-transparent text-muted-foreground hover:bg-muted/60'
-                              }`}
+                              } min-h-10`}
                             >
                               <span className="truncate">{song.title}</span>
                               {isSelected && (

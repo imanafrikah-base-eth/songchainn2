@@ -174,7 +174,7 @@ const HostControl = () => {
                     p.user_id === selectedUserId
                       ? "bg-primary/10 border border-primary/30"
                       : "hover:bg-muted/50"
-                  }`}
+                  } min-h-10`}
                 >
                   <div className="flex items-center gap-2">
                     <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold">

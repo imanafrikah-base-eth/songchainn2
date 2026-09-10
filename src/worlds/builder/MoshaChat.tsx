@@ -151,7 +151,7 @@ export function MoshaChat({ facts, worldId, worldSlug, mode, onModeChange }: Pro
         <button
           type="button"
           onClick={() => onModeChange(mode === 'guided' ? 'quiet' : 'guided')}
-          className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+          className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground min-h-10"
         >
           {mode === 'guided' ? 'Go quiet' : 'Guide me'}
         </button>
@@ -183,7 +183,7 @@ export function MoshaChat({ facts, worldId, worldSlug, mode, onModeChange }: Pro
                 type="button"
                 disabled={sendingRequest}
                 onClick={() => void sendFeatureRequest(lastAsked)}
-                className="mt-2 flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-50"
+                className="mt-2 flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-50 min-h-10"
               >
                 {sendingRequest ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -201,7 +201,7 @@ export function MoshaChat({ facts, worldId, worldSlug, mode, onModeChange }: Pro
                     key={chip}
                     type="button"
                     onClick={() => ask(chip)}
-                    className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground min-h-10"
                   >
                     {chip}
                   </button>
@@ -271,7 +271,7 @@ export function MoshaOptIn({
             mode === 'guided'
               ? 'bg-primary text-primary-foreground'
               : 'border border-border text-foreground'
-          }`}
+          } min-h-10`}
         >
           <Check className="h-3.5 w-3.5" /> Guide me
         </button>
@@ -281,7 +281,7 @@ export function MoshaOptIn({
             onModeChange('quiet');
             onDismiss();
           }}
-          className="rounded-full border border-border px-3.5 py-1.5 text-sm text-muted-foreground"
+          className="rounded-full border border-border px-3.5 py-1.5 text-sm text-muted-foreground min-h-10"
         >
           I am good, stay quiet
         </button>
