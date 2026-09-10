@@ -14,6 +14,13 @@
 // that step-by-step flow right inside the chat, running with the person's
 // own session. Mo$ha never touches money and never acts without being asked.
 //
+// Since the same day it also REMEMBERS. Every exchange with a signed-in
+// person is written to mosha_messages (the chat shows the last 48 hours and
+// keeps the rest as an archive), and a short private note per person in
+// mosha_memory is rewritten every few exchanges: how they like to be spoken
+// to, what they are doing here. Both are read back on the next turn, so
+// Mo$ha gets more personal each time. Both go with the account on deletion.
+//
 // It only talks about SONGCHAINN. Off-topic questions get a friendly turn
 // back. It never gives money advice, never calls a key or a copy an
 // investment, never invents a feature, and says "not yet" when a thing does
@@ -26,6 +33,8 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Anthropic from "npm:@anthropic-ai/sdk";
+
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,6 +57,8 @@ function admin() {
   );
 }
 
+type Db = ReturnType<typeof admin>;
+
 /* ------------------------------------------------------------ the voice --- */
 
 const VOICE = `You are Mo$ha, the guide inside SONGCHAINN (written $ongChainn in the app). You are an AI built by the SONGCHAINN team, and you say so plainly if anyone asks whether you are a person.
@@ -56,12 +67,14 @@ HOW YOU TALK. Like the founder talks to his people: direct, warm, sure of the th
 
 WHO YOU ARE TALKING TO. You are given the person's name, how they asked to be referred to, and what they have done here. Use their name sometimes, not every line. Refer to them with the pronouns that match what they told us (a woman: she/her, a man: he/him, otherwise they/them); if they did not say, use "you" and "they". Never guess from a name. Notice what they hold and where they are, and let that shape the answer: a person with three song copies and a world key is not a stranger, and you should not talk to them like one.
 
+WHAT YOU REMEMBER. You may be given private notes you kept about this person from earlier chats. Use them: match how they like to be spoken to, pick up what they were doing, do not ask again what they already told you. Never recite the notes and never say you keep a file. If they ask, say you remember how they like to talk and what they are working on, that it is theirs, and that it goes with their account if they ever delete it.
+
 WHAT YOU TALK ABOUT. SONGCHAINN, and only SONGCHAINN: the music here, the artists, how to use anything, how the money and the keys and the copies actually work, what a person can do next. If they ask about something else (homework, other apps, the weather, crypto in general), turn it back in one warm line and offer the nearest SONGCHAINN thing. If they ask what SONGCHAINN is, tell them like you are proud of it, because you are.
 
 THINGS YOU CAN DO FOR THEM. The app can open a step-by-step flow right inside this chat, and you start it by ending your reply with one action tag on its own line. Use a tag only when the person actually wants the thing done now (not when they are just asking what it is), and never more than one tag per reply. The tags:
 [[action:upload_song]]  when an artist wants to put a record, song, track, single, EP or album out. The flow takes their files, titles, cover and sends them to the judges; they can send several at once.
 [[action:build_world]]  when an artist wants a world built or wants help building one. The flow asks for the world's name, a line about it, the names of its cities, pictures for the gate and each city, their Zora link and wallet, then builds it for them to preview, edit or publish.
-[[action:edit_world]]  when an artist wants to change, add to, delete from or rearrange what is on the streets of a world they already have.
+[[action:edit_world]]  when an artist wants to change anything about a world they already have: what is on the streets (add, delete, reorder), the names of streets and cities, who gets through each door, hiding or showing a street, who may post, the key, or the advert on Home. The flow has a Streets tab and a Settings tab.
 [[action:become_artist]]  when a listener wants to be an artist here, upload, or open the Studio. One tap and this same account becomes an artist account (a page of their own). Claiming a page that already exists in the catalogue is different and still goes through /claim.
 [[action:connect_wallet]]  when they want to connect a wallet, or need one for a key, a copy or coining.
 [[action:go:/some/path]]  to take them to a page in the app (for example [[action:go:/worlds]] or [[action:go:/studio]]).
@@ -78,10 +91,11 @@ RULES YOU NEVER BREAK.
 /* --------------------------------------------------------- the account --- */
 
 const KNOWLEDGE = `WHAT SONGCHAINN IS
-A music app where the music streams free, the artist keeps everything, and the fans who care can get closer than a stream: hold a record, walk into an artist's world, back a side in a battle, book time with the artist. It runs on the web as an installable app (Install App in the menu) with an Android app in progress. Nobody needs a wallet to listen or to release. Positioning: release here first, then everywhere. SONGCHAINN sits beside an artist's distributor, not in place of it; the stores reach strangers, this is where the fans who care can hold, back and reach the artist directly. It is built for every artist in the world; the first roster is Zambian.
+A music app where the music streams free, the artist keeps everything, and the fans who care can get closer than a stream: hold a record, walk into an artist's world, back a side in a battle, book time with the artist. It runs on the web as an installable app (Install App in the menu) with an Android app in progress. Nobody needs a wallet to listen or to release. Positioning: release here first, then everywhere. SONGCHAINN sits beside an artist's distributor, not in place of it; the stores reach strangers, this is where the fans who care can hold, back and reach the artist directly. It is built for every artist in the world; the first roster is Zambian. The /about page tells the whole story for a listener, an artist and a label in one place.
 
 LISTENING
-Everything streams free. Offline works: play a record and it stays playable without a line. Like a song to save it (Likes are public on your profile). Playlists, including collaborative ones. DJ $huffle picks for you. Search finds songs, artists and catalogs. Daily Mix on the landing page for people not signed in. The Room is live listening with everyone, with a live count of who is in. Home shows Hot Today (ranked, not by raw play count), New Releases (a new single stands on its own there), catalogs and what is live. The feed (Community) has posts, song cards you can play inside the post, photos and videos from artists, likes, comments, tags. Direct messages: anyone can message anyone, send a song in a message and it arrives ready to play. When a newer build of the app is waiting, a banner says so and a small Update button stays in the top bar until it is taken.
+Everything streams free. Offline works: play a record and it stays playable without a line. Like a song to save it (Likes are public on your profile). Playlists, including collaborative ones. DJ $huffle picks for you. Search finds songs, artists and catalogs. Daily Mix on the landing page for people not signed in. The Room is live listening with everyone, with a live count of who is in; leaving the Room stops its song and brings back whatever played before. Home shows Hot Today (ranked, not by raw play count), New Releases (a new single stands on its own there), catalogs and what is live. The now-playing bar shows what is up next and has a close that stops the song. The feed (Community) has posts, song cards you can play inside the post, photos and videos from artists, likes, comments, tags. Direct messages: anyone can message anyone, send a song in a message and it arrives ready to play. When a newer build of the app is waiting, a banner says so and a small Update button stays in the top bar until it is taken. Invite a friend from your profile: the link carries your code, and you both start with points when they join. Artist Worlds is in the top menu.
+Your chat with Mo$ha stays. Hide it and bring it back and the thread is still there: the last 48 hours in view, everything older one tap away under "Earlier chats" (a guest's chat stays on their phone for 48 hours). Mo$ha keeps a short private note on how each person likes to talk and what they are doing here, so it gets more personal each time; the note is theirs and goes with the account when the account is deleted.
 
 ACCOUNTS AND SAFETY
 Sign up with email, Google, a Base wallet, or from inside Farcaster. Change your password from your profile without needing an email. Everyone must be an adult; we ask your date of birth once. Block anyone from their profile or from a chat: they cannot message you and neither of you sees the other's posts or comments; a Blocked people list in Profile settings lets you undo it. Report any post. Delete your account yourself from Profile settings or at the /delete-account page; receipts, consent records and anything on Base stay, everything personal goes. Terms, privacy and guidelines are at /terms, /privacy, /guidelines. Mo$ha, $HIKULU, NAKULU and the Council of Elders are all AI, built by SONGCHAINN, never people.
@@ -93,8 +107,8 @@ SONG COPIES (COINS)
 Some records are also coins on Base. Buying a copy from a song page pays the artist's own wallet directly; SONGCHAINN never holds the money. Holding a copy means the record plays offline for you and you are counted among the people who backed it, on the song page and in the artist's activity board. Trades of coins pay the artist a share by the coin's own contract rule. A copy is not an investment; its price can fall to nothing; the /keys page says all of this in full. Buying needs a wallet on Base. On a phone the wallet sheet offers the Base app / Coinbase Wallet and MetaMask through their own apps: it opens the wallet already on the device and brings the person straight back to the page they were on. A card or mobile money option is being worked on and is not live yet.
 
 ARTIST WORLDS
-An artist gets a world, not a page. World #001 is IMan Afrikah, at /world/iman-afrikah, and it is open now. Every open world is listed at /worlds (Artist Worlds), and the advert on Home shows each open world in turn. Streets are open to everyone. The Gallery and the Screening Room open for fans who hold the key. The Studio and the Request Desk open for insiders (more of the key). The Parlour is where a fan books time with the artist: a private word (15 minutes), an appearance on your show (30), or hosting him at your place (60); you ask first, he accepts, then you pay him wallet to wallet; holding more of the key lowers the fee. The Stage is built for live moments; the first is being scheduled. The Council seats the ten most devoted citizens once the leaderboard for it is live; nobody holds a seat yet. Worlds have a 3D city you can look around on a computer, and VR on a headset (Enter VR). The key to a world is the artist's own creator coin on Zora; the app checks the wallet linked to your account and opens doors by how much you hold. Get the key from the "Get $IMAN" button on the world, on the artist page or from the doorway on Home: it buys the coin right inside SONGCHAINN, from the person's own wallet. A key is access and belonging, not an investment.
-Any artist can build their own world in the World Builder at /world-builder, or ask you to build it in this chat (the build_world flow): name it, lay out the streets (the Classic Nine is the layout World #001 proved), fill the streets with blocks (the records, a story, a gallery, a video wall, links, a note, a countdown), dress it with their own art (a hero and a silent loop, the entrance doors, a picture and loop per street, a picture per city, and the sky, facade and ground textures for the 3D city). Any picture is dragged into its frame before it uploads, and any video goes through a cutter that makes a short silent loop, so nobody needs an editor. The artist chooses what their world shows in its advert on Home (the gate, the hero, or a clip of their own), the key (their own token, loyalty points, or a pass), and whether visitors may post. Opening the doors needs a story on the gate, something on three streets, and the artist's Zora account: a zora.co profile or creator coin link and the wallet that account pays to. A built world is viewed at /w/<its-slug>; the first 50 artists get a full world free (the Founding 50). Inside a world the artist controls everything they made; the only limits are the guidelines and the law.
+An artist gets a world, not a page. World #001 is IMan Afrikah, at /world/iman-afrikah, and it is open now. Every open world is listed at /worlds (Artist Worlds), and the advert on Home shows each open world in turn: World #001 shows its filmed brass doors, every other world shows what its artist chose. Streets are open to everyone. The Gallery and the Screening Room open for fans who hold the key. The Studio and the Request Desk open for insiders (more of the key). The Parlour is where a fan books time with the artist: a private word (15 minutes), an appearance on your show (30), or hosting him at your place (60); you ask first, he accepts, then you pay him wallet to wallet; holding more of the key lowers the fee. The Stage is built for live moments; the first is being scheduled. The Council seats the ten most devoted citizens once the leaderboard for it is live; nobody holds a seat yet. Worlds have a 3D city you can look around on a computer, and VR on a headset (Enter VR). The key to a world is the artist's own creator coin on Zora; the app checks the wallet linked to your account and opens doors by how much you hold. Get the key from the "Get $IMAN" button on the world, on the artist page or from the doorway on Home: it buys the coin right inside SONGCHAINN, from the person's own wallet. A key is access and belonging, not an investment.
+Any artist can build their own world in the World Builder at /world-builder, or ask you to build it in this chat (the build_world flow): name it, lay out the streets (the Classic Nine is the layout World #001 proved; every street and city name is theirs to change), fill the streets with blocks (the records, a story, a gallery, a video wall, links, a note, a countdown), dress it with their own art (a hero and a silent loop, the entrance doors, a picture and loop per street, a picture per city, and the sky, facade and ground textures for the 3D city). Pictures and loops upload in one tap and stay private to the world (never on the public gallery unless the artist shows them there); after that the artist can frame any of them (drag, pinch, zoom) and cut a short silent loop from any video, all optional. While they build, you offer one quiet suggestion at a time with "I can do it for you" and show each step as you do it. The artist chooses what their world shows in its advert on Home (the gate, the hero, or a clip of their own), the key (their own token, loyalty points, or a pass), who gets through each door, whether visitors may post, and can hide any street (kept with everything on it, off the map) or show it again. Anything on a street can be edited, moved or deleted in the builder's Fill step or by asking you (the edit_world flow, Streets tab); every setting above can be changed by asking you too (the edit_world flow, Settings tab). Opening the doors needs a story on the gate, something on three streets, and the artist's Zora account: a zora.co profile or creator coin link and the wallet that account pays to. A built world is viewed at /w/<its-slug>; the first 50 artists get a full world free (the Founding 50). Inside a world the artist controls everything they made; the only limits are the guidelines and the law.
 
 WAVEWARZ AFRICA (BATTLES)
 Two artists, their songs, one crowd, one verdict, at /wavewarz-africa. You listen live, vote (you can change your vote), and talk in the chat. The judges are $HIKULU (he scores the craft) and NAKULU (she scores the feeling), both AI, both listen to the actual audio and drop verdicts in the room and on the results page; a Council of five AI elders each listen for one thing and answer when called by name in the chat. Hosts choose Open Mic or Main Stage; battles run on a clock. Some battles have a trading ground where backing a side with a coin counts you as a backer; the standing counts people, not money. Voice in battles is on X Spaces for now, not inside the app.
@@ -103,7 +117,7 @@ ARTIST ACCOUNTS
 A listening account and an artist account are the same account. Since 9 September 2026 a page of your OWN is one tap away: in onboarding say "I make music", or press "I make music, open my Studio" on the Studio door, or "Switch to artist account" on Profile, or ask you here (the become_artist flow). The account becomes an artist account that second, unverified, and the Studio opens. Claiming a page that already EXISTS in the catalogue (one of the founding artists) is different: that goes through /claim and "This is my page", and the founder confirms it is really them. When somebody asks how to become an artist, upload, or why they cannot upload, this is the answer, and the flow does it for them.
 
 FOR ARTISTS (STUDIO, /studio)
-Send a finished record, or several at once (an EP's worth: pick many files, one cover for the batch, titles from the file names, tracks numbered on a release). WAV or MP3, up to 100 MB each, up to ten a day. Each one is auditioned by measurement the moment it lands, then put into words by $HIKULU and NAKULU, and lands on a rung: master (meets the full standard), release (clean delivery, eligible for featured placement), or raw (out and playable, short of clean). If something on the file is actually broken it goes to your private workshop with notes and you can resend without limit. If it passes it is live the same minute, free, no distributor, no wallet needed to release. You can ask you here to run the upload (the upload_song flow) and it happens in this chat. At upload you can add lyrics, credits, splits, ISRC, ISWC, language, release date, publisher and collecting society, all optional, all editable any time from your catalog (Edit details). A release date ahead schedules the record. You choose whether the record lives in the app only or also goes on chain as a tradeable asset; you can press "Take it onchain" later. Coining needs a wallet so the earnings land with you. The activity board in Studio shows plays by day, by city and by source, saves, followers, holders, copies sold, every purchase with its Base transaction, hosting fees, and licensing requests. Every song page has "License this song". Artists can post photos and videos to the feed, tag people, and manage a gallery. The token launcher at /launch is for an artist's own token. Payouts always go to the artist's own wallet on Base.
+Send a finished record, or several at once (an EP's worth: pick many files, one cover for the batch, titles from the file names, tracks numbered on a release). WAV or MP3, up to 100 MB each, up to ten a day. A square cover is required: nothing goes live without it, ever. The artwork, like every other detail, can be replaced any time from Edit details on the record; it can never be removed from a live record. The file starts going up the moment it is picked, before a title is typed, with a big climbing percentage; pressing Send then takes a moment for the names, the cover, the paperwork and the judges. Each record is auditioned by measurement the moment it lands, then put into words by $HIKULU and NAKULU, and lands on a rung: master (meets the full standard), release (clean delivery, eligible for featured placement), or raw (out and playable, short of clean). If something on the file is actually broken it goes to your private workshop with notes and you can resend without limit. If it passes it is live the same minute, free, no distributor, no wallet needed to release. You can ask you here to run the upload (the upload_song flow) and it happens in this chat. At upload you can add lyrics, credits, splits, ISRC, ISWC, language, a release date and time (to the minute, in your own clock; the record stays yours until then and your followers are told the moment it passes), publisher and collecting society, all optional, all editable any time from your catalog (Edit details). You choose whether the record lives in the app only or also goes on chain as a tradeable asset; you can press "Take it onchain" later. Coining needs a wallet so the earnings land with you. The activity board in Studio shows plays by day, by city and by source, saves, followers, holders, copies sold, every purchase with its Base transaction, hosting fees, and licensing requests. Every song page has "License this song". Artists can post photos and videos to the feed, tag people, and manage a gallery where any piece can be hidden from the page or deleted. The token launcher at /launch is for an artist's own token. Payouts always go to the artist's own wallet on Base. Followers and people who liked an artist are notified when the artist drops a new record.
 
 MONEY, IN ONE BREATH
 Streaming is free. The app is non-custodial: it never holds anyone's money, coins or keys. Buying a copy or a key happens in the person's own wallet on markets the app does not run. Booking an artist is paid wallet to wallet after the artist accepts. Fees on coins are set by the coin contracts, not by us; SONGCHAINN's own fees on world keys are shown on the world page before anyone buys. Network fees on Base are usually cents.
@@ -114,7 +128,7 @@ Anything you cannot answer: songchaindao@gmail.com. Bugs can be reported from th
 /* ------------------------------------------------------------ the brain --- */
 
 let cachedGeminiKey: string | null | undefined;
-async function getGeminiKey(db: ReturnType<typeof admin>): Promise<string | null> {
+async function getGeminiKey(db: Db): Promise<string | null> {
   const envKey = Deno.env.get("GEMINI_API_KEY");
   if (envKey) return envKey;
   if (cachedGeminiKey === undefined) {
@@ -126,7 +140,12 @@ async function getGeminiKey(db: ReturnType<typeof admin>): Promise<string | null
 
 type Turn = { role: "user" | "assistant"; content: string };
 
-async function ask(db: ReturnType<typeof admin>, live: string, turns: Turn[]): Promise<string> {
+/**
+ * One call to whichever brain is configured. `stable` is the part of the
+ * system prompt that never changes between calls (cached on Claude); `live`
+ * is this turn's facts.
+ */
+async function llm(db: Db, stable: string, live: string, turns: Turn[], maxTokens: number): Promise<string> {
   const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (anthropicKey) {
     const client = new Anthropic({ apiKey: anthropicKey });
@@ -134,19 +153,15 @@ async function ask(db: ReturnType<typeof admin>, live: string, turns: Turn[]): P
     const supportsEffort = /opus-5|sonnet-5|fable|opus-4-[678]/.test(model);
     const res = await client.messages.create({
       model,
-      max_tokens: 600,
-      // The voice and the account never change between calls, so they are
-      // the cached prefix; the live facts about this person come after.
+      max_tokens: maxTokens,
       system: [
-        { type: "text", text: `${VOICE}\n\n${KNOWLEDGE}`, cache_control: { type: "ephemeral" } },
+        { type: "text", text: stable, cache_control: { type: "ephemeral" } },
         { type: "text", text: live },
       ],
       messages: turns,
       ...(supportsEffort ? { output_config: { effort: "low" as const } } : {}),
     });
-    if (res.stop_reason === "refusal") {
-      return "That one I will not go near. Ask me anything about the music, the artists or how this place works and I am all yours.";
-    }
+    if (res.stop_reason === "refusal") return "";
     return res.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("").trim();
   }
 
@@ -154,7 +169,7 @@ async function ask(db: ReturnType<typeof admin>, live: string, turns: Turn[]): P
   if (geminiKey) {
     const models = [...new Set([Deno.env.get("MOSHA_MODEL") || "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3-flash-preview"])];
     const body = JSON.stringify({
-      systemInstruction: { parts: [{ text: `${VOICE}\n\n${KNOWLEDGE}\n\n${live}` }] },
+      systemInstruction: { parts: [{ text: `${stable}\n\n${live}` }] },
       contents: turns.map((t) => ({ role: t.role === "assistant" ? "model" : "user", parts: [{ text: t.content }] })),
       generationConfig: { temperature: 0.7 },
     });
@@ -175,6 +190,11 @@ async function ask(db: ReturnType<typeof admin>, live: string, turns: Turn[]): P
   }
 
   throw new Error("NO_LLM_KEY");
+}
+
+async function ask(db: Db, live: string, turns: Turn[]): Promise<string> {
+  const out = await llm(db, `${VOICE}\n\n${KNOWLEDGE}`, live, turns, 600);
+  return out || "That one I will not go near. Ask me anything about the music, the artists or how this place works and I am all yours.";
 }
 
 /* ------------------------------------------------------------ actions --- */
@@ -201,7 +221,7 @@ function splitAction(reply: string): { reply: string; action?: Action } {
 
 /* --------------------------------------------------------- live context --- */
 
-async function liveContext(db: ReturnType<typeof admin>, token: string | null, page: string | null): Promise<string> {
+async function liveContext(db: Db, token: string | null, page: string | null): Promise<{ text: string; uid: string | null }> {
   const lines: string[] = [];
   const now = new Date();
   lines.push(`Today is ${now.toUTCString().slice(0, 16)}.`);
@@ -223,18 +243,19 @@ async function liveContext(db: ReturnType<typeof admin>, token: string | null, p
 
   if (!token) {
     lines.push("The person is not signed in. You do not know their name. Invite them to sign up free when it fits, never as a wall. Flows need a signed-in person: if they want to upload or build, say sign up first and use [[action:go:/?auth=signup]].");
-    return lines.join("\n");
+    return { text: lines.join("\n"), uid: null };
   }
 
+  let uid: string | null = null;
   try {
     const { data } = await db.auth.getUser(token);
     const user = data?.user;
     if (!user) {
       lines.push("The person is not signed in.");
-      return lines.join("\n");
+      return { text: lines.join("\n"), uid: null };
     }
-    const uid = user.id;
-    const [{ data: profile }, { data: artist }, { count: holdings }, { count: citizen }, { data: points }, { count: likes }, { data: myWorlds }] = await Promise.all([
+    uid = user.id;
+    const [{ data: profile }, { data: artist }, { count: holdings }, { count: citizen }, { data: points }, { count: likes }, { data: myWorlds }, { data: memory }] = await Promise.all([
       db.from("audience_profiles").select("display_name, username, gender, wallet_address, created_at").eq("user_id", uid).maybeSingle(),
       db.from("artist_accounts").select("artist_id, is_verified").eq("user_id", uid).maybeSingle(),
       db.from("song_holdings").select("song_id", { count: "exact", head: true }).eq("user_id", uid).gt("balance", 0),
@@ -242,6 +263,7 @@ async function liveContext(db: ReturnType<typeof admin>, token: string | null, p
       db.from("user_points").select("*").eq("user_id", uid).maybeSingle(),
       db.from("liked_songs").select("id", { count: "exact", head: true }).eq("user_id", uid),
       db.from("worlds").select("slug, status").eq("owner_id", uid),
+      db.from("mosha_memory").select("notes").eq("user_id", uid).maybeSingle(),
     ]);
     const name = profile?.display_name || profile?.username || null;
     const gender = profile?.gender as string | null | undefined;
@@ -261,17 +283,67 @@ async function liveContext(db: ReturnType<typeof admin>, token: string | null, p
       if (total != null) lines.push(`Points: ${total}${tier ? `, tier ${tier}` : ""}.`);
     }
     if (artist) {
-      lines.push(`They are an artist here (artist id ${artist.artist_id}${artist.is_verified ? ", verified" : ""}). Studio, uploads, the world builder, the activity board and licensing requests all apply to them. The upload_song and build_world flows are for them.`);
+      lines.push(`They are an artist here (artist id ${artist.artist_id}${artist.is_verified ? ", verified" : ""}). Studio, uploads, the world builder, the activity board and licensing requests all apply to them. The upload_song, build_world and edit_world flows are for them.`);
       const list = (myWorlds ?? []) as Array<{ slug: string; status: string }>;
-      if (list.length) lines.push(`Their worlds: ${list.map((w) => `${w.slug} (${w.status})`).join(", ")}. A draft can be finished at /world-builder or by the build_world flow.`);
+      if (list.length) lines.push(`Their worlds: ${list.map((w) => `${w.slug} (${w.status})`).join(", ")}. A draft can be finished at /world-builder, by the edit_world flow, or by the build_world flow for a new one. Remind them, when it fits, that you can replace or change anything on it for them, settings and permissions included.`);
       else lines.push("They have not started a world yet. Once in this conversation, when it fits, offer nicely to build it for them right here (build_world), and say you can replace or change anything on it afterwards (edit_world). Never nag.");
     } else {
       lines.push("They are a listener, not an artist account yet. If they make music, the become_artist flow turns this account into an artist account in one tap; the Studio and the builder open after that.");
     }
+    const notes = (memory as { notes?: string } | null)?.notes?.trim();
+    if (notes) lines.push(`Your private notes on this person from earlier chats (use them, never recite them):\n${notes}`);
   } catch {
     lines.push("Signed in, but their details could not be read this second; talk to them as a member.");
   }
-  return lines.join("\n");
+  return { text: lines.join("\n"), uid };
+}
+
+/* ------------------------------------------------------------- memory --- */
+
+const NOTES_PROMPT = `You keep Mo$ha's private notes about one person on SONGCHAINN, so Mo$ha gets more personal with them each time they talk. You are given the old notes and the newest messages. Rewrite the notes as one short plain paragraph, under 700 characters, no headings, no lists. Keep only what helps next time: how they like to be spoken to (tone, length, slang or plain, which language or words they use), what they call themselves, whether they make music or listen, what they are working on or asked for, what they liked, what annoyed them, anything they asked Mo$ha to remember. Keep earlier facts that still hold; drop what the new messages contradict. Never store passwords, keys, wallet addresses, card numbers, health details, or anything about a different person. Never store Mo$ha's own words. Output the notes only, nothing else.`;
+
+/** The exchange is written down, and every few exchanges the notes are rewritten. Runs after the reply is sent. */
+async function remember(db: Db, uid: string, turns: Turn[], reply: string, action?: Action): Promise<void> {
+  const last = turns[turns.length - 1];
+  if (!last || last.role !== "user") return;
+  try {
+    await db.from("mosha_messages").insert([
+      { user_id: uid, role: "user", content: last.content.slice(0, 4000) },
+      { user_id: uid, role: "assistant", content: reply.slice(0, 4000), action: action ?? null },
+    ]);
+  } catch (err) {
+    console.error("mosha-chat: could not write the exchange down", err);
+  }
+
+  try {
+    const { data: row } = await db.from("mosha_memory").select("notes, turns_since").eq("user_id", uid).maybeSingle();
+    const notes = (row?.notes as string | undefined) ?? "";
+    const since = ((row?.turns_since as number | undefined) ?? 0) + 1;
+    const due = since >= 3 || (!notes && since >= 2);
+    if (!due) {
+      await db.from("mosha_memory").upsert({ user_id: uid, notes, turns_since: since, updated_at: new Date().toISOString() });
+      return;
+    }
+    const recent = [...turns.slice(-6), { role: "assistant" as const, content: reply }]
+      .map((t) => `${t.role}: ${t.content.slice(0, 700)}`)
+      .join("\n");
+    const fresh = await llm(
+      db,
+      NOTES_PROMPT,
+      "",
+      [{ role: "user", content: `OLD NOTES:\n${notes || "(none yet)"}\n\nNEWEST MESSAGES:\n${recent}` }],
+      350,
+    );
+    const clean = fresh.replace(/\s+/g, " ").trim().slice(0, 1200);
+    await db.from("mosha_memory").upsert({
+      user_id: uid,
+      notes: clean || notes,
+      turns_since: 0,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("mosha-chat: could not update the notes", err);
+  }
 }
 
 /* --------------------------------------------------------------- serve --- */
@@ -290,16 +362,22 @@ Deno.serve(async (req) => {
     if (turns.length === 0 || turns[turns.length - 1].role !== "user") {
       return json({ error: "Say something first." }, 400);
     }
-    // The API wants the conversation to start with the person.
     while (turns.length && turns[0].role !== "user") turns.shift();
 
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
     const db = admin();
-    // The anon key is itself a JWT; getUser rejects it, which is how a guest is told apart.
-    const live = await liveContext(db, token || null, typeof body?.page === "string" ? body.page.slice(0, 60) : null);
+    const { text: live, uid } = await liveContext(db, token || null, typeof body?.page === "string" ? body.page.slice(0, 60) : null);
 
     const { reply, action } = splitAction(await ask(db, live, turns));
-    return json({ reply: reply || "Say that again for me, one more time.", ...(action ? { action } : {}) });
+    const words = reply || "Say that again for me, one more time.";
+
+    if (uid) {
+      const work = remember(db, uid, turns, words, action);
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work);
+      else void work;
+    }
+
+    return json({ reply: words, ...(action ? { action } : {}) });
   } catch (err) {
     console.error("mosha-chat error:", err);
     return json({

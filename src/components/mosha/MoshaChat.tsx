@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
 import { askMoshaFull, MOSHA_INTRO, type MoshaAction, type MoshaTurn } from '@/lib/mosha';
+import { getCache, loadEarlier, loadGuest, loadRecent, saveGuest, setCache, type StoredTurn } from '@/lib/moshaHistory';
 import { useAuth } from '@/context/AuthContext';
 import { MoshaFlow, FLOW_LABEL, type MoshaFlowName } from '@/components/mosha/MoshaFlows';
 
@@ -22,9 +23,33 @@ const STARTERS = [
 const ARTIST_ACCOUNT_ASK = /\b(artist account|artist profile|claim|switch\s+(?:to\s+)?(?:my\s+)?artist|become an artist|upload|put\s+(?:my|our)\s+(?:music|songs?|records?)\s+out|release\s+(?:my|a)\s+(?:song|record|track)|studio)\b/i;
 
 interface ChatTurn extends MoshaTurn {
+  id?: string;
+  at?: string;
   action?: { label: string; to: string };
   /** A flow Mo$ha opened under this reply. */
   flow?: MoshaFlowName;
+  /** Opened from a chip, not said: shown now, never written down. */
+  local?: boolean;
+}
+
+function toChat(t: StoredTurn): ChatTurn {
+  return {
+    id: t.id,
+    at: t.at,
+    role: t.role,
+    content: t.content,
+    action: t.action?.type === 'go' ? { label: 'Take me there', to: t.action.path } : undefined,
+  };
+}
+
+function toStored(t: ChatTurn): StoredTurn {
+  return {
+    id: t.id,
+    at: t.at ?? new Date().toISOString(),
+    role: t.role,
+    content: t.content,
+    action: t.action ? { type: 'go', path: t.action.to } : undefined,
+  };
 }
 
 /** One-tap flows for someone who would rather do than ask. */
@@ -41,8 +66,9 @@ const DO_CHIPS: Array<{ flow: MoshaFlowName; artistOnly: boolean }> = [
  *
  * It is a conversation, not a menu. The first line is Mo$ha's, the starters
  * are there for someone who does not know what to ask, and everything after
- * that is typed. History lives in memory for the session; the inbox keeps
- * its own copy in the database.
+ * that is typed. Hide it and bring it back and the thread is still there:
+ * the last 48 hours come back from the server (or the phone, for a guest),
+ * and everything older is one tap away under "Earlier chats".
  */
 export function MoshaChat({
   onClose,
@@ -60,18 +86,83 @@ export function MoshaChat({
   const [turns, setTurns] = useState<ChatTurn[]>(initial ?? []);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [hasArchive, setHasArchive] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [restored, setRestored] = useState(Boolean(initial));
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const holdScroll = useRef(false);
+  const seeded = Boolean(initial);
+  const userId = user?.id ?? null;
+  const historyKey = userId ?? 'guest';
+
+  // The thread comes back when Mo$ha is shown again: from the page cache
+  // first, then the server (or the phone, for a guest).
+  useEffect(() => {
+    if (seeded) return;
+    const cached = getCache(historyKey);
+    if (cached) {
+      setTurns(cached.turns.map(toChat));
+      setHasArchive(cached.hasArchive);
+      setRestored(true);
+      return;
+    }
+    if (!userId) {
+      const g = loadGuest();
+      setTurns(g.map(toChat));
+      setCache(historyKey, g, false);
+      setRestored(true);
+      return;
+    }
+    let alive = true;
+    void loadRecent(userId).then(({ turns: t, hasArchive: more }) => {
+      if (!alive) return;
+      setTurns(t.map(toChat));
+      setHasArchive(more);
+      setCache(historyKey, t, more);
+      setRestored(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [seeded, historyKey, userId]);
+
+  // Whatever is on screen is what comes back next time.
+  useEffect(() => {
+    if (!restored || seeded) return;
+    const stored = turns.filter((t) => !t.local).map(toStored);
+    setCache(historyKey, stored, hasArchive);
+    if (!userId) saveGuest(stored);
+  }, [turns, hasArchive, restored, seeded, historyKey, userId]);
 
   useEffect(() => {
+    if (holdScroll.current) {
+      holdScroll.current = false;
+      return;
+    }
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   }, [turns, busy]);
+
+  /** One more page of the archive, above what is already showing. */
+  const pullEarlier = useCallback(async () => {
+    if (!userId || pulling) return;
+    setPulling(true);
+    try {
+      const before = turns.find((t) => t.at)?.at ?? new Date().toISOString();
+      const { turns: older, more } = await loadEarlier(userId, before);
+      holdScroll.current = true;
+      setTurns((prev) => [...older.map(toChat), ...prev]);
+      setHasArchive(more);
+    } finally {
+      setPulling(false);
+    }
+  }, [userId, pulling, turns]);
 
   const send = useCallback(
     async (text: string) => {
       const clean = text.trim();
       if (!clean || busy) return;
-      const next: ChatTurn[] = [...turns, { role: 'user', content: clean }];
+      const next: ChatTurn[] = [...turns, { role: 'user', content: clean, at: new Date().toISOString() }];
       setTurns(next);
       setDraft('');
       setBusy(true);
@@ -87,7 +178,7 @@ export function MoshaChat({
             ? { label: 'Open the Studio', to: '/studio' }
             : { label: 'Switch to artist account', to: '/claim' }
           : undefined;
-      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow }]);
+      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow, at: new Date().toISOString() }]);
       setBusy(false);
       input.current?.focus();
     },
@@ -95,7 +186,7 @@ export function MoshaChat({
   );
 
   const openFlow = useCallback((flow: MoshaFlowName) => {
-    setTurns((prev) => [...prev, { role: 'assistant', content: FLOW_LABEL[flow] + '. Right here.', flow }]);
+    setTurns((prev) => [...prev, { role: 'assistant', content: FLOW_LABEL[flow] + '. Right here.', flow, local: true, at: new Date().toISOString() }]);
   }, []);
 
   return (
@@ -106,15 +197,25 @@ export function MoshaChat({
           <span className="rounded border border-current/40 px-1 text-[9px] font-semibold uppercase tracking-wide opacity-80" title="An AI guide. Replies are generated.">AI</span>
         </span>
         {onClose && (
-          <button type="button" onClick={onClose} aria-label="Close Mo$ha" className="rounded-full p-1 text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label="Hide Mo$ha" title="Hide. Your chat stays." className="rounded-full p-1 text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         )}
       </div>
 
       <div ref={scroller} className="flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
-        <Bubble role="assistant">{MOSHA_INTRO}</Bubble>
-        {isArtist && (
+        {hasArchive && userId && (
+          <button
+            type="button"
+            disabled={pulling}
+            onClick={() => void pullEarlier()}
+            className="mx-auto block rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {pulling ? 'Pulling up' : 'Earlier chats'}
+          </button>
+        )}
+        {turns.length === 0 && <Bubble role="assistant">{MOSHA_INTRO}</Bubble>}
+        {isArtist && turns.length === 0 && (
           <Bubble role="assistant">Want me to build your world for you? Say the word and it is done in a few taps. I can replace or change anything on it after, whenever you like.</Bubble>
         )}
         {turns.map((t, i) => (
