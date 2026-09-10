@@ -21,6 +21,7 @@ import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
 import { getBlockType } from '@/worlds/blocks';
 import { UploadProgress } from '@/components/studio/UploadProgress';
 import { EMPTY_DETAILS } from '@/lib/songDetails';
+import { checkCover, COVER_ACCEPT } from '@/lib/coverArt';
 
 export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world';
 
@@ -135,21 +136,28 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   }
 
   const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
-  const ready = queued.length > 0 && queued.every((t) => t.title.trim()) && artistName.trim() && !busy;
-  const send = () => void start({ artistName: artistName.trim(), cover, details: EMPTY_DETAILS });
+  const ready = queued.length > 0 && queued.every((t) => t.title.trim()) && artistName.trim() && !!cover && !busy;
+  const send = () => void start({ artistName: artistName.trim(), cover, details: EMPTY_DETAILS }).catch((err) => toast.error((err as Error)?.message || 'That did not go through. Try again.'));
+  const pickCover = async (f: File | null) => {
+    if (!f) return;
+    const check = await checkCover(f);
+    if (check.block) { toast.error(check.block); return; }
+    if (check.warn) toast(check.warn);
+    setCover(f);
+  };
 
   return (
     <div className="space-y-2">
       {!finished && (
         <>
           <input ref={fileRef} type="file" multiple accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg" className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
-          <input ref={coverRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => setCover(e.target.files?.[0] ?? null)} />
+          <input ref={coverRef} type="file" accept={COVER_ACCEPT} className="hidden" onChange={(e) => { void pickCover(e.target.files?.[0] ?? null); e.target.value = ''; }} />
           <div className="flex flex-wrap gap-1.5">
             <Button size="sm" variant={tracks.length ? 'outline' : 'default'} className="h-9 rounded-full text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
               <Music4 className="mr-1 h-3.5 w-3.5" /> {tracks.length ? 'Add more' : 'Pick the audio'}
             </Button>
             <Button size="sm" variant="outline" className="h-9 rounded-full text-xs" disabled={busy} onClick={() => coverRef.current?.click()}>
-              {cover ? 'Cover: ' + cover.name.slice(0, 14) : 'Cover art'}
+              {cover ? 'Cover: ' + cover.name.slice(0, 14) : 'Cover art (needed)'}
             </Button>
           </div>
           {tracks.length > 0 && (
@@ -175,7 +183,7 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
           <Button asChild size="sm" variant="ghost" className="h-9 rounded-full text-xs"><Link to="/studio">See it in the Studio</Link></Button>
         </div>
       )}
-      <p className="text-[11px] text-muted-foreground">WAV or MP3, up to 100 MB each. Lyrics and credits can be added later from the Studio.</p>
+      <p className="text-[11px] text-muted-foreground">WAV or MP3, up to 100 MB each, and a square cover: nothing goes live without it. Lyrics, credits and the artwork can be changed any time from the Studio.</p>
     </div>
   );
 }

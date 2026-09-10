@@ -63,13 +63,16 @@ export default async function handler(req, res) {
 
   const { data: song, error: songErr } = await db
     .from('songs')
-    .select('id, title, artist_name, owner_id, status, audio_url, storage_key, audition, created_at')
+    .select('id, title, artist_name, owner_id, status, audio_url, storage_key, audition, created_at, cover_art_url')
     .eq('id', songId)
     .single();
 
   if (songErr || !song) return send(res, 404, { error: 'Track not found.' });
   if (song.owner_id !== user.id) return send(res, 403, { error: 'That is not your track.' });
   if (song.status === 'published') return send(res, 409, { error: 'This one is already out.' });
+  // Nothing goes live without its artwork. The database refuses it too; this
+  // says so in words before the judges spend a minute on the file.
+  if (!song.cover_art_url) return send(res, 422, { error: 'Add the cover art first. Nothing goes live without it.', code: 'NO_COVER' });
 
   // "Still listening" is only true for twenty minutes. Past that the tab
   // closed on it or the function died, and the artist can ask again rather

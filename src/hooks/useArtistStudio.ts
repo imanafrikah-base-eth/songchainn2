@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { saveSongDetails, type SongDetails } from '@/lib/songDetails';
+import { landCover as landCoverFile, NO_COVER } from '@/lib/coverArt';
 
 /**
  * The artist side of SONGCHAINN: upload a track, have it auditioned, and see
@@ -413,22 +414,11 @@ export function useBatchUpload() {
     [landOne],
   );
 
-  /** The cover, once, through the visual upload door; every row points at it. */
+  /** The cover, once, through the visual upload door; every row points at it. Throws when it does not land. */
   const landCover = useCallback(
-    async (cover: File): Promise<string | null> => {
+    async (cover: File): Promise<string> => {
       if (coverUrlRef.current) return coverUrlRef.current;
-      const { data: ticket, error } = await supabase.functions.invoke('upload-url', {
-        body: { purpose: 'visual', title: 'Cover', fileName: cover.name, contentType: cover.type, fileBytes: cover.size },
-      });
-      if (error || !ticket?.uploadUrl) return null;
-      await putWithProgress(ticket.uploadUrl, cover, () => undefined);
-      const { data: row } = await supabase
-        .from('artist_media' as never)
-        .update({ is_published: false, updated_at: new Date().toISOString() } as never)
-        .eq('id', ticket.mediaId)
-        .select('public_url')
-        .maybeSingle();
-      const url = (row as { public_url?: string } | null)?.public_url ?? (typeof ticket.publicUrl === 'string' ? ticket.publicUrl : null);
+      const url = await landCoverFile(cover);
       coverUrlRef.current = url;
       return url;
     },
@@ -462,19 +452,18 @@ export function useBatchUpload() {
           }
         : undefined;
 
-      // The names the artist typed, and the cover, onto the row that already holds the file.
-      let coverUrl: string | null = null;
-      if (meta.cover) {
-        try { coverUrl = await landCover(meta.cover); } catch { coverUrl = null; }
-        if (!coverUrl) warnings.push('The cover art did not land. The record is out without it; add it again from your catalog.');
-      }
+      // The names the artist typed, and the cover, onto the row that already
+      // holds the file. The cover landed before this was called (start does
+      // it once for the batch); with no cover nothing goes live, so nothing is sent.
+      const coverUrl = coverUrlRef.current;
+      if (!coverUrl) return { audition: Promise.resolve() };
       await supabase
         .from('songs')
         .update({
           title: cur.title.trim() || titleFromFileName(cur.file.name),
           artist_name: meta.artistName,
           genre: meta.genre || null,
-          ...(coverUrl ? { cover_art_url: coverUrl } : {}),
+          cover_art_url: coverUrl,
         } as never)
         .eq('id', songId);
 
@@ -495,7 +484,7 @@ export function useBatchUpload() {
 
       return { audition: runAudition(key, songId, warnings) };
     },
-    [user, queueLanding, landCover, runAudition],
+    [user, queueLanding, runAudition],
   );
 
   /** A track whose file landed but whose audition fell over: ask once more. */
@@ -524,6 +513,10 @@ export function useBatchUpload() {
       setRunning(true);
       const auditions: Promise<void>[] = [];
       try {
+        // The cover, once for the whole batch, before a single record is
+        // sent. Nothing goes live without it, so nothing is sent without it.
+        if (!meta.cover) throw new Error(NO_COVER);
+        await landCover(meta.cover);
         for (const t of todo) {
           auditions.push((await sendOne(t, meta, tracks.length)).audition);
         }
@@ -541,7 +534,7 @@ export function useBatchUpload() {
         setRunning(false);
       }
     },
-    [running, tracks, sendOne, queryClient],
+    [running, tracks, sendOne, landCover, queryClient],
   );
 
   /** Something is with the judges or the send is running. Files landing on their own do not block the form. */

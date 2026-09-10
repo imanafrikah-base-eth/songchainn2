@@ -32,49 +32,12 @@ import { SongDetailsDialog } from '@/components/studio/SongDetailsDialog';
 import { UploadProgress } from '@/components/studio/UploadProgress';
 import { ActivityBoard } from '@/components/studio/ActivityBoard';
 import { EMPTY_DETAILS, detailProblems, requestOnchain, type SongDetails } from '@/lib/songDetails';
+import { checkCover, COVER_ACCEPT, COVER_GOOD_PX, MAX_COVER_MB, NO_COVER, type CoverCheck } from '@/lib/coverArt';
 import { useSongCoin } from '@/hooks/useSongCoins';
 
 // A WAV master runs about 10.6 MB a minute, so this has to be generous enough
 // that a full lossless record fits. Keep in step with MAX_BYTES in upload-url.
 const MAX_MB = 100;
-// Keep in step with MAX_COVER_BYTES in upload-url.
-const MAX_COVER_MB = 8;
-// Stores want square art. Under this it is soft on a phone; under 600 it is
-// unusable and gets stopped here rather than at the server.
-const COVER_GOOD_PX = 1400;
-const COVER_MIN_PX = 600;
-
-/** What is wrong with a cover before a byte of it leaves the phone. */
-async function checkCover(file: File): Promise<{ block: string | null; warn: string | null }> {
-  if (file.size > MAX_COVER_MB * 1024 * 1024) {
-    return { block: `That image is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Covers are ${MAX_COVER_MB} MB at most.`, warn: null };
-  }
-  const url = URL.createObjectURL(file);
-  try {
-    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-      img.onerror = () => reject(new Error('unreadable'));
-      img.src = url;
-    });
-    const shortest = Math.min(width, height);
-    const ratio = width / height;
-    if (ratio > 1.1 || ratio < 0.9) {
-      return { block: `That image is ${width} by ${height}. Covers have to be square; crop it first.`, warn: null };
-    }
-    if (shortest < COVER_MIN_PX) {
-      return { block: `That image is only ${shortest} pixels across. It needs at least ${COVER_MIN_PX}, and ${COVER_GOOD_PX} looks right.`, warn: null };
-    }
-    if (shortest < COVER_GOOD_PX) {
-      return { block: null, warn: `${shortest} pixels across will look soft on a big screen. ${COVER_GOOD_PX} or more is the store standard.` };
-    }
-    return { block: null, warn: null };
-  } catch {
-    return { block: 'We could not read that image. Send a JPG, PNG or WEBP.', warn: null };
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
 
 // Under this the judges send it to the workshop anyway (a snippet), so say
 // so before a 90 MB upload rather than after it.
@@ -129,7 +92,7 @@ const Studio = () => {
   const [genre, setGenre] = useState('');
   const [cover, setCover] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [coverCheck, setCoverCheck] = useState<{ block: string | null; warn: string | null }>({ block: null, warn: null });
+  const [coverCheck, setCoverCheck] = useState<CoverCheck>({ block: null, warn: null });
   const coverRef = useRef<HTMLInputElement>(null);
   /** Credits, paperwork, the release and where the records live. Shared by the batch. All optional. */
   const [details, setDetails] = useState<SongDetails>(EMPTY_DETAILS);
@@ -187,7 +150,7 @@ const Studio = () => {
   };
 
   const canSubmit =
-    queued.length > 0 && queued.every((t) => !trackProblem(t)) && !coverCheck.block && !detailProblem
+    queued.length > 0 && queued.every((t) => !trackProblem(t)) && !!cover && !coverCheck.block && !detailProblem
     && artistName.trim().length > 0 && !busy && !cannotUpload && !overCap;
 
   const meta = (): BatchMeta => ({
@@ -213,7 +176,11 @@ const Studio = () => {
 
   const submit = async () => {
     if (!canSubmit) return;
-    await start(meta());
+    try {
+      await start(meta());
+    } catch (err) {
+      toast.error((err as Error)?.message || 'That did not go through. Try again.');
+    }
   };
 
   const startOver = () => {
@@ -362,9 +329,9 @@ const Studio = () => {
                     onTitle={(v) => setTitle(t.key, v)}
                     onNumber={(v) => setTrackNumber(t.key, v)}
                     onRemove={() => remove(t.key)}
-                    onRetry={() => void start(meta(), t.key)}
+                    onRetry={() => void start(meta(), t.key).catch((err) => toast.error((err as Error)?.message || 'That did not go through. Try again.'))}
                     onAskAgain={() => void askAgain(t.key)}
-                    retryReady={!trackProblem(t) && !coverCheck.block && !detailProblem && artistName.trim().length > 0 && !cannotUpload && leftToday > 0}
+                    retryReady={!trackProblem(t) && !!cover && !coverCheck.block && !detailProblem && artistName.trim().length > 0 && !cannotUpload && leftToday > 0}
                   />
                 ))}
               </ul>
@@ -394,7 +361,7 @@ const Studio = () => {
               </label>
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Cover art <span className="normal-case font-normal">{tracks.length > 1 ? '(one for the whole batch; optional, but it should not be)' : '(optional, but it should not be)'}</span>
+                  Cover art <span className="normal-case font-normal">{tracks.length > 1 ? '(one for the whole batch)' : ''}</span>
                 </span>
                 <div className="flex items-center gap-3">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
@@ -405,7 +372,7 @@ const Studio = () => {
                   <input
                     ref={coverRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept={COVER_ACCEPT}
                     disabled={busy}
                     onChange={(e) => {
                       const f = e.target.files?.[0] ?? null;
@@ -424,9 +391,11 @@ const Studio = () => {
                   <p className="mt-2 text-xs text-destructive">{coverCheck.block}</p>
                 ) : coverCheck.warn ? (
                   <p className="mt-2 text-xs text-amber-500">{coverCheck.warn}</p>
+                ) : tracks.length > 0 && !cover ? (
+                  <p className="mt-2 text-xs text-amber-500">{NO_COVER}</p>
                 ) : (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Square JPG, PNG or WEBP, {COVER_GOOD_PX} pixels or more, under {MAX_COVER_MB} MB. Without it your record shows up blank next to everyone else.
+                    Square JPG, PNG or WEBP, {COVER_GOOD_PX} pixels or more, under {MAX_COVER_MB} MB. Nothing goes live without it.
                   </p>
                 )}
               </label>
@@ -911,6 +880,7 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
         title={release.title || 'Untitled'}
         genre={release.genre}
         artistId={artistId}
+        coverUrl={release.cover_art_url}
         open={editing}
         onOpenChange={setEditing}
       />

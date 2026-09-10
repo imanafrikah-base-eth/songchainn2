@@ -204,12 +204,12 @@ export async function saveSongDetails(songId: string, details: SongDetails): Pro
  * be frozen forever. A typo in a title is the most common thing an artist
  * wants to fix the minute after they press send.
  */
-export async function saveSongCore(songId: string, core: { title: string; genre: string | null }): Promise<void> {
+export async function saveSongCore(songId: string, core: { title: string; genre: string | null; cover_art_url?: string | null }): Promise<void> {
   const title = core.title.trim();
   if (!title) throw new Error('A record needs a title.');
   const { error } = await supabase
     .from('songs')
-    .update({ title, genre: core.genre?.trim() || null, details_updated_at: new Date().toISOString() } as never)
+    .update({ title, genre: core.genre?.trim() || null, ...(core.cover_art_url ? { cover_art_url: core.cover_art_url } : {}), details_updated_at: new Date().toISOString() } as never)
     .eq('id', songId);
   if (error) throw error;
 }
