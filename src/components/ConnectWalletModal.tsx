@@ -132,7 +132,9 @@ export function ConnectWalletModal() {
           </p>
         )}
 
-        {/* Farcaster and Zora, connected the same way: one row, one tap. */}
+        {/* Farcaster and Zora are names, not wallets: they sign on their own
+            sites, so there is nothing here to connect to. They go on your
+            page; the wallet above is the one that pays. */}
         {!connectingRdns && <ProfileConnections compact />}
 
         {mobile ? (

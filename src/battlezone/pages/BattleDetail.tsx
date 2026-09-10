@@ -16,7 +16,7 @@ import AppLink from "@/battlezone/components/AppLink";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
 import { BattleCountdown } from "@/battlezone/components/BattleCountdown";
 import { STAGES, buildClock } from "@/battlezone/lib/battleStages";
-import { SONGS } from "@/data/musicData";
+import { ARTISTS, SONGS } from "@/data/musicData";
 
 const BattleDetail = () => {
   const { isEmbedded, embedTo } = useEmbedMode();
@@ -203,6 +203,9 @@ const BattleDetail = () => {
           </div>
         )}
 
+        {/* A name on a battle card is the artist, and a title is the record.
+            Tapping either used to do nothing, which is the app showing you
+            something and then refusing to let you follow it. */}
         <div className="grid grid-cols-3 gap-6 items-center">
           <div className="flex flex-col items-center gap-3 text-center">
             <img
@@ -216,8 +219,8 @@ const BattleDetail = () => {
                 target.src = wavewarzLogo;
               }}
             />
-            <h3 className="font-bold text-foreground">{battle.artistA.name}</h3>
-            <span className="text-xs text-muted-foreground">{battle.songA}</span>
+            <BattleArtistName name={battle.artistA.name} />
+            <BattleSongTitle title={battle.songA} artistName={battle.artistA.name} />
             <span className="text-xs text-muted-foreground">{battle.artistA.region}</span>
             {battle.winner === "A" && <span className="rounded-full bg-neon-gold/20 px-3 py-1 text-xs font-bold text-neon-gold">Winner</span>}
           </div>
@@ -236,8 +239,8 @@ const BattleDetail = () => {
                 target.src = wavewarzLogo;
               }}
             />
-            <h3 className="font-bold text-foreground">{battle.artistB.name}</h3>
-            <span className="text-xs text-muted-foreground">{battle.songB}</span>
+            <BattleArtistName name={battle.artistB.name} />
+            <BattleSongTitle title={battle.songB} artistName={battle.artistB.name} />
             <span className="text-xs text-muted-foreground">{battle.artistB.region}</span>
             {battle.winner === "B" && <span className="rounded-full bg-neon-gold/20 px-3 py-1 text-xs font-bold text-neon-gold">Winner</span>}
           </div>
@@ -410,3 +413,42 @@ const BattleDetail = () => {
 };
 
 export default BattleDetail;
+
+/* ------------------------------------------------- names that go somewhere --- */
+
+/** Look up a catalogue artist by the name a battle stored. */
+function artistIdFor(name: string | null | undefined): string | null {
+  const wanted = (name ?? '').trim().toLowerCase();
+  if (!wanted) return null;
+  return ARTISTS.find((a) => a.name.trim().toLowerCase() === wanted)?.id ?? null;
+}
+
+/** Look up a record by its title, preferring the one by this artist. */
+function songIdFor(title: string | null | undefined, artistName: string | null | undefined): string | null {
+  const wanted = (title ?? '').trim().toLowerCase();
+  if (!wanted || wanted === 'tbd') return null;
+  const byArtist = (artistName ?? '').trim().toLowerCase();
+  const matches = SONGS.filter((s) => s.title.trim().toLowerCase() === wanted);
+  const mine = matches.find((s) => s.artist.trim().toLowerCase() === byArtist);
+  return (mine ?? matches[0])?.id ?? null;
+}
+
+function BattleArtistName({ name }: { name: string }) {
+  const id = artistIdFor(name);
+  if (!id) return <h3 className="font-bold text-foreground">{name}</h3>;
+  return (
+    <AppLink to={`/artist/${id}`} className="font-bold text-foreground hover:text-primary transition-colors">
+      {name}
+    </AppLink>
+  );
+}
+
+function BattleSongTitle({ title, artistName }: { title: string; artistName: string }) {
+  const id = songIdFor(title, artistName);
+  if (!id) return <span className="text-xs text-muted-foreground">{title}</span>;
+  return (
+    <AppLink to={`/song/${id}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+      {title}
+    </AppLink>
+  );
+}

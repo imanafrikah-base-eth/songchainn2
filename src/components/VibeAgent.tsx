@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { claimInterruption, releaseInterruption } from '@/lib/interruptions';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
@@ -178,6 +178,7 @@ function useOverlayOpen(): boolean {
 
 export function VibeAgent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, audienceProfile } = useAuth();
   const { currentSong, isPlaying } = usePlayerState();
   const { currentTime } = usePlayerTime();
@@ -220,6 +221,10 @@ export function VibeAgent() {
   const [isBuildingLane, setIsBuildingLane] = useState(false);
   const { toast } = useToast();
   const overlayOpen = useOverlayOpen();
+  /* A battle is a room, not a page: two artists, their names, the votes, the
+     verdicts. A tab parked on the right edge lands squarely on one of those
+     names, so Mo$ha stays out of the way in there entirely. */
+  const inABattle = /^\/wavewarz-africa\/(battle|room|live)/.test(location.pathname);
   /* A question handed in with the call, asked for them the moment it opens. */
   const [chatAsk, setChatAsk] = useState<string | null>(null);
   const [discoveryArtistName, setDiscoveryArtistName] = useState<string | null>(null);
@@ -623,7 +628,7 @@ export function VibeAgent() {
 
   // Two things reaching for the same corner is one too many: while a menu,
   // a sheet or a dialog is open, Mo$ha waits its turn.
-  if (overlayOpen) return null;
+  if (overlayOpen || inABattle) return null;
 
   if (!step) {
     if (chatOpen) {

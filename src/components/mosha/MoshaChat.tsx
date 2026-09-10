@@ -6,6 +6,7 @@ import { getCache, loadEarlier, loadGuest, loadRecent, saveGuest, setCache, type
 import { useAuth } from '@/context/AuthContext';
 import { MoshaFlow, FLOW_LABEL, type MoshaFlowName } from '@/components/mosha/MoshaFlows';
 import { useDuplicateAccounts } from '@/hooks/useAccountLinks';
+import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
 
 const STARTERS = [
   'What is this place?',
@@ -93,6 +94,10 @@ export function MoshaChat({
   const { isArtist, user } = useAuth();
   // Sorting out logins is only offered to somebody who actually has more than one.
   const { data: twins = [] } = useDuplicateAccounts();
+  // What they already have decides what is worth offering. Mo$ha reading
+  // their own account back to them is the whole difference between a guide
+  // and a pop-up.
+  const { data: myWorlds = [] } = useMyWorlds();
   const [turns, setTurns] = useState<ChatTurn[]>(initial ?? []);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -233,8 +238,17 @@ export function MoshaChat({
           </button>
         )}
         {turns.length === 0 && <Bubble role="assistant">{MOSHA_INTRO}</Bubble>}
-        {isArtist && turns.length === 0 && (
+        {/* Only to an artist who has not built one. Offering to build a world
+            to somebody who already has one is the app telling them it never
+            looked, and that is the fastest way to lose their trust. */}
+        {isArtist && myWorlds.length === 0 && turns.length === 0 && (
           <Bubble role="assistant">Want me to build your world for you? Say the word and it is done in a few taps. I can replace or change anything on it after, whenever you like.</Bubble>
+        )}
+        {isArtist && myWorlds.length > 0 && turns.length === 0 && (
+          <Bubble role="assistant">
+            Your world is standing. Say the word and I will change anything on it: the streets, what
+            is on them, who gets through each door, the advert on Home.
+          </Bubble>
         )}
         {/* More than one login under one name. Said once, without alarm, and
             only to the person it belongs to. */}

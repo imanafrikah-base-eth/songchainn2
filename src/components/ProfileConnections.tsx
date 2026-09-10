@@ -20,6 +20,16 @@ const ROWS: Array<{ kind: Kind; label: string; short: string; hint: string; colu
   { kind: 'zora', label: 'Zora', short: 'ZO', hint: 'your Zora handle', column: 'zora_handle', home: (h) => `https://zora.co/@${h}` },
 ];
 
+/**
+ * Why this is a name and not a Connect button.
+ *
+ * People kept trying to "connect Zora" and finding nothing, because a Zora
+ * account is not a browser wallet: it lives on zora.co and signs there. The
+ * same is true of Farcaster. So here they are what they actually are, names
+ * that go on your page, and the wallet that pays is a separate thing.
+ */
+const WHY = 'Zora and Farcaster are profiles, not wallets. Putting your name here shows them on your page. To buy or hold anything, connect the wallet on this device: usually the Base app or MetaMask.';
+
 function clean(raw: string): string {
   return raw.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?(warpcast\.com|farcaster\.xyz|zora\.co)\/@?/i, '').replace(/[/?#].*$/, '').slice(0, 64);
 }
@@ -63,7 +73,8 @@ export function ProfileConnections({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className={compact ? 'mt-4' : ''}>
-      <p className="mb-2 text-xs text-muted-foreground text-center">Connect a profile</p>
+      <p className="mb-1 text-xs text-muted-foreground text-center">Connect a profile</p>
+      <p className="mb-2 text-center text-[11px] leading-relaxed text-muted-foreground/80">{WHY}</p>
       <div className="space-y-2">
         {ROWS.map((row) => {
           const value = values[row.kind];
@@ -80,7 +91,7 @@ export function ProfileConnections({ compact = false }: { compact?: boolean }) {
                     autoFocus
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    placeholder={row.hint}
+                    placeholder={row.kind === 'zora' ? 'your Zora handle, or paste your zora.co link' : row.hint}
                     maxLength={80}
                     className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
                   />

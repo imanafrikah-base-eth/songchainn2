@@ -43,7 +43,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import djShuffleBranding from '@/assets/Dj Suffle Branding.webp';
 import { SearchModal } from '@/components/SearchModal';
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -969,7 +968,24 @@ export default function Home() {
                       </Button>
                     </div>
                     <div className="rounded-2xl border border-cyan-300/25 bg-black/35 p-2">
-                      <img src={djShuffleBranding} alt="DJ Shuffle branding" className="h-full w-full rounded-xl object-cover" />
+                      {/* The DJ's own clip, silent and looping, the same one
+                          that runs on his page when the music is on. */}
+                      <video
+                        src="/dj-shuffle.mp4"
+                        poster="/dj-shuffle.jpg"
+                        muted
+                        loop
+                        playsInline
+                        autoPlay
+                        preload="none"
+                        aria-label="DJ $huffle"
+                        className="h-full w-full rounded-xl object-cover motion-reduce:hidden"
+                      />
+                      <img
+                        src="/dj-shuffle.jpg"
+                        alt=""
+                        className="hidden h-full w-full rounded-xl object-cover motion-reduce:block"
+                      />
                     </div>
                   </div>
                 </div>
