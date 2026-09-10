@@ -15,8 +15,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { fitStyle, type ArtFit } from '@/lib/artFit';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import type { AvatarConfig } from '../avatars';
-import { CitizenAvatar } from './CitizenAvatar';
 
 function alreadyArrived(worldSlug: string): boolean {
   try {
@@ -38,14 +36,12 @@ function markArrived(worldSlug: string) {
 export function ArrivalWalk({
   worldSlug,
   worldName,
-  avatar,
   accent,
   entrance,
   fit,
 }: {
   worldSlug: string;
   worldName: string;
-  avatar: AvatarConfig;
   /** The colour the city is currently wearing. */
   accent: string;
   /**
@@ -128,19 +124,14 @@ export function ArrivalWalk({
             />
           )}
 
-          {/* You, walking through it */}
+          {/* The world's name, rising through the gap. No figure walks in;
+              the doors and the name are the whole arrival. */}
           <motion.div
             className="relative z-10 flex flex-col items-center gap-4"
-            initial={{ scale: 0.55, y: 40, opacity: 0 }}
-            animate={{ scale: [0.55, 1.05, 1.9], y: [40, 0, -30], opacity: [0, 1, 0] }}
+            initial={{ scale: 0.85, y: 24, opacity: 0 }}
+            animate={{ scale: [0.85, 1, 1.25], y: [24, 0, -16], opacity: [0, 1, 0] }}
             transition={{ duration: 1.8, times: [0, 0.45, 1], ease: 'easeInOut' }}
           >
-            <motion.div
-              animate={{ rotate: [-2.5, 2.5, -2.5] }}
-              transition={{ duration: 0.62, repeat: 2, ease: 'easeInOut' }}
-            >
-              <CitizenAvatar config={avatar} size={92} />
-            </motion.div>
             <p
               className="text-[10px] font-semibold uppercase tracking-[0.3em]"
               style={{ color: accent }}
@@ -195,7 +186,7 @@ function FilmedDoors({ entrance, fit }: { entrance: { poster: string; video?: st
           style={fitStyle(fit)}
         />
       )}
-      {/* The frame darkens at the edges so the citizen reads against it. */}
+      {/* The frame darkens at the edges so the name reads against it. */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(7,7,11,0.85)_100%)]" />
     </motion.div>
   );

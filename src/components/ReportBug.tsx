@@ -49,18 +49,20 @@ export function ReportBug({ onClose }: { onClose: () => void }) {
       at: new Date().toISOString(),
     };
 
-    const { error } = await (supabase as any).from('bug_reports').insert({
-      user_id: user?.id ?? null,
-      area,
-      detail: detail.trim() || null,
-      page: context.page,
-      screen_size: context.screen,
-      user_agent: context.agent,
+    // Saved in the app and mailed to the founders' inbox, in one call.
+    const { data, error } = await supabase.functions.invoke('founder-inbox', {
+      body: {
+        kind: 'bug',
+        subject: area,
+        text: detail.trim() || `(no details) ${area}`,
+        page: context.page,
+        screen_size: context.screen,
+      },
     });
 
     setSending(false);
 
-    if (error) {
+    if (error || !data?.success) {
       // Never swallow it. Somebody who took the time to report deserves to know
       // it did not arrive, and a silent failure here loses the report twice.
       toast.error('That did not send', {

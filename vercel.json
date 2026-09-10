@@ -4,6 +4,28 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/"
+    },
+    {
+      "source": "/about",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/about"
+    },
+    {
       "source": "/song/:id",
       "has": [
         {

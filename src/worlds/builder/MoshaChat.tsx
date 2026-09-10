@@ -97,17 +97,14 @@ export function MoshaChat({ facts, worldId, worldSlug, mode, onModeChange }: Pro
   const sendFeatureRequest = async (askedAs: string) => {
     if (!user) return;
     setSendingRequest(true);
-    const { error } = await supabase.from('world_feature_requests' as never).insert({
-      user_id: user.id,
-      world_id: worldId,
-      world_slug: worldSlug,
-      build_step: facts.step,
-      request: askedAs,
-      asked_as: askedAs,
-    } as never);
+    // Saved with the world and the step attached, and mailed to the
+    // founders' inbox, in one call.
+    const { data, error } = await supabase.functions.invoke('founder-inbox', {
+      body: { kind: 'feature', text: askedAs, world_id: worldId, world_slug: worldSlug, build_step: facts.step, page: window.location.pathname },
+    });
     setSendingRequest(false);
-    if (error) {
-      toast.error('Could not send that on', { description: error.message });
+    if (error || !data?.success) {
+      toast.error('Could not send that on', { description: error?.message ?? 'Try again in a moment.' });
       return;
     }
     say({

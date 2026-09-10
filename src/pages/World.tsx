@@ -159,8 +159,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
       {/* You do not appear here, you walk in. Once per visit. */}
       <ArrivalWalk
         worldSlug={world.slug}
-        worldName={`$<ArtistName name={world.artistName} artistId={world.artistId} size={10} /> World`}
-        avatar={citizen.avatar}
+        worldName={`${world.artistName} World`}
         accent={theme.accent}
         entrance={world.entrance}
         fit={world.artFit?.entrance}

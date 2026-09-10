@@ -37,23 +37,23 @@ export function SuggestionDialog({ open, onOpenChange }: SuggestionDialogProps) 
     }
     setIsSubmitting(true);
     const payload = {
-      user_id: user?.id || null,
-      user_label: user?.email || user?.id || 'guest',
-      title: title.trim() || 'Feature suggestion',
-      details: details.trim(),
-      source: 'songchainn-app',
-      created_at: new Date().toISOString(),
+      kind: 'suggestion',
+      subject: title.trim() || 'Feature suggestion',
+      text: details.trim(),
+      page: window.location.pathname,
     };
     try {
-      const { error } = await (supabase as any).from('suggestion_forms').insert(payload);
-      if (error) {
-        // Fallback if table is not ready yet.
-        const subject = encodeURIComponent(`$ongChainn Suggestion: ${payload.title}`);
-        const body = encodeURIComponent(`User: ${payload.user_label}\n\n${payload.details}`);
-        void fcOpenUrl(`mailto:wavewarzafrica@songchainn.xyz?subject=${subject}&body=${body}`);
-        toast.success('Suggestion captured and email draft opened.');
+      // One door for everything sent to the founders: it is saved and it
+      // lands in the main inbox. If the door is shut, the person's own mail
+      // app opens with the same note to the same inbox.
+      const { data, error } = await supabase.functions.invoke('founder-inbox', { body: payload });
+      if (error || !data?.success) {
+        const subject = encodeURIComponent(`$ongChainn suggestion: ${payload.subject}`);
+        const body = encodeURIComponent(`From: ${user?.email || user?.id || 'guest'}\n\n${payload.text}`);
+        void fcOpenUrl(`mailto:songchaindao@gmail.com?subject=${subject}&body=${body}`);
+        toast.success('Your mail app has it, addressed to us.');
       } else {
-        toast.success('Suggestion sent. Thank you for helping improve $ongChainn.');
+        toast.success('Sent. Thank you for helping improve $ongChainn.');
       }
       setTitle('');
       setDetails('');

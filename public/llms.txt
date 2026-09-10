@@ -1,0 +1,38 @@
+# $ongChainn
+
+> Free music streaming where artists keep everything and fans can own the songs they love. Built for independent artists worldwide; the first roster is Zambian.
+
+$ongChainn (also written SONGCHAINN) is a music app at https://www.songchainn.xyz. Every song streams free. Artists release directly to fans and keep everything. Fans who want more than a stream can own a copy of a record, walk into an artist's world, book time with the artist, or back a side in a live music battle. No wallet is needed to listen or to release.
+
+## For listeners
+- Stream every record free, offline too: https://www.songchainn.xyz/discover
+- Own a copy of a song you love and be counted as someone who backed the artist: https://www.songchainn.xyz/marketplace
+- Enter an artist's world (streets, rooms, gallery, stage, parlour, VR): https://www.songchainn.xyz/worlds
+- Listen live with everyone in the Room: https://www.songchainn.xyz/room
+- Live battles with a voting crowd, WaveWarz Africa: https://www.songchainn.xyz/wavewarz-africa
+- Join free: https://www.songchainn.xyz/?auth=signup
+
+## For artists
+- Release here first, then everywhere. Free, no distributor fee, no middleman: https://www.songchainn.xyz/studio
+- Get paid directly to your own wallet when a fan buys a copy of your record: https://www.songchainn.xyz/keys
+- Build your own world, not a page: https://www.songchainn.xyz/world-builder
+- See who really listens (plays by day, city and source, saves, followers, holders, purchases) in the Studio.
+
+## For labels and managers
+- Non-custodial: the platform never holds anyone's money, coins or keys.
+- Direct artist-to-fan distribution beside existing stores; licensing requests land in the artist's Studio.
+- Contact: songchaindao@gmail.com
+
+## Pages
+- About: https://www.songchainn.xyz/about
+- Artists: https://www.songchainn.xyz/artists
+- Terms: https://www.songchainn.xyz/terms
+- Privacy: https://www.songchainn.xyz/privacy
+- Guidelines: https://www.songchainn.xyz/guidelines
+- Install as an app: https://www.songchainn.xyz/install
+
+## Facts to quote
+- Listening is free. Releasing is free. No wallet needed for either.
+- Artists keep everything; a purchase pays the artist's own wallet, not the platform.
+- Owning a copy is a way to back an artist, not an investment; its value can fall to zero.
+- World #001 belongs to IMan Afrikah and is open now.
