@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
@@ -9,20 +9,6 @@ const GOOGLE_CLIENT_ID =
   '541798318088-t7i3uqpdihatrf3530p58qgqpuvdej4n.apps.googleusercontent.com';
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
-
-/**
- * How long Google's script gets before we stop waiting for it and draw our
- * own button. Long enough for a slow phone on a slow network to load 200KB
- * (a 50 KB/s LTE link in Lusaka needs a good ten seconds); short enough that
- * a person on a browser that blocks the script is not left looking at a hole.
- * A blocked script rejects at once and never waits this long, so the timer
- * only ever fires for the slow case, where the redirect button is the worse
- * answer: it walks a page navigation through the auth server on the same
- * slow link, and that is the one place a raw "site can't be reached" page
- * can appear. If the script arrives after this fires, the proper button
- * replaces the redirect one.
- */
-const GSI_PATIENCE_MS = 12000;
 
 /** How long the auth server gets to answer a probe before we call the link down. */
 const REACH_TIMEOUT_MS = 8000;
@@ -42,8 +28,6 @@ async function authServerReachable(): Promise<boolean> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), REACH_TIMEOUT_MS);
   try {
-    // 401 is the healthy answer without an apikey; any HTTP answer means the
-    // link carries.
     await fetch(`${SUPABASE_URL}/auth/v1/health`, { signal: controller.signal, cache: 'no-store' });
     return true;
   } catch {
@@ -51,6 +35,18 @@ async function authServerReachable(): Promise<boolean> {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+/**
+ * Google refuses to sign anyone in from inside another app's built-in
+ * browser (the one WhatsApp, Facebook, Instagram, TikTok, X and Telegram
+ * open links in): it answers "disallowed_useragent" and the person sees a
+ * dead end. Better to say so up front and point them at a real browser.
+ */
+function inAppBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /FBAN|FBAV|FB_IAB|Instagram|Line\/|MicroMessenger|Twitter|TikTok|BytedanceWebview|Snapchat|; wv\)|WebView/i.test(ua);
 }
 
 declare global {
@@ -88,59 +84,47 @@ async function sha256Hex(input: string): Promise<string> {
     .join('');
 }
 
-/** Google's four-colour G, drawn here so the fallback button needs nothing from Google to look right. */
+/** Google's four-colour G, drawn here so the button needs nothing from Google to look right. */
 function GoogleMark({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 18 18" className={className} aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"
-      />
-      <path
-        fill="#34A853"
-        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M3.97 10.72A5.41 5.41 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"
-      />
-      <path
-        fill="#EA4335"
-        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"
-      />
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.97 10.72A5.41 5.41 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
     </svg>
   );
 }
 
 interface GoogleSignInProps {
-  /** Show the Google One Tap floating prompt in addition to the button */
+  /** Also offer Google's One Tap prompt, when the browser and Google allow it. */
   oneTap?: boolean;
   onError?: (message: string) => void;
 }
 
 /**
- * "Continue with Google", two ways.
+ * "Continue with Google", the way that always works, plus One Tap when it can.
  *
- * The first way is Google Identity Services: Google's own script draws the
- * official button and (optionally) the One Tap prompt, and the ID token it
- * hands back is exchanged for a Supabase session with a nonce check. The
- * SHA-256 hash goes to Google, the raw nonce to Supabase.
+ * The button is ours and it goes through Supabase's ordinary Google sign-in:
+ * a hop to accounts.google.com and back to the page. That path depends on
+ * nothing loading on our page, works on every browser that can reach
+ * Google, and the auth logs show it completing. It used to sit behind
+ * Google's own scripted button, which could arrive late, draw nothing when
+ * the origin was not on Google's list, or silently do nothing in a webview;
+ * each of those looked like a broken button.
  *
- * The second way exists because the first one can simply not arrive. Ad
- * blockers, privacy extensions, some corporate networks and the odd browser
- * setting all stop accounts.google.com/gsi/client from loading, and until now
- * the component's answer to that was a blank forty-pixel gap that looked like
- * a bug (the founder saw exactly that). So: while the script is loading there
- * is a visible placeholder, and if it fails or takes too long we draw our own
- * button that goes through Supabase's ordinary OAuth redirect instead. That
- * path needs nothing from Google on our page at all; it walks the person to
- * accounts.google.com and back. Same account, same session, one extra hop.
+ * One Tap is the extra: Google's script is loaded in the background and,
+ * where the browser and the person's Google session allow it, the prompt
+ * appears and signs them in with an ID token (nonce-checked by Supabase).
+ * If it never appears, nothing is missing; the button is right there.
+ *
+ * Inside another app's built-in browser Google refuses to sign anyone in,
+ * so there the button is replaced by a line that says to open a real
+ * browser, and the email form below still works.
  */
 export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
-  const buttonRef = useRef<HTMLDivElement>(null);
   const [verifying, setVerifying] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [fallback, setFallback] = useState(false);
+  const [webview] = useState(inAppBrowser);
 
   const redirectSignIn = useCallback(async () => {
     setVerifying(true);
@@ -152,7 +136,10 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
       }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/` },
+        options: {
+          redirectTo: `${window.location.origin}/`,
+          queryParams: { prompt: 'select_account' },
+        },
       });
       if (error) {
         onError?.(error.message);
@@ -165,22 +152,30 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
     }
   }, [onError]);
 
+  // Coming back from Google with a complaint in the URL: say it in words
+  // instead of leaving a person on a page that did nothing.
   useEffect(() => {
-    if (!isSupabaseConfigured || !GOOGLE_CLIENT_ID) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const desc = params.get('error_description') || hash.get('error_description') || params.get('error') || hash.get('error');
+      if (desc) onError?.(`Google sign-in did not finish: ${decodeURIComponent(desc.replace(/\+/g, ' '))}. Try again, or use your email.`);
+    } catch {
+      /* nothing to read */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // One Tap, in the background, never in the way.
+  useEffect(() => {
+    if (!oneTap || webview || !isSupabaseConfigured || !GOOGLE_CLIENT_ID) return;
     let cancelled = false;
-
-    const patience = window.setTimeout(() => {
-      if (!cancelled) setFallback(true);
-    }, GSI_PATIENCE_MS);
-
     (async () => {
       try {
         await loadGsi();
         if (cancelled || !window.google?.accounts?.id) return;
-
         const rawNonce = crypto.randomUUID().replace(/-/g, '');
         const hashedNonce = await sha256Hex(rawNonce);
-
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: async (response: { credential?: string }) => {
@@ -203,51 +198,16 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
           },
           nonce: hashedNonce,
           use_fedcm_for_prompt: true,
+          itp_support: true,
+          cancel_on_tap_outside: false,
         });
-
-        if (buttonRef.current) {
-          window.google.accounts.id.renderButton(buttonRef.current, {
-            theme: 'filled_black',
-            size: 'large',
-            shape: 'pill',
-            text: 'continue_with',
-            logo_alignment: 'left',
-            width: Math.min(Math.max(buttonRef.current.clientWidth || 340, 200), 400),
-          });
-        }
-        window.clearTimeout(patience);
-        setFallback(false);
-        setReady(true);
-
-        /* Google can accept the script and still refuse the button: when the
-           page's origin is not on the client ID's allowed list (localhost, a
-           preview URL, a new domain) it draws an iframe of zero height and
-           logs "origin is not allowed" to the console, nothing else. That was
-           the blank gap on the founder's PC. So the button is measured once it
-           has had a moment to draw, and if there is nothing there, the
-           redirect button takes its place. The redirect path is checked by
-           Supabase, not by this client ID, so it works on every origin. */
-        window.setTimeout(() => {
-          if (cancelled) return;
-          const h = buttonRef.current?.getBoundingClientRect().height ?? 0;
-          if (h < 20) {
-            setReady(false);
-            setFallback(true);
-          }
-        }, 1500);
-
-        if (oneTap) {
-          window.google.accounts.id.prompt();
-        }
+        window.google.accounts.id.prompt();
       } catch {
-        // Script blocked or unavailable: the redirect button takes over.
-        if (!cancelled) setFallback(true);
+        /* Script blocked or refused: the button is right there. */
       }
     })();
-
     return () => {
       cancelled = true;
-      window.clearTimeout(patience);
       try {
         window.google?.accounts?.id?.cancel();
       } catch {
@@ -255,43 +215,29 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oneTap]);
+  }, [oneTap, webview]);
 
   if (!isSupabaseConfigured || !GOOGLE_CLIENT_ID) return null;
 
-  const showFallback = fallback && !ready;
-  const loading = !ready && !fallback;
+  if (webview) {
+    return (
+      <p className="mb-3 rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        Google sign-in does not work inside this app's browser. Open songchainn.xyz in Chrome or Safari for Google, or use your email below.
+      </p>
+    );
+  }
 
   return (
     <div className="relative mb-3">
-      {/* Google's own button lands in here. Kept in the tree while loading so
-          the script has somewhere to draw; hidden only if we gave up on it. */}
-      <div
-        ref={buttonRef}
-        className={`flex justify-center [color-scheme:light] ${showFallback ? 'hidden' : ''}`}
-      />
-
-      {loading && (
-        <div
-          className="flex h-10 items-center justify-center gap-2 rounded-full border border-border bg-muted/40 text-sm text-muted-foreground animate-pulse"
-          aria-live="polite"
-        >
-          <GoogleMark className="h-4 w-4 opacity-60" />
-          Loading Google sign-in
-        </div>
-      )}
-
-      {showFallback && (
-        <button
-          type="button"
-          onClick={redirectSignIn}
-          disabled={verifying}
-          className="flex h-10 w-full items-center justify-center gap-2.5 rounded-full border border-border bg-background text-sm font-medium text-foreground transition hover:bg-accent disabled:opacity-60"
-        >
-          <GoogleMark className="h-4 w-4" />
-          Continue with Google
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={redirectSignIn}
+        disabled={verifying}
+        className="flex h-11 w-full items-center justify-center gap-2.5 rounded-full border border-border bg-background text-sm font-medium text-foreground transition hover:bg-accent disabled:opacity-60"
+      >
+        <GoogleMark className="h-4 w-4" />
+        Continue with Google
+      </button>
 
       {verifying && (
         <div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70">
