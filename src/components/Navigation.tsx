@@ -451,7 +451,7 @@ export function Navigation() {
             <button
               type="button"
               onClick={() => setShowOfflineSaveAnnouncement(false)}
-              className="text-xs sm:text-sm text-emerald-200 hover:text-emerald-100"
+              className="inline-flex min-h-10 items-center px-3 text-xs sm:text-sm text-emerald-200 hover:text-emerald-100"
             >
               Got it
             </button>
