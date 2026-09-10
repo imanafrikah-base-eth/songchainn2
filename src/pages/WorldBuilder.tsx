@@ -11,6 +11,7 @@ import { PropForm } from '@/worlds/builder/PropForm';
 import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
 import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
 import { MyWorldsList } from '@/worlds/builder/MyWorldsList';
+import { OtherWorlds } from '@/worlds/builder/OtherWorlds';
 import { StreetKey } from '@/worlds/builder/StreetKey';
 import { DropsPanel } from '@/worlds/builder/DropsPanel';
 import { ArtPicker } from '@/worlds/builder/ArtPicker';
@@ -310,6 +311,8 @@ export default function WorldBuilder() {
         {/* 1 ------------------------------------------------------- name */}
         {step === 'name' && (
           <section className="space-y-4">
+            {/* A world made on their other login, theirs to claim or leave. */}
+            <OtherWorlds mine={myWorlds} />
             {/* Anything already started comes first. Somebody who has a world
                 in progress almost never wants a second one, and being offered
                 a blank form is how they conclude their work is gone. */}

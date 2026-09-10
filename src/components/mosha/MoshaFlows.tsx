@@ -22,14 +22,16 @@ import { getBlockType } from '@/worlds/blocks';
 import { UploadProgress } from '@/components/studio/UploadProgress';
 import { EMPTY_DETAILS } from '@/lib/songDetails';
 import { checkCover, COVER_ACCEPT } from '@/lib/coverArt';
+import { useAccountLinkActions, useDuplicateAccounts, type DuplicateAccount } from '@/hooks/useAccountLinks';
 
-export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery';
+export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery' | 'merge_accounts';
 
 export const FLOW_LABEL: Record<MoshaFlowName, string> = {
   upload_song: 'Put a record out',
   build_world: 'Build my world',
   edit_world: 'Edit my world',
   edit_gallery: 'Edit my gallery',
+  merge_accounts: 'Sort out my logins',
   become_artist: 'Make me an artist',
   connect_wallet: 'Connect my wallet',
 };
@@ -57,6 +59,7 @@ export function MoshaFlow({ flow, onClose }: { flow: MoshaFlowName; onClose?: ()
       {current === 'build_world' && <BuildWorldFlow onNeedArtist={() => setCurrent('become_artist')} />}
       {current === 'edit_world' && <EditWorldFlow onNeedArtist={() => setCurrent('become_artist')} />}
       {current === 'edit_gallery' && <EditGalleryFlow onNeedArtist={() => setCurrent('become_artist')} />}
+      {current === 'merge_accounts' && <MergeAccountsFlow />}
     </div>
   );
 }
@@ -204,6 +207,116 @@ function FlowTrack({ track: t, busy, onTitle, onRemove }: { track: QueuedTrack; 
       {t.phase === 'done' && t.result?.hikulu && <p className="mt-1 text-xs text-muted-foreground">{t.result.hikulu}</p>}
       {t.phase === 'error' && <p className="mt-1 text-xs text-destructive">{t.error}</p>}
     </li>
+  );
+}
+
+/* -------------------------------------------------------- merge accounts --- */
+
+/**
+ * More than one login under the same name, sorted out by the person who owns
+ * them. They pick the one to keep; Mo$ha says the same thing has to be said
+ * from the other login too, because a name alone is not proof, and does the
+ * moving the moment both sides agree. Everything held by the spare comes
+ * across; nothing is deleted.
+ */
+function MergeAccountsFlow() {
+  const { user } = useAuth();
+  const { data: others = [], isLoading } = useDuplicateAccounts();
+  const { claim, apply } = useAccountLinkActions();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [log, setLog] = useState<string[]>([]);
+  const note = (t: string) => setLog((l) => [...l, t]);
+
+  if (!user) return <p className="text-sm">Sign in and I can look at this with you.</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground">Looking at your logins.</p>;
+  if (!others.length) return <p className="text-sm">Just the one login here, all yours. Nothing to sort out.</p>;
+
+  const keepThis = async (other: DuplicateAccount, keepMine: boolean) => {
+    setBusy(other.user_id);
+    try {
+      const state = await claim.mutateAsync({ other: other.user_id, keep: keepMine ? user.id : other.user_id });
+      if (state === 'waiting') {
+        note(keepMine
+          ? 'Noted. Sign in on the other one and tell me the same thing there, then I move everything across.'
+          : 'Noted. Sign in on that one and tell me the same thing, then I move this one into it.');
+      } else {
+        note('Both sides agree. Bringing it across now.');
+        if (keepMine) {
+          await apply.mutateAsync(other.user_id);
+          note('Done. One login, everything in it.');
+        } else {
+          note('Sign in on the one you are keeping and I will finish it there.');
+        }
+      }
+    } catch (e) {
+      toast.error((e as Error)?.message || 'That did not go through.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const finish = async (other: DuplicateAccount) => {
+    setBusy(other.user_id);
+    try {
+      await apply.mutateAsync(other.user_id);
+      note('Done. Everything is on this login now.');
+    } catch (e) {
+      toast.error((e as Error)?.message || 'That did not go through.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm">
+        You are here more than once under the same name. Tell me which login to keep and I will
+        bring everything into it. Nothing moves until you say so from both sides.
+      </p>
+      <ul className="space-y-2">
+        {others.map((o) => (
+          <li key={o.user_id} className="rounded-xl border border-border p-2.5">
+            <p className="text-xs font-semibold">{o.how_they_signed_in}</p>
+            <p className="text-[11px] text-muted-foreground">
+              Made {new Date(o.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+              {o.is_verified_artist ? ' · verified artist' : ''}
+              {o.worlds ? ` · ${o.worlds} world${o.worlds === 1 ? '' : 's'}` : ''}
+              {o.songs ? ` · ${o.songs} record${o.songs === 1 ? '' : 's'}` : ''}
+              {o.media ? ` · ${o.media} picture${o.media === 1 ? '' : 's'}` : ''}
+            </p>
+            {o.link_state === 'joined' ? (
+              <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-primary"><Check className="h-3 w-3" /> Already joined to this one.</p>
+            ) : o.link_state === 'ready' && !o.is_primary ? (
+              <Button size="sm" className="mt-2 h-9 rounded-full text-xs" disabled={!!busy} onClick={() => void finish(o)}>
+                {busy === o.user_id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null} Bring it all here
+              </Button>
+            ) : o.link_state === 'ready' && o.is_primary ? (
+              <p className="mt-1.5 text-[11px] text-muted-foreground">Agreed. Sign in on that one and I will finish it there.</p>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Button size="sm" className="h-9 rounded-full text-xs" disabled={!!busy} onClick={() => void keepThis(o, true)}>
+                  {busy === o.user_id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null} Keep the one I am on
+                </Button>
+                <Button size="sm" variant="outline" className="h-9 rounded-full text-xs" disabled={!!busy} onClick={() => void keepThis(o, false)}>
+                  Keep that one instead
+                </Button>
+              </div>
+            )}
+            {o.link_state === 'waiting' && (
+              <p className="mt-1.5 text-[11px] text-amber-500">Waiting for you to say the same thing from the other login.</p>
+            )}
+          </li>
+        ))}
+      </ul>
+      {log.length > 0 && (
+        <ul className="space-y-1 text-xs text-muted-foreground">
+          {log.slice(-4).map((t, i) => <li key={i} className="flex items-start gap-1.5"><Check className="mt-0.5 h-3 w-3 shrink-0 text-primary" /> {t}</li>)}
+        </ul>
+      )}
+      <p className="text-[11px] text-muted-foreground">
+        Your records, worlds and pictures all come across. The spare login lets go of the name and stops being a person here.
+      </p>
+    </div>
   );
 }
 

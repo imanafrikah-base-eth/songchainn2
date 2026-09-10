@@ -5,6 +5,7 @@ import { askMoshaFull, MOSHA_INTRO, type MoshaAction, type MoshaTurn } from '@/l
 import { getCache, loadEarlier, loadGuest, loadRecent, saveGuest, setCache, type StoredTurn } from '@/lib/moshaHistory';
 import { useAuth } from '@/context/AuthContext';
 import { MoshaFlow, FLOW_LABEL, type MoshaFlowName } from '@/components/mosha/MoshaFlows';
+import { useDuplicateAccounts } from '@/hooks/useAccountLinks';
 
 const STARTERS = [
   'What is this place?',
@@ -58,6 +59,7 @@ const DO_CHIPS: Array<{ flow: MoshaFlowName; artistOnly: boolean }> = [
   { flow: 'build_world', artistOnly: true },
   { flow: 'edit_world', artistOnly: true },
   { flow: 'edit_gallery', artistOnly: true },
+  { flow: 'merge_accounts', artistOnly: false },
   { flow: 'become_artist', artistOnly: false },
   { flow: 'connect_wallet', artistOnly: false },
 ];
@@ -84,6 +86,8 @@ export function MoshaChat({
   compact?: boolean;
 }) {
   const { isArtist, user } = useAuth();
+  // Sorting out logins is only offered to somebody who actually has more than one.
+  const { data: twins = [] } = useDuplicateAccounts();
   const [turns, setTurns] = useState<ChatTurn[]>(initial ?? []);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -219,6 +223,22 @@ export function MoshaChat({
         {isArtist && turns.length === 0 && (
           <Bubble role="assistant">Want me to build your world for you? Say the word and it is done in a few taps. I can replace or change anything on it after, whenever you like.</Bubble>
         )}
+        {/* More than one login under one name. Said once, without alarm, and
+            only to the person it belongs to. */}
+        {twins.length > 0 && turns.length === 0 && (
+          <Bubble role="assistant">
+            One thing: you are here {twins.length + 1} times under the same name. That happens when
+            you sign in one way and then another. Tell me which login you want to keep and I will
+            bring everything into it, records, worlds, pictures and all. Nothing gets deleted.
+            <button
+              type="button"
+              onClick={() => openFlow('merge_accounts')}
+              className="mt-2 inline-flex min-h-10 items-center rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground"
+            >
+              Sort it out for me
+            </button>
+          </Bubble>
+        )}
         {turns.map((t, i) => (
           <Bubble key={i} role={t.role} wide={Boolean(t.flow)}>
             {t.content}
@@ -267,7 +287,7 @@ export function MoshaChat({
       {/* The things Mo$ha can do, always one tap away, not only before the first word. */}
       {user && (
         <div className="flex gap-1.5 overflow-x-auto border-t border-border px-3 py-1.5 scrollbar-hide">
-          {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).map((c) => (
+          {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).filter((c) => c.flow !== 'merge_accounts' || twins.length > 0).map((c) => (
             <button key={c.flow} type="button" disabled={busy} onClick={() => openFlow(c.flow)} className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50 min-h-10">
               {FLOW_LABEL[c.flow]}
             </button>

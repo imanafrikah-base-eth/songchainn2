@@ -17,7 +17,7 @@ export interface MoshaTurn {
 
 /** Something Mo$ha wants the app to open for the person: a flow in the chat, or a page. */
 export type MoshaAction =
-  | { type: 'flow'; flow: 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery' }
+  | { type: 'flow'; flow: 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery' | 'merge_accounts' }
   | { type: 'go'; path: string };
 
 export interface MoshaReply {
@@ -48,7 +48,7 @@ export async function askMoshaFull(turns: MoshaTurn[], surface: 'bubble' | 'inbo
     if (error || !data?.reply) return { reply: DROPPED };
     const raw = data.action as MoshaAction | undefined;
     const action: MoshaAction | undefined =
-      raw?.type === 'flow' && ['upload_song', 'build_world', 'become_artist', 'connect_wallet', 'edit_world', 'edit_gallery'].includes(raw.flow)
+      raw?.type === 'flow' && ['upload_song', 'build_world', 'become_artist', 'connect_wallet', 'edit_world', 'edit_gallery', 'merge_accounts'].includes(raw.flow)
         ? raw
         : raw?.type === 'go' && typeof raw.path === 'string' && raw.path.startsWith('/')
           ? raw

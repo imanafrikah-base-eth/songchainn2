@@ -30,6 +30,8 @@ export interface MyWorld {
   created_at: string;
   updated_at: string;
   owner_last_entered_at: string | null;
+  /** How many streets stand in it. What is built decides what is kept. */
+  streets: number;
 }
 
 export function useMyWorlds() {
@@ -42,11 +44,20 @@ export function useMyWorlds() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('worlds')
-        .select('id, slug, artist_name, status, world_number, created_at, updated_at, owner_last_entered_at')
+        .select('id, slug, artist_name, status, world_number, created_at, updated_at, owner_last_entered_at, world_streets(count)')
         .eq('owner_id', user!.id)
         .order('updated_at', { ascending: false });
       if (error) return [];
-      return (data ?? []) as unknown as MyWorld[];
+      type Row = Omit<MyWorld, 'streets'> & { world_streets?: Array<{ count: number }> };
+      // The fullest world first: when two of them have to become one, what
+      // the artist has actually built is what survives.
+      return ((data ?? []) as unknown as Row[])
+        .map((w) => ({ ...w, streets: w.world_streets?.[0]?.count ?? 0 }))
+        .sort((a, b) =>
+          (b.status === 'published' ? 1 : 0) - (a.status === 'published' ? 1 : 0)
+          || b.streets - a.streets
+          || Date.parse(b.updated_at) - Date.parse(a.updated_at),
+        ) as MyWorld[];
     },
   });
 }

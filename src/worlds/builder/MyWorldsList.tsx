@@ -31,6 +31,9 @@ export function MyWorldsList({
   const [into, setInto] = useState<MyWorld | null>(null);
 
   if (!worlds.length) return null;
+  // The list arrives fullest first, so the first one is what the artist has
+  // built most. That is the one a merge keeps, and it says so.
+  const richest = worlds[0];
 
   const doMerge = async () => {
     if (!folding || !into) return;
@@ -59,7 +62,8 @@ export function MyWorldsList({
                   {w.artist_name || w.slug}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  {w.status === 'published' ? 'Open to people' : 'Draft'}
+                  {w.id === richest.id && worlds.length > 1 ? 'Most built · ' : ''}
+                  {w.streets} street{w.streets === 1 ? '' : 's'} · {w.status === 'published' ? 'Open to people' : 'Draft'}
                   {w.world_number ? ` · World #${String(w.world_number).padStart(3, '0')}` : ''}
                 </span>
                 <span className="mt-0.5 block truncate text-[11px] text-muted-foreground/80">
@@ -73,7 +77,9 @@ export function MyWorldsList({
 
             {worlds.length > 1 && (
               <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 px-3 py-2">
-                <span className="text-[11px] text-muted-foreground">Fold this one into</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {w.id === richest.id ? 'This is the one to keep. Fold another into it from its own row.' : 'Fold this one into'}
+                </span>
                 {worlds
                   .filter((other) => other.id !== w.id && !(w.status === 'published' && other.status !== 'published'))
                   .map((other) => (

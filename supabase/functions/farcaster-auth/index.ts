@@ -104,7 +104,32 @@ async function issueSupabaseSession(fid: number, metadata: Record<string, unknow
     { auth: { persistSession: false } },
   );
 
-  const email = `fid-${fid}@farcaster.songchainn.xyz`;
+  // Where this Farcaster ID actually lives.
+  //
+  // Somebody who signed in through Farcaster once got a login of their own,
+  // separate from the account they already had here, and the app treated the
+  // two as strangers. When a person has said (or the founder has said) that
+  // both are them, the Farcaster ID points at the account they really use,
+  // and coming in through Farcaster lands them there from then on.
+  let email = `fid-${fid}@farcaster.songchainn.xyz`;
+  try {
+    const { data: known } = await admin
+      .from('farcaster_identities')
+      .select('user_id')
+      .eq('fid', fid)
+      .maybeSingle();
+    const owner = (known as { user_id?: string } | null)?.user_id;
+    if (owner) {
+      const { data: real } = await admin.auth.admin.getUserById(owner);
+      if (real?.user?.email) {
+        email = real.user.email;
+        console.log('[farcaster-auth] fid', fid, 'signs in as its own account');
+      }
+    }
+  } catch (err) {
+    // No mapping, or it could not be read: the Farcaster login still works.
+    console.error('[farcaster-auth] identity lookup failed', err);
+  }
 
   // Create user if they don't exist yet; track whether this is a brand-new account
   const { error: createErr } = await admin.auth.admin.createUser({
