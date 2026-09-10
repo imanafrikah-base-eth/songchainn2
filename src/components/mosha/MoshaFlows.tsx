@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, ChevronDown, ChevronUp, Eye, EyeOff, Globe2, Hammer, Loader2, Mic2, Music4, Plus, Settings2, Trash2, Upload, Wallet, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronUp, Eye, EyeOff, Globe2, Hammer, ImagePlus, Loader2, Mic2, Music4, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBecomeArtist } from '@/hooks/useBecomeArtist';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { useBatchUpload, type QueuedTrack } from '@/hooks/useArtistStudio';
-import { useMediaUpload } from '@/hooks/useArtistMedia';
+import { useMediaUpload, useMyMedia, useMediaActions, type ArtistMediaItem } from '@/hooks/useArtistMedia';
 import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
 import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
 import { getBlockType } from '@/worlds/blocks';
@@ -23,12 +23,13 @@ import { UploadProgress } from '@/components/studio/UploadProgress';
 import { EMPTY_DETAILS } from '@/lib/songDetails';
 import { checkCover, COVER_ACCEPT } from '@/lib/coverArt';
 
-export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world';
+export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery';
 
 export const FLOW_LABEL: Record<MoshaFlowName, string> = {
   upload_song: 'Put a record out',
   build_world: 'Build my world',
   edit_world: 'Edit my world',
+  edit_gallery: 'Edit my gallery',
   become_artist: 'Make me an artist',
   connect_wallet: 'Connect my wallet',
 };
@@ -55,6 +56,7 @@ export function MoshaFlow({ flow, onClose }: { flow: MoshaFlowName; onClose?: ()
       {current === 'upload_song' && <UploadSongFlow onNeedArtist={() => setCurrent('become_artist')} />}
       {current === 'build_world' && <BuildWorldFlow onNeedArtist={() => setCurrent('become_artist')} />}
       {current === 'edit_world' && <EditWorldFlow onNeedArtist={() => setCurrent('become_artist')} />}
+      {current === 'edit_gallery' && <EditGalleryFlow onNeedArtist={() => setCurrent('become_artist')} />}
     </div>
   );
 }
@@ -202,6 +204,177 @@ function FlowTrack({ track: t, busy, onTitle, onRemove }: { track: QueuedTrack; 
       {t.phase === 'done' && t.result?.hikulu && <p className="mt-1 text-xs text-muted-foreground">{t.result.hikulu}</p>}
       {t.phase === 'error' && <p className="mt-1 text-xs text-destructive">{t.error}</p>}
     </li>
+  );
+}
+
+/* ---------------------------------------------------------- edit gallery --- */
+
+/**
+ * The artist's pictures and clips, right here: rename, hide or show,
+ * replace the file, delete, add more. Everything the Studio and the page
+ * menu can do, without leaving the chat.
+ */
+function EditGalleryFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
+  const { isArtist } = useAuth();
+  const { data: items = [], isLoading } = useMyMedia();
+  const { update, remove } = useMediaActions();
+  const upload = useMediaUpload();
+  const addRef = useRef<HTMLInputElement>(null);
+  const replaceRef = useRef<HTMLInputElement>(null);
+  const [replacing, setReplacing] = useState<ArtistMediaItem | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; title: string; caption: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [log, setLog] = useState<string[]>([]);
+  const note = (t: string) => setLog((l) => [...l, t]);
+
+  if (!isArtist) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm">A gallery comes with an artist account. Yours can be one right now.</p>
+        <Button size="sm" className="h-9 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>
+      </div>
+    );
+  }
+
+  const tooBig = (file: File) => {
+    const isVideo = file.type.startsWith('video/');
+    const cap = isVideo ? 200 : 20;
+    return file.size > cap * 1024 * 1024 ? `That file is too big. ${isVideo ? 'Video' : 'Images'} must be under ${cap} MB.` : null;
+  };
+
+  const add = async (file: File | undefined) => {
+    if (!file) return;
+    const big = tooBig(file);
+    if (big) { toast.error(big); return; }
+    setBusy('add');
+    try {
+      const item = await upload.upload(file, {});
+      if (!item) throw new Error(upload.error || 'It did not land.');
+      note(`Added ${item.title || file.name}. It is on your page.`);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'That did not go through.');
+    } finally {
+      setBusy(null);
+      if (addRef.current) addRef.current.value = '';
+    }
+  };
+
+  const replaceFile = async (file: File | undefined) => {
+    const target = replacing;
+    setReplacing(null);
+    if (!file || !target) return;
+    const big = tooBig(file);
+    if (big) { toast.error(big); return; }
+    setBusy(target.id);
+    try {
+      const fresh = await upload.upload(file, { title: target.title ?? undefined, caption: target.caption ?? undefined, private: !target.is_published });
+      if (!fresh) throw new Error(upload.error || 'The new file did not land.');
+      await update.mutateAsync({ id: fresh.id, sort_order: target.sort_order });
+      await remove.mutateAsync(target.id);
+      note(`Replaced ${target.title || 'the piece'} with ${file.name}.`);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Could not replace that.');
+    } finally {
+      setBusy(null);
+      if (replaceRef.current) replaceRef.current.value = '';
+    }
+  };
+
+  const toggle = async (item: ArtistMediaItem) => {
+    setBusy(item.id);
+    try {
+      await update.mutateAsync({ id: item.id, is_published: !item.is_published });
+      note(`${item.title || 'That piece'} is now ${item.is_published ? 'hidden from' : 'showing on'} your page.`);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'That did not save.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const del = async (item: ArtistMediaItem) => {
+    setBusy(item.id);
+    try {
+      await remove.mutateAsync(item.id);
+      note(`Deleted ${item.title || 'that piece'}.`);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Could not delete that.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveRename = async () => {
+    if (!renaming) return;
+    setBusy(renaming.id);
+    try {
+      await update.mutateAsync({ id: renaming.id, title: renaming.title.trim() || null, caption: renaming.caption.trim() || null });
+      note(`Renamed to ${renaming.title.trim() || 'Untitled'}.`);
+      setRenaming(null);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'That did not save.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm">Your gallery. Rename, hide, replace or delete anything here; add more with one tap.</p>
+      <input ref={addRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm" className="hidden" onChange={(e) => void add(e.target.files?.[0])} />
+      <input ref={replaceRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm" className="hidden" onChange={(e) => void replaceFile(e.target.files?.[0])} />
+      <Button size="sm" className="h-9 rounded-full text-xs" disabled={busy === 'add'} onClick={() => addRef.current?.click()}>
+        {busy === 'add' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="mr-1 h-3.5 w-3.5" />}
+        {upload.phase === 'uploading' ? `Uploading ${upload.progress}%` : 'Add a picture or a clip'}
+      </Button>
+
+      {isLoading ? (
+        <p className="text-xs text-muted-foreground">Looking at your gallery.</p>
+      ) : items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Nothing up yet. Add one and it shows on your page.</p>
+      ) : (
+        <ul className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
+          {items.map((item) => (
+            <li key={item.id} className="rounded-xl border border-border p-2">
+              <div className="flex items-center gap-2">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-muted">
+                  {item.kind === 'video'
+                    ? (item.poster_url ? <img src={item.poster_url} alt="" className="h-full w-full object-cover" /> : <video src={item.public_url} className="h-full w-full object-cover" muted preload="metadata" />)
+                    : <img src={item.public_url} alt="" className="h-full w-full object-cover" loading="lazy" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold">{item.title || 'Untitled'}</p>
+                  <p className="text-[10px] text-muted-foreground">{item.kind === 'video' ? 'Clip' : 'Picture'}{item.is_published ? '' : ' · Hidden'}</p>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <button type="button" aria-label={`Rename ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => setRenaming({ id: item.id, title: item.title ?? '', caption: item.caption ?? '' })} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" aria-label={item.is_published ? `Hide ${item.title || 'this piece'}` : `Show ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => void toggle(item)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50">{item.is_published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</button>
+                  <button type="button" aria-label={`Replace ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => { setReplacing(item); replaceRef.current?.click(); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-50">{busy === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}</button>
+                  <button type="button" aria-label={`Delete ${item.title || 'this piece'}`} disabled={!!busy} onClick={() => void del(item)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+              {renaming?.id === item.id && (
+                <div className="mt-2 space-y-1.5">
+                  <input value={renaming.title} onChange={(e) => setRenaming({ ...renaming, title: e.target.value })} placeholder="Title" maxLength={120} className={input} />
+                  <input value={renaming.caption} onChange={(e) => setRenaming({ ...renaming, caption: e.target.value })} placeholder="Say something about it" maxLength={300} className={input} />
+                  <div className="flex gap-1.5">
+                    <Button size="sm" className="h-8 rounded-full text-xs" disabled={!!busy} onClick={() => void saveRename()}><Check className="mr-1 h-3.5 w-3.5" /> Save</Button>
+                    <Button size="sm" variant="ghost" className="h-8 rounded-full text-xs" disabled={!!busy} onClick={() => setRenaming(null)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {log.length > 0 && (
+        <ul className="space-y-1 text-xs text-muted-foreground">
+          {log.slice(-5).map((t, i) => <li key={i} className="flex items-start gap-1.5"><Check className="mt-0.5 h-3 w-3 shrink-0 text-primary" /> {t}</li>)}
+        </ul>
+      )}
+      <p className="text-[11px] text-muted-foreground">Delete is for good. Hidden pieces stay yours and come back with one tap.</p>
+    </div>
   );
 }
 

@@ -1205,7 +1205,11 @@ export default function ArtistDetail() {
  */
 function ArtistGallerySection({ artistId }: { artistId: string | undefined }) {
   const { data: media = [] } = useArtistGallery(artistId);
-  if (!media.length) return null;
+  const { artistId: myArtistId } = useAuth();
+  const isOwner = !!artistId && !!myArtistId && String(myArtistId) === String(artistId);
+  // Visitors see the section only when there is something to see; the
+  // artist always sees it, because that is where they manage the work.
+  if (!media.length && !isOwner) return null;
   return (
     <section className="mb-10">
       <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Gallery</h2>

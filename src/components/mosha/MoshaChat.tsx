@@ -57,6 +57,7 @@ const DO_CHIPS: Array<{ flow: MoshaFlowName; artistOnly: boolean }> = [
   { flow: 'upload_song', artistOnly: true },
   { flow: 'build_world', artistOnly: true },
   { flow: 'edit_world', artistOnly: true },
+  { flow: 'edit_gallery', artistOnly: true },
   { flow: 'become_artist', artistOnly: false },
   { flow: 'connect_wallet', artistOnly: false },
 ];

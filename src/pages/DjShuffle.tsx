@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Music2, PauseCircle, PlayCircle, Shuffle, User2 } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
@@ -8,7 +8,6 @@ import { AmbientBackground } from '@/components/AmbientBackground';
 import { Button } from '@/components/ui/button';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { ARTISTS, CATALOGS, SONGS, Song } from '@/data/musicData';
-import djShuffleBranding from '@/assets/Dj Suffle Branding.webp';
 
 type DjMode = 'artists' | 'all-songs' | 'catalogs';
 
@@ -45,6 +44,17 @@ export default function DjShuffle() {
   const [selectedCatalogIds, setSelectedCatalogIds] = useState<string[]>([]);
   const { playQueue, pause } = usePlayerActions();
   const { currentSong, isPlaying } = usePlayerState();
+  /* The DJ's own clip runs only while the DJ is on and the music is actually
+     playing: it starts with Start Shuffle and stops the moment the music does. */
+  const [djOn, setDjOn] = useState(false);
+  const clipRef = useRef<HTMLVideoElement>(null);
+  const rolling = djOn && isPlaying;
+  useEffect(() => {
+    const el = clipRef.current;
+    if (!el) return;
+    if (rolling) void el.play().catch(() => undefined);
+    else el.pause();
+  }, [rolling]);
 
   const selectedArtistSongs = useMemo(
     () => SONGS.filter((song) => selectedArtistIds.includes(song.artistId)),
@@ -64,6 +74,7 @@ export default function DjShuffle() {
     (mode === 'catalogs' && selectedCatalogSongs.length > 0);
 
   const startDjShuffle = () => {
+    setDjOn(true);
     let sourceSongs: Song[] = SONGS;
     if (mode === 'artists') sourceSongs = selectedArtistSongs;
     if (mode === 'catalogs') sourceSongs = selectedCatalogSongs;
@@ -80,6 +91,7 @@ export default function DjShuffle() {
   };
 
   const stopDjShuffle = () => {
+    setDjOn(false);
     pause();
     try {
       localStorage.removeItem('songchainn_dj_shuffle_active');
@@ -136,7 +148,17 @@ export default function DjShuffle() {
               </p>
             </div>
             <div className="rounded-2xl border border-cyan-300/25 bg-black/45 p-2">
-              <img src={djShuffleBranding} alt="DJ Shuffle branding" className="h-full w-full rounded-xl object-cover" />
+              <video
+                ref={clipRef}
+                src="/dj-shuffle.mp4"
+                poster="/dj-shuffle.jpg"
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-label={rolling ? "DJ $huffle, live" : "DJ $huffle, waiting for the music"}
+                className="h-full w-full rounded-xl object-cover"
+              />
             </div>
           </div>
         </section>
