@@ -17,7 +17,7 @@ import { requestWalletConnection } from '@/lib/walletGate';
 import { useBatchUpload, type QueuedTrack } from '@/hooks/useArtistStudio';
 import { useMediaUpload, useMyMedia, useMediaActions, type ArtistMediaItem } from '@/hooks/useArtistMedia';
 import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
-import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
+import { useMyWorlds, whenLabel } from '@/worlds/builder/useMyWorlds';
 import { getBlockType } from '@/worlds/blocks';
 import { UploadProgress } from '@/components/studio/UploadProgress';
 import { EMPTY_DETAILS } from '@/lib/songDetails';
@@ -620,7 +620,12 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   if (!worldId) {
     return (
       <div className="flex flex-wrap gap-1.5">
-        {mine.map((w) => <Button key={w.id} size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => setWorldId(w.id)}>{w.artist_name || w.slug} ({w.status})</Button>)}
+        {mine.map((w) => (
+          <Button key={w.id} size="sm" variant="outline" className="h-auto min-h-11 flex-col items-start rounded-2xl px-3 py-1.5 text-xs" onClick={() => setWorldId(w.id)}>
+            <span>{w.artist_name || w.slug} ({w.status})</span>
+            <span className="text-[10px] font-normal text-muted-foreground">Made {whenLabel(w.created_at)} · last in it {whenLabel(w.owner_last_entered_at)}</span>
+          </Button>
+        ))}
       </div>
     );
   }

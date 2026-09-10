@@ -30,11 +30,14 @@ export const BATTLE_MARKET_ENABLED = false;
 /**
  * $WWAT, the WaveWarz Africa token. Hosting a battle is paid in it.
  *
- * Read from the environment rather than hardcoded so the coin can be launched
- * without a code change, and so a testnet address can stand in during a
- * rehearsal. Empty means the coin is not live yet.
+ * Launched on Base on 10 September 2026 as "WWA Token" ($WWAT). A token
+ * address is public the moment it exists, so it ships with the app; the
+ * environment still wins, so a testnet address can stand in for a rehearsal.
  */
-export const WWAT_TOKEN_ADDRESS = (import.meta.env.VITE_WWAT_TOKEN_ADDRESS ?? '').trim();
+export const WWAT_TOKEN_ADDRESS = (
+  (import.meta.env.VITE_WWAT_TOKEN_ADDRESS as string | undefined) ||
+  '0xefa920796416daf8dc8df7e5ceaeee45ae3350be'
+).trim();
 
 export const WWAT_TOKEN_DECIMALS = Number(import.meta.env.VITE_WWAT_TOKEN_DECIMALS ?? 18);
 

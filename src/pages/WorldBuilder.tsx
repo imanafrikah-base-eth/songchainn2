@@ -10,6 +10,7 @@ import { BLOCK_TYPES, BlockList, getBlockType, type BlockContext } from '@/world
 import { PropForm } from '@/worlds/builder/PropForm';
 import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
 import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
+import { MyWorldsList } from '@/worlds/builder/MyWorldsList';
 import { StreetKey } from '@/worlds/builder/StreetKey';
 import { DropsPanel } from '@/worlds/builder/DropsPanel';
 import { ArtPicker } from '@/worlds/builder/ArtPicker';
@@ -318,33 +319,18 @@ export default function WorldBuilder() {
                   {unopened.length === 1 ? 'You already started a world.' : 'You already started these.'}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Pick up where you left off, or start another one below.
+                  {unopened.length > 1
+                    ? 'An account holds one world. Fold the spare into the one you are keeping and nothing is lost.'
+                    : 'Pick up where you left off.'}
                 </p>
-                <ul className="mt-3 space-y-2">
-                  {unopened.map((w) => (
-                    <li key={w.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setParams({ id: w.id });
-                          setStep('streets');
-                        }}
-                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-background/60 px-3 py-2.5 text-left transition-colors hover:border-primary/40"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-foreground">
-                            {w.artist_name || w.slug}
-                          </span>
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {w.status === 'published' ? 'Published' : 'Draft'}
-                            {w.world_number ? ` · World #${String(w.world_number).padStart(3, '0')}` : ''}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-xs font-semibold text-primary">Continue</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <MyWorldsList
+                  className="mt-3"
+                  worlds={unopened}
+                  onOpen={(w) => {
+                    setParams({ id: w.id });
+                    setStep('streets');
+                  }}
+                />
               </div>
             )}
 
@@ -352,6 +338,11 @@ export default function WorldBuilder() {
               <h1 className="font-heading text-2xl font-semibold text-foreground">
                 {unopened.length > 0 ? 'Or name a new world' : 'Name your world'}
               </h1>
+              {unopened.length > 0 && (
+                <p className="mt-1 text-xs text-amber-500">
+                  You already have a world, and an account holds one. Open that one, or merge above.
+                </p>
+              )}
               <p className="mt-1 text-sm text-muted-foreground">
                 This is the whole of step one on purpose.
               </p>

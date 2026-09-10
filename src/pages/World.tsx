@@ -43,6 +43,7 @@ import { CityBlock } from '@/worlds/components/CityBlock';
 import { WorldArt } from '@/worlds/components/WorldArt';
 import { EnterVR } from '@/worlds/components/EnterVR';
 import { ArrivalWalk } from '@/worlds/components/ArrivalWalk';
+import { touchWorldEntry } from '@/worlds/builder/useMyWorlds';
 import { AvatarPicker } from '@/worlds/components/AvatarPicker';
 import { CitizenAvatar } from '@/worlds/components/CitizenAvatar';
 import { useCitizen } from '@/worlds/useCitizen';
@@ -134,7 +135,14 @@ const World = () => {
 
 function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; segment?: string; fromDb?: boolean }) {
   const { wallet, rings, connect, refresh } = useWorldAccess(world);
-  const { artistId } = useAuth();
+  const { artistId, user } = useAuth();
+
+  /* When the artist walks into their own world, the builder can say when
+     that was. Nobody else's visit is stamped. */
+  useEffect(() => {
+    if (!user || !world?.slug) return;
+    void touchWorldEntry(world.slug);
+  }, [user, world?.slug]);
   const theme = useCityTheme(world);
   const citizen = useCitizen(world, rings);
   const [dressing, setDressing] = useState(false);

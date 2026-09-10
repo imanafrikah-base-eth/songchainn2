@@ -222,8 +222,15 @@ export function useWorldBuilder(worldId?: string) {
         .single();
 
       if (ce || !created) {
+        // The rules that refuse a world (an account holds one; a name belongs
+        // to whoever took it) say why in plain words and name the world to
+        // open instead, so the artist reads that rather than a code.
         throw new Error(
-          ce?.code === '23505' ? 'That name is already taken' : 'Could not create the world',
+          ce?.message && ce.code === '23505'
+            ? ce.message
+            : ce?.code === '23505'
+              ? 'That name is already taken'
+              : ce?.message || 'Could not create the world',
         );
       }
       const id = (created as { id: string }).id;
