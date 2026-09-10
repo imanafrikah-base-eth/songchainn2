@@ -1,4 +1,5 @@
 import { useState, type SyntheticEvent } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, Play, Pause, Music,
@@ -444,7 +445,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
       <div className="absolute bottom-0 left-0 right-16 p-4 pb-24 md:pb-4 z-10">
         <button onClick={goToProfile} className="flex items-center gap-2 mb-2">
           <span className="font-bold text-white text-base truncate max-w-[220px]">
-            @{post.profile?.profile_name || 'Anonymous'}
+            <ArtistName prefix="@" name={post.profile?.profile_name || 'Anonymous'} userId={post.user_id} size={14} />
           </span>
           {isFollowing && <span className="text-[10px] text-white/50 bg-white/10 px-1.5 py-0.5 rounded-full shrink-0">Following</span>}
         </button>

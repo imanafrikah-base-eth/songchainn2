@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { MapPin, Music, Users } from 'lucide-react';
 import { Artist, SONGS } from '@/data/musicData';
@@ -72,7 +73,7 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
 
         <div className="p-4 text-center">
           <h3 className="font-heading font-semibold text-foreground truncate mb-1 group-hover:text-primary transition-colors">
-            {artist.name}
+            <ArtistName name={artist.name} artistId={artist.id} size={16} />
           </h3>
 
           <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground mb-3">

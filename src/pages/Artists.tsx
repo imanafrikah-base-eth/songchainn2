@@ -1,4 +1,5 @@
 ﻿import { useMemo } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { Users, Music, TrendingUp, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -190,7 +191,7 @@ export default function Artists() {
                       {/* Artist name overlay */}
                       <div className="absolute bottom-0 left-0 right-0 p-4">
                         <h3 className="font-heading text-xl font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                          {artist.name}
+                          <ArtistName name={artist.name} artistId={artist.id} size={14} />
                         </h3>
                         <p className="text-sm text-muted-foreground truncate">{artist.location}</p>
                       </div>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Lock, Play, Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Song } from '@/data/musicData';
@@ -160,7 +161,7 @@ export function GenreExplorer({ songs, onPlay, isLocked }: GenreExplorerProps) {
                     ) : null}
                   </div>
                   <p className="mt-2 truncate text-sm text-foreground">{song.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{song.artist}</p>
+                  <p className="truncate text-xs text-muted-foreground"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                 </button>
               </li>
             );

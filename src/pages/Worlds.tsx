@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ArtistName } from '@/components/ArtistName';
 import { ArrowLeft, ArrowRight, Globe2, Hammer } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -49,7 +50,7 @@ const Worlds = () => {
                       {formatWorldNumber(w)}
                     </p>
                     <div className="absolute inset-x-0 bottom-0 p-4">
-                      <h2 className="font-heading text-xl font-bold text-white">{w.artistName}</h2>
+                      <h2 className="font-heading text-xl font-bold text-white"><ArtistName name={w.artistName} artistId={(w as { artistId?: string | null }).artistId} size={16} /></h2>
                       {w.positioning ? <p className="mt-0.5 text-xs text-white/75 line-clamp-2">{w.positioning}</p> : null}
                     </div>
                   </div>

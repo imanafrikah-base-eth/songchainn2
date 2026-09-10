@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ArtistName } from '@/components/ArtistName';
 import { formatDistanceToNow } from 'date-fns';
 import { Heart, Music } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -83,7 +84,7 @@ export function LikedActivity({
                     ? <img src={a.image} alt="" loading="lazy" className="h-full w-full object-cover" />
                     : <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-muted-foreground">{a.name.charAt(0)}</div>}
                 </div>
-                <span className="text-sm font-semibold text-foreground">{a.name}</span>
+                <span className="text-sm font-semibold text-foreground"><ArtistName name={a.name} artistId={a.artistId} size={14} /></span>
               </Link>
             ))}
           </div>
@@ -106,7 +107,7 @@ export function LikedActivity({
                 <Cover src={song.coverImage} alt={song.title} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">{song.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{song.artist}</p>
+                  <p className="truncate text-xs text-muted-foreground"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                 </div>
                 <Heart className="h-4 w-4 shrink-0 fill-primary text-primary" />
                 <span className="shrink-0 text-xs text-muted-foreground">

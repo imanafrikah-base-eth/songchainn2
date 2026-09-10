@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type SyntheticEvent } from 'react';
+import { ArtistName, VerifiedMark } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Heart, MoreHorizontal, Reply, Trash2, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -284,7 +285,7 @@ export function CommentSheet({
                                 <span className="inline-flex items-center gap-1">
                                   <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(comment.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                                   <span>{displayName}</span>
-                                  {isArtistComment && isVerifiedArtist && <VerifiedBadge size={15} />}
+                                  <VerifiedMark verified={isArtistComment && isVerifiedArtist} userId={comment.user_id} artistId={comment.artist_id} size={15} />
                                 </span>
                               </button>
                               <span className="text-xs text-muted-foreground ml-2">

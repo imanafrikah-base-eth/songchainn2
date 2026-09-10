@@ -13,6 +13,7 @@
 // is playing dresses the whole layer, because music runs under every city.
 
 import { useEffect, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Wallet, Disc3, Shirt } from 'lucide-react';
@@ -158,7 +159,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
       {/* You do not appear here, you walk in. Once per visit. */}
       <ArrivalWalk
         worldSlug={world.slug}
-        worldName={`${world.artistName} World`}
+        worldName={`$<ArtistName name={world.artistName} artistId={world.artistId} size={10} /> World`}
         avatar={citizen.avatar}
         accent={theme.accent}
         entrance={world.entrance}
@@ -231,7 +232,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
                     />
                   )}
                   <div>
-                    <h1 className="font-heading text-3xl font-bold sm:text-4xl">{world.artistName} World</h1>
+                    <h1 className="font-heading text-3xl font-bold sm:text-4xl"><ArtistName name={world.artistName} artistId={world.artistId} size={22} /> World</h1>
                     <p className="mt-1 max-w-xl text-sm text-white/60">{world.positioning}</p>
                   </div>
                 </div>
@@ -336,7 +337,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
                   <WalletChip world={world} wallet={wallet} balance={rings.balance} onConnect={() => void connect()} onRefresh={refresh} />
                 </div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-300/80 drop-shadow">
-                  {world.artistName} World
+                  <ArtistName name={world.artistName} artistId={world.artistId} size={10} /> World
                 </p>
                 <h1 className={`mt-2 font-heading text-3xl font-bold drop-shadow-lg sm:text-4xl ${(DOOR_HUES[room.hue] ?? DOOR_HUES.amber).text}`}>
                   {room.name}
@@ -455,7 +456,7 @@ function CityView({
             <WalletChip world={world} wallet={wallet} balance={rings.balance} onConnect={onConnect} onRefresh={onRefresh} />
           </div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-300/80 drop-shadow">
-            {world.artistName} World
+            <ArtistName name={world.artistName} artistId={world.artistId} size={10} /> World
           </p>
           <h1 className={`mt-2 font-heading text-3xl font-bold drop-shadow-lg sm:text-4xl ${hue.text}`}>
             {city.name}

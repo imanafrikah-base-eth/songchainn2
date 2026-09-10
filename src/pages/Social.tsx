@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -528,7 +529,7 @@ export default function Social() {
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold truncate">{profile.profile_name}</p>
+                                <p className="font-semibold truncate"><ArtistName name={profile.profile_name} userId={profile.user_id} size={14} /></p>
                                 {profile.bio && (
                                   <p className="text-xs text-muted-foreground truncate">{profile.bio}</p>
                                 )}

@@ -1,4 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Music2, PauseCircle, PlayCircle, Shuffle, User2 } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -172,7 +173,7 @@ export default function DjShuffle() {
                         : 'border-white/15 bg-black/40 text-zinc-100 hover:border-cyan-300/40'
                     }`}
                   >
-                    {artist.name}
+                    <ArtistName name={artist.name} artistId={artist.id} size={14} />
                   </button>
                 ))}
               </div>
@@ -195,7 +196,7 @@ export default function DjShuffle() {
                     }`}
                   >
                     {catalog.title}
-                    <span className="ml-1 text-xs text-zinc-400">· {catalog.artist}</span>
+                    <span className="ml-1 text-xs text-zinc-400">· <ArtistName name={catalog.artist} artistId={catalog.artistId} size={12} /></span>
                   </button>
                 ))}
               </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Compass, Sparkles, TrendingUp, Heart, Shuffle, Filter, Users, ArrowRight, Headphones, Music, Flame, HardDrive, Play } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -755,7 +756,7 @@ export default function Discover() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{catalog.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{catalog.artist}</p>
+                      <p className="text-xs text-muted-foreground truncate"><ArtistName name={catalog.artist} artistId={catalog.artistId} size={12} /></p>
                     </div>
                     <Badge variant="outline" className={`text-[10px] ${getGenreColor(catalog.genre)}`}>
                       {catalog.genre}

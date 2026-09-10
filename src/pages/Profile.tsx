@@ -1,4 +1,5 @@
 import { PhotoPositioner } from '@/components/PhotoPositioner';
+import { ArtistName } from '@/components/ArtistName';
 import { cropImage, CENTRE_CROP, type PhotoCrop } from '@/lib/cropImage';
 import { type ChangeEvent, type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -857,7 +858,7 @@ export default function Profile() {
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${isProfileOnline ? 'bg-green-500' : 'bg-muted'}`} />
                 <h1 className="font-heading text-2xl font-bold text-foreground">
-                  {profileDisplayName}
+                  <ArtistName name={profileDisplayName} userId={user?.id} size={18} />
                 </h1>
                 {profileUsername && (
                   <span className="text-sm text-muted-foreground">@{profileUsername}</span>

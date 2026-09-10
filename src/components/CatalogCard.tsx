@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { Music } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -46,7 +47,7 @@ export function CatalogCard({ catalog, isNew, className }: CatalogCardProps) {
           <h3 className="font-heading text-sm sm:text-base font-semibold text-foreground truncate">
             {catalog.title}
           </h3>
-          <p className="text-xs sm:text-sm text-muted-foreground truncate">{catalog.artist}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground truncate"><ArtistName name={catalog.artist} artistId={catalog.artistId} size={12} /></p>
           <div className="mt-2 flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
             <span>{catalog.trackCount} tracks</span>
             <span>{catalog.genre}</span>

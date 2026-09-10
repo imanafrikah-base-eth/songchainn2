@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { GetKeyModal } from '@/worlds/components/GetKeyModal';
 import { getArtistCoin } from '@/lib/artistCoins';
 import { Link } from 'react-router-dom';
@@ -421,7 +422,7 @@ export function WorldDoorway({
           <span className="rounded-full border border-white/25 bg-black/50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/85 backdrop-blur-sm">
             World #001
           </span>
-          <span className="text-[11px] font-semibold text-white/75">{world.artistName}</span>
+          <span className="text-[11px] font-semibold text-white/75"><ArtistName name={world.artistName} artistId={world.artistId} size={11} /></span>
         </div>
 
         {/* Sound is off until asked for. An ad that makes noise at somebody is

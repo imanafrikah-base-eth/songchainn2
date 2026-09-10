@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,8 @@ export interface HeroFeature {
   id: string;
   title: string;
   artist: string;
+  /** The catalog artist id, so the verification mark can travel with the name. */
+  artistId?: string;
   coverImage?: string;
   /** Small line above the title: "New release", "Hot today", ... */
   label?: string;
@@ -88,7 +91,7 @@ export const HomeHero = memo(function HomeHero({ feature, onPlay, faces = [] }: 
               {feature.title}
             </h1>
             <p className="mt-1 truncate text-sm text-muted-foreground sm:text-base">
-              {feature.artist}
+              <ArtistName name={feature.artist} artistId={feature.artistId} size={14} />
             </p>
 
             <div className="mt-5 flex items-center justify-center gap-2.5 sm:justify-start">

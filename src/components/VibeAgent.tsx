@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { claimInterruption, releaseInterruption } from '@/lib/interruptions';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -774,7 +775,7 @@ export function VibeAgent() {
                     className="w-full text-left rounded-lg border border-border/60 bg-secondary/20 px-2.5 py-2 hover:bg-secondary/35 transition-colors"
                   >
                     <p className="text-xs text-muted-foreground">Artist to watch</p>
-                    <p className="text-sm text-foreground font-medium truncate">{recommendedArtist.name}</p>
+                    <p className="text-sm text-foreground font-medium truncate"><ArtistName name={recommendedArtist.name} artistId={recommendedArtist.id} size={14} /></p>
                   </button>
                 )}
               </div>

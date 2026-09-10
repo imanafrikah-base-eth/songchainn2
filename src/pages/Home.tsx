@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart, PlayCircle, Disc3, Info, Search, Wand2 } from 'lucide-react';
@@ -1329,7 +1330,7 @@ export default function Home() {
                             {catalog.title}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {catalog.artist}
+                            <ArtistName name={catalog.artist} artistId={catalog.artistId} size={12} />
                           </p>
                         </div>
                       </div>

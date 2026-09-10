@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type SyntheticEvent } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -540,7 +541,7 @@ export default function Community() {
                     </Avatar>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">
-                        {displayName}
+                        <ArtistName name={displayName} userId={profile.user_id} size={14} />
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatPresenceLabel(true, lastSeenByUserId[profile.user_id] ?? null)}
@@ -716,7 +717,7 @@ export default function Community() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(profile.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
                       <h3 className="font-semibold text-foreground truncate">
-                          {safeDisplayName(profile.display_name, profile.username)}
+                          <ArtistName name={safeDisplayName(profile.display_name, profile.username)} userId={profile.user_id} size={14} />
                       </h3>
                       {!onlineUserIds.has(profile.user_id) && (
                         <span className="text-xs text-muted-foreground">

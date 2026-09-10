@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ArtistName } from '@/components/ArtistName';
 import { ArrowLeft, Trophy, Crown } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -73,7 +74,7 @@ const Leaderboard = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate flex items-center gap-1.5">
-                  {e.displayName}
+                  <ArtistName name={e.displayName} userId={e.userId} size={14} />
                   {e.isOg && <OgBadge size="sm" />}
                 </p>
                 <div className="mt-0.5"><TierBadge tier={e.tier} size="sm" /></div>

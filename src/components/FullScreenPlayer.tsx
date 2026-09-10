@@ -1,4 +1,5 @@
 import { memo, useEffect, useState, useRef, useCallback } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -489,7 +490,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                   onClick={() => { onClose(); navigate(`/artist/${currentSong.artistId}`); }}
                   className="text-lg text-muted-foreground truncate hover:text-primary transition-colors text-left"
                 >
-                  {currentSong.artist}
+                  <ArtistName name={currentSong.artist} artistId={currentSong.artistId} size={16} />
                 </button>
                 {currentSong.isTokenGated && ownershipStatus !== 'free' && (
                   <div className="mt-2 flex items-center justify-center gap-2">
@@ -723,7 +724,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                           Up Next
                         </span>
                         <div className="mt-1 text-foreground text-sm truncate">
-                          {nextSong.title} <span className="text-muted-foreground">• {nextSong.artist}</span>
+                          {nextSong.title} <span className="text-muted-foreground">• <ArtistName name={nextSong.artist} artistId={nextSong.artistId} size={12} /></span>
                         </div>
                       </div>
                     );
@@ -861,7 +862,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                             >
                               {song.title}
                             </p>
-                            <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                            <p className="text-xs text-muted-foreground truncate"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                           </div>
                           <button
                             type="button"

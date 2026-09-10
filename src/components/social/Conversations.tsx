@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { Send, ArrowLeft, MoreVertical, Ban, Flag, Play, Music, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -108,7 +109,7 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
               {conversation.other_name.slice(0, 1).toUpperCase()}
             </span>
           )}
-          <span className="truncate text-sm font-semibold text-foreground">{conversation.other_name}</span>
+          <span className="truncate text-sm font-semibold text-foreground"><ArtistName name={conversation.other_name} userId={conversation.other_user_id} size={14} /></span>
         </Link>
         <div className="relative">
           <button
@@ -286,7 +287,7 @@ export function Conversations() {
             )}
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-sm font-semibold text-foreground">{c.other_name}</span>
+                <span className="truncate text-sm font-semibold text-foreground"><ArtistName name={c.other_name} userId={c.other_user_id} size={14} /></span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">
                   {timeAgo(c.last_message_at)}
                 </span>

@@ -1,4 +1,5 @@
 import { useState, type SyntheticEvent } from 'react';
+import { ArtistName, VerifiedMark } from '@/components/ArtistName';
 import { formatDistanceToNow } from 'date-fns';
 import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check, CheckCircle2, Flag, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -160,7 +161,7 @@ export function PostCard({
               {isOfficial ? (
                 <OfficialBadge size={17} />
               ) : (
-                isArtistPost && isVerifiedArtist && <VerifiedBadge size={17} />
+                <VerifiedMark verified={isArtistPost && isVerifiedArtist} userId={post.user_id} artistId={post.artist_id} size={17} />
               )}
               {!isOwnPost && (
                 isArtistPost ? (
@@ -259,7 +260,7 @@ export function PostCard({
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-foreground truncate">{song.title}</p>
-            <p className="text-sm text-muted-foreground truncate">{artist?.name}</p>
+            <p className="text-sm text-muted-foreground truncate"><ArtistName name={artist?.name} artistId={artist?.id} size={12} /></p>
           </div>
           <Button size="icon" variant="secondary" className="flex-shrink-0">
             <Play className="w-4 h-4" />

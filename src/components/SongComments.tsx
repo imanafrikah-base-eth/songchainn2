@@ -1,4 +1,5 @@
 import { useState, useMemo, type SyntheticEvent } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -225,7 +226,7 @@ export function SongComments({ songId, songTitle, artistName }: SongCommentsProp
                         className="font-medium text-foreground hover:text-primary transition-colors truncate inline-flex items-center gap-2"
                       >
                         <span className={`w-2 h-2 rounded-full ${onlineUserIds.has(comment.user_id) ? 'bg-green-500' : 'bg-muted'}`} />
-                        {comment.profile?.profile_name || 'Anonymous'}
+                        <ArtistName name={comment.profile?.profile_name || 'Anonymous'} userId={comment.user_id} size={13} />
                       </Link>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className="text-xs text-muted-foreground">

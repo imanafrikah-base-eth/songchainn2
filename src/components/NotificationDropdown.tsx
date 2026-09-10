@@ -1,4 +1,5 @@
 import { useState, type ComponentType } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -190,7 +191,7 @@ function NotificationItem({
           ) : (
             <p className="text-sm">
               <span className="font-semibold text-foreground">
-                {name || 'Someone'}
+                <ArtistName name={name || 'Someone'} userId={notification.from_user_id} size={13} />
               </span>{' '}
               <span className="text-muted-foreground">{message}</span>
             </p>

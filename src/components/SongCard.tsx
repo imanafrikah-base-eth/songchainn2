@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { Play, Pause, Heart, Image as ImageIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -265,7 +266,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
               className="text-xs sm:text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
             >
-              {song.artist}
+              <ArtistName name={song.artist} artistId={song.artistId} size={12} />
             </button>
           </div>
 
@@ -435,7 +436,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
                 className="text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
               >
-                {song.artist}
+                <ArtistName name={song.artist} artistId={song.artistId} size={12} />
               </button>
               {showOnchainBadge && (
                 <div className="mt-1">
@@ -573,7 +574,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
           className="text-sm text-muted-foreground truncate mb-3 hover:text-primary transition-colors text-left block w-full"
         >
-          {song.artist}
+          <ArtistName name={song.artist} artistId={song.artistId} size={12} />
         </button>
 
         {showOnchainBadge && (

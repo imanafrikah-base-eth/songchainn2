@@ -9,6 +9,7 @@
 // access. That is the property that makes the shelf safe to open to strangers.
 
 import { useMemo } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
@@ -125,7 +126,7 @@ function CatalogListBlock({ props, ctx }: BlockProps) {
               )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-foreground">{song.title}</span>
-                <span className="block truncate text-xs text-muted-foreground">{song.artist}</span>
+                <span className="block truncate text-xs text-muted-foreground"><ArtistName name={song.artist} artistId={song.artistId} size={11} /></span>
               </span>
             </button>
           </li>

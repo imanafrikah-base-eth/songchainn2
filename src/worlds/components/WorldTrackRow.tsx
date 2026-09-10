@@ -2,6 +2,7 @@
 // links out to the song page for pulses, comments and collecting.
 
 import { Link } from 'react-router-dom';
+import { ArtistName } from '@/components/ArtistName';
 import { Play, Pause } from 'lucide-react';
 import type { Song } from '@/data/musicData';
 import { usePlayerActions, useSafePlayerState } from '@/context/PlayerContext';
@@ -50,7 +51,7 @@ export function WorldTrackRow({
         >
           {song.title}
         </Link>
-        <p className="truncate text-xs text-white/50">{song.artist}</p>
+        <p className="truncate text-xs text-white/50"><ArtistName name={song.artist} artistId={song.artistId} size={11} /></p>
       </div>
       <button
         type="button"

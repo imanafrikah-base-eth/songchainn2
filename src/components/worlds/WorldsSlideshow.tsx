@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { WorldArt } from '@/worlds/components/WorldArt';
@@ -120,7 +121,7 @@ function WorldAd({ world, cta }: { world: WorldConfig; cta: ReactNode }) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">{formatWorldNumber(world)}</p>
-          <h3 className="mt-1 font-heading text-2xl font-bold leading-tight text-white sm:text-3xl">{world.artistName}</h3>
+          <h3 className="mt-1 font-heading text-2xl font-bold leading-tight text-white sm:text-3xl"><ArtistName name={world.artistName} artistId={(world as { artistId?: string | null }).artistId} size={20} /></h3>
           {world.positioning ? <p className="mt-1 max-w-xl text-sm text-white/80 line-clamp-2">{world.positioning}</p> : null}
           <Link
             to={worldPath(world)}

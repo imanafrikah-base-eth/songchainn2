@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ArtistName } from '@/components/ArtistName';
 import { formatDistanceToNow } from 'date-fns';
 import { Music, Play, Zap, Disc3, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -115,7 +116,7 @@ export function MusicActivity({
                 <Cover src={song.coverImage} alt={song.title} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">{song.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{song.artist}</p>
+                  <p className="truncate text-xs text-muted-foreground"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                 </div>
                 <span className="shrink-0 text-xs font-semibold text-muted-foreground">
                   {plays.toLocaleString()} {plays === 1 ? 'play' : 'plays'}
@@ -143,7 +144,7 @@ export function MusicActivity({
                     ? <img src={artist.image} alt="" loading="lazy" className="h-full w-full object-cover" />
                     : <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-muted-foreground">{artist.name.charAt(0)}</div>}
                 </div>
-                <span className="text-sm font-semibold text-foreground">{artist.name}</span>
+                <span className="text-sm font-semibold text-foreground"><ArtistName name={artist.name} artistId={artist.artistId} size={14} /></span>
                 <span className="text-xs text-muted-foreground">{artist.plays}</span>
               </Link>
             ))}
@@ -164,7 +165,7 @@ export function MusicActivity({
                 <Cover src={song.coverImage} alt={song.title} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{song.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{song.artist}</p>
+                  <p className="truncate text-xs text-muted-foreground"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                 </div>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(at), { addSuffix: true })}

@@ -1,4 +1,5 @@
 ﻿import { useMemo } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music } from 'lucide-react';
@@ -123,7 +124,7 @@ export default function CatalogDetail() {
                     )}
                   </div>
                   <span className="text-lg text-foreground group-hover:text-primary transition-colors">
-                    {artist.name}
+                    <ArtistName name={artist.name} artistId={artist.id} size={14} />
                   </span>
                 </Link>
               )}

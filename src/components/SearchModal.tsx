@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
 import { Search, Music, User, Disc3, X, TrendingUp, Clock } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -59,6 +60,8 @@ interface SearchResult {
   subtitle: string;
   image?: string;
   score: number;
+  /** The catalog artist behind the row, so the mark can travel with the name. */
+  artistId?: string;
 }
 
 function scoreMatch(text: string, query: string): number {
@@ -87,6 +90,7 @@ function buildResults(query: string, songs: Song[], artists: Artist[], catalogs:
         id: song.id,
         title: song.title,
         subtitle: song.artist,
+        artistId: song.artistId,
         image: song.coverImage,
         score,
       });
@@ -101,6 +105,7 @@ function buildResults(query: string, songs: Song[], artists: Artist[], catalogs:
         id: artist.id,
         title: artist.name,
         subtitle: artist.location,
+        artistId: artist.id,
         image: artist.profileImage,
         score: score * 1.1,
       });
@@ -117,6 +122,7 @@ function buildResults(query: string, songs: Song[], artists: Artist[], catalogs:
         id: catalog.id,
         title: catalog.title,
         subtitle: catalog.artist,
+        artistId: catalog.artistId,
         image: catalog.coverImage,
         score,
       });
@@ -264,7 +270,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
       [...allSongs]
         .sort((a, b) => (b.plays || 0) - (a.plays || 0))
         .slice(0, 5)
-        .map((s) => ({ kind: 'song' as const, id: s.id, title: s.title, subtitle: s.artist, image: s.coverImage, score: s.plays })),
+        .map((s) => ({ kind: 'song' as const, id: s.id, title: s.title, subtitle: s.artist, artistId: s.artistId, image: s.coverImage, score: s.plays })),
     [allSongs],
   );
 
@@ -397,8 +403,8 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{result.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{result.subtitle}</p>
+                        <p className="text-sm font-medium text-foreground truncate"><ArtistName name={result.title} artistId={result.kind === 'artist' ? result.artistId : undefined} size={14} /></p>
+                        <p className="text-xs text-muted-foreground truncate"><ArtistName name={result.subtitle} artistId={result.kind === 'artist' ? undefined : result.artistId} size={12} /></p>
                       </div>
                       <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase shrink-0">
                         {KIND_LABEL[result.kind]}

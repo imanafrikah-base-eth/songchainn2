@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Headphones, ListMusic, Music, Pause, Play, Lock, Globe, Plus, GripVertical, X, Users, UserPlus, Pencil, Share2, MoreVertical, ChevronUp, ChevronDown } from 'lucide-react';
@@ -751,7 +752,7 @@ export default function PlaylistDetail() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                      <p className="text-xs text-muted-foreground truncate"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                     </div>
                     <Plus className="w-4 h-4 text-primary flex-shrink-0" />
                   </button>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
@@ -180,7 +181,7 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
               to={`/artist/${song.artistId}`}
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
             >
-              {song.artist}
+              <ArtistName name={song.artist} artistId={song.artistId} size={12} />
             </Link>
           </div>
           
@@ -647,7 +648,7 @@ export default function Marketplace() {
                         <Music className="w-8 h-8 text-muted-foreground" />
                       )}
                     </div>
-                    <p className="text-sm font-semibold text-foreground truncate">{artist.name}</p>
+                    <p className="text-sm font-semibold text-foreground truncate"><ArtistName name={artist.name} artistId={artist.id} size={14} /></p>
                     <p className="text-[11px] text-muted-foreground truncate">{artist.location}</p>
                     <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary/15 text-primary px-2 py-0.5 text-[10px] font-semibold">
                       <Coins className="w-3 h-3" />
@@ -680,7 +681,7 @@ export default function Marketplace() {
                 )}
               </div>
               <div>
-                <h3 className="text-xl font-heading font-bold text-foreground">{selectedArtist.name}</h3>
+                <h3 className="text-xl font-heading font-bold text-foreground"><ArtistName name={selectedArtist.name} artistId={selectedArtist.id} size={18} /></h3>
                 <p className="text-xs text-muted-foreground">
                   {selectedCatalogs.reduce((sum, c) => sum + c.songs.length, 0)} songs on-chain across {selectedCatalogs.length} release{selectedCatalogs.length === 1 ? '' : 's'}
                 </p>

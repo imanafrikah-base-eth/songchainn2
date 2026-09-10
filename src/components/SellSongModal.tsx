@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { X, Loader2, Music, AlertCircle, Check, TrendingDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -128,7 +129,7 @@ export function SellSongModal({ song, isOpen, onClose, balance, coinAddress, wal
               )}
             </div>
             <h2 className="text-lg sm:text-xl font-bold mb-0.5 sm:mb-1 truncate px-4">{song.title}</h2>
-            <p className="text-sm text-muted-foreground">{song.artist}</p>
+            <p className="text-sm text-muted-foreground"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
           </div>
         </div>
 

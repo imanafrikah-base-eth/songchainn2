@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Link2, ListMusic, Settings, Share2, HardDrive, Bot } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -1684,8 +1685,7 @@ export default function Room() {
                       navigate(`/artist/${currentArtist.id}`);
                     }}
                   >
-                    <span className="truncate">{currentSong?.artist}</span>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                    <ArtistName name={currentSong?.artist} artistId={currentArtist.id} size={14} />
                   </button>
                 ) : (
                   <div className="truncate">
@@ -1803,7 +1803,7 @@ export default function Room() {
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm text-zinc-100 truncate">{song.title}</div>
-                        <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
+                        <div className="text-xs text-zinc-400 truncate"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></div>
                       </div>
                     </div>
                   ))}
@@ -2239,10 +2239,7 @@ function SwipeToReplyMessage({
           </div>
         )}
         <span className="text-zinc-100 inline-flex items-center gap-1">
-          <span>{message.room_name}:</span>
-          {KNOWN_ARTIST_NAMES.has(message.room_name.trim().toLowerCase()) && (
-            <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-          )}
+          <ArtistName name={`${message.room_name}:`} userId={(message as { user_id?: string | null }).user_id} size={14} />
         </span>{' '}
         <span className="text-zinc-300">
           {renderMessageWithCustomEmojis(message.content || message.message || '')}

@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronUp, Headphones, X } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
@@ -240,7 +241,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                   onClick={(e) => { e.stopPropagation(); navigate(`/artist/${currentSong.artistId}`); }}
                   className="text-[11px] text-muted-foreground truncate hover:text-primary transition-colors text-left"
                 >
-                  {currentSong.artist}
+                  <ArtistName name={currentSong.artist} artistId={currentSong.artistId} size={12} />
                 </button>
               </div>
             </div>
@@ -313,11 +314,11 @@ export const AudioPlayer = memo(function AudioPlayer() {
                     onClick={(e) => { e.stopPropagation(); navigate(`/artist/${currentSong.artistId}`); }}
                     className="text-xs sm:text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
                   >
-                    {currentSong.artist}
+                    <ArtistName name={currentSong.artist} artistId={currentSong.artistId} size={12} />
                   </button>
                   {nextSong && (
                     <p className="text-[10px] text-muted-foreground truncate">
-                      Up Next: {nextSong.title} • {nextSong.artist}
+                      Up Next: {nextSong.title} • <ArtistName name={nextSong.artist} artistId={nextSong.artistId} size={10} />
                     </p>
                   )}
                 </div>

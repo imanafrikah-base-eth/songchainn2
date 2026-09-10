@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight, Search, Shuffle, Bot, Store, Mic, Lock, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -937,7 +938,7 @@ export default function Auth() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs text-foreground truncate">{song.title}</p>
-                      <p className="text-[11px] text-muted-foreground truncate">{song.artist}</p>
+                      <p className="text-[11px] text-muted-foreground truncate"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                     </div>
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-1.5">
@@ -986,7 +987,7 @@ export default function Auth() {
                       )}
                     </div>
                     <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                    <p className="text-xs text-muted-foreground truncate"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                     <div className="mt-1 flex items-center justify-between gap-1.5">
                       <span className="text-[11px] text-primary font-semibold">#{index + 1}</span>
                       {coinAddressBySongId.has(song.id) && (
@@ -1162,7 +1163,7 @@ export default function Auth() {
                       </div>
                     </div>
                     <p className="text-sm font-medium text-foreground truncate">{catalog.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{catalog.artist}</p>
+                    <p className="text-xs text-muted-foreground truncate"><ArtistName name={catalog.artist} artistId={catalog.artistId} size={12} /></p>
                     <p className="text-[11px] text-muted-foreground mt-1">{catalog.trackCount} tracks • {catalog.totalPlays.toLocaleString()} plays</p>
                   </button>
                 ))}
@@ -1277,7 +1278,7 @@ export default function Auth() {
                         <Users className="w-7 h-7 text-muted-foreground" />
                       )}
                     </div>
-                    <p className="text-xs text-foreground truncate">{artist.name}</p>
+                    <p className="text-xs text-foreground truncate"><ArtistName name={artist.name} artistId={artist.id} size={12} /></p>
                     <p className="text-[11px] text-muted-foreground truncate">{artist.location}</p>
                   </button>
                 ))}

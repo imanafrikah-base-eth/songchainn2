@@ -1,4 +1,5 @@
 ﻿import { useParams, Link } from 'react-router-dom';
+import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music, ListMusic, ListPlus, Clock, Headphones } from 'lucide-react';
 import { SONGS, ARTISTS } from '@/data/musicData';
@@ -245,7 +246,7 @@ export default function SongDetail() {
                   )}
                 </div>
                 <span className="text-lg text-foreground group-hover:text-primary transition-colors">
-                  {artist.name}
+                  <ArtistName name={artist.name} artistId={artist.id} size={14} />
                 </span>
               </Link>
 
@@ -353,7 +354,7 @@ export default function SongDetail() {
           <section className="mt-12">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-heading text-xl font-semibold text-foreground">
-                More from {artist.name}
+                More from <ArtistName name={artist.name} artistId={artist.id} size={14} />
               </h2>
               <Link 
                 to={`/artist/${artist.id}`}

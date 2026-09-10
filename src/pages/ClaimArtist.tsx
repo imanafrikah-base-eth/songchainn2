@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeCheck, Check, Loader2, Mic2, RefreshCw, Search } from 'lucide-react';
@@ -161,7 +162,7 @@ export default function ClaimArtist() {
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold">{a.name.charAt(0)}</span>
                         )}
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-foreground">{a.name}</span>
+                          <span className="block truncate text-sm font-semibold text-foreground"><ArtistName name={a.name} artistId={a.id} size={14} /></span>
                           <span className="block text-xs text-muted-foreground">
                             {taken ? 'This page already has its artist' : myClaim?.status === 'pending' ? 'Claim under review' : 'Not claimed yet'}
                           </span>
