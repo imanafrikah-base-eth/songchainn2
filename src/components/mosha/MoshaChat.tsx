@@ -77,12 +77,17 @@ export function MoshaChat({
   onClose,
   extraChips,
   initial,
+  ask,
+  onAsked,
   compact = false,
 }: {
   onClose?: () => void;
   /** Extra one-tap actions shown beside the starters, e.g. "Set my vibe". */
   extraChips?: Array<{ label: string; onClick: () => void }>;
   initial?: MoshaTurn[];
+  /** A question handed in from elsewhere, asked once the moment it opens. */
+  ask?: string | null;
+  onAsked?: () => void;
   compact?: boolean;
 }) {
   const { isArtist, user } = useAuth();
@@ -190,6 +195,14 @@ export function MoshaChat({
     [busy, turns, isArtist],
   );
 
+  /* A question handed in with the call, asked once, so nobody has to type
+     out a problem the app already knows about. */
+  const askedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ask || busy || askedRef.current === ask) return;
+    askedRef.current = ask;
+    void send(ask).then(() => onAsked?.());
+  }, [ask, busy, send, onAsked]);
   const openFlow = useCallback((flow: MoshaFlowName) => {
     setTurns((prev) => [...prev, { role: 'assistant', content: FLOW_LABEL[flow] + '. Right here.', flow, local: true, at: new Date().toISOString() }]);
   }, []);

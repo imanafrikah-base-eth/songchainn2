@@ -13,6 +13,7 @@ import { ARTIST_COINS } from '@/lib/artistCoins';
 import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { Button } from '@/components/ui/button';
+import { MyWalletsPanel } from '@/components/wallet/MyWalletsPanel';
 
 /**
  * What you actually hold, with SONGCHAINN's own things first.
@@ -121,9 +122,8 @@ export default function Wallet() {
           </div>
         ) : (
           <>
-            <p className="mb-6 font-mono text-xs text-muted-foreground">
-              {walletAddress.slice(0, 10)}…{walletAddress.slice(-6)}
-            </p>
+            {/* Which wallets are here, and which one pays. */}
+            <MyWalletsPanel className="mb-6" />
 
             {/* The music comes first. */}
             <section className="mb-6">

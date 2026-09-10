@@ -2,6 +2,7 @@ import type { Database } from '@/integrations/supabase/types';
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { subscribeWalletChanges } from '@/lib/walletGate';
 import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
 import { hasWalletProvider, getWalletProvider, connectWallet, signMessage, generateNonce, selectWallet, subscribeWallets, toChecksumAddress } from '@/lib/baseWallet';
 
@@ -157,6 +158,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userRef = React.useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
+  // A wallet connected anywhere in the app shows up here at once, so the top
+  // bar changes the moment it happens rather than on the next reload.
+  useEffect(() => subscribeWalletChanges((address) => {
+    if (address) setWalletAddress(address);
+  }), []);
+
   // Check for any wallet provider (keep it fresh when the app regains focus)
   useEffect(() => {
     const update = () => setIsWalletDetected(hasWalletProvider());
@@ -263,6 +270,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (profileData) {
       setAudienceProfile(profileData as any);
+      // The wallet the person is actually using, read back on every load.
+      // Without this the app asked them to connect one they already had.
+      const saved = (profileData as any).wallet_address as string | null | undefined;
+      if (saved) setWalletAddress(saved);
       upsertProfile(profileData as any);
       // A profile with any name set means onboarding was already done (handles rows
       // created before the onboarding_completed column existed).

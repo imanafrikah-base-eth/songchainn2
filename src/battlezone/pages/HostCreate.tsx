@@ -95,7 +95,10 @@ const HostCreate = () => {
   const artistOptions = useMemo(
     () =>
       [...ARTISTS]
-        .filter((artist) => stage !== "main_stage" || !readyIds || readyIds.has(String(artist.id)))
+        // Fail open. A picker that silently offers nobody is worse than one
+        // that offers everybody and lets the server explain the refusal, which
+        // is exactly what an empty ready-list did the first time round.
+        .filter((artist) => stage !== "main_stage" || !readyIds || readyIds.size === 0 || readyIds.has(String(artist.id)))
         .map((artist) => ({ id: artist.id, name: artist.name }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [stage, readyIds]

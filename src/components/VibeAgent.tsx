@@ -147,6 +147,28 @@ function pickNextSong(params: {
   return scored[0]?.song || null;
 }
 
+/** True while a drawer, sheet or dialog owns the screen. */
+function useOverlayOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const read = () => {
+      const body = document.body;
+      const blocked = body.hasAttribute('data-scroll-locked')
+        || body.style.pointerEvents === 'none'
+        || body.dataset.menuOpen === 'true'
+        || !!document.querySelector('[role="dialog"][data-state="open"], [data-radix-popper-content-wrapper]');
+      setOpen(blocked);
+    };
+    read();
+    const mo = new MutationObserver(read);
+    mo.observe(document.body, { attributes: true, attributeFilter: ['style', 'data-scroll-locked', 'data-menu-open'], childList: true, subtree: false });
+    const io = new MutationObserver(read);
+    io.observe(document.documentElement, { childList: true, subtree: true });
+    return () => { mo.disconnect(); io.disconnect(); };
+  }, []);
+  return open;
+}
+
 export function VibeAgent() {
   const navigate = useNavigate();
   const { user, audienceProfile } = useAuth();
@@ -190,6 +212,9 @@ export function VibeAgent() {
   const [lanePlaylistId, setLanePlaylistId] = useState<string | null>(null);
   const [isBuildingLane, setIsBuildingLane] = useState(false);
   const { toast } = useToast();
+  const overlayOpen = useOverlayOpen();
+  /* A question handed in with the call, asked for them the moment it opens. */
+  const [chatAsk, setChatAsk] = useState<string | null>(null);
   const [discoveryArtistName, setDiscoveryArtistName] = useState<string | null>(null);
   const [sessionStartAt, setSessionStartAt] = useState<number>(Date.now());
   const [externalPrompt, setExternalPrompt] = useState<ExternalPrompt | null>(null);
@@ -292,10 +317,14 @@ export function VibeAgent() {
   }, [step]);
 
   useEffect(() => {
-    const handleOpen = () => {
+    const handleOpen = (event: Event) => {
       setDismissedUntil(0);
       // "Call Mo$ha" opens the conversation. The scripted vibe flow is one
-      // chip away inside it.
+      // chip away inside it. When something sent a question along with the
+      // call (a purchase that failed, say), Mo$ha opens already holding it,
+      // so the person does not have to explain their own problem twice.
+      const asked = (event as CustomEvent<{ ask?: string } | undefined>)?.detail?.ask;
+      setChatAsk(typeof asked === 'string' && asked.trim() ? asked.trim() : null);
       setChatOpen(true);
     };
     const handlePrompt = (event: Event) => {
@@ -585,12 +614,18 @@ export function VibeAgent() {
     }
   }, [addSongsToPlaylist, createPlaylist, displayName, isBuildingLane, mode, tasteLane, toast]);
 
+  // Two things reaching for the same corner is one too many: while a menu,
+  // a sheet or a dialog is open, Mo$ha waits its turn.
+  if (overlayOpen) return null;
+
   if (!step) {
     if (chatOpen) {
       return (
         <div className="agent-dock fixed z-[58] bottom-20 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6 w-[min(calc(100vw-0.75rem),22rem)] sm:w-[23rem] md:w-[24rem]">
           <div className="overflow-hidden rounded-2xl border border-border bg-background/95 shadow-2xl backdrop-blur">
             <MoshaChat
+              ask={chatAsk}
+              onAsked={() => setChatAsk(null)}
               onClose={() => setChatOpen(false)}
               extraChips={[
                 {

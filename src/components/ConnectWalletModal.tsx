@@ -3,6 +3,7 @@ import { Wallet, ExternalLink, Loader2, ChevronRight, X } from 'lucide-react';
 import { connectWallet, prefetchSdkWallets } from '@/lib/baseWallet';
 import { rememberReturnPath } from '@/lib/deviceGuards';
 import { ProfileConnections } from '@/components/ProfileConnections';
+import { providerFromRdns } from '@/hooks/useMyWallets';
 import { useWalletOptions } from '@/hooks/useDiscoveredWallets';
 import { isWalletGateOpen, subscribeWalletGate, resolveWalletGate } from '@/lib/walletGate';
 
@@ -49,7 +50,8 @@ export function ConnectWalletModal() {
     try {
       const result = await connectWallet(rdns);
       if (result.success && result.address) {
-        resolveWalletGate(result.address);
+        const picked = options.find((w) => w.rdns === rdns);
+        resolveWalletGate(result.address, providerFromRdns(rdns, picked?.name));
       } else {
         setError(result.error || 'Failed to connect wallet');
       }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Coins, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { buyCoinWithEth } from '@/lib/zoraTrading';
+import { buyAsset } from '@/lib/safeBuy';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
 
@@ -34,16 +34,20 @@ export function BuyWwat({ compact = false }: { compact?: boolean }) {
         });
         return;
       }
-      const res = await buyCoinWithEth({
-        coinAddress: WWAT_TOKEN_ADDRESS as `0x${string}`,
-        ethAmount,
-        userAddress: address as `0x${string}`,
-      });
+      const res = await buyAsset({ coinAddress: WWAT_TOKEN_ADDRESS, ethAmount, address });
       if (res.success) {
         toast.success('You hold $WWAT', { description: 'You can host a battle with it now.' });
         setOpen(false);
       } else {
-        toast.error('That did not go through', { description: res.error });
+        toast.error('That did not go through', {
+          description: res.message,
+          action: {
+            label: 'Ask Mo$ha',
+            onClick: () => window.dispatchEvent(new CustomEvent('songchainn:open-mosha', {
+              detail: { ask: `I tried to buy $WWAT for ${ethAmount} ETH and it did not work. It said: ${res.message}${res.advice ? ` (${res.advice})` : ''}. What should I do?` },
+            })),
+          },
+        });
       }
     } finally {
       setBusy(null);

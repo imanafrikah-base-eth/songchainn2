@@ -297,6 +297,14 @@ export function Navigation() {
                     }}
                   />
                   <MoreRow
+                    icon={Wallet}
+                    label="Your wallet"
+                    onClick={() => {
+                      setShowMore(false);
+                      navigate('/wallet');
+                    }}
+                  />
+                  <MoreRow
                     icon={Globe2}
                     label="Artist Worlds"
                     onClick={() => {

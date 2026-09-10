@@ -24,7 +24,8 @@ import {
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { getConnectedAccounts } from '@/lib/baseWallet';
 import { requestWalletConnection } from '@/lib/walletGate';
-import { buyCoinWithEth, getBuyQuote, getCoinTokenBalance } from '@/lib/zoraTrading';
+import { getBuyQuote, getCoinTokenBalance } from '@/lib/zoraTrading';
+import { buyAsset } from '@/lib/safeBuy';
 import { getEthUsdPrice } from '@/lib/ethPrice';
 
 const PRESETS_USD = [2, 5, 20];
@@ -136,9 +137,19 @@ export function GetKeyModal({
     if (!wallet || !ethAmount) return;
     setBusy('Confirm in your wallet');
     try {
-      const res = await buyCoinWithEth({ coinAddress: coinAddress as Address, ethAmount, userAddress: wallet as Address });
+      // The shared path: on Base, enough for the fee, and a plain sentence
+      // when something goes wrong rather than a chain error.
+      const res = await buyAsset({ coinAddress, ethAmount, address: wallet });
       if (!res.success) {
-        toast.error('Not bought', { description: res.error ?? 'The trade did not go through.' });
+        toast.error('Not bought', {
+          description: res.message,
+          action: {
+            label: 'Ask Mo$ha',
+            onClick: () => window.dispatchEvent(new CustomEvent('songchainn:open-mosha', {
+              detail: { ask: `I tried to get ${symbol} for ${ethAmount} ETH and it did not work. It said: ${res.message}${res.advice ? ` (${res.advice})` : ''}. What should I do?` },
+            })),
+          },
+        });
         return;
       }
       setTxHash(res.txHash ?? null);

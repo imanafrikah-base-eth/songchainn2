@@ -29,6 +29,7 @@ import { PostComposer } from '@/components/social/PostComposer';
 import { PostCard } from '@/components/social/PostCard';
 import { BlockButton } from '@/components/social/BlockButton';
 import { ArtistGallery } from '@/components/gallery/ArtistGallery';
+import { ArtistStats } from '@/components/ArtistStats';
 import { useArtistGallery } from '@/hooks/useArtistMedia';
 import type { SocialPostWithProfile } from '@/types/social';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
@@ -1011,37 +1012,21 @@ export default function ArtistDetail() {
                 </p>
               )}
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="glass-card p-4 rounded-xl text-center">
-                  <Music className="w-6 h-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-heading font-bold text-foreground">
-                    {artistSongs.length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Songs</p>
-                </div>
-                <div className="glass-card p-4 rounded-xl text-center">
-                  <PlayCircle className="w-6 h-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-heading font-bold text-foreground">
-                    {artistStats.totalPlays.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Streams</p>
-                </div>
-                <div className="glass-card p-4 rounded-xl text-center">
-                  <Users className="w-6 h-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-heading font-bold text-foreground">
-                    {artistFollowers.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Followers</p>
-                </div>
-                <div className="glass-card p-4 rounded-xl text-center">
-                  <Heart className="w-6 h-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-heading font-bold text-foreground">
-                    {artistStats.totalLikes.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Likes</p>
-                </div>
-              </div>
+              {/* What this artist has done here, with some life in it. */}
+              <ArtistStats
+                className="mb-6"
+                songs={artistSongs.length}
+                streams={artistStats.totalPlays}
+                followers={artistFollowers}
+                likes={artistStats.totalLikes}
+                topSongs={artistSongs
+                  .map((song) => ({
+                    id: song.id,
+                    title: song.title,
+                    plays: popularityData?.find((d) => d.song_id === song.id)?.play_count ?? song.plays ?? 0,
+                  }))
+                  .sort((a, b) => b.plays - a.plays)}
+              />
 
               {/* Location Badge */}
               <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-border">
