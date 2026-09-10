@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, ChevronDown, ChevronUp, Globe2, Hammer, Loader2, Mic2, Music4, Plus, Trash2, Upload, Wallet, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronUp, Eye, EyeOff, Globe2, Hammer, Loader2, Mic2, Music4, Plus, Settings2, Trash2, Upload, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -422,7 +422,10 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   const { data: mine = [] } = useMyWorlds();
   const [worldId, setWorldId] = useState<string | undefined>(mine.length === 1 ? mine[0].id : undefined);
   const [streetId, setStreetId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'streets' | 'settings'>('streets');
+  const [log, setLog] = useState<string[]>([]);
   const b = useWorldBuilder(worldId);
+  const done = (what: string) => { setLog((l) => [...l.slice(-4), what]); toast('Done', { description: what }); };
 
   useEffect(() => { if (!worldId && mine.length === 1) setWorldId(mine[0].id); }, [mine, worldId]);
   useEffect(() => { if (!streetId && b.streets[0]) setStreetId(b.streets[0].id); }, [b.streets, streetId]);
@@ -442,9 +445,96 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   }
   const street = b.streets.find((s) => s.id === streetId) ?? null;
   const blocks = street ? [...(b.blocksByStreet[street.id] ?? [])].sort((a, c) => a.sort_order - c.sort_order) : [];
+  const w = b.world;
+
+  if (tab === 'settings' && w) {
+    const zoraCoin = (w.zora_profile_url ?? '').match(/base:(0x[0-9a-fA-F]{40})/);
+    return (
+      <div className="space-y-3">
+        <div className="flex gap-1.5">
+          <button type="button" onClick={() => setTab('streets')} className="h-8 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground">Streets</button>
+          <button type="button" className="h-8 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">Settings</button>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Names</p>
+          <ul className="mt-1 space-y-1.5">
+            {b.streets.map((s) => (
+              <li key={s.id} className="flex items-center gap-1.5">
+                <input value={s.name} maxLength={40} aria-label="Street name" onChange={(e) => void b.saveStreet(s.id, { name: e.target.value })} className={`${input} py-1.5`} />
+                <select value={s.access} aria-label="Who gets in" onChange={(e) => { void b.saveStreet(s.id, { access: e.target.value }); done(`${s.name}: ${e.target.value === 'public' ? 'open to everyone' : e.target.value + ' door'}`); }} className="h-9 rounded-xl border border-border bg-background px-2 text-xs text-foreground">
+                  <option value="public">Everyone</option>
+                  <option value="fan">Fans</option>
+                  <option value="insider">Insiders</option>
+                  <option value="council">Council</option>
+                  <option value="event">Event</option>
+                </select>
+                <button type="button" aria-label={s.hidden ? 'Show' : 'Hide'} onClick={() => { void b.saveStreet(s.id, { hidden: !s.hidden }); done(`${s.name} ${s.hidden ? 'shown' : 'hidden'}`); }} className={`rounded-full p-1.5 ${s.hidden ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                  {s.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                <button type="button" aria-label="Delete street" onClick={() => { void b.removeStreet(s.id); done(`${s.name} deleted`); }} className="rounded-full p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+              </li>
+            ))}
+            {b.cities.map((c) => (
+              <li key={c.id} className="flex items-center gap-1.5">
+                <input value={c.name} maxLength={40} aria-label="City name" onChange={(e) => void b.saveCity(c.id, { name: e.target.value })} className={`${input} py-1.5`} />
+                <span className="shrink-0 text-[11px] text-muted-foreground">city</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Who may post</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {([['off', 'Only me'], ['members', 'People past the key'], ['everyone', 'Anyone']] as const).map(([v, t]) => (
+              <button key={v} type="button" onClick={() => { void b.saveWorld({ visitor_posts: v }); done(`Posting: ${t}`); }} className={`h-8 rounded-full px-3 text-xs font-medium ${(w.visitor_posts ?? 'off') === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">The key</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {([['songchainn', '$ONGCHAINN'], ['points', 'Loyalty points'], ['pass', 'A pass'], ['token', zoraCoin ? 'My creator coin' : 'My own token']] as const).map(([v, t]) => (
+              <button key={v} type="button" disabled={v === 'token' && !zoraCoin && !b.gate.token_address} onClick={() => { void b.saveGate({ kind: v, ...(v === 'token' && zoraCoin ? { token_address: zoraCoin[1] } : {}) }); done(`Key: ${t}`); }} className={`h-8 rounded-full px-3 text-xs font-medium disabled:opacity-40 ${b.gate.kind === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
+            ))}
+          </div>
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+            <label className="text-[11px] text-muted-foreground">Fan at<input type="number" value={b.gate.fan_threshold} onChange={(e) => void b.saveGate({ fan_threshold: Number(e.target.value) })} className={`${input} mt-0.5 py-1`} /></label>
+            <label className="text-[11px] text-muted-foreground">Insider at<input type="number" value={b.gate.insider_threshold} onChange={(e) => void b.saveGate({ insider_threshold: Number(e.target.value) })} className={`${input} mt-0.5 py-1`} /></label>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Advert on Home</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {([['entrance', 'The gate'], ['hero', 'The hero'], ['custom', 'A clip of my own']] as const).map(([v, t]) => (
+              <button key={v} type="button" onClick={() => { void b.saveWorld({ ad_kind: v }); done(`Advert: ${t}`); }} className={`h-8 rounded-full px-3 text-xs font-medium ${(w.ad_kind ?? 'entrance') === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
+            ))}
+          </div>
+          {w.ad_kind === 'custom' ? <p className="mt-1 text-[11px] text-muted-foreground">Add the clip itself from the builder's Art step.</p> : null}
+        </div>
+
+        {log.length > 0 && (
+          <ul className="space-y-0.5 text-xs text-muted-foreground">
+            {log.map((l, i) => <li key={i} className="flex items-center gap-1.5"><Check className="h-3 w-3 text-primary" />{l}</li>)}
+          </ul>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          <Button asChild size="sm" variant="ghost" className="h-8 rounded-full text-xs"><Link to="/world-builder">Full builder</Link></Button>
+          {w.slug && <Button asChild size="sm" variant="ghost" className="h-8 rounded-full text-xs"><Link to={`/w/${w.slug}`}>Walk it</Link></Button>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
+      <div className="flex gap-1.5">
+        <button type="button" className="h-8 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">Streets</button>
+        <button type="button" onClick={() => setTab('settings')} className="inline-flex h-8 items-center gap-1 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground"><Settings2 className="h-3.5 w-3.5" /> Settings</button>
+      </div>
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
         {b.streets.map((s) => (
           <button key={s.id} type="button" onClick={() => setStreetId(s.id)} className={`h-8 shrink-0 rounded-full px-3 text-xs font-medium ${street?.id === s.id ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{s.name}</button>

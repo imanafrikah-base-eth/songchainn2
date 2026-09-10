@@ -105,6 +105,13 @@ interface RoomEntry {
   inFlight: Promise<void> | null;
   /** A change arrived while a query was running, so run once more after it. */
   dirty: boolean;
+  /**
+   * Somebody who closes the app never sends leave_room, and a heartbeat that
+   * simply stops writes nothing, so no change event ever arrives. The view
+   * drops them after 90 seconds; this asks again on a clock so the number
+   * on Home follows it down.
+   */
+  poll: number;
 }
 
 const rooms = new Map<string, RoomEntry>();
@@ -167,6 +174,7 @@ function ensureRoom(roomId: string): RoomEntry {
     teardown: null,
     inFlight: null,
     dirty: false,
+    poll: window.setInterval(() => refresh(roomId), 30_000),
   };
   rooms.set(roomId, entry);
   refresh(roomId);
@@ -182,6 +190,7 @@ function release(roomId: string, listener: Listener): void {
     const live = rooms.get(roomId);
     if (!live || live.listeners.size > 0) return;
     rooms.delete(roomId);
+    window.clearInterval(entry.poll);
     void supabase.removeChannel(live.channel);
   }, LINGER_MS);
 }

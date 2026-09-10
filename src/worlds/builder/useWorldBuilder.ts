@@ -80,6 +80,8 @@ export interface DraftStreet {
   key_threshold: string | null;
   /* The drop on this door, when key_kind is 'nft'. */
   key_nft_id: string | null;
+  /** Put away: kept with everything on it, off the map until shown again. */
+  hidden: boolean;
 }
 
 export interface DraftGate {
@@ -155,7 +157,7 @@ export function useWorldBuilder(worldId?: string) {
 
         const { data: s } = await supabase
           .from('world_streets')
-          .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id')
+          .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden')
           .eq('world_id', id)
           .order('sort_order');
         const streetRows = (s ?? []) as unknown as DraftStreet[];
@@ -301,12 +303,17 @@ export function useWorldBuilder(worldId?: string) {
           access: 'public',
           sort_order: streets.length,
         })
-        .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id')
+        .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden')
         .single();
       if (data) setStreets((prev) => [...prev, data as unknown as DraftStreet]);
     },
     [world, streets.length],
   );
+
+  const saveCity = useCallback(async (id: string, patch: Partial<DraftCity>) => {
+    setCities((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    await supabase.from('world_cities').update(patch).eq('id', id);
+  }, []);
 
   const saveStreet = useCallback(async (id: string, patch: Partial<DraftStreet>) => {
     setStreets((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -401,6 +408,7 @@ export function useWorldBuilder(worldId?: string) {
     saveGate,
     addStreet,
     saveStreet,
+    saveCity,
     removeStreet,
     addBlock,
     saveBlock,

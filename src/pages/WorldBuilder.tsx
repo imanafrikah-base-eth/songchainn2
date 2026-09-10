@@ -14,6 +14,7 @@ import { StreetKey } from '@/worlds/builder/StreetKey';
 import { DropsPanel } from '@/worlds/builder/DropsPanel';
 import { ArtPicker } from '@/worlds/builder/ArtPicker';
 import { MoshaPanel } from '@/worlds/builder/MoshaPanel';
+import { MoshaSuggest } from '@/worlds/builder/MoshaSuggest';
 import { MoshaChat, MoshaOptIn } from '@/worlds/builder/MoshaChat';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { useArtistGallery } from '@/hooks/useArtistMedia';
@@ -293,6 +294,7 @@ export default function WorldBuilder() {
             Everybody gets this, including lite: it is the intro, and on lite it
             is all he does. */}
         <MoshaPanel step={step} worldId={b.world?.id ?? ''} />
+        {b.world ? <div className="mb-4"><MoshaSuggest step={step} b={b} /></div> : null}
 
         {/* The chat is a premium thing. On lite the whole builder and all the
             stock is still there, he just does not talk. */}
@@ -471,11 +473,38 @@ export default function WorldBuilder() {
                     <span className="text-xs text-muted-foreground">
                       {(b.blocksByStreet[s.id]?.length ?? 0)} on it
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => b.saveStreet(s.id, { hidden: !s.hidden })}
+                      className={`h-9 rounded-full border px-3 text-xs font-medium focus-ring ${s.hidden ? 'border-amber-500/50 text-amber-500' : 'border-border text-muted-foreground'}`}
+                    >
+                      {s.hidden ? 'Hidden. Show it' : 'Hide'}
+                    </button>
                   </div>
                   <StreetKey street={s} worldSlug={b.world?.slug} onSave={(patch) => b.saveStreet(s.id, patch)} />
                 </li>
               ))}
             </ul>
+
+            {b.cities.length > 0 && (
+              <div className="rounded-lg border border-border bg-card p-3.5">
+                <h2 className="text-sm font-semibold text-foreground">Your cities</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Starter names. Call them what they are in your world.</p>
+                <ul className="mt-2 space-y-2">
+                  {b.cities.map((c) => (
+                    <li key={c.id}>
+                      <input
+                        className={input}
+                        value={c.name}
+                        maxLength={40}
+                        aria-label="City name"
+                        onChange={(e) => b.saveCity(c.id, { name: e.target.value })}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <AddStreet onAdd={b.addStreet} />
 

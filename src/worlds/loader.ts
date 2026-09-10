@@ -61,6 +61,7 @@ interface CityRow {
   empty_line: string;
   hue: string;
   sort_order: number;
+  hidden?: boolean | null;
   buildings: string[];
 }
 
@@ -78,6 +79,7 @@ interface StreetRow {
   key_song_id?: string | null;
   key_threshold?: string | number | null;
   key_nft_id?: string | null;
+  hidden?: boolean | null;
 }
 
 const ACCESS: WorldRoomAccess[] = ['public', 'fan', 'insider', 'council', 'event'];
@@ -150,7 +152,8 @@ export function rowsToWorldConfig(
     positioning: world.positioning,
     story: world.story ?? [],
     featuredSongIds: world.featured_song_ids ?? [],
-    rooms: [...streets].sort((a, b) => a.sort_order - b.sort_order).map(toRoom),
+    // A street the artist put away is not on the map and not a door.
+    rooms: [...streets].filter((s) => !s.hidden).sort((a, b) => a.sort_order - b.sort_order).map(toRoom),
     cities: [...cities].sort((a, b) => a.sort_order - b.sort_order).map(toCity),
     accent: world.accent,
     heroImage: world.hero_image ?? undefined,
@@ -201,7 +204,7 @@ export async function fetchWorldBySlug(slug: string | undefined): Promise<WorldC
       .eq('world_id', (world as unknown as WorldRow).id),
     supabase
       .from('world_streets')
-      .select('slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id')
+      .select('slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden')
       .eq('world_id', (world as unknown as WorldRow).id),
   ]);
 

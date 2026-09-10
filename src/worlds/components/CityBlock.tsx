@@ -32,8 +32,12 @@ export function CityBlock({
   // these blocks and the 3D buildings can never disagree about which city is
   // the tallest.
   const { count, unit, ratio, isEmpty } = standingFor(world, city);
-  const art = world.cityArt?.[city.slug];
-  const loop = world.cityVideo?.[city.slug];
+  // The tower shows the city's own art; failing that, the picture on the
+  // first door inside it, so a city with content never has to wear the
+  // window grid. The grid only dresses a city with no picture anywhere.
+  const doorArt = city.buildings.map((slug) => world.roomArt?.[slug]).find(Boolean);
+  const art = world.cityArt?.[city.slug] ?? doorArt;
+  const loop = world.cityVideo?.[city.slug] ?? (world.cityArt?.[city.slug] ? undefined : city.buildings.map((slug) => world.roomVideo?.[slug]).find(Boolean));
 
   const litWindows = Math.round(ratio * WINDOW_TOTAL);
   // The artist's own picture is the building. The lit-window grid was drawn

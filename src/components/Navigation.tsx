@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Flame, Gift, Menu, X, LogOut, Wallet, Headphones, Sparkles, Disc3, Bot, Lightbulb, Bug, Search, MoreHorizontal, ChevronDown, RefreshCw, type LucideIcon } from 'lucide-react';
+import { Flame, Gift, Menu, X, LogOut, Wallet, Headphones, Sparkles, Disc3, Bot, Lightbulb, Bug, Search, MoreHorizontal, ChevronDown, RefreshCw, type LucideIcon , Globe2 } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { applyAppUpdate, subscribeAppUpdate, getAppUpdate } from '@/lib/appUpdate';
 import { useEngagement } from '@/context/EngagementContext';
@@ -294,6 +294,14 @@ export function Navigation() {
                     onClick={() => {
                       setShowMore(false);
                       window.dispatchEvent(new CustomEvent('songchainn:open-mosha'));
+                    }}
+                  />
+                  <MoreRow
+                    icon={Globe2}
+                    label="Artist Worlds"
+                    onClick={() => {
+                      setShowMore(false);
+                      navigate('/worlds');
                     }}
                   />
                   <MoreRow
