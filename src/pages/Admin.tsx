@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { useSongPopularity } from '@/hooks/usePopularity';
 import { ArtistApplicationsPanel } from '@/components/admin/ArtistApplicationsPanel';
 import { ArtistClaimsPanel } from '@/components/admin/ArtistClaimsPanel';
+import { VerificationRequestsPanel } from '@/components/admin/VerificationRequestsPanel';
 import { ArtistWalletsPanel } from '@/components/admin/ArtistWalletsPanel';
 import { FeatureRequestsPanel } from '@/components/admin/FeatureRequestsPanel';
 import { CoinQueuePanel } from '@/components/admin/CoinQueuePanel';
@@ -148,7 +149,14 @@ export default function Admin() {
             </button>
           </div>
 
-          {activeTab === 'claims' && <ArtistClaimsPanel />}
+          {activeTab === 'claims' && (
+            <div className="space-y-10">
+              <ArtistClaimsPanel />
+              <div className="border-t border-border pt-8">
+                <VerificationRequestsPanel />
+              </div>
+            </div>
+          )}
 
           {activeTab === 'payouts' && <ArtistWalletsPanel />}
 

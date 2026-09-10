@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react';
-import { X, Play, ChevronLeft, ChevronRight, Coins, ImageIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, Play, ChevronLeft, ChevronRight, Coins, ImageIcon, Clapperboard, Images } from 'lucide-react';
 import { useArtistGallery, type ArtistMediaItem } from '@/hooks/useArtistMedia';
 
 /**
- * An artist's visual work, shown the way they made it.
+ * An artist's visual work, in order.
  *
- * A masonry column layout rather than a grid of squares, because cropping
- * somebody's photograph into a thumbnail to make the rows line up is the app
- * deciding how their work looks. Portrait stays portrait.
+ * Nothing falls loose on the page. Every piece sits in a section for its
+ * kind (the clips together, the pictures together), each section has its
+ * name and its count, and inside a section the tiles line up on one grid.
+ * The frame is the same shape for every tile in a section; the picture
+ * fills it and the full piece opens in the viewer at a tap.
  *
- * The coin pill only appears when a coin address genuinely exists. A piece the
- * artist has not coined says nothing about coins at all.
+ * The coin pill only appears when a coin address genuinely exists. A piece
+ * the artist has not coined says nothing about coins at all.
  */
 
 interface Props {
@@ -19,21 +21,36 @@ interface Props {
   emptyMessage?: string;
 }
 
+type SectionKey = 'video' | 'image';
+
+const SECTIONS: Array<{ key: SectionKey; label: string; icon: typeof Clapperboard; grid: string; frame: string }> = [
+  { key: 'video', label: 'Clips', icon: Clapperboard, grid: 'grid-cols-2 sm:grid-cols-3', frame: 'aspect-video' },
+  { key: 'image', label: 'Pictures', icon: Images, grid: 'grid-cols-3 sm:grid-cols-4', frame: 'aspect-square' },
+];
+
 export function ArtistGallery({ artistId, emptyMessage }: Props) {
   const { data: items = [], isLoading } = useArtistGallery(artistId);
   const [openAt, setOpenAt] = useState<number | null>(null);
 
+  // Sections in a fixed order, and one flat list in that same order so the
+  // viewer walks through the gallery the way the page shows it.
+  const { sections, ordered } = useMemo(() => {
+    const sections = SECTIONS.map((s) => ({ ...s, items: items.filter((i) => i.kind === s.key) })).filter((s) => s.items.length > 0);
+    const ordered = sections.flatMap((s) => s.items);
+    return { sections, ordered };
+  }, [items]);
+
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="aspect-[4/5] animate-pulse rounded-xl bg-muted" />
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <div key={i} className="aspect-square animate-pulse rounded-xl bg-muted" />
         ))}
       </div>
     );
   }
 
-  if (!items.length) {
+  if (!ordered.length) {
     return (
       <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
         <ImageIcon className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
@@ -44,71 +61,80 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
     );
   }
 
+  let offset = 0;
   return (
     <>
-      <div className="columns-2 gap-3 sm:columns-3 [&>*]:mb-3">
-        {items.map((item, i) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setOpenAt(i)}
-            className="group relative block w-full break-inside-avoid overflow-hidden rounded-xl border border-border bg-muted text-left"
-            style={aspect(item)}
-          >
-            {item.kind === 'video' ? (
-              <>
-                {item.poster_url ? (
-                  <img src={item.poster_url} alt={item.title ?? ''} className="h-full w-full object-cover" loading="lazy" />
-                ) : (
-                  <video src={item.public_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-                )}
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm">
-                    <Play className="ml-0.5 h-5 w-5 fill-white text-white" />
-                  </span>
-                </span>
-              </>
-            ) : (
-              <img
-                src={item.public_url}
-                alt={item.title ?? ''}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                loading="lazy"
-              />
-            )}
-
-            {item.coin_status === 'minted' && item.zora_coin_address && (
-              <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-                <Coins className="h-3 w-3" /> Coined
-              </span>
-            )}
-            {item.title && (
-              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2.5 pb-2 pt-6 text-xs font-medium text-white">
-                <span className="line-clamp-1">{item.title}</span>
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="space-y-6">
+        {sections.map((section) => {
+          const start = offset;
+          offset += section.items.length;
+          const Icon = section.icon;
+          return (
+            <section key={section.key} aria-label={section.label}>
+              <div className="mb-2 flex items-center gap-2">
+                <Icon className="h-4 w-4 text-muted-foreground" />
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.label}</h4>
+                <span className="text-xs text-muted-foreground/70">{section.items.length}</span>
+              </div>
+              <div className={`grid gap-2 ${section.grid}`}>
+                {section.items.map((item, i) => (
+                  <Tile key={item.id} item={item} frame={section.frame} onOpen={() => setOpenAt(start + i)} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
-      {openAt !== null && items[openAt] && (
-        <Lightbox
-          items={items}
-          index={openAt}
-          onIndex={setOpenAt}
-          onClose={() => setOpenAt(null)}
-        />
+      {openAt !== null && ordered[openAt] && (
+        <Lightbox items={ordered} index={openAt} onIndex={setOpenAt} onClose={() => setOpenAt(null)} />
       )}
     </>
   );
 }
 
-/* Reserve the right shape before the file loads, so the column does not jump
-   as each piece arrives. Falls back to a portrait-ish box when we never
-   measured it. */
-function aspect(item: ArtistMediaItem): React.CSSProperties {
-  if (item.width && item.height) return { aspectRatio: `${item.width} / ${item.height}` };
-  return { aspectRatio: '4 / 5' };
+function Tile({ item, frame, onOpen }: { item: ArtistMediaItem; frame: string; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`group relative block w-full overflow-hidden rounded-xl border border-border bg-muted text-left ${frame}`}
+      aria-label={item.title || (item.kind === 'video' ? 'Play clip' : 'Open picture')}
+    >
+      {item.kind === 'video' ? (
+        <>
+          {item.poster_url ? (
+            <img src={item.poster_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <video src={item.public_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+          )}
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm">
+              <Play className="ml-0.5 h-4 w-4 fill-white text-white" />
+            </span>
+          </span>
+        </>
+      ) : (
+        <img
+          src={item.public_url}
+          alt=""
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          loading="lazy"
+        />
+      )}
+
+      {item.coin_status === 'minted' && item.zora_coin_address && (
+        <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+          <Coins className="h-3 w-3" /> Coined
+        </span>
+      )}
+      {item.title && (
+        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-1.5 pt-5 text-[11px] font-medium text-white">
+          <span className="line-clamp-1">{item.title}</span>
+        </span>
+      )}
+    </button>
+  );
 }
 
 function Lightbox({

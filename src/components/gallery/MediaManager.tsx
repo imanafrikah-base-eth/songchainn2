@@ -25,6 +25,12 @@ import {
 const MAX_IMAGE_MB = 20;
 const MAX_VIDEO_MB = 200;
 
+/** The sections the page shows, in the same order. Nothing sits loose. */
+const SECTIONS: Array<{ key: 'video' | 'image'; label: string }> = [
+  { key: 'video', label: 'Clips' },
+  { key: 'image', label: 'Pictures' },
+];
+
 interface Props {
   /** Their wallet, if they have connected one. Coining is offered only then. */
   walletAddress?: string | null;
@@ -111,8 +117,14 @@ export function MediaManager({ walletAddress }: Props) {
           Nothing up yet. What you add here is what people see on your page.
         </p>
       ) : (
+        <div className="space-y-6">
+          {SECTIONS.filter((sec) => items.some((i) => i.kind === sec.key)).map((sec) => (
+            <section key={sec.key} aria-label={sec.label}>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {sec.label} <span className="font-normal text-muted-foreground/70">{items.filter((i) => i.kind === sec.key).length}</span>
+              </h4>
         <ul className="space-y-2">
-          {items.map((item) => (
+          {items.filter((i) => i.kind === sec.key).map((item) => (
             <li key={item.id} className="flex gap-3 rounded-xl border border-border bg-card p-3">
               <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                 {item.kind === 'video' ? (
@@ -236,6 +248,9 @@ export function MediaManager({ walletAddress }: Props) {
             </li>
           ))}
         </ul>
+            </section>
+          ))}
+        </div>
       )}
 
       {!walletAddress && items.length > 0 && (

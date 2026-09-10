@@ -240,6 +240,7 @@ export default function Home() {
       id: pick.song.id,
       title: pick.song.title,
       artist: pick.song.artist,
+      artistId: pick.song.artistId,
       coverImage: pick.song.coverImage,
       label: pick.label,
       href: `/song/${pick.song.id}`,

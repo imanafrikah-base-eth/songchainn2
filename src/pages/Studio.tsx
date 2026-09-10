@@ -31,6 +31,7 @@ import { SongDetailsFields, DistributionChoice } from '@/components/studio/SongD
 import { SongDetailsDialog } from '@/components/studio/SongDetailsDialog';
 import { UploadProgress } from '@/components/studio/UploadProgress';
 import { ActivityBoard } from '@/components/studio/ActivityBoard';
+import { VerificationCard } from '@/components/studio/VerificationCard';
 import { EMPTY_DETAILS, detailProblems, requestOnchain, type SongDetails } from '@/lib/songDetails';
 import { checkCover, COVER_ACCEPT, COVER_GOOD_PX, MAX_COVER_MB, NO_COVER, type CoverCheck } from '@/lib/coverArt';
 import { useSongCoin } from '@/hooks/useSongCoins';
@@ -557,6 +558,10 @@ const Studio = () => {
           </span>
           <Globe2 className="h-4 w-4 shrink-0 text-muted-foreground" />
         </Link>
+
+        {/* ----------------------------------------------- verification --- */}
+
+        <VerificationCard />
 
         {/* ------------------------------------------------ visual work --- */}
 
