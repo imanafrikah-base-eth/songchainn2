@@ -219,7 +219,7 @@ export function ShareSongButton({
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={(e) => { e.stopPropagation(); setShowSheet(true); }}
-        className={cn('p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all', className)}
+        className={cn('inline-flex min-h-11 min-w-11 items-center justify-center p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all', className)}
       >
         <Share2 className="w-4 h-4" />
       </motion.button>

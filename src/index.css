@@ -682,6 +682,25 @@ body {
 .grid > [role="button"] {
   min-width: min-content;
 }
+/* The reset above outranks Tailwind's min-width utilities by source order,
+   which silently shrank icon buttons back to their padding. A tap target
+   that asked for a minimum keeps it. */
+.flex > .min-w-11,
+.grid > .min-w-11 {
+  min-width: 2.75rem;
+}
+.flex > .min-w-10,
+.grid > .min-w-10 {
+  min-width: 2.5rem;
+}
+.flex > .min-w-8,
+.grid > .min-w-8 {
+  min-width: 2rem;
+}
+.flex > button,
+.grid > button {
+  min-width: min-content;
+}
 
 .min-w-0 {
   min-width: 0;
