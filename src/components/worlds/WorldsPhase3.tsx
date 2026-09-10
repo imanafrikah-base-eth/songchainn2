@@ -30,21 +30,28 @@ import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
  */
 
 /** Every line below names something that exists. Nothing is a promise. */
+const W = '/world-assets';
 const WHAT_IS_REAL = [
   {
     icon: Glasses,
     title: 'Step inside in VR',
-    line: 'Put on a VR headset and you are standing in the city itself. No headset? On a computer you can still look around it in 3D on screen.',
+    line: 'A headset puts you in the city. A computer lets you look around it in 3D.',
+    image: `${W}/city-music.jpg`,
+    video: `${W}/city-music.mp4`,
   },
   {
     icon: MessageSquare,
     title: 'Get a private word',
-    line: 'Book fifteen minutes with the artist in the Parlour. You pay them straight from your own wallet, and we never hold the money.',
+    line: 'Fifteen minutes with the artist in the Parlour, paid wallet to wallet.',
+    image: `${W}/room-parlour.jpg`,
+    video: `${W}/room-parlour.mp4`,
   },
   {
     icon: KeyRound,
     title: 'Hold the key, doors open',
-    line: "The artist's coin is the key. Hold it and rooms unlock, sell it and they close. No subscription anywhere.",
+    line: "The artist's coin is the key. Hold it and rooms unlock.",
+    image: `${W}/entrance-doors.jpg`,
+    video: `${W}/entrance.mp4`,
   },
 ];
 
@@ -103,25 +110,29 @@ export function WorldsPhase3({
         />
       </div>
 
-      {/* 2. WHAT IS REAL */}
+      {/* 2. WHAT IS REAL, shown: the rooms themselves behind the words. */}
       <ul className="mt-5 grid gap-3 sm:grid-cols-3">
-        {WHAT_IS_REAL.map(({ icon: Icon, title, line }) => (
-          <li
-            key={title}
-            className="rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-primary/30"
-          >
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary/12">
-              <Icon className="h-4 w-4 text-primary" />
-            </span>
-            <p className="mt-2.5 text-sm font-semibold text-foreground">{title}</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{line}</p>
+        {WHAT_IS_REAL.map(({ icon: Icon, title, line, image, video }) => (
+          <li key={title} className="group relative min-h-[10rem] overflow-hidden rounded-xl border border-border bg-black">
+            <img src={image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+            <video src={video} poster={image} muted loop playsInline autoPlay preload="none" className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+            <div className="relative flex h-full flex-col justify-end p-4">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
+                <Icon className="h-3.5 w-3.5 text-white" />
+              </span>
+              <p className="mt-2 text-sm font-semibold text-white drop-shadow">{title}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-white/80 drop-shadow">{line}</p>
+            </div>
           </li>
         ))}
       </ul>
 
       {/* 3. THE OFFER */}
-      <div className="mt-4 overflow-hidden rounded-2xl border border-primary/30 bg-card/60">
-        <div className="grid gap-4 p-5 sm:grid-cols-[1.2fr_auto] sm:items-center sm:p-6">
+      <div className="relative mt-4 overflow-hidden rounded-2xl border border-primary/30 bg-card/60">
+        <img src={`${W}/square-hero.jpg`} alt="" loading="lazy" decoding="async" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/95 via-background/80 to-background/40" />
+        <div className="relative grid gap-4 p-5 sm:grid-cols-[1.2fr_auto] sm:items-center sm:p-6">
           <div>
             <p className="inline-flex items-center gap-1.5 rounded-full border border-primary/35 bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
               <Hammer className="h-3 w-3" />

@@ -1,153 +1,66 @@
 import { Link } from 'react-router-dom';
-import {
-  Radio, Coins, Swords, Trophy, Users, UploadCloud, BadgeCheck, Wallet, Globe2, ArrowRight,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useArtistOwnership } from '@/hooks/useArtistOwnership';
+import { ArtMosaic, ArtistFaces, PictureCard } from '@/components/ArtMosaic';
 
 /**
- * What is actually here, said plainly.
+ * What is actually here, shown rather than listed.
  *
- * Replaces the "Phase Two Beta" panel. Nothing on SONGCHAINN is in beta any
- * more, and telling people it is makes a finished product feel unfinished.
- *
- * The list an artist needs to see is not the list a listener needs to see, so
- * this renders two different things depending on who is reading it.
+ * This used to be a column of icons and paragraphs. Now every thing that
+ * works has a picture of itself: the records are the records, the rooms are
+ * the rooms, the world is the world. Two versions still: a listener and an
+ * artist want different doors.
  */
 
-type Item = { icon: typeof Radio; title: string; body: string; to?: string; cta?: string; soon?: boolean };
-
-const FOR_LISTENERS: Item[] = [
-  {
-    icon: Radio,
-    title: 'The whole catalog, streaming',
-    body: 'Every record on here was mastered before it was published. Play it anywhere, and it keeps working offline.',
-    to: '/discover',
-    cta: 'Start listening',
-  },
-  {
-    icon: Coins,
-    title: 'Songs you can actually own',
-    body: 'Tracks are real coins on Base. Back an artist you believe in early, and hold a piece of the record.',
-    to: '/marketplace',
-    cta: 'Open the marketplace',
-  },
-  {
-    icon: Users,
-    title: 'Rooms',
-    body: 'Listen at the same time as everybody else, talk while it plays, and find people with your taste.',
-    to: '/room',
-    cta: 'Find a room',
-  },
-  {
-    icon: Swords,
-    title: 'WaveWarz Africa',
-    body: 'Live battles between African artists, with $HIKULU and NAKULU judging. You vote, and your vote counts.',
-    to: '/wavewarz-africa',
-    cta: 'Watch a battle',
-  },
-  {
-    icon: Trophy,
-    title: 'Points that mean something',
-    body: 'Listening, liking and voting all earn points. They are counted on our side, so they cannot be faked, and they decide the leaderboard.',
-    to: '/leaderboard',
-    cta: 'See the top fans',
-  },
-];
-
-const FOR_ARTISTS: Item[] = [
-  {
-    icon: UploadCloud,
-    title: 'Release today, free',
-    body: 'Send a finished record from the Studio. If it meets the standard it is live to listeners the same minute. Nobody sits between you and your release. The Studio opens once your artist account is confirmed.',
-    to: '/claim',
-    cta: 'Get your artist account',
-  },
-  {
-    icon: BadgeCheck,
-    title: 'Your page, run by you',
-    body: 'Already have songs on here? Claim your artist page and your name, bio, picture and cover become the page. The verified tick comes with it.',
-    to: '/artists',
-    cta: 'Find your page',
-  },
-  {
-    icon: Wallet,
-    title: 'Paid to your own wallet',
-    body: 'Coin a track and earnings go straight to a wallet you control. We never hold your money, so there is nothing for anyone to freeze.',
-  },
-  {
-    icon: Trophy,
-    title: 'See who is really listening',
-    body: 'Points come from real listening, not follows. You can see which fans actually show up for you.',
-    to: '/leaderboard',
-    cta: 'See the leaderboard',
-  },
-  {
-    icon: Globe2,
-    title: 'Build your own World',
-    body: 'A space that is yours alone, with rooms only your people can walk into. Six screens, no code, and free for the first 50 artists.',
-    to: '/world-builder',
-    cta: 'Start building',
-  },
-];
-
-function Row({ item }: { item: Item }) {
-  const { icon: Icon, title, body, to, cta, soon } = item;
-  return (
-    <div className="flex gap-3">
-      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-        <Icon className="h-4 w-4 text-primary" />
-      </div>
-      <div className="min-w-0">
-        <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-          {title}
-          {soon && (
-            <span className="rounded-full border border-border bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-              Coming soon
-            </span>
-          )}
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{body}</p>
-        {to && cta && (
-          <Link
-            to={to}
-            className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-          >
-            {cta}
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        )}
-      </div>
-    </div>
-  );
-}
+const W = '/world-assets';
 
 export function WhatsLive() {
   const { isArtist, isLoading } = useArtistOwnership();
   if (isLoading) return null;
 
-  const items = isArtist ? FOR_ARTISTS : FOR_LISTENERS;
-
   return (
-    <section className="glass-card rounded-2xl p-5 sm:rounded-3xl sm:p-6 shine-overlay">
-      <div className="mb-1 flex items-center gap-2">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-        </span>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Live now</span>
+    <section className="glass-card overflow-hidden rounded-2xl sm:rounded-3xl shine-overlay">
+      <div className="p-5 pb-3 sm:p-6 sm:pb-3">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Live now</span>
+        </div>
+        <h3 className="font-heading text-lg font-bold text-foreground sm:text-xl">
+          {isArtist ? 'Everything you can do here' : "What's on $ongChainn"}
+        </h3>
       </div>
 
-      <h3 className="font-heading text-lg font-bold text-foreground sm:text-xl">
-        {isArtist ? 'Everything you can do here' : "What's on SONGCHAINN"}
-      </h3>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {isArtist
-          ? 'All of this is working today. Nothing here is a promise.'
-          : 'All of it is working today, and it is free to listen.'}
-      </p>
+      <ArtMosaic count={16} seed={isArtist ? 11 : 5} size="sm" className="px-5 sm:px-6" />
 
-      <div className="mt-5 space-y-5">
-        {items.map((item) => <Row key={item.title} item={item} />)}
+      <div className="grid gap-3 p-5 pt-4 sm:grid-cols-2 sm:p-6 sm:pt-4">
+        {isArtist ? (
+          <>
+            <PictureCard image={`${W}/room-studio.jpg`} title="Release today, free" line="Send a finished record. The judges listen, it is live the same minute." to="/studio" cta="Open the Studio" />
+            <PictureCard image={`${W}/square-hero.jpg`} video={`${W}/square-hero.mp4`} title="Build your own world" line="Streets, rooms, a key. Six screens, no code, or ask Mo$ha to build it." to="/world-builder" cta="Start building" />
+            <PictureCard image={`${W}/room-request.jpg`} title="Paid to your own wallet" line="Coin a record and the earnings land with you. We never hold the money." to="/studio" cta="See the activity board" />
+            <PictureCard image={`${W}/room-council.jpg`} title="See who really listens" line="Points come from real listening, so you see the fans who show up." to="/leaderboard" cta="The leaderboard" />
+          </>
+        ) : (
+          <>
+            <PictureCard image={`${W}/room-gallery.jpg`} title="Every record, streaming free" line="Mastered before it was published. Plays offline too." to="/discover" cta="Start listening" />
+            <PictureCard image={`${W}/room-streets.jpg`} video={`${W}/room-streets.mp4`} title="Walk into a world" line="An artist's streets, rooms and stage. Hold the key and doors open." to="/worlds" cta="Artist Worlds" />
+            <PictureCard image={`${W}/room-stage.jpg`} title="Rooms and battles" line="Listen with everyone at once, or watch two artists go head to head." to="/room" cta="The Room" />
+            <PictureCard image={`${W}/room-wall.jpg`} title="Own the songs you love" line="Some records are coins on Base. Back one early and hold a piece." to="/marketplace" cta="The marketplace" />
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-border/60 px-5 py-3 sm:px-6">
+        <div className="flex items-center gap-3">
+          <ArtistFaces count={6} size="sm" />
+          <p className="text-xs text-muted-foreground">The artists are here. Every one of them keeps everything.</p>
+        </div>
+        <Link to={isArtist ? '/studio' : '/artists'} className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary">
+          {isArtist ? 'Studio' : 'Meet them'} <ArrowRight className="h-3 w-3" />
+        </Link>
       </div>
     </section>
   );

@@ -87,6 +87,7 @@ export default {
         "2xl": "calc(var(--radius) + 8px)",
       },
       keyframes: {
+        drift: { from: { transform: "translateX(0)" }, to: { transform: "translateX(-50%)" } },
         shimmer: { from: { transform: "translateX(-100%)" }, to: { transform: "translateX(300%)" } },
         "accordion-down": {
           from: { height: "0" },
