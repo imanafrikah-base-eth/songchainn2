@@ -7,7 +7,8 @@ const getEnv = (key: string): string | undefined => {
 };
 
 const ALLOWED_ORIGINS = new Set<string>(
-  (getEnv("ALLOWED_ORIGINS") ?? "https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz")
+  (getEnv("ALLOWED_ORIGINS") ??
+    "https://songchainn.xyz,https://app.songchainn.xyz,https://www.songchainn.xyz,https://beta.songchainn.xyz,http://localhost:5173,http://127.0.0.1:5173")
     .split(",").map((s) => s.trim()).filter(Boolean),
 );
 
@@ -73,6 +74,21 @@ const getAuthenticatedUser = async (req: Request) => {
   return (await res.json().catch(() => null)) as { id?: string; email?: string } | null;
 };
 
+const serviceGet = async (path: string): Promise<Array<Record<string, unknown>> | null> => {
+  const supabaseUrl = getEnv("SUPABASE_URL");
+  const serviceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
+    });
+    if (!res.ok) return null;
+    return (await res.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+  } catch {
+    return null;
+  }
+};
+
 // Returns the explicit role for this user in this battle room, or null if no
 // membership row exists. Throws on infrastructure errors so the caller can
 // fail closed rather than silently downgrading to "audience" on a network
@@ -81,29 +97,12 @@ const getBattleRole = async (
   battleId: string,
   userId: string,
 ): Promise<{ role: string | null; error?: "config" | "lookup" }> => {
-  const supabaseUrl = getEnv("SUPABASE_URL");
-  const serviceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) return { role: null, error: "config" };
-
-  const restUrl = new URL(`${supabaseUrl}/rest/v1/battle_rooms`);
-  restUrl.searchParams.set("select", "role");
-  restUrl.searchParams.set("battle_id", `eq.${battleId}`);
-  restUrl.searchParams.set("user_id", `eq.${userId}`);
-  restUrl.searchParams.set("order", "last_seen_at.desc");
-  restUrl.searchParams.set("limit", "1");
-
-  let res: Response;
-  try {
-    res = await fetch(restUrl.toString(), {
-      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
-    });
-  } catch {
-    return { role: null, error: "lookup" };
-  }
-  if (!res.ok) return { role: null, error: "lookup" };
-
-  const rows = (await res.json().catch(() => [])) as Array<{ role?: string }>;
-  return { role: rows[0]?.role ?? null };
+  if (!getEnv("SUPABASE_URL") || !getEnv("SUPABASE_SERVICE_ROLE_KEY")) return { role: null, error: "config" };
+  const rows = await serviceGet(
+    `battle_rooms?select=role&battle_id=eq.${encodeURIComponent(battleId)}&user_id=eq.${encodeURIComponent(userId)}&order=last_seen_at.desc&limit=1`,
+  );
+  if (rows === null) return { role: null, error: "lookup" };
+  return { role: (rows[0]?.role as string | undefined) ?? null };
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -126,6 +125,14 @@ const handler = async (req: Request): Promise<Response> => {
     const roomName = String((body as any)?.roomName || "").trim();
     const participantName = String((body as any)?.participantName || "").trim() || "WaveWarz Listener";
     if (!roomName) return json(origin, { error: "roomName is required" }, { status: 400 });
+
+    // In-app voice is on per battle since 11 Sep 2026. A battle whose host has
+    // not turned it on gets no room pass at all, whatever the caller's role.
+    const battleRows = await serviceGet(`battles?select=voice_enabled&id=eq.${encodeURIComponent(roomName)}&limit=1`);
+    if (battleRows === null) return json(origin, { error: "Could not check this battle" }, { status: 503 });
+    if (battleRows[0]?.voice_enabled !== true) {
+      return json(origin, { error: "In-app voice is not on for this battle" }, { status: 403 });
+    }
 
     const lookup = await getBattleRole(roomName, user.id);
     if (lookup.error === "config") {
@@ -184,4 +191,3 @@ if (typeof denoServe === "function") {
     event.respondWith(handler(event.request));
   });
 }
-

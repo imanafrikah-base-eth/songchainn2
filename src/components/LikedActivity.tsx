@@ -1,4 +1,4 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { artistPath, songPath } from '@/lib/slugRoutes';
 import { Link } from 'react-router-dom';
 import { ArtistName } from '@/components/ArtistName';
 import { formatDistanceToNow } from 'date-fns';
@@ -102,7 +102,7 @@ export function LikedActivity({
             {songs.map(({ song, at }) => (
               <Link
                 key={`${song.id}-${at}`}
-                to={`/song/${song.id}`}
+                to={songPath(song)}
                 className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 transition-colors hover:bg-muted/50"
               >
                 <Cover src={song.coverImage} alt={song.title} />

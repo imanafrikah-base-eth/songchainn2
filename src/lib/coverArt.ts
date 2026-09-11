@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { shrinkCover } from '@/lib/shrinkImage';
+import { sendFile } from '@/lib/storageUpload';
 
 /**
  * Cover art rules, in one place, because every door a record can come
@@ -37,7 +38,7 @@ export async function checkCover(file: File): Promise<CoverCheck> {
     const shortest = Math.min(width, height);
     const ratio = width / height;
     if (ratio > 1.1 || ratio < 0.9) {
-      return { block: `That image is ${width} by ${height}. Covers have to be square; crop it first.`, warn: null };
+      return { block: 'Covers are square. Pick the photo again and drag it square.', warn: null };
     }
     if (shortest < COVER_MIN_PX) {
       return { block: `That image is only ${shortest} pixels across. It needs at least ${COVER_MIN_PX}, and ${COVER_GOOD_PX} looks right.`, warn: null };
@@ -65,7 +66,7 @@ export async function landCover(cover: File, onProgress?: (pct: number) => void)
     body: { purpose: 'visual', title: 'Cover', fileName: sending.name, contentType: sending.type, fileBytes: sending.size },
   });
   if (error || !ticket?.uploadUrl) throw new Error('The cover art could not start uploading. Check your connection and try again.');
-  await putFile(ticket.uploadUrl, sending, onProgress);
+  await sendFile(ticket.uploadUrl, sending, { kind: 'visual', id: ticket.mediaId }, onProgress);
   const { data: row } = await supabase
     .from('artist_media' as never)
     .update({ is_published: false, updated_at: new Date().toISOString() } as never)
@@ -75,22 +76,4 @@ export async function landCover(cover: File, onProgress?: (pct: number) => void)
   const url = (row as { public_url?: string } | null)?.public_url ?? (typeof ticket.publicUrl === 'string' ? ticket.publicUrl : null);
   if (!url) throw new Error('The cover art did not land. Try again.');
   return url;
-}
-
-function putFile(url: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url, true);
-    xhr.setRequestHeader('Content-Type', file.type);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`The cover art did not land (${xhr.status}). Try again.`));
-    };
-    xhr.onerror = () => reject(new Error('The cover art did not land. Check your connection and try again.'));
-    xhr.ontimeout = () => reject(new Error('The cover art timed out. Try again on a stronger connection.'));
-    xhr.send(file);
-  });
 }

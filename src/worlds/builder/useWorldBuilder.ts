@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { WorldStage } from '@/worlds/types';
+import { noteDid } from '@/lib/moshaWatch';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { CLASSIC_NINE_ROOMS } from '../rooms';
@@ -60,6 +62,10 @@ export interface DraftCity {
   kind: string;
   hue: string;
   sort_order: number;
+  /** How visitors see it while it is being built: open, coming soon, off the map. */
+  stage?: WorldStage;
+  /** Street slugs standing in this city, in the order they stand. */
+  buildings?: string[];
 }
 
 export interface DraftStreet {
@@ -82,6 +88,12 @@ export interface DraftStreet {
   key_nft_id: string | null;
   /** Put away: kept with everything on it, off the map until shown again. */
   hidden: boolean;
+  /**
+   * How visitors see it while it is being built. 'away' is the same thing
+   * `hidden` has always meant, and the database keeps the two in step, so
+   * older code that only reads `hidden` is unaffected.
+   */
+  stage?: WorldStage;
 }
 
 export interface DraftGate {
@@ -113,6 +125,37 @@ export function slugify(input: string): string {
     .slice(0, 48);
 }
 
+/* How each saved change is said to Mo$ha: [set, cleared]. Only what an artist
+   would recognise as a thing they did; everything else stays unsaid. */
+const WORLD_FIELD_WORDS: Partial<Record<keyof DraftWorld, [string, string]>> = {
+  hero_image: ['set the hero picture', 'took the hero picture off'],
+  hero_video: ['set the hero loop', 'took the hero loop off'],
+  entrance_poster: ['set the entrance picture', 'took the entrance picture off'],
+  entrance_video: ['set the entrance loop', 'took the entrance loop off'],
+  story: ['changed the story on the gate', 'cleared the story on the gate'],
+  positioning: ['changed the line about the world', 'cleared the line about the world'],
+  artist_name: ['changed the name on the world', 'cleared the name on the world'],
+  accent: ['changed the colour of the world', 'changed the colour of the world'],
+  visitor_posts: ['changed who may post in the world', 'changed who may post in the world'],
+  ad_kind: ['changed what the advert on Home shows', 'changed what the advert on Home shows'],
+  ad_image: ['set the picture for the advert on Home', 'took the advert picture off'],
+  ad_video: ['set the clip for the advert on Home', 'took the advert clip off'],
+  zora_profile_url: ['put in their Zora link', 'took their Zora link off'],
+  zora_wallet_address: ['put in the wallet their Zora account pays to', 'took the Zora payout wallet off'],
+  mosha_mode: ['changed how much Mo$ha talks while they build', 'changed how much Mo$ha talks while they build'],
+};
+
+const STAGE_WORDS: Record<string, string> = { open: 'open to visitors', soon: 'Coming soon', away: 'off the map' };
+
+function noteWorldPatch(patch: Partial<DraftWorld>) {
+  for (const [field, value] of Object.entries(patch)) {
+    const words = WORLD_FIELD_WORDS[field as keyof DraftWorld];
+    if (!words) continue;
+    const empty = value === null || value === '' || (Array.isArray(value) && value.length === 0);
+    noteDid(`world:${field}`, empty ? words[1] : words[0]);
+  }
+}
+
 export function useWorldBuilder(worldId?: string) {
   const { user, artistId } = useAuth();
   const [world, setWorld] = useState<DraftWorld | null>(null);
@@ -122,6 +165,26 @@ export function useWorldBuilder(worldId?: string) {
   const [blocksByStreet, setBlocksByStreet] = useState<Record<string, BlockInstance[]>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* The world as of the last save, not as of the last render. An upload can
+     take minutes, and the save that runs when it finishes used to build on the
+     world as it was when the file was picked, wiping whatever was set while it
+     was on its way. */
+  const worldRef = useRef<DraftWorld | null>(null);
+  useEffect(() => {
+    worldRef.current = world;
+  }, [world]);
+  /* Names, for saying what was changed in words the artist chose. */
+  const streetsRef = useRef<DraftStreet[]>([]);
+  const citiesRef = useRef<DraftCity[]>([]);
+  useEffect(() => {
+    streetsRef.current = streets;
+  }, [streets]);
+  useEffect(() => {
+    citiesRef.current = cities;
+  }, [cities]);
+  const streetName = (id: string) => streetsRef.current.find((s) => s.id === id)?.name ?? 'a street';
+  const nameForSlug = (slug: string) =>
+    streetsRef.current.find((s) => s.slug === slug)?.name ?? citiesRef.current.find((c) => c.slug === slug)?.name ?? slug;
 
   const load = useCallback(
     async (id: string) => {
@@ -150,14 +213,14 @@ export function useWorldBuilder(worldId?: string) {
 
         const { data: c } = await supabase
           .from('world_cities')
-          .select('id, slug, name, kind, hue, sort_order')
+          .select('id, slug, name, kind, hue, sort_order, stage, buildings')
           .eq('world_id', id)
           .order('sort_order');
         setCities((c ?? []) as unknown as DraftCity[]);
 
         const { data: s } = await supabase
           .from('world_streets')
-          .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden')
+          .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden, stage')
           .eq('world_id', id)
           .order('sort_order');
         const streetRows = (s ?? []) as unknown as DraftStreet[];
@@ -276,13 +339,45 @@ export function useWorldBuilder(worldId?: string) {
     [user?.id, artistId],
   );
 
+  const writeWorld = useCallback(async (patch: Partial<DraftWorld>) => {
+    const current = worldRef.current;
+    if (!current) return;
+    worldRef.current = { ...current, ...patch };
+    setWorld((prev) => (prev ? { ...prev, ...patch } : prev));
+    await supabase.from('worlds').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', current.id);
+  }, []);
+
   const saveWorld = useCallback(
     async (patch: Partial<DraftWorld>) => {
-      if (!world) return;
-      setWorld({ ...world, ...patch } as DraftWorld);
-      await supabase.from('worlds').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', world.id);
+      noteWorldPatch(patch);
+      await writeWorld(patch);
     },
-    [world],
+    [writeWorld],
+  );
+
+  /** One entry in one of the world's maps (a street's picture, a city's loop, a frame), merged into the latest map. */
+  const saveWorldKey = useCallback(
+    async (column: 'room_art' | 'room_video' | 'city_art' | 'city_video' | 'art_fit' | 'depth', key: string, value: unknown) => {
+      const current = worldRef.current;
+      if (!current) return;
+      const next: Record<string, unknown> = { ...((current[column] as Record<string, unknown> | null) ?? {}) };
+      const on = value !== null && value !== undefined;
+      if (on) next[key] = value;
+      else delete next[key];
+
+      const place = nameForSlug(key.includes(':') ? key.split(':')[1] : key);
+      const said: Record<typeof column, string> = {
+        room_art: on ? `put a picture on the street ${place}` : `took the picture off the street ${place}`,
+        room_video: on ? `put a loop on the street ${place}` : `took the loop off the street ${place}`,
+        city_art: on ? `put a picture on the city ${place}` : `took the picture off the city ${place}`,
+        city_video: on ? `put a loop on the city ${place}` : `took the loop off the city ${place}`,
+        art_fit: `framed the ${key.includes(':') ? `picture on ${place}` : `${key} picture`}`,
+        depth: on ? `set the 3D ${key} texture` : `took the 3D ${key} texture off`,
+      };
+      noteDid(`${column}:${key}`, said[column]);
+      await writeWorld({ [column]: next } as Partial<DraftWorld>);
+    },
+    [writeWorld],
   );
 
   const saveGate = useCallback(
@@ -290,6 +385,7 @@ export function useWorldBuilder(worldId?: string) {
       if (!world) return;
       const next = { ...gate, ...patch };
       setGate(next);
+      noteDid('gate', 'changed the key to the world or how much of it opens each door');
       await supabase.from('world_gates').upsert({ world_id: world.id, ...next }, { onConflict: 'world_id' });
     },
     [world, gate],
@@ -297,9 +393,9 @@ export function useWorldBuilder(worldId?: string) {
 
   const addStreet = useCallback(
     async (name: string) => {
-      if (!world) return;
+      if (!world) return null;
       const slug = slugify(name);
-      if (!slug) return;
+      if (!slug) return null;
       const { data } = await supabase
         .from('world_streets')
         .insert({
@@ -310,24 +406,43 @@ export function useWorldBuilder(worldId?: string) {
           access: 'public',
           sort_order: streets.length,
         })
-        .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden')
+        .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden, stage')
         .single();
-      if (data) setStreets((prev) => [...prev, data as unknown as DraftStreet]);
+      if (data) {
+        setStreets((prev) => [...prev, data as unknown as DraftStreet]);
+        noteDid(`street-add:${slug}`, `added a street called ${name}`);
+        return slug;
+      }
+      return null;
     },
     [world, streets.length],
   );
 
   const saveCity = useCallback(async (id: string, patch: Partial<DraftCity>) => {
+    const name = patch.name ?? citiesRef.current.find((c) => c.id === id)?.name ?? 'a city';
+    if (patch.name !== undefined) noteDid(`city-name:${id}`, `renamed a city to ${patch.name}`);
+    if (patch.stage) noteDid(`city-stage:${id}`, `set the city ${name} to ${STAGE_WORDS[patch.stage] ?? patch.stage}`);
+    if (patch.buildings) noteDid(`city-buildings:${id}`, `rearranged the streets standing in the city ${name}`);
     setCities((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     await supabase.from('world_cities').update(patch).eq('id', id);
   }, []);
 
   const saveStreet = useCallback(async (id: string, patch: Partial<DraftStreet>) => {
+    const name = patch.name ?? streetName(id);
+    if (patch.name !== undefined) noteDid(`street-name:${id}`, `renamed a street to ${patch.name}`);
+    if (patch.stage) noteDid(`street-stage:${id}`, `set the street ${name} to ${STAGE_WORDS[patch.stage] ?? patch.stage}`);
+    else if (patch.hidden !== undefined) noteDid(`street-stage:${id}`, patch.hidden ? `put the street ${name} off the map` : `put the street ${name} back on the map`);
+    if (patch.access !== undefined) noteDid(`street-access:${id}`, `changed who gets into ${name}`);
+    if (patch.key_kind !== undefined || patch.key_song_id !== undefined || patch.key_nft_id !== undefined || patch.key_threshold !== undefined) {
+      noteDid(`street-key:${id}`, `changed the key on ${name}`);
+    }
+    if (patch.tagline !== undefined || patch.teaser !== undefined) noteDid(`street-words:${id}`, `changed the words on ${name}`);
     setStreets((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
     await supabase.from('world_streets').update(patch).eq('id', id);
   }, []);
 
   const removeStreet = useCallback(async (id: string) => {
+    noteDid(`street-remove:${id}`, `deleted the street ${streetName(id)}`);
     setStreets((prev) => prev.filter((s) => s.id !== id));
     await supabase.from('world_streets').delete().eq('id', id);
   }, []);
@@ -347,6 +462,7 @@ export function useWorldBuilder(worldId?: string) {
           ...prev,
           [streetId]: [...(prev[streetId] ?? []), data as unknown as BlockInstance],
         }));
+        noteDid(`block-add:${streetId}:${blockType}`, `added ${blockType.replace(/-/g, ' ')} to ${streetName(streetId)}`);
       }
     },
     [blocksByStreet],
@@ -354,6 +470,7 @@ export function useWorldBuilder(worldId?: string) {
 
   const saveBlock = useCallback(
     async (streetId: string, blockId: string, props: Record<string, unknown>) => {
+      noteDid(`block-edit:${blockId}`, `edited something on ${streetName(streetId)}`);
       setBlocksByStreet((prev) => ({
         ...prev,
         [streetId]: (prev[streetId] ?? []).map((b) => (b.id === blockId ? { ...b, props } : b)),
@@ -364,6 +481,7 @@ export function useWorldBuilder(worldId?: string) {
   );
 
   const removeBlock = useCallback(async (streetId: string, blockId: string) => {
+    noteDid(`block-remove:${blockId}`, `removed something from ${streetName(streetId)}`);
     setBlocksByStreet((prev) => ({
       ...prev,
       [streetId]: (prev[streetId] ?? []).filter((b) => b.id !== blockId),
@@ -380,6 +498,7 @@ export function useWorldBuilder(worldId?: string) {
       if (i < 0 || j < 0 || j >= current.length) return;
       [current[i], current[j]] = [current[j], current[i]];
       const renumbered = current.map((b, idx) => ({ ...b, sort_order: idx }));
+      noteDid(`block-move:${streetId}`, `reordered what is on ${streetName(streetId)}`);
       setBlocksByStreet((prev) => ({ ...prev, [streetId]: renumbered }));
       await Promise.all(
         renumbered.map((b) => supabase.from('world_blocks').update({ sort_order: b.sort_order }).eq('id', b.id)),
@@ -394,6 +513,7 @@ export function useWorldBuilder(worldId?: string) {
     const { data, error: pe } = await supabase.rpc('publish_world', { _world_id: world.id });
     if (pe) return { ok: false, message: 'Could not publish', world_number: null };
     const row = Array.isArray(data) ? data[0] : data;
+    noteDid('publish', row?.ok ? 'opened the doors of the world' : `tried to open the doors and was told: ${String(row?.message ?? 'not yet')}`);
     if (row?.ok) await load(world.id);
     return {
       ok: Boolean(row?.ok),
@@ -412,6 +532,7 @@ export function useWorldBuilder(worldId?: string) {
     error,
     createWorld,
     saveWorld,
+    saveWorldKey,
     saveGate,
     addStreet,
     saveStreet,

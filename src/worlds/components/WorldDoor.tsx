@@ -6,7 +6,7 @@
 
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, Crown, Radio, DoorOpen } from 'lucide-react';
+import { Lock, Crown, Radio, DoorOpen, Hammer } from 'lucide-react';
 import type { WorldConfig, WorldRoomDef, WorldRings } from '../types';
 import { doorStateFor, roomIsEnterable } from '../types';
 import { WorldArt } from './WorldArt';
@@ -91,17 +91,19 @@ export function WorldDoor({
         <div className="relative flex h-full flex-col p-5" style={{ transform: 'translateZ(30px)' }}>
           <div className="mb-3 flex items-start justify-between gap-2">
             <p className={`text-[10px] font-semibold uppercase tracking-[0.18em] drop-shadow ${enterable ? hue.text : 'text-white/50'}`}>
-              {room.access === 'public' && 'Open to everyone'}
-              {room.access === 'fan' && 'Fan door'}
-              {room.access === 'insider' && 'Insider door'}
-              {room.access === 'council' && 'The top ten'}
-              {room.access === 'event' && 'Event door'}
+              {state === 'soon' && 'Coming soon'}
+              {state !== 'soon' && room.access === 'public' && 'Open to everyone'}
+              {state !== 'soon' && room.access === 'fan' && 'Fan door'}
+              {state !== 'soon' && room.access === 'insider' && 'Insider door'}
+              {state !== 'soon' && room.access === 'council' && 'The top ten'}
+              {state !== 'soon' && room.access === 'event' && 'Event door'}
             </p>
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm">
               {state === 'open' && <DoorOpen className={`h-4 w-4 ${hue.text}`} />}
               {(state === 'locked' || state === 'no-wallet') && <Lock className="h-4 w-4 text-white/60" />}
               {state === 'council' && <Crown className="h-4 w-4 text-yellow-300" />}
               {state === 'event' && <Radio className="h-4 w-4 text-red-300" />}
+              {state === 'soon' && <Hammer className="h-4 w-4 text-white/60" />}
             </span>
           </div>
 
@@ -128,6 +130,9 @@ export function WorldDoor({
               {state === 'no-wallet' && <span className="text-white/60">Connect to see your doors.</span>}
               {state === 'event' && (
                 <span className="text-white/60">No live moment right now. The first one is being scheduled.</span>
+              )}
+              {state === 'soon' && (
+                <span className="text-white/60">Coming soon. The artist is still building this one.</span>
               )}
             </div>
           </div>

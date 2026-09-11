@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, Play, Pause, Music,
   UserPlus, Check, Disc3, Copy, PartyPopper, Sparkles, Flame, UserCheck,
-  ListMusic, Headphones, MoreHorizontal, Trash2, Flag, UserMinus, Link2,
+  ListMusic, Headphones, MoreHorizontal, Trash2, Flag, UserMinus, Link2, Pencil,
 } from 'lucide-react';
 import { ReportDialog } from '@/components/ReportDialog';
+import { InlineEdit, EditedMark } from '@/components/social/InlineEdit';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +29,7 @@ import { SongCardMotion, normaliseSongCard } from '@/components/social/SongCardM
 import { useShare } from '@/hooks/useShare';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePulseCounts } from '@/hooks/usePopularity';
-import { getArtistSlugUrl, getSongSlugUrl } from '@/lib/slugRoutes';
+import { getArtistSlugUrl, getSongSlugUrl, songPath } from '@/lib/slugRoutes';
 
 function formatPulseTime(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -45,11 +46,13 @@ interface MusicFeedCardProps {
   onComment: () => void;
   /** Own posts only. Optional so existing callers keep working. */
   onDelete?: (postId: string) => void | Promise<unknown>;
+  /** Optional so existing callers keep working; without it Edit stays hidden. */
+  onEdit?: (postId: string, content: string) => Promise<boolean>;
   /** Take your own name off somebody else's post. */
   onUntagSelf?: (postId: string) => Promise<boolean> | void;
 }
 
-export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, onDelete, onUntagSelf }: MusicFeedCardProps) {
+export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, onDelete, onEdit, onUntagSelf }: MusicFeedCardProps) {
   const { user } = useAuth();
   const { currentSong, isPlaying, playSong, pause, play } = usePlayer();
   const navigate = useNavigate();
@@ -66,6 +69,8 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
   const activeSong = song ?? artistSong;
 
   const isOwnPost          = user?.id === post.user_id;
+  /* A caption with a typo used to mean deleting the whole slide. */
+  const [editingCaption, setEditingCaption] = useState(false);
   const isTaggedHere       = !!user?.id && (post.tagged ?? []).some((t) => t.user_id === user.id);
   const isThisSongPlaying  = activeSong ? currentSong?.id === activeSong.id && isPlaying : false;
   const isWelcomePost      = post.post_type === 'welcome';
@@ -366,7 +371,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
               Copy link
             </DropdownMenuItem>
             {activeSong && (
-              <DropdownMenuItem onClick={() => navigate(`/song/${activeSong.id}`)} className="gap-2">
+              <DropdownMenuItem onClick={() => navigate(songPath(activeSong))} className="gap-2">
                 <Music className="w-4 h-4" />View song
               </DropdownMenuItem>
             )}
@@ -400,6 +405,12 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Link2 className="w-4 h-4" />}
               Copy post link
             </DropdownMenuItem>
+            {isOwnPost && onEdit && (
+              <DropdownMenuItem onClick={() => setEditingCaption(true)} className="gap-2">
+                <Pencil className="w-4 h-4" />
+                Edit caption
+              </DropdownMenuItem>
+            )}
             {isOwnPost && onDelete && (
               <DropdownMenuItem onClick={() => setConfirmingDelete(true)} className="gap-2 text-destructive focus:text-destructive">
                 <Trash2 className="w-4 h-4" />
@@ -512,9 +523,24 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
             )}
           </div>
         )}
-        {!isWelcomePost && !isArtistFollowPost && !isSongLikePost && !isSongPulsePost && !isSongCommentPost
-          && !isPlaylistCreatedPost && !isRoomEnteredPost && post.content && (
-          <p className="text-white/90 text-sm mb-2 line-clamp-2">{post.content}</p>
+        {editingCaption && onEdit ? (
+          <div className="mb-2 rounded-xl bg-black/80 p-2">
+            <InlineEdit
+              value={post.content || ''}
+              rows={2}
+              placeholder="Your caption"
+              onSave={(next) => onEdit(post.id, next)}
+              onCancel={() => setEditingCaption(false)}
+            />
+          </div>
+        ) : (
+          !isWelcomePost && !isArtistFollowPost && !isSongLikePost && !isSongPulsePost && !isSongCommentPost
+            && !isPlaylistCreatedPost && !isRoomEnteredPost && post.content && (
+            <p className="text-white/90 text-sm mb-2 line-clamp-2">
+              {post.content}
+              {post.edited_at ? <EditedMark at={post.edited_at} className="ml-2 text-white/60" /> : null}
+            </p>
+          )
         )}
 
         {/* Who is in it. Names, not avatars: a row of tiny faces tells you

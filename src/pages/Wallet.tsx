@@ -1,3 +1,4 @@
+import { songPath } from '@/lib/slugRoutes';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -226,7 +227,7 @@ export default function Wallet() {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-foreground">
                         {song ? (
-                          <Link to={`/song/${song.id}`} className="hover:text-primary">{song.title}</Link>
+                          <Link to={songPath(song)} className="hover:text-primary">{song.title}</Link>
                         ) : (
                           'A song'
                         )}

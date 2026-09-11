@@ -242,6 +242,8 @@ export type Database = {
           voting_open: boolean | null
           winner: string | null
           x_space_url: string | null
+          voice_enabled: boolean
+          voice_enabled_at: string | null
         }
         Insert: {
           artist_a_image?: string | null
@@ -278,6 +280,8 @@ export type Database = {
           voting_open?: boolean | null
           winner?: string | null
           x_space_url?: string | null
+          voice_enabled?: boolean
+          voice_enabled_at?: string | null
         }
         Update: {
           artist_a_image?: string | null
@@ -314,6 +318,8 @@ export type Database = {
           voting_open?: boolean | null
           winner?: string | null
           x_space_url?: string | null
+          voice_enabled?: boolean
+          voice_enabled_at?: string | null
         }
         Relationships: []
       }

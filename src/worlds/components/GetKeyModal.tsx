@@ -145,9 +145,13 @@ export function GetKeyModal({
           description: res.message,
           action: {
             label: 'Ask Mo$ha',
-            onClick: () => window.dispatchEvent(new CustomEvent('songchainn:open-mosha', {
-              detail: { ask: `I tried to get ${symbol} for ${ethAmount} ETH and it did not work. It said: ${res.message}${res.advice ? ` (${res.advice})` : ''}. What should I do?` },
-            })),
+            onClick: () => {
+              // Out of his way first, or the dialog is still on top of him.
+              onOpenChange(false);
+              window.dispatchEvent(new CustomEvent('songchainn:open-mosha', {
+                detail: { ask: `I tried to get ${symbol} for ${ethAmount} ETH and it did not work. It said: ${res.message}${res.advice ? ` (${res.advice})` : ''}. What should I do?` },
+              }));
+            },
           },
         });
         return;
@@ -171,7 +175,7 @@ export function GetKeyModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-amber-400" /> Get {symbol}</DialogTitle>
           <DialogDescription>
-            {symbol} is {artistName}'s own coin on Base. Hold it in your wallet and the doors open; the more you hold, the deeper the room. You buy it here, from your own wallet, and it stays there.
+            {artistName}'s coin on Base. Hold it and the doors open. It is bought from your wallet and stays there.
           </DialogDescription>
         </DialogHeader>
 
@@ -179,8 +183,8 @@ export function GetKeyModal({
           <div className="space-y-3">
             <p className="flex items-center gap-2 text-sm font-semibold text-foreground"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Done. {symbol} is in your wallet.</p>
             {heldWhole != null ? (
-              <p className="text-sm text-muted-foreground">You now hold {Math.floor(heldWhole).toLocaleString()} {symbol}.
-                {nextDoor ? ` ${nextDoor.need.toLocaleString()} opens the ${nextDoor.name} doors.` : thresholds ? ' Every door is open to you.' : ''}
+              <p className="text-sm text-muted-foreground">You hold {Math.floor(heldWhole).toLocaleString()} {symbol}.
+                {nextDoor ? ` ${nextDoor.need.toLocaleString()} opens the ${nextDoor.name} door.` : thresholds ? ' Every door is open.' : ''}
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
@@ -193,7 +197,7 @@ export function GetKeyModal({
           </div>
         ) : !wallet ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Connect the wallet the key should live in. Base App, Coinbase Wallet, MetaMask and Rainbow all work.</p>
+            <p className="text-sm text-muted-foreground">Connect the wallet the key lives in.</p>
             <Button onClick={() => void connect()} disabled={busy != null} className="w-full gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />} Connect wallet
             </Button>
@@ -202,8 +206,8 @@ export function GetKeyModal({
           <div className="space-y-4">
             {thresholds ? (
               <p className="text-xs text-muted-foreground">
-                Fan doors open at {thresholds.FAN.toLocaleString()} {symbol}, insider doors at {thresholds.INSIDER.toLocaleString()}.
-                {heldWhole != null ? ` You hold ${Math.floor(heldWhole).toLocaleString()}.` : ''}
+                Fan door {thresholds.FAN.toLocaleString()} · Insider {thresholds.INSIDER.toLocaleString()}
+                {heldWhole != null ? ` · You hold ${Math.floor(heldWhole).toLocaleString()}` : ''}
               </p>
             ) : null}
             <div>
@@ -237,7 +241,7 @@ export function GetKeyModal({
                 <span className="text-muted-foreground">You get about</span>
                 <span className="font-mono text-foreground">{quoting ? '...' : quote != null ? `${fmtCoins(quote)} ${symbol}` : 'no quote yet'}</span>
               </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">The exact amount is set by the pool at the moment you confirm. Network fee on Base is extra and usually cents.</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">Final amount is set when you confirm. Base fee is a few cents.</p>
             </div>
             <ConsentNotice which="key_risk" />
             <Button onClick={() => void buy()} disabled={busy != null || !ethAmount} className="w-full gap-2">

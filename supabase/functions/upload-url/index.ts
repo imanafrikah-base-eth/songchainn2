@@ -207,6 +207,97 @@ async function presignVisual(o: {
   };
 }
 
+/* ------------------------------------------------------------ episodes --- */
+
+// A recording kept from a world's live station. The artist's browser records
+// the session itself and sends it here like any other upload, so keeping an
+// episode needs no recording server of our own. Only the world's artist, and
+// only in a world where voice is on (can_host_world_voice decides both).
+const MAX_EPISODE_BYTES = 200 * 1024 * 1024;
+const EPISODE_TYPES: Record<string, string> = {
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/mp4": "m4a",
+  "audio/mpeg": "mp3",
+};
+
+async function presignEpisode(o: {
+  // deno-lint-ignore no-explicit-any
+  db: any;
+  // deno-lint-ignore no-explicit-any
+  asUser: any;
+  userId: string;
+  worldSlug: string;
+  sessionId: string | null;
+  title: string;
+  fileName: string;
+  contentType: string;
+  fileBytes: number;
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  publicBase: string;
+}): Promise<{ status: number; body: unknown }> {
+  if (!o.worldSlug) return { status: 400, body: { error: "Which world is this episode for?" } };
+
+  // Asked as the person, so auth.uid() inside the check is really them.
+  const { data: allowed } = await o.asUser.rpc("can_host_world_voice", { _slug: o.worldSlug });
+  if (!allowed) {
+    return {
+      status: 403,
+      body: { error: "Only this world's artist can keep episodes here, and voice is on for the first ten worlds for now." },
+    };
+  }
+
+  const baseType = o.contentType.split(";")[0].trim();
+  const ext = EPISODE_TYPES[baseType];
+  if (!ext) return { status: 415, body: { error: "An episode can be WebM, Ogg, M4A or MP3 audio." } };
+  if (!Number.isFinite(o.fileBytes) || o.fileBytes <= 0 || o.fileBytes > MAX_EPISODE_BYTES) {
+    return { status: 413, body: { error: `An episode must be under ${MAX_EPISODE_BYTES / (1024 * 1024)} MB.` } };
+  }
+
+  const { data: world } = await o.db.from("worlds").select("id").eq("slug", o.worldSlug).maybeSingle();
+  const episodeId = crypto.randomUUID();
+  const key = [
+    "episodes",
+    o.userId,
+    episodeId,
+    `${slugify(o.fileName.replace(/\.[^.]+$/, ""), "episode")}.${ext}`,
+  ].join("/");
+  const publicUrl = `${o.publicBase}/${key}`;
+
+  // Unpublished until the recording is really in storage and the artist keeps it.
+  const { error: insertErr } = await o.db.from("world_episodes").insert({
+    id: episodeId,
+    world_slug: o.worldSlug,
+    world_id: (world as { id?: string } | null)?.id ?? null,
+    session_id: o.sessionId,
+    host_id: o.userId,
+    title: o.title || "",
+    storage_key: key,
+    audio_url: publicUrl,
+    mime_type: baseType,
+    bytes: Math.round(o.fileBytes),
+    is_published: false,
+  });
+  if (insertErr) {
+    console.error("upload-url could not reserve world_episodes:", insertErr);
+    return { status: 500, body: { error: "Could not start the upload. Try again." } };
+  }
+
+  const uploadUrl = await presignPut({
+    accountId: o.accountId,
+    accessKeyId: o.accessKeyId,
+    secretAccessKey: o.secretAccessKey,
+    bucket: o.bucket,
+    key,
+    expiresIn: PRESIGN_TTL,
+  });
+
+  return { status: 200, body: { episodeId, uploadUrl, storageKey: key, publicUrl, expiresIn: PRESIGN_TTL } };
+}
+
 /* ------------------------------------------------- AWS SigV4 presign --- */
 
 const enc = new TextEncoder();
@@ -386,6 +477,31 @@ Deno.serve(async (req) => {
   const contentType = str(body.contentType, 100).toLowerCase();
   const genre = str(body.genre, 60) || null;
   const fileBytes = Number(body.fileBytes);
+
+  /* ---------------------------------------------------------- episodes --- */
+
+  // purpose: 'episode' is a recording kept from a world's live station. It
+  // lands in world_episodes, and only the world's own artist may send one.
+  if (str(body.purpose, 20) === "episode") {
+    const sessionId = str(body.sessionId, 40);
+    const episode = await presignEpisode({
+      db: createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } }),
+      asUser,
+      userId: user.id,
+      worldSlug: str(body.worldSlug, 80),
+      sessionId: /^[0-9a-f-]{36}$/i.test(sessionId) ? sessionId : null,
+      title,
+      fileName,
+      contentType,
+      fileBytes,
+      accountId: accountId!,
+      accessKeyId: accessKeyId!,
+      secretAccessKey: secretAccessKey!,
+      bucket: bucket!,
+      publicBase,
+    });
+    return json(origin, episode.body, episode.status);
+  }
 
   /* ------------------------------------------------------- visual work --- */
 

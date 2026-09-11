@@ -267,7 +267,8 @@ test.describe('Signed-in journeys', () => {
 
     // Build a world.
     await visit(page, '/world-builder', errors);
-    const nameInput = page.locator('input[placeholder="N3M3SIS"]').first();
+    // The placeholder reads "For example, N3M3SIS" since the name step was reworded.
+    const nameInput = page.locator('input[placeholder*="N3M3SIS"]').first();
     await expect(nameInput).toBeVisible({ timeout: 15_000 });
     await nameInput.fill(`QA World ${RUN}`);
     await page.locator('input[placeholder="How you want to be credited"]').fill(`QA Artist ${RUN}`);

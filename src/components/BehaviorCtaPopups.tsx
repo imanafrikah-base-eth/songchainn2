@@ -1,4 +1,4 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInterruption } from '@/hooks/useInterruption';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -290,7 +290,7 @@ export function BehaviorCtaPopups() {
               ? `Quick switch: "${suggestion.title}" keeps this ${suggestion.genre} energy clean and locked in.`
               : `Try "${suggestion.title}" next. It fits your recent listening pattern on $ongChainn.`,
             ctaLabel: 'Play Next',
-            ctaPath: `/song/${suggestion.id}`,
+            ctaPath: songPath(suggestion),
           });
         }
       }

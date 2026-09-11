@@ -74,6 +74,8 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
     getPostComments,
     addComment,
     untagSelf,
+    editPost,
+    editComment,
   } = useSocial();
   
   const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
@@ -1030,6 +1032,9 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
               {/* What this artist has done here, with some life in it. */}
               <ArtistStats
                 className="mb-6"
+                isOwner={isOwner}
+                artistName={artist?.name}
+                onSeeSongs={() => document.getElementById('artist-music')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                 songs={artistSongs.length}
                 streams={artistStats.totalPlays}
                 followers={artistFollowers}
@@ -1083,6 +1088,8 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
                   post={post}
                   onLike={toggleLikePost}
                   onDelete={deletePost}
+                  onEdit={editPost}
+                  onEditComment={editComment}
                   onFollow={followUser}
                   isFollowing={timelineUserId ? isFollowingUser(timelineUserId) : false}
                   onGetComments={getPostComments}
@@ -1094,7 +1101,7 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
           </div>
         </section>
 
-        <section>
+        <section id="artist-music" className="scroll-mt-24">
           <h2 className="font-heading text-xl font-semibold text-foreground mb-6">
             {isOwner ? 'My Music' : 'Discography'}
           </h2>

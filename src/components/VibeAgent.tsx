@@ -163,14 +163,16 @@ function useOverlayOpen(): boolean {
       setOpen(
         body.hasAttribute('data-scroll-locked')
         || body.style.pointerEvents === 'none'
-        || body.dataset.menuOpen === 'true',
+        || body.dataset.menuOpen === 'true'
+        // Any hand-built panel that raised its hand through useOverlayFlag.
+        || body.hasAttribute('data-overlay-open'),
       );
     };
     read();
     const mo = new MutationObserver(read);
     mo.observe(document.body, {
       attributes: true,
-      attributeFilter: ['style', 'data-scroll-locked', 'data-menu-open'],
+      attributeFilter: ['style', 'data-scroll-locked', 'data-menu-open', 'data-overlay-open'],
     });
     return () => mo.disconnect();
   }, []);
@@ -222,9 +224,37 @@ export function VibeAgent() {
   const [isBuildingLane, setIsBuildingLane] = useState(false);
   const { toast } = useToast();
   const overlayOpen = useOverlayOpen();
-  /* A battle is a room, not a page: two artists, their names, the votes, the
-     verdicts. A tab parked on the right edge lands squarely on one of those
-     names, so Mo$ha stays out of the way in there entirely. */
+  /* Where Mo$ha does not belong.
+     A tab parked on the right edge of every screen in the app is not helpful,
+     it is furniture. He stays out of three kinds of place:
+
+       - a battle, which is two artists, their names and the votes, and where a
+         tab lands squarely on one of those names
+       - a screen that already has its own Mo$ha, so he is not offering himself
+         twice: The Room's chat and the world builder
+       - a screen somebody is reading or working through rather than browsing:
+         the legal pages, the admin console, the launcher, a world someone has
+         walked into, and the account-deletion page
+
+     Everywhere else he is one tap away, and a direct call always opens him
+     wherever the person is. */
+  const NO_MOSHA = [
+    /^\/wavewarz-africa\/(battle|room|live)/,
+    /^\/room\b/,
+    /^\/world-builder\b/,
+    /^\/world\//,
+    /^\/w\//,
+    /^\/launch\b/,
+    /^\/drops\//,
+    /^\/console\b/,
+    /^\/admin\b/,
+    /^\/terms\b/,
+    /^\/privacy\b/,
+    /^\/guidelines\b/,
+    /^\/delete-account\b/,
+    /^\/reset-password\b/,
+  ];
+  const noMoshaHere = NO_MOSHA.some((rx) => rx.test(location.pathname));
   const inABattle = /^\/wavewarz-africa\/(battle|room|live)/.test(location.pathname);
   /* A question handed in with the call, asked for them the moment it opens. */
   const [chatAsk, setChatAsk] = useState<string | null>(null);
@@ -629,12 +659,16 @@ export function VibeAgent() {
 
   // Two things reaching for the same corner is one too many: while a menu,
   // a sheet or a dialog is open, Mo$ha waits its turn.
-  if (overlayOpen || inABattle) return null;
+  /* Never in a battle, not even when called. Elsewhere the tab hides on the
+     pages listed above and behind an overlay, but a direct call still opens
+     him right where the person is standing. */
+  if (inABattle) return null;
+  if ((overlayOpen || noMoshaHere) && !chatOpen) return null;
 
   if (!step) {
     if (chatOpen) {
       return (
-        <div className="agent-dock fixed z-[58] bottom-20 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6 w-[min(calc(100vw-0.75rem),22rem)] sm:w-[23rem] md:w-[24rem]">
+        <div className="agent-dock pointer-events-auto fixed z-[70] bottom-20 sm:bottom-24 md:bottom-6 right-2 sm:right-3 md:right-6 w-[min(calc(100vw-0.75rem),22rem)] sm:w-[23rem] md:w-[24rem]">
           <div className="overflow-hidden rounded-2xl border border-border bg-background/95 shadow-2xl backdrop-blur">
             <MoshaChat
               ask={chatAsk}

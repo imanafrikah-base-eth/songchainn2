@@ -1,4 +1,4 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { AmbientBackground } from '@/components/AmbientBackground';
+import { RoomPeople } from '@/components/room/RoomPeople';
 import { toast } from 'sonner';
 
 type RoomMessage = {
@@ -61,6 +62,30 @@ const MOSHA_USER_ID = 'mosha-bot';
 const MOSHA_NAME = 'Mo$ha';
 const MOSHA_ROOM_GREETING_PREFIX = 'songchainn:mosha-room-greeted:v1:';
 const MOSHA_MODE_KEY = 'songchainn:mosha-room-mode:v1';
+
+/** A tiny deterministic generator, so one seed always gives one order. */
+function seededRandom(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The same shuffled order for everybody, changing once a day. */
+function shuffledForToday<T>(items: readonly T[]): T[] {
+  const day = Math.floor(Date.now() / 86_400_000);
+  const rand = seededRandom(day * 2654435761);
+  const out = items.slice();
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 const KNOWN_ARTIST_NAMES = new Set(
   ARTISTS.map(a => a.name.trim().toLowerCase()).filter(Boolean)
@@ -279,9 +304,8 @@ export default function Room() {
   const { enterRoomMode, exitRoomMode, setVolume, volume, play, hideRoom } = usePlayerActions();
   const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
 
-  const playlist = useMemo(() => {
-    return SONGS;
-  }, []);
+  // On shuffle, and on the same shuffle as everyone else in here.
+  const playlist = useMemo(() => shuffledForToday(SONGS), []);
 
   const [roomName, setRoomName] = useState<string>('');
   const [messages, setMessages] = useState<RoomMessage[]>([]);
@@ -1449,21 +1473,6 @@ export default function Room() {
     return matches.slice(0, 7);
   }, [knownMentionNames, mentionState]);
 
-  const onlineNames = useMemo(() => {
-    const merged = new Set<string>([MOSHA_NAME]);
-    const selfName = normalizeRoomName(roomName || '');
-    if (selfName) merged.add(selfName);
-    for (const userEntry of liveUsers) {
-      const normalized = normalizeRoomName(userEntry.room_name || '') || `user-${userEntry.user_id.slice(0, 6)}`;
-      if (normalized) merged.add(normalized);
-    }
-    const ordered = [...merged].sort((a, b) => {
-      if (a === MOSHA_NAME) return -1;
-      if (b === MOSHA_NAME) return 1;
-      return a.localeCompare(b);
-    });
-    return ordered;
-  }, [liveUsers, roomName]);
 
   const messageById = useMemo(() => {
     const map = new Map<string, RoomMessage>();
@@ -1572,7 +1581,7 @@ export default function Room() {
               type="button"
               onClick={async () => {
                 if (!currentSong) return;
-                const songUrl = `${window.location.origin}/song/${currentSong.id}`;
+                const songUrl = `${window.location.origin}${songPath(currentSong)}`;
                 const roomUrl = `${window.location.origin}/room`;
                 try {
                   await navigator.clipboard.writeText(`${songUrl}\n${roomUrl}`);
@@ -1619,30 +1628,29 @@ export default function Room() {
                 <span>Live room</span>
               </span>
               <span className="hidden sm:inline text-zinc-500">
-                One shared playlist for everyone in here.
+                One shared playlist, on shuffle.
               </span>
             </div>
-            <div className="text-zinc-400">
-              <span>{onlineCount} listening</span>
-            </div>
+            <RoomPeople
+              people={liveUsers}
+              count={onlineCount}
+              selfUserId={user?.id}
+              selfName={roomName || undefined}
+              moshaName={MOSHA_NAME}
+            />
           </div>
-          {onlineNames.length > 0 && (
-            <div className="text-[11px] text-zinc-500 truncate">
-              Online now: {onlineNames.join(' • ')}
-            </div>
-          )}
           <div
             role="button"
             tabIndex={0}
             onClick={() => {
               if (!currentSong) return;
-              navigate(`/song/${currentSong.id}`);
+              navigate(songPath(currentSong));
             }}
             onKeyDown={(e) => {
               if (e.key !== 'Enter' && e.key !== ' ') return;
               if (!currentSong) return;
               e.preventDefault();
-              navigate(`/song/${currentSong.id}`);
+              navigate(songPath(currentSong));
             }}
             className="relative w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10 transition-colors overflow-hidden"
           >
@@ -1745,6 +1753,7 @@ export default function Room() {
                       reactions={reactionsByMessageId[m.id]}
                       myReactions={myReactionsByMessageId[m.id]}
                       onReact={(emoji) => toggleQuickReaction(m.id, emoji)}
+                      isMine={!!user?.id && m.user_id === user.id}
                     />
                   );
                 })}
@@ -1787,7 +1796,13 @@ export default function Room() {
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 min-h-0 flex flex-col">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-xs text-zinc-400">Up next</div>
-                  <div className="text-xs text-zinc-500">{onlineCount} online</div>
+                  <RoomPeople
+                    people={liveUsers}
+                    count={onlineCount}
+                    selfUserId={user?.id}
+                    selfName={roomName || undefined}
+                    moshaName={MOSHA_NAME}
+                  />
                 </div>
                 <div className="mt-3 space-y-2 overflow-y-auto pr-1">
                   {upNextSongs.map(song => (
@@ -2149,6 +2164,7 @@ function SwipeToReplyMessage({
   reactions,
   myReactions,
   onReact,
+  isMine = false,
 }: {
   message: RoomMessage;
   parent?: RoomMessage;
@@ -2156,6 +2172,8 @@ function SwipeToReplyMessage({
   reactions?: Record<string, number>;
   myReactions?: Record<string, boolean>;
   onReact: (emoji: string) => void;
+  /** Your own words, tinted so the column is readable at a glance. */
+  isMine?: boolean;
 }) {
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const modeRef = useRef<'undecided' | 'swipe' | 'scroll'>('undecided');
@@ -2233,18 +2251,34 @@ function SwipeToReplyMessage({
         className="group flex items-start gap-2 text-sm leading-relaxed text-zinc-200"
         style={{ transform: offsetX ? `translateX(${offsetX}px)` : undefined, transition: offsetX ? undefined : 'transform 120ms ease-out' }}
       >
+      <div
+        aria-hidden
+        className={[
+          'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold uppercase',
+          isMine ? 'bg-primary/25 text-primary' : 'bg-white/10 text-zinc-300',
+        ].join(' ')}
+      >
+        {(message.room_name || '?').trim().charAt(0) || '?'}
+      </div>
       <div className="min-w-0 flex-1">
-        {parent && (
-          <div className="mb-1 pl-2 border-l border-white/15 text-xs text-zinc-500 truncate">
-            Reply to {parent.room_name}: {parent.content || parent.message}
+        <div
+          className={[
+            'rounded-2xl border px-3 py-2',
+            isMine ? 'border-primary/25 bg-primary/10' : 'border-white/10 bg-white/[0.04]',
+          ].join(' ')}
+        >
+          {parent && (
+            <div className="mb-1 border-l border-white/15 pl-2 text-xs text-zinc-500 truncate">
+              Reply to {parent.room_name}: {parent.content || parent.message}
+            </div>
+          )}
+          <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-zinc-100">
+            <ArtistName name={message.room_name} userId={(message as { user_id?: string | null }).user_id} size={14} />
+          </span>
+          <div className="text-zinc-200">
+            {renderMessageWithCustomEmojis(message.content || message.message || '')}
           </div>
-        )}
-        <span className="text-zinc-100 inline-flex items-center gap-1">
-          <ArtistName name={`${message.room_name}:`} userId={(message as { user_id?: string | null }).user_id} size={14} />
-        </span>{' '}
-        <span className="text-zinc-300">
-          {renderMessageWithCustomEmojis(message.content || message.message || '')}
-        </span>
+        </div>
         <div className="mt-1 flex items-center gap-1.5">
           {QUICK_REACTIONS.map((emoji) => {
             const count = reactions?.[emoji] ?? 0;

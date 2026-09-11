@@ -36,7 +36,7 @@ const LOGIN = args.includes('--login');
 const WIDTHS = argOf('widths', '320,360,402').split(',').map((w) => Number(w.trim()));
 const ROUTES = argOf(
   'routes',
-  '/,/discover,/artists,/social,/marketplace,/profile,/playlists,/leaderboard,/about,/dj-shuffle',
+  '/,/discover,/artists,/social,/marketplace,/profile,/playlists,/leaderboard,/about,/dj-shuffle,/room,/wallet,/worlds',
 )
   .split(',')
   .map((r) => r.trim())

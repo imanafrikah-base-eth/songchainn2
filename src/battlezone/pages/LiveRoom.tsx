@@ -31,6 +31,7 @@ import { battleChatScope } from "@/battlezone/lib/roomScope";
 import BattleStage from "@/battlezone/components/BattleStage";
 import { BattleCountdown } from "@/battlezone/components/BattleCountdown";
 import { STAGES } from "@/battlezone/lib/battleStages";
+import { BattleVoiceSwitch } from "@/battlezone/components/BattleVoiceSwitch";
 
 /* A counter, not a clock: two mounts in the same millisecond would share a
    channel name and therefore share one channel object. */
@@ -67,7 +68,10 @@ const LiveRoom = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile } = useAuth();
-  const { data: battle, isLoading } = useBattle(roomId);
+  const { data: battle, isLoading, refetch: refetchBattle } = useBattle(roomId);
+  // Voice is on per battle: the host turns it on from this room, and until they
+  // do the battle keeps its X Space link, the poll and the chat.
+  const voiceOn = VOICE_ENABLED && battle?.voiceEnabled === true;
   const { data: liveBattles = [] } = useBattles("live");
 
   const [votedFor, setVotedFor] = useState<"A" | "B" | null>(null);
@@ -366,7 +370,7 @@ const LiveRoom = () => {
   // Publish host mixed audio (mic + song) to LiveKit room when state changes
   const { audioState: hostAudioState, publishToRoom: hostPublish, unpublishFromRoom: hostUnpublish } = hostAudio;
   useEffect(() => {
-    if (!VOICE_ENABLED) return;
+    if (!voiceOn) return;
     const room = liveKitRoomRef.current;
     if (!room || myRole !== 'host') return;
     if (hostAudioState === 'idle') {
@@ -374,7 +378,7 @@ const LiveRoom = () => {
     } else {
       void hostPublish(room);
     }
-  }, [hostAudioState, myRole, hostPublish, hostUnpublish]);
+  }, [hostAudioState, myRole, hostPublish, hostUnpublish, voiceOn]);
 
   const host = getParticipantsByRole('host')[0];
   const coHosts = getParticipantsByRole('co-host');
@@ -424,7 +428,7 @@ const LiveRoom = () => {
   }, [roomId, user, profile?.display_name, profile?.username]);
 
   useEffect(() => {
-    if (!VOICE_ENABLED) return;
+    if (!voiceOn) return;
     if (!roomId || !user) return;
     let cancelled = false;
     const participantName = profile?.display_name || profile?.username || "WaveWarz Listener";
@@ -481,7 +485,7 @@ const LiveRoom = () => {
     // the initial token is minted before approval and LiveKit doesn't let a grant be
     // upgraded in place, so without this a newly-approved speaker couldn't be heard until
     // they manually left and rejoined the room.
-  }, [roomId, user, profile?.display_name, profile?.username, canPublishAudio]);
+  }, [roomId, user, profile?.display_name, profile?.username, canPublishAudio, voiceOn]);
 
 
   useEffect(() => {
@@ -519,7 +523,7 @@ const LiveRoom = () => {
 
 
   const getSidebarTabs = () => {
-    if (!VOICE_ENABLED) return ["audience", "chat"] as const;
+    if (!voiceOn) return ["audience", "chat"] as const;
     if (!hasPermission('canApproveSpeakers')) return ["audience", "chat"] as const;
     return ["audience", "requests", "chat"] as const;
   };
@@ -584,7 +588,7 @@ const LiveRoom = () => {
             <div className={`rounded-lg border border-border bg-card text-foreground ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
               {myRole === "host" ? "Host" : myRole === "co-host" ? "Co-Host" : myRole === "speaker" ? "Speaker" : "Audience"}
             </div>
-            {VOICE_ENABLED ? (
+            {voiceOn ? (
               <div className={`rounded-lg border ${audioConnected ? "border-primary/40 text-primary" : "border-border text-muted-foreground"} bg-card ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
                 {audioConnected ? "Audio On" : "Audio Reconnecting"}
               </div>
@@ -620,7 +624,7 @@ const LiveRoom = () => {
       <div className="flex-1 flex flex-col lg:flex-row">
         <div className={`flex-1 ${isEmbedded ? "p-2.5 sm:p-3" : "p-3 sm:p-4"} space-y-4 sm:space-y-6 overflow-y-auto`}>
           {/* Speaking Area (in-app voice) */}
-          {VOICE_ENABLED && (
+          {voiceOn && (
             <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
               <h3 className="text-sm font-bold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2">
                 <Mic className="h-4 w-4" /> Speaking Now
@@ -637,7 +641,7 @@ const LiveRoom = () => {
           )}
 
           {/* Live audio on X Spaces */}
-          {!VOICE_ENABLED && battle.xSpaceUrl && (
+          {!voiceOn && battle.xSpaceUrl && (
             <div className={`rounded-2xl border border-primary/30 bg-primary/5 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-5"} backdrop-blur flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
               <div className="flex items-start gap-3">
                 <Radio className="h-5 w-5 text-primary shrink-0 mt-0.5" />
@@ -808,7 +812,7 @@ const LiveRoom = () => {
           </div>
 
           {/* Microphone Controls */}
-          {VOICE_ENABLED && (
+          {voiceOn && (
             <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
               <h3 className="text-sm font-bold text-muted-foreground mb-3">Audio Controls</h3>
               <MicControls
@@ -819,11 +823,16 @@ const LiveRoom = () => {
           )}
 
           {/* Speaker Management */}
-          {VOICE_ENABLED && hasPermission('canApproveSpeakers') && (
+          {voiceOn && hasPermission('canApproveSpeakers') && (
             <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
               <h3 className="text-sm font-bold text-muted-foreground mb-3">Speaker Management</h3>
               <SpeakerManagement battleId={roomId || ''} maxSpeakers={10} />
             </div>
+          )}
+
+          {/* The host bringing in-app voice into this battle. */}
+          {myRole === "host" && !voiceOn && !battleEnded && roomId && (
+            <BattleVoiceSwitch battleId={roomId} onEnabled={() => void refetchBattle()} />
           )}
 
           {/* Host Controls */}
@@ -847,7 +856,7 @@ const LiveRoom = () => {
               </div>
 
               {/* Host Music Broadcast */}
-              {VOICE_ENABLED && (
+              {voiceOn && (
               <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
@@ -987,9 +996,9 @@ const LiveRoom = () => {
                       <p className="text-xs font-medium text-foreground truncate">{p.display_name || "Anonymous"}</p>
                       <p className="text-[10px] text-muted-foreground capitalize">{p.role}</p>
                     </div>
-                    {VOICE_ENABLED && p.is_speaking && !p.is_muted
+                    {voiceOn && p.is_speaking && !p.is_muted
                       ? <Volume2 className="h-3 w-3 text-primary shrink-0" />
-                      : VOICE_ENABLED && p.is_muted && p.role !== "audience"
+                      : voiceOn && p.is_muted && p.role !== "audience"
                       ? <MicOff className="h-3 w-3 text-muted-foreground shrink-0" />
                       : null
                     }

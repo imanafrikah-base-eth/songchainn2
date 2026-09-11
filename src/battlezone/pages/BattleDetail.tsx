@@ -1,4 +1,4 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -448,7 +448,7 @@ function BattleSongTitle({ title, artistName }: { title: string; artistName: str
   const id = songIdFor(title, artistName);
   if (!id) return <span className="text-xs text-muted-foreground">{title}</span>;
   return (
-    <AppLink to={`/song/${id}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+    <AppLink to={songPath({ id })} className="text-xs text-muted-foreground hover:text-primary transition-colors">
       {title}
     </AppLink>
   );

@@ -8,6 +8,7 @@ import { SongDetailsFields } from '@/components/studio/SongDetailsFields';
 import { GENRES } from '@/data/musicData';
 import { EMPTY_DETAILS, detailProblems, saveSongCore, saveSongDetails, useSongDetails, type SongDetails } from '@/lib/songDetails';
 import { checkCover, COVER_ACCEPT, landCover, type CoverCheck } from '@/lib/coverArt';
+import { CoverCropDialog, prepareCover } from '@/components/studio/CoverCrop';
 
 const input =
   'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none disabled:opacity-60';
@@ -22,6 +23,7 @@ export function SongDetailsDialog({
   coverUrl = null,
   open,
   onOpenChange,
+  onSaved,
 }: {
   songId: string;
   title: string;
@@ -31,6 +33,8 @@ export function SongDetailsDialog({
   coverUrl?: string | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** Called once a save lands, e.g. to send a record that was waiting on its cover to the judges. */
+  onSaved?: () => void;
 }) {
   const { data, isLoading } = useSongDetails(open ? songId : undefined);
   const [draft, setDraft] = useState<SongDetails>(EMPTY_DETAILS);
@@ -41,9 +45,10 @@ export function SongDetailsDialog({
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverCheck, setCoverCheck] = useState<CoverCheck>({ block: null, warn: null });
   const [coverPct, setCoverPct] = useState<number | null>(null);
+  const [cropping, setCropping] = useState<File | null>(null);
   const queryClient = useQueryClient();
 
-  const pickCover = (f: File | null) => {
+  const acceptCover = (f: File | null) => {
     setCoverFile(f);
     setCoverCheck({ block: null, warn: null });
     if (f) void checkCover(f).then(setCoverCheck);
@@ -51,6 +56,15 @@ export function SongDetailsDialog({
       if (old) URL.revokeObjectURL(old);
       return f ? URL.createObjectURL(f) : null;
     });
+  };
+
+  // Any photo: one that is not square opens the square window first, and a
+  // square one comes back already made small.
+  const pickCover = async (f: File | null) => {
+    if (!f) return acceptCover(null);
+    const prepared = await prepareCover(f);
+    if (prepared.needsCrop) setCropping(f);
+    else acceptCover(prepared.file);
   };
 
   useEffect(() => {
@@ -100,6 +114,7 @@ export function SongDetailsDialog({
       ]);
       toast('Saved', { description: `${titleDraft.trim()} is up to date.` });
       onOpenChange(false);
+      onSaved?.();
     } catch (err) {
       toast.error((err as Error)?.message || 'Could not save. Try again.');
     } finally {
@@ -111,6 +126,7 @@ export function SongDetailsDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <CoverCropDialog file={cropping} onCancel={() => setCropping(null)} onDone={(f) => { setCropping(null); acceptCover(f); }} />
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>Artwork, name, genre, lyrics, credits and the record's paperwork. Change anything, any time.</DialogDescription>
@@ -131,13 +147,13 @@ export function SongDetailsDialog({
                   type="file"
                   accept={COVER_ACCEPT}
                   disabled={saving}
-                  onChange={(e) => { pickCover(e.target.files?.[0] ?? null); e.target.value = ''; }}
+                  onChange={(e) => { void pickCover(e.target.files?.[0] ?? null); e.target.value = ''; }}
                   className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-foreground"
                 />
                 <p className={`mt-1 text-xs ${coverCheck.block ? 'text-destructive' : coverCheck.warn ? 'text-amber-500' : 'text-muted-foreground'}`}>
                   {coverPct !== null
                     ? `Sending the artwork, ${coverPct}%`
-                    : coverCheck.block ?? coverCheck.warn ?? (coverUrl ? 'Square JPG, PNG or WEBP. Replace it any time.' : 'Square JPG, PNG or WEBP. Nothing goes live without it.')}
+                    : coverCheck.block ?? coverCheck.warn ?? (coverUrl ? 'Any JPG, PNG or WEBP photo, made square here. Replace it any time.' : 'Any JPG, PNG or WEBP photo, made square here. Nothing goes live without it.')}
                 </p>
               </label>
             </div>

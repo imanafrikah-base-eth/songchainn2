@@ -13,7 +13,7 @@
 // is playing dresses the whole layer, because music runs under every city.
 
 import { artistPath } from '@/lib/slugRoutes';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -23,7 +23,11 @@ import { ARTISTS } from '@/data/musicData';
 import { getWorldBySlug, formatWorldNumber } from '@/worlds/registry';
 import { fetchWorldBySlug } from '@/worlds/loader';
 import { BuiltRoom } from '@/worlds/components/BuiltRoom';
+import { ArrangeStreet } from '@/worlds/components/ArrangeStreet';
+import { ArrangeCity } from '@/worlds/components/ArrangeCity';
+import { StationPanel } from '@/worlds/voice/StationPanel';
 import { useWorldAccess } from '@/worlds/useWorldAccess';
+import { OwnerViewBar } from '@/worlds/components/OwnerViewBar';
 import { useAuth } from '@/context/AuthContext';
 import { useCityTheme } from '@/worlds/useCityTheme';
 import {
@@ -110,17 +114,24 @@ const World = () => {
   // art and gate as World #001, with its streets' blocks inside the rooms.
   const coded = getWorldBySlug(key);
   const [loaded, setLoaded] = useState<WorldConfig | null | undefined>(undefined);
+  // Bumped when the owner changes their world from inside it, so the page
+  // reads it again without blanking to a loading bar in front of them.
+  const [version, setVersion] = useState(0);
+  const shownKey = useRef(key);
   useEffect(() => {
     if (coded) return;
     let live = true;
-    setLoaded(undefined);
+    if (shownKey.current !== key) {
+      shownKey.current = key;
+      setLoaded(undefined);
+    }
     void fetchWorldBySlug(key).then((w) => {
       if (live) setLoaded(w ?? null);
     });
     return () => {
       live = false;
     };
-  }, [key, coded]);
+  }, [key, coded, version]);
 
   const world = coded ?? loaded;
   if (world === undefined) {
@@ -131,11 +142,24 @@ const World = () => {
     );
   }
   if (!world) return <Navigate to="/not-found" replace />;
-  return <WorldInner world={world} segment={roomSlug} fromDb={!coded} />;
+  return <WorldInner world={world} segment={roomSlug} fromDb={!coded} onChanged={() => setVersion((v) => v + 1)} />;
 };
 
-function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; segment?: string; fromDb?: boolean }) {
-  const { wallet, rings, connect, refresh } = useWorldAccess(world);
+function WorldInner({
+  world,
+  segment,
+  fromDb = false,
+  onChanged,
+}: {
+  world: WorldConfig;
+  segment?: string;
+  fromDb?: boolean;
+  onChanged?: () => void;
+}) {
+  const { wallet, rings, connect, refresh, isOwner, asVisitor, setAsVisitor } = useWorldAccess(world);
+  /* The artist in their own world, seeing it as its owner: they can arrange
+     what they are standing in, where they are standing. */
+  const ownerView = Boolean(isOwner && !asVisitor && fromDb && world.id);
   const { artistId, user } = useAuth();
 
   /* When the artist walks into their own world, the builder can say when
@@ -165,6 +189,17 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#07070b] text-white">
+      {/* The artist standing in their own world: which view they are in, the
+          switch into a visitor's shoes, and the way back to the builder. */}
+      {isOwner && (
+        <OwnerViewBar
+          slug={world.slug}
+          worldId={world.id}
+          draft={world.draft}
+          asVisitor={asVisitor}
+          onAsVisitorChange={setAsVisitor}
+        />
+      )}
       {/* You do not appear here, you walk in. Once per visit. */}
       <ArrivalWalk
         worldSlug={world.slug}
@@ -215,6 +250,9 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
             onConnect={() => void connect()}
             onRefresh={refresh}
             theme={theme}
+            soon={city.stage === 'soon' && !(isOwner && !asVisitor)}
+            ownerView={ownerView}
+            onChanged={onChanged}
           />
         ) : !room ? (
           <>
@@ -280,7 +318,13 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
               {[...world.cities]
                 .sort((a, b) => a.order - b.order)
                 .map((c, i) => (
-                  <CityBlock key={c.slug} world={world} city={c} index={i} />
+                  <CityBlock
+                    key={c.slug}
+                    world={world}
+                    city={c}
+                    index={i}
+                    soon={c.stage === 'soon' && !(isOwner && !asVisitor)}
+                  />
                 ))}
             </div>
 
@@ -295,6 +339,11 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
                   <WorldDoor key={r.slug} world={world} room={r} rings={rings} connected={connected} index={i} />
                 ))}
               </div>
+            </div>
+
+            {/* The station: live voice from the artist, and the episodes kept from it. */}
+            <div className="mt-12">
+              <StationPanel worldSlug={world.slug} worldId={world.id ?? null} />
             </div>
 
             {/* Drops the artist minted from inside this world. Renders nothing
@@ -354,8 +403,13 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
               </div>
             </header>
 
-            {roomIsEnterable(doorStateFor(room, rings, connected)) || room.access === 'public' ? (
-              <RoomContent world={world} roomSlug={room.slug} rings={rings} fromDb={fromDb} />
+            {/* A public street always let people in, which also let anyone with
+                the address walk into a street the artist marked Coming soon. The
+                owner is let through by doorStateFor, so only visitors stop here. */}
+            {doorStateFor(room, rings, connected) === 'soon' ? (
+              <ComingSoonPanel name={room.name} />
+            ) : roomIsEnterable(doorStateFor(room, rings, connected)) || room.access === 'public' ? (
+              <RoomContent world={world} roomSlug={room.slug} rings={rings} fromDb={fromDb} ownerView={ownerView} />
             ) : room.access === 'event' ? (
               <StageRoom world={world} />
             ) : (
@@ -381,6 +435,21 @@ function SectionLabel({ title, note }: { title: string; note: string }) {
     <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <h2 className="font-heading text-lg font-bold text-white/90">{title}</h2>
       <p className="text-xs text-white/45">{note}</p>
+    </div>
+  );
+}
+
+/**
+ * A street or city the artist marked Coming soon, reached by someone who is not
+ * the artist. It stays on the map so people know it is on the way; this is what
+ * they find if they follow the address in before it opens.
+ */
+function ComingSoonPanel({ name }: { name: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-8 text-center">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300/80">Coming soon</p>
+      <p className="mt-2 text-sm text-white/70">{name} is still being built.</p>
+      <p className="mt-1 text-xs text-white/40">The artist will open it when it is ready.</p>
     </div>
   );
 }
@@ -422,7 +491,15 @@ function CityView({
   onConnect,
   onRefresh,
   theme,
+  soon = false,
+  ownerView = false,
+  onChanged,
 }: {
+  /** The artist marked this city Coming soon and the viewer is not the artist. */
+  soon?: boolean;
+  /** The owner in their own view: they can arrange this city in place. */
+  ownerView?: boolean;
+  onChanged?: () => void;
   world: WorldConfig;
   city: WorldCityDef;
   rings: ReturnType<typeof useWorldAccess>['rings'];
@@ -479,7 +556,11 @@ function CityView({
         </div>
       </header>
 
-      {buildings.length > 0 ? (
+      {ownerView ? <ArrangeCity world={world} citySlug={city.slug} onChanged={onChanged} /> : null}
+
+      {soon ? (
+        <ComingSoonPanel name={city.name} />
+      ) : buildings.length > 0 ? (
         <>
           <SectionLabel title="On this street" note="Every building here holds a different part of it." />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -509,14 +590,21 @@ function RoomContent({
   roomSlug,
   rings,
   fromDb,
+  ownerView = false,
 }: {
   world: WorldConfig;
   roomSlug: string;
   rings: ReturnType<typeof useWorldAccess>['rings'];
   fromDb?: boolean;
+  ownerView?: boolean;
 }) {
-  // A built world's rooms are streets with blocks on them.
-  if (fromDb) return <BuiltRoom world={world} roomSlug={roomSlug} rings={rings} />;
+  // A built world's rooms are streets with blocks on them. Its owner can
+  // arrange the one they are standing on, right here.
+  if (fromDb) {
+    return ownerView
+      ? <ArrangeStreet world={world} roomSlug={roomSlug} rings={rings} />
+      : <BuiltRoom world={world} roomSlug={roomSlug} rings={rings} />;
+  }
   switch (roomSlug) {
     case 'gate':
       return <GateRoom world={world} rings={rings} />;

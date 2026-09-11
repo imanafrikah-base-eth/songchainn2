@@ -63,7 +63,7 @@ async function currentChainId(): Promise<number | null> {
 }
 
 /** Ask the wallet to move to Base. Returns true when it is there. */
-async function ensureBase(): Promise<boolean> {
+export async function ensureBase(): Promise<boolean> {
   const id = await currentChainId();
   if (id === BASE_CHAIN_ID || id === null) return id === BASE_CHAIN_ID;
   const provider = getWalletProvider();

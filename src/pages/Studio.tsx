@@ -33,7 +33,8 @@ import { UploadProgress } from '@/components/studio/UploadProgress';
 import { ActivityBoard } from '@/components/studio/ActivityBoard';
 import { VerificationCard } from '@/components/studio/VerificationCard';
 import { EMPTY_DETAILS, detailProblems, requestOnchain, type SongDetails } from '@/lib/songDetails';
-import { checkCover, COVER_ACCEPT, COVER_GOOD_PX, MAX_COVER_MB, NO_COVER, type CoverCheck } from '@/lib/coverArt';
+import { checkCover, COVER_ACCEPT, COVER_GOOD_PX, NO_COVER, type CoverCheck } from '@/lib/coverArt';
+import { CoverCropDialog, prepareCover } from '@/components/studio/CoverCrop';
 import { useSongCoin } from '@/hooks/useSongCoins';
 
 // A WAV master runs about 10.6 MB a minute, so this has to be generous enough
@@ -94,6 +95,16 @@ const Studio = () => {
   const [cover, setCover] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverCheck, setCoverCheck] = useState<CoverCheck>({ block: null, warn: null });
+  const [cropping, setCropping] = useState<File | null>(null);
+  const acceptCover = (f: File | null) => {
+    setCover(f);
+    setCoverCheck({ block: null, warn: null });
+    if (f) void checkCover(f).then(setCoverCheck);
+    setCoverPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return f ? URL.createObjectURL(f) : null;
+    });
+  };
   const coverRef = useRef<HTMLInputElement>(null);
   /** Credits, paperwork, the release and where the records live. Shared by the batch. All optional. */
   const [details, setDetails] = useState<SongDetails>(EMPTY_DETAILS);
@@ -360,6 +371,11 @@ const Studio = () => {
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
                 />
               </label>
+              <CoverCropDialog
+                file={cropping}
+                onCancel={() => setCropping(null)}
+                onDone={(f) => { setCropping(null); acceptCover(f); }}
+              />
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Cover art <span className="normal-case font-normal">{tracks.length > 1 ? '(one for the whole batch)' : ''}</span>
@@ -377,12 +393,12 @@ const Studio = () => {
                     disabled={busy}
                     onChange={(e) => {
                       const f = e.target.files?.[0] ?? null;
-                      setCover(f);
-                      setCoverCheck({ block: null, warn: null });
-                      if (f) void checkCover(f).then(setCoverCheck);
-                      setCoverPreview((old) => {
-                        if (old) URL.revokeObjectURL(old);
-                        return f ? URL.createObjectURL(f) : null;
+                      e.target.value = '';
+                      if (!f) return;
+                      // Any photo: one that is not square opens the square window first.
+                      void prepareCover(f).then((prepared) => {
+                        if (prepared.needsCrop) setCropping(f);
+                        else acceptCover(prepared.file);
                       });
                     }}
                     className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-foreground"
@@ -396,7 +412,7 @@ const Studio = () => {
                   <p className="mt-2 text-xs text-amber-500">{NO_COVER}</p>
                 ) : (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Square JPG, PNG or WEBP, {COVER_GOOD_PX} pixels or more, under {MAX_COVER_MB} MB. Nothing goes live without it.
+                    Any JPG, PNG or WEBP photo. Not square? You drag it square here. {COVER_GOOD_PX} pixels or more looks best. Nothing goes live without it.
                   </p>
                 )}
               </label>
@@ -888,6 +904,7 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
         coverUrl={release.cover_art_url}
         open={editing}
         onOpenChange={setEditing}
+        onSaved={stuck && !release.cover_art_url ? () => void askAgain() : undefined}
       />
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -988,11 +1005,24 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
           </button>
         )}
       </div>
-      {stuck && (
+      {stuck && !release.cover_art_url ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            The music arrived. It stopped at the cover. Add the artwork and it goes to the judges.
+          </p>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 min-h-10"
+          >
+            <ImageIcon className="h-3.5 w-3.5" /> Add the cover
+          </button>
+        </div>
+      ) : stuck ? (
         <p className="mt-2 text-xs text-muted-foreground">
           This one has been with the judges longer than it should. Usually the tab closed on it. Ask again and it picks up where it left off.
         </p>
-      )}
+      ) : null}
 
       {hasNote && (
         <>

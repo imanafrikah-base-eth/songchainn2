@@ -56,6 +56,14 @@ function devPreviewView(): string | null {
  */
 const PREVIEW_WALLET = '0x0000000000000000000000000000000000000001';
 
+/**
+ * Stands in for "a wallet is connected" when the owner is looking at their own
+ * world. Doors ask whether anything is connected before they ask what is held,
+ * and the artist who built the place should never be told to connect a wallet
+ * to see it. Nothing is read from this: the server already decided.
+ */
+const OWNER_STANDS_HERE = '0x0000000000000000000000000000000000000002';
+
 function devPreviewRings(): WorldRings | null {
   const view = devPreviewView();
   if (!view) return null;
@@ -80,10 +88,27 @@ export interface WorldAccess {
   isResolving: boolean;
   connect: () => Promise<string | null>;
   refresh: () => void;
+  /** True when the person looking at this world owns it. */
+  isOwner: boolean;
+  /** An owner is seeing it the way a stranger would. */
+  asVisitor: boolean;
+  setAsVisitor: (next: boolean) => void;
 }
 
 export function useWorldAccess(world: WorldConfig): WorldAccess {
   const [wallet, setWallet] = useState<string | null>(null);
+  /* An owner's one-tap switch into a stranger's shoes. Held for the tab so
+     walking from a street into a room keeps the view they chose. */
+  const [asVisitor, setAsVisitorState] = useState<boolean>(() => {
+    try { return sessionStorage.getItem('world-as-visitor:' + world.slug) === '1'; } catch { return false; }
+  });
+  const setAsVisitor = useCallback((next: boolean) => {
+    setAsVisitorState(next);
+    try {
+      if (next) sessionStorage.setItem('world-as-visitor:' + world.slug, '1');
+      else sessionStorage.removeItem('world-as-visitor:' + world.slug);
+    } catch { /* restricted storage: the view simply resets on navigation */ }
+  }, [world.slug]);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -114,13 +139,13 @@ export function useWorldAccess(world: WorldConfig): WorldAccess {
   }, []);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['world-gate', world.slug, wallet?.toLowerCase() ?? null, devPreviewView()],
+    queryKey: ['world-gate', world.slug, wallet?.toLowerCase() ?? null, devPreviewView(), asVisitor],
     queryFn: async (): Promise<WorldRings> => {
       const preview = devPreviewRings();
       if (preview) return preview;
       if (!isSupabaseConfigured) return prelaunchRings();
       const { data: payload, error } = await supabase.functions.invoke('world-gate', {
-        body: { world: world.slug, wallet },
+        body: { world: world.slug, wallet, asVisitor },
       });
       const rings = (error || !payload?.rings ? prelaunchRings() : (payload.rings as WorldRings));
 
@@ -171,11 +196,19 @@ export function useWorldAccess(world: WorldConfig): WorldAccess {
     void refetch();
   }, [refetch]);
 
+  const rings = data ?? prelaunchRings();
+  const isOwner = rings.isOwner === true;
+
   return {
-    wallet: wallet ?? (devPreviewView() ? PREVIEW_WALLET : null),
-    rings: data ?? prelaunchRings(),
+    // An owner needs no wallet to stand in their own world, and a door that
+    // reads "connect a wallet" to the person who built it is nonsense.
+    wallet: wallet ?? (isOwner ? OWNER_STANDS_HERE : devPreviewView() ? PREVIEW_WALLET : null),
+    rings,
     isResolving: isLoading,
     connect,
     refresh,
+    isOwner,
+    asVisitor: isOwner && asVisitor,
+    setAsVisitor,
   };
 }

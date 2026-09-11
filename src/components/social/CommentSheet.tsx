@@ -2,7 +2,7 @@ import { artistPath } from '@/lib/slugRoutes';
 import { useState, useRef, useEffect, useMemo, type SyntheticEvent } from 'react';
 import { ArtistName, VerifiedMark } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Heart, MoreHorizontal, Reply, Trash2, Flag } from 'lucide-react';
+import { X, Send, Heart, MoreHorizontal, Reply, Trash2, Flag, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ReportDialog } from '@/components/ReportDialog';
+import { InlineEdit, EditedMark } from '@/components/social/InlineEdit';
 import { useAuth } from '@/context/AuthContext';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,8 @@ interface CommentSheetProps {
   onAddComment: (content: string) => void;
   /** Your own comments only. Resolves true when it is really gone. */
   onDeleteComment?: (commentId: string) => Promise<boolean> | void;
+  /** Optional so existing callers keep working; without it Edit stays hidden. */
+  onEditComment?: (commentId: string, content: string) => Promise<boolean>;
   commentsCount: number;
   onCommentsUpdate?: (comments: PostComment[]) => void;
 }
@@ -51,6 +54,7 @@ export function CommentSheet({
   isLoading, 
   onAddComment,
   onDeleteComment,
+  onEditComment,
   commentsCount,
   onCommentsUpdate
 }: CommentSheetProps) {
@@ -58,6 +62,8 @@ export function CommentSheet({
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<ReplyingTo | null>(null);
   const [localComments, setLocalComments] = useState<PostComment[]>([]);
+  /* Which comment is open for editing, if any. */
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [likingCommentId, setLikingCommentId] = useState<string | null>(null);
   const [reporting, setReporting] = useState<{ id: string; userId: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -304,16 +310,24 @@ export function CommentSheet({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   {isOwnComment ? (
-                                    onDeleteComment && (
-                                      <DropdownMenuItem
-                                        disabled={deletingId === comment.id}
-                                        onClick={() => void handleDeleteComment(comment.id)}
-                                        className="text-destructive focus:text-destructive"
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Delete comment
-                                      </DropdownMenuItem>
-                                    )
+                                    <>
+                                      {onEditComment && (
+                                        <DropdownMenuItem onClick={() => setEditingId(comment.id)}>
+                                          <Pencil className="w-4 h-4 mr-2" />
+                                          Edit comment
+                                        </DropdownMenuItem>
+                                      )}
+                                      {onDeleteComment && (
+                                        <DropdownMenuItem
+                                          disabled={deletingId === comment.id}
+                                          onClick={() => void handleDeleteComment(comment.id)}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Delete comment
+                                        </DropdownMenuItem>
+                                      )}
+                                    </>
                                   ) : (
                                     <DropdownMenuItem onClick={() => setReporting({ id: comment.id, userId: comment.user_id })}>
                                       <Flag className="w-4 h-4 mr-2" />
@@ -324,9 +338,31 @@ export function CommentSheet({
                               </DropdownMenu>
                             )}
                           </div>
-                          <p className="text-sm text-foreground/90 mt-1">
-                            {renderCommentContent(comment.content)}
-                          </p>
+                          {editingId === comment.id && onEditComment ? (
+                            <div className="mt-1">
+                              <InlineEdit
+                                value={comment.content}
+                                rows={2}
+                                maxLength={2000}
+                                placeholder="Your comment"
+                                onSave={async (next) => {
+                                  const ok = await onEditComment(comment.id, next);
+                                  if (ok) {
+                                    setLocalComments((prev) => prev.map((c) => (
+                                      c.id === comment.id ? { ...c, content: next, edited_at: new Date().toISOString() } : c
+                                    )));
+                                  }
+                                  return ok;
+                                }}
+                                onCancel={() => setEditingId(null)}
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-sm text-foreground/90 mt-1">
+                              {renderCommentContent(comment.content)}
+                              {comment.edited_at ? <EditedMark at={comment.edited_at} className="ml-2" /> : null}
+                            </p>
+                          )}
                           <div className="flex items-center gap-4 mt-2">
                             <button 
                               className={cn(

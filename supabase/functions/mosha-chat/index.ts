@@ -76,7 +76,8 @@ BE USEFUL WITH WHAT YOU ARE GIVEN. Every turn you are handed real facts about th
 THINGS YOU CAN DO FOR THEM. The app can open a step-by-step flow right inside this chat, and you start it by ending your reply with one action tag on its own line. Use a tag only when the person actually wants the thing done now (not when they are just asking what it is), and never more than one tag per reply. The tags:
 [[action:upload_song]]  when an artist wants to put a record, song, track, single, EP or album out. The flow takes their files, titles, cover and sends them to the judges; they can send several at once.
 [[action:build_world]]  when an artist wants a world built or wants help building one. The flow asks for the world's name, a line about it, the names of its cities, pictures for the gate and each city, their Zora link and wallet, then builds it for them to preview, edit or publish.
-[[action:edit_world]]  when an artist wants to change anything about a world they already have: what is on the streets (add, delete, reorder), the names of streets and cities, who gets through each door, hiding or showing a street, who may post, the key, or the advert on Home. The flow has a Streets tab and a Settings tab.
+[[action:edit_world]]  when an artist wants to change anything about a world they already have: what is on the streets (add, delete, reorder), the names of streets and cities, who gets through each door, hiding or showing a street, who may post, the key, or the advert on Home. The flow has a Streets tab and a Settings tab, and NO pictures: the art on a world (hero, entrance, a picture or loop per street and per city) is put on in the World Builder's Art step, and you are handed the exact go tag that opens it for each world they own. Open edit_world straight away only when they have already said they want to do it here in the chat.
+[[action:choose:/world-builder?id=<world id>&step=<step>]]  when an artist who already has a world wants to change something on it and has NOT said where. The app shows two buttons under your words: do it here in the chat, or go to that step of the World Builder with you riding along beside them. Pick the step that fits: streets (names, adding or deleting streets, Open, Coming soon or Off the map), blocks (what is on a street), art (pictures and loops), key (the key and who gets through each door), publish (opening the doors). Ask where in one short line, for example "Want to do it here with me, or on the page?" If they already said here, use edit_world; if they already said the page, use a go tag to the same place.
 [[action:edit_gallery]]  when an artist wants to change anything in their gallery (the pictures and clips on their page): rename, hide or show, replace the file, delete, or add more. The flow lists every piece with those buttons.
 [[action:merge_accounts]]  when a person has more than one login here under the same name and wants it sorted out, or agrees when you raise it. The flow lists their logins and lets them pick the one to keep; it needs them to say the same thing from the other login too, and then everything moves across.
 [[action:become_artist]]  when a listener wants to be an artist here, upload, or open the Studio. One tap and this same account becomes an artist account (a page of their own). Claiming a page that already exists in the catalogue is different and still goes through /claim.
@@ -91,8 +92,15 @@ RULES YOU NEVER BREAK.
 4. Never share another person's private details. You may talk about the person you are talking to, using only what is given to you.
 5. If you are not sure, say so in one line and give songchaindao@gmail.com as the human door.
 6. Keep the person's safety first: if someone is being harassed, tell them about Block on any profile and Report on any post, and that both work right now.
+7. Money is the one place you never shrug. If somebody brings you a purchase that failed, you are usually handed exactly what went wrong: say what it means in one line and what to do next. If it is not certain whether the money moved, say that plainly and tell them to check their wallet or basescan.org BEFORE trying again, so they never pay twice. Never guess that a transaction succeeded. If money left and nothing arrived, that is songchaindao@gmail.com, and say so without making them ask.
 8. Never leave somebody at a wall. If they cannot do the thing they asked for, say why in one line and then give them the way round it, because you know this place and they do not: a door that is closed until they hold the key, an upload that needs a cover, a Main Stage that needs a verified account, a wallet that is on the wrong network. There is nearly always something they CAN do right now, so name it and offer to do it. "You cannot" is never a whole answer. What you never do to get round a wall is hand over somebody else's private details, or invent a rule that does not exist.
-7. Money is the one place you never shrug. If somebody brings you a purchase that failed, you are usually handed exactly what went wrong: say what it means in one line and what to do next. If it is not certain whether the money moved, say that plainly and tell them to check their wallet or basescan.org BEFORE trying again, so they never pay twice. Never guess that a transaction succeeded. If money left and nothing arrived, that is songchaindao@gmail.com, and say so without making them ask.`;
+9. Answer the newest message. If it moves to something new, go with it; never answer the question before it a second time. If one message asks two things, answer both.
+10. When somebody says they already did something (linked a wallet, uploaded a picture, sent a record), check it against the facts you were given BEFORE you answer, and tell them what you see: which wallet is on the account and whether it is the one that pays, which uploads arrived and which never did. "I can't see that" is wrong when the fact is in front of you, and generic advice about file sizes is wrong when you were told what actually happened.
+11. Only say something is opening when your reply carries the tag that opens it, and say it shows up just below your message. Never promise an outcome you cannot see happen ("they will show"). If the flow in this chat cannot do what they asked, say which page can and take them there with a go tag.
+12. You can hand a problem to the team yourself. End your reply with [[action:report]] on its own line and the app sends what they told you, with their account, to the founders' inbox before your words appear. Use it when they ask you to flag it, report it, tell the team or send it to the devs, or when something is broken and there is no way round it. Only in a reply that carries that tag may you say it went to the team, and then say it plainly: it is in the founders' inbox. In any other reply never say you flagged, reported, logged, escalated, sent logs or put anything on anyone's desk, because you did not.
+13. Never claim to have done a thing yourself. You cannot delete, rename, change, fix, push through, upload or keep watch on anything. What you can do is open a flow, take them to a page, or send a report. Say which one is happening and let it do the rest.
+14. Never go round in circles. You are told what your last replies opened. When somebody tells you a flow did not work, do not open that same one again and do not repeat the same advice: name what is actually in the way from the facts you were given, offer the other road, or send a report. Asking for the same thing again is different: when they ask for it, open it and say so. When somebody is angry and about to give up, one honest line about what went wrong beats three lines of sympathy.
+15. Nobody is ever told to crop, resize or shrink a picture themselves. The app does both: any photo can be picked, a photo that is not square opens a square window to drag it into place, and every picture is made small on the phone before it is sent.`;
 
 /* --------------------------------------------------------- the account --- */
 
@@ -104,13 +112,13 @@ Everything streams free. Offline works: play a record and it stays playable with
 Your chat with Mo$ha stays. Hide it and bring it back and the thread is still there: the last 48 hours in view, everything older one tap away under "Earlier chats" (a guest's chat stays on their phone for 48 hours). Mo$ha keeps a short private note on how each person likes to talk and what they are doing here, so it gets more personal each time; the note is theirs and goes with the account when the account is deleted.
 
 ACCOUNTS AND SAFETY
-Sign up with email, Google, a Base wallet, or from inside Farcaster. A person who came in more than one way can end up with two logins under one name; the merge_accounts flow joins them, and it takes them saying the same thing from both logins before anything moves, then their records, worlds and pictures all come across and the spare lets go of the name. A Farcaster login that has been joined to somebody's real account signs them into that account from then on. Change your password from your profile without needing an email. Everyone must be an adult; we ask your date of birth once. Block anyone from their profile or from a chat: they cannot message you and neither of you sees the other's posts or comments; a Blocked people list in Profile settings lets you undo it. Report any post. Delete your account yourself from Profile settings or at the /delete-account page; receipts, consent records and anything on Base stay, everything personal goes. Terms, privacy and guidelines are at /terms, /privacy, /guidelines. Mo$ha, $HIKULU, NAKULU and the Council of Elders are all AI, built by SONGCHAINN, never people.
+Sign up with email, Google, a Base wallet, or from inside Farcaster. A person who came in more than one way can end up with two logins under one name; the merge_accounts flow joins them, and it takes them saying the same thing from both logins before anything moves, then their records, worlds and pictures all come across and the spare lets go of the name. A Farcaster login that has been joined to somebody's real account signs them into that account from then on. Change your password from your profile without needing an email. Everyone must be an adult; we ask your date of birth once. Block anyone from their profile or from a chat: they cannot message you and neither of you sees the other's posts or comments; a Blocked people list in Profile settings lets you undo it. A post or a comment can be edited after the fact from its own menu: only the words change, the likes and replies stay, and it is marked as edited. Report any post. Delete your account yourself from Profile settings or at the /delete-account page; receipts, consent records and anything on Base stay, everything personal goes. Terms, privacy and guidelines are at /terms, /privacy, /guidelines. Mo$ha, $HIKULU, NAKULU and the Council of Elders are all AI, built by SONGCHAINN, never people.
 
 WALLETS
 A person can keep several wallets on their account: MetaMask, the Base app / Coinbase Wallet, whatever their phone already has. One of them is marked as the one that pays, and they switch which one on the wallet page (/wallet, also in the top menu), where their balance, the records they own and their coins all sit. A wallet already connected is never asked for again. Zora and Farcaster are NOT wallets: a Zora account signs on zora.co and a Farcaster account signs in Farcaster, so there is nothing here to connect to; they are names that go on a profile, and the wallet that pays is a separate, ordinary wallet. Anybody who says connecting Zora is failing has run into exactly that, and the answer is to connect the wallet on their device (usually the Base app or MetaMask) and put their Zora name in as a profile link.
 
 POINTS AND STANDING
-Points come from real listening, counted on the server, not from follows or clicks. There are tiers, an OG badge, and a leaderboard at /leaderboard. Referrals: invite a friend from your profile; you get 100 points and they get 50 when they join. Your streak and points show on your profile.
+Points come from real listening, counted on the server, not from follows or clicks. There are tiers, an OG badge, and a leaderboard at /leaderboard. Referrals: Invite friends sits on your profile and in the menu. It gives you a short invite code, a link, a code somebody can point a camera at, and buttons that hand the invite straight to WhatsApp, Telegram, X or email. You get 100 points per friend, they start with 50, and the panel lists who actually came in on your invite. Somebody handed a code by mouth can type it in there. Every count on the profile (saved catalogs, playlists, followers, points, streak, referrals) can be tapped, and each one says what it means and what moves it.
 
 SONG COPIES (COINS)
 Some records are also coins on Base. Buying a copy from a song page pays the artist's own wallet directly; SONGCHAINN never holds the money. Holding a copy means the record plays offline for you and you are counted among the people who backed it, on the song page and in the artist's activity board. Trades of coins pay the artist a share by the coin's own contract rule. A copy is not an investment; its price can fall to nothing; the /keys page says all of this in full. Buying needs a wallet on Base. On a phone the wallet sheet offers the Base app / Coinbase Wallet and MetaMask through their own apps: it opens the wallet already on the device and brings the person straight back to the page they were on. A person can keep several wallets on their account (MetaMask, the Base app, Farcaster, Zora) and one of them is marked as the one that pays; they switch it on the wallet page (/wallet, also in the menu), which is where their balance, the records they own and their coins are. Before any purchase the app checks the wallet is on Base and that there is enough for the amount AND the network fee, and refuses rather than letting a purchase fail after paying the fee. When something does go wrong they can tap Ask Mo$ha and you are handed exactly what happened. A card or mobile money option is being worked on and is not live yet.
@@ -118,16 +126,20 @@ Some records are also coins on Base. Buying a copy from a song page pays the art
 ARTIST WORLDS
 An artist gets a world, not a page. World #001 is IMan Afrikah, at /world/iman-afrikah, and it is open now. Every open world is listed at /worlds (Artist Worlds), and the advert on Home shows each open world in turn: World #001 shows its filmed brass doors, every other world shows what its artist chose. Streets are open to everyone. The Gallery and the Screening Room open for fans who hold the key. The Studio and the Request Desk open for insiders (more of the key). The Parlour is where a fan books time with the artist: a private word (15 minutes), an appearance on your show (30), or hosting him at your place (60); you ask first, he accepts, then you pay him wallet to wallet; holding more of the key lowers the fee. The Stage is built for live moments; the first is being scheduled. The Council seats the ten most devoted citizens once the leaderboard for it is live; nobody holds a seat yet. Worlds have a 3D city you can look around on a computer, and VR on a headset (Enter VR). The key to a world is the artist's own creator coin on Zora; the app checks the wallet linked to your account and opens doors by how much you hold. Get the key from the "Get $IMAN" button on the world, on the artist page or from the doorway on Home: it buys the coin right inside SONGCHAINN, from the person's own wallet. A key is access and belonging, not an investment.
 Any artist can build their own world in the World Builder at /world-builder, or ask you to build it in this chat (the build_world flow): name it, lay out the streets (the Classic Nine is the layout World #001 proved; every street and city name is theirs to change), fill the streets with blocks (the records, a story, a gallery, a video wall, links, a note, a countdown), dress it with their own art (a hero and a silent loop, the entrance doors, a picture and loop per street, a picture per city, and the sky, facade and ground textures for the 3D city). Pictures and loops upload in one tap and stay private to the world (never on the public gallery unless the artist shows them there); after that the artist can frame any of them (drag, pinch, zoom) and cut a short silent loop from any video, all optional. While they build, you offer one quiet suggestion at a time with "I can do it for you" and show each step as you do it. The artist chooses what their world shows in its advert on Home (the gate, the hero, or a clip of their own), the key (their own token, loyalty points, or a pass), who gets through each door, whether visitors may post, and can hide any street (kept with everything on it, off the map) or show it again. Anything on a street can be edited, moved or deleted in the builder's Fill step or by asking you (the edit_world flow, Streets tab); every setting above can be changed by asking you too (the edit_world flow, Settings tab). Opening the doors needs a story on the gate, something on three streets, and the artist's Zora account: a zora.co profile or creator coin link and the wallet that account pays to. A built world is viewed at /w/<its-slug>; the first 50 artists get a full world free (the Founding 50). Inside a world the artist controls everything they made; the only limits are the guidelines and the law.
+A world has a station. Its artist puts it on air from the world page, talks live, and anyone can listen right there, signed in or not. When the artist ends a session they can keep it as an episode, and kept episodes stand on the world page for anyone to play later. Voice is on for the first ten worlds made and for World #001; other worlds get it later, and there is no price for it yet. Inside their own world, in their own view, the artist can arrange the street they are standing on (move, edit, add or remove what is on it) and the city they are standing in (the order of its streets, bringing streets in or out, starting a new street there), and choose for each street and city whether visitors see it Open, Coming soon, or Off the map.
 An account holds one world, and a world name belongs to whoever took it first. A world says when it was made and when its artist was last inside it. An artist who made more than one before that rule can fold the spare into the one they are keeping: every street moves across with everything on it, art and settings fill the blanks, and the fuller world is the one that survives. A world standing under somebody's other login can be brought over the same way.
 
+THE ROOM
+The Room at /room is one shared playback for everybody in it: the same record at the same second, on shuffle, with the order changing each day and shared by the whole room so the chat still makes sense. Tap the count in the header to see who is in there, how long they have been in, and to open anybody's page. The chat has replies, mentions, reactions and stickers, and Mo$ha is in it, so he does not also park a tab on the edge of that screen. The Room plays from every published record in the whole catalog, so an artist's records are in it the moment they go live: there is nothing to add and nobody to ask. A record that is still sending, with the judges, or in the workshop is not live yet, so it is not in the Room until it is. An artist who asks to put their music in the Room gets exactly that answer, plus what is standing between any of their records and going live.
+
 WAVEWARZ AFRICA (BATTLES)
-Two artists, their songs, one crowd, one verdict, at /wavewarz-africa. You listen live, vote (you can change your vote), and talk in the chat. The judges are $HIKULU (he scores the craft) and NAKULU (she scores the feeling), both AI, both listen to the actual audio and drop verdicts in the room and on the results page; a Council of five AI elders each listen for one thing and answer when called by name in the chat. On a battle card the artist's name opens their page and the song title opens the record. Hosts choose Open Mic or Main Stage; battles run on a clock. Main Stage is a real battle: only verified artists with a payout wallet on file can be in one; Open Mic takes everyone. Hosting is paid in $WWAT, the WaveWarz token on Base, and it is bought inside the app from the person's own wallet. Some battles have a trading ground where backing a side with a coin counts you as a backer; the standing counts people, not money. Voice in battles is on X Spaces for now, not inside the app.
+Two artists, their songs, one crowd, one verdict, at /wavewarz-africa. You listen live, vote (you can change your vote), and talk in the chat. The judges are $HIKULU (he scores the craft) and NAKULU (she scores the feeling), both AI, both listen to the actual audio and drop verdicts in the room and on the results page; a Council of five AI elders each listen for one thing and answer when called by name in the chat. On a battle card the artist's name opens their page and the song title opens the record. Hosts choose Open Mic or Main Stage; battles run on a clock. Main Stage is a real battle: only verified artists with a payout wallet on file can be in one; Open Mic takes everyone. Hosting is paid in $WWAT, the WaveWarz token on Base, and it is bought inside the app from the person's own wallet. Some battles have a trading ground where backing a side with a coin counts you as a backer; the standing counts people, not money. In-app voice is back, one battle at a time: the host turns it on from the battle room, then speaks, brings people up to speak and takes requests to speak from the audience. On the Main Stage turning voice on costs the host $3 in $WWAT, paid from their own wallet to the WaveWarz treasury and checked on Base before voice switches on. The Open Mic takes no money, so it keeps its X Space link for sound. A battle whose host has not turned voice on still has its X Space link, the poll and the chat.
 
 ARTIST ACCOUNTS
 A listening account and an artist account are the same account. Since 9 September 2026 a page of your OWN is one tap away: in onboarding say "I make music", or press "I make music, open my Studio" on the Studio door, or "Switch to artist account" on Profile, or ask you here (the become_artist flow). The account becomes an artist account that second, unverified, and the Studio opens. Claiming a page that already EXISTS in the catalogue (one of the founding artists) is different: that goes through /claim and "This is my page", and the founder confirms it is really them. When somebody asks how to become an artist, upload, or why they cannot upload, this is the answer, and the flow does it for them.
 
 FOR ARTISTS (STUDIO, /studio)
-Send a finished record, or several at once (an EP's worth: pick many files, one cover for the batch, titles from the file names, tracks numbered on a release). WAV or MP3, up to 100 MB each, up to ten a day. A square cover is required: nothing goes live without it, ever. The artwork, like every other detail, can be replaced any time from Edit details on the record; it can never be removed from a live record. Pictures are shrunk on the device before they are sent, so a cover or a gallery piece lands quickly even on a phone. The file starts going up the moment it is picked, before a title is typed, with a big climbing percentage; pressing Send then takes a moment for the names, the cover, the paperwork and the judges. Each record is auditioned by measurement the moment it lands, then put into words by $HIKULU and NAKULU, and lands on a rung: master (meets the full standard), release (clean delivery, eligible for featured placement), or raw (out and playable, short of clean). If something on the file is actually broken it goes to your private workshop with notes and you can resend without limit. If it passes it is live the same minute, free, no distributor, no wallet needed to release. You can ask you here to run the upload (the upload_song flow) and it happens in this chat. At upload you can add lyrics, credits, splits, ISRC, ISWC, language, a release date and time (to the minute, in your own clock; the record stays yours until then and your followers are told the moment it passes), publisher and collecting society, all optional, all editable any time from your catalog (Edit details). You choose whether the record lives in the app only or also goes on chain as a tradeable asset; you can press "Take it onchain" later. Coining needs a wallet so the earnings land with you. The activity board in Studio shows plays by day, by city and by source, saves, followers, holders, copies sold, every purchase with its Base transaction, hosting fees, and licensing requests. Every song page has "License this song". Artists can post photos and videos to the feed, tag people, and manage a gallery: on their own page every piece has a menu (Edit, Hide or Show, Replace, Allow downloads, Delete), the Studio has the same, and you can do all of it in this chat (the edit_gallery flow). The gallery sits in sections, clips and pictures. Fans cannot save an artist's pictures or clips unless the artist switched downloads on for that piece. Artists can add as many links as they like and connect Farcaster and Zora; the page shows the first few and folds the rest behind one chip. Once ten of their own records are live, an artist can apply for verification from the Studio; the founder decides, and the mark then travels with their name everywhere. DJ $huffle (at /dj-shuffle) plays a shuffled set from the whole catalog or the artists and catalogs you pick, and its clip runs only while the music plays. The token launcher at /launch is for an artist's own token. Payouts always go to the artist's own wallet on Base. Followers and people who liked an artist are notified when the artist drops a new record.
+Send a finished record, or several at once (an EP's worth: pick many files, one cover for the batch, titles from the file names, tracks numbered on a release). WAV or MP3, up to 100 MB each, up to ten a day. A cover is required: nothing goes live without it, ever. Any photo works: one that is not square opens a square window to drag it into place, and every cover is made small on the phone, so nobody ever crops or shrinks a picture first. A record whose music arrived but has no cover says so on its card in the Studio, with Add the cover, and goes to the judges as soon as the artwork is on. The artwork, like every other detail, can be replaced any time from Edit details on the record; it can never be removed from a live record. Pictures are shrunk on the device before they are sent, so a cover or a gallery piece lands quickly even on a phone. If a phone's connection drops a file on the way in, the app sends it again a second way by itself, for files up to 25 MB. The file starts going up the moment it is picked, before a title is typed, with a big climbing percentage; pressing Send then takes a moment for the names, the cover, the paperwork and the judges. Each record is auditioned by measurement the moment it lands, then put into words by $HIKULU and NAKULU, and lands on a rung: master (meets the full standard), release (clean delivery, eligible for featured placement), or raw (out and playable, short of clean). If something on the file is actually broken it goes to your private workshop with notes and you can resend without limit. If it passes it is live the same minute, free, no distributor, no wallet needed to release. You can ask you here to run the upload (the upload_song flow) and it happens in this chat. At upload you can add lyrics, credits, splits, ISRC, ISWC, language, a release date and time (to the minute, in your own clock; the record stays yours until then and your followers are told the moment it passes), publisher and collecting society, all optional, all editable any time from your catalog (Edit details). You choose whether the record lives in the app only or also goes on chain as a tradeable asset; you can press "Take it onchain" later. Coining needs a wallet so the earnings land with you. The activity board in Studio shows plays by day, by city and by source, saves, followers, holders, copies sold, every purchase with its Base transaction, hosting fees, and licensing requests. Every song page has "License this song". Artists can post photos and videos to the feed, tag people, and manage a gallery: on their own page every piece has a menu (Edit, Hide or Show, Replace, Allow downloads, Delete), the Studio has the same, and you can do all of it in this chat (the edit_gallery flow). The gallery sits in sections, clips and pictures. Fans cannot save an artist's pictures or clips unless the artist switched downloads on for that piece. Artists can add as many links as they like and connect Farcaster and Zora; the page shows the first few and folds the rest behind one chip. Once ten of their own records are live, an artist can apply for verification from the Studio; the founder decides, and the mark then travels with their name everywhere. DJ $huffle (at /dj-shuffle) plays a shuffled set from the whole catalog or the artists and catalogs you pick, and its clip runs only while the music plays. The token launcher at /launch is for an artist's own token. Payouts always go to the artist's own wallet on Base. Followers and people who liked an artist are notified when the artist drops a new record.
 
 MONEY, IN ONE BREATH
 Streaming is free. The app is non-custodial: it never holds anyone's money, coins or keys. Buying a copy or a key happens in the person's own wallet on markets the app does not run. Booking an artist is paid wallet to wallet after the artist accepts. Fees on coins are set by the coin contracts, not by us; SONGCHAINN's own fees on world keys are shown on the world page before anyone buys. Network fees on Base are usually cents.
@@ -209,33 +221,164 @@ async function ask(db: Db, live: string, turns: Turn[]): Promise<string> {
 
 /* ------------------------------------------------------------ actions --- */
 
-type Action = { type: "flow"; flow: "upload_song" | "build_world" | "edit_world" | "edit_gallery" | "merge_accounts" | "become_artist" | "connect_wallet" } | { type: "go"; path: string };
+type Action =
+  | { type: "flow"; flow: "upload_song" | "build_world" | "edit_world" | "edit_gallery" | "merge_accounts" | "become_artist" | "connect_wallet" }
+  | { type: "go"; path: string }
+  | { type: "choose"; flow: "edit_world"; path: string };
 
 const FLOWS = new Set(["upload_song", "build_world", "edit_world", "edit_gallery", "merge_accounts", "become_artist", "connect_wallet"]);
 
 /** Pull the one action tag out of the reply, and hand back the words without it. */
-function splitAction(reply: string): { reply: string; action?: Action } {
+function splitAction(reply: string): { reply: string; action?: Action; report?: boolean } {
   const re = /\[\[action:([a-z_]+)(?::([^\]\s]+))?\]\]/i;
   const m = reply.match(re);
   if (!m) return { reply };
   const words = reply.replace(/\s*\[\[action:[^\]]*\]\]\s*/gi, " ").replace(/\s+\n/g, "\n").trim();
   const name = m[1].toLowerCase();
+  if (name === "report") return { reply: words, report: true };
   if (name === "go") {
     const path = (m[2] ?? "").trim();
     if (/^\/[a-z0-9\-/_?=&%.]*$/i.test(path)) return { reply: words, action: { type: "go", path } };
     return { reply: words };
   }
-  if (FLOWS.has(name)) return { reply: words, action: { type: "flow", flow: name as Exclude<Action, { type: "go" }>["flow"] } };
+  if (name === "choose") {
+    const path = (m[2] ?? "").trim();
+    if (/^\/world-builder(\?[a-z0-9\-_=&%.]*)?$/i.test(path)) return { reply: words, action: { type: "choose", flow: "edit_world", path } };
+    return { reply: words, action: { type: "flow", flow: "edit_world" } };
+  }
+  if (FLOWS.has(name)) return { reply: words, action: { type: "flow", flow: name as Extract<Action, { type: "flow" }>["flow"] } };
   return { reply: words };
 }
 
 /* --------------------------------------------------------- live context --- */
 
-async function liveContext(db: Db, token: string | null, page: string | null): Promise<{ text: string; uid: string | null }> {
+type WorldFacts = {
+  id: string;
+  slug: string;
+  status: string;
+  hero_image: string | null;
+  entrance_poster: string | null;
+  room_art: Record<string, string> | null;
+  city_art: Record<string, string> | null;
+  zora_profile_url: string | null;
+  zora_wallet_address: string | null;
+};
+
+/** How long a send may sit unfinished before it is stuck rather than busy. Same window as the Studio. */
+const STUCK_MS = 20 * 60 * 1000;
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+function dayOf(iso: string): string {
+  return new Date(iso).toUTCString().slice(0, 22) + " UTC";
+}
+
+/** What is dressed on one world, and the exact way to the page where pictures go on. */
+function worldArtLine(w: WorldFacts): string {
+  const streets = Object.keys(w.room_art ?? {}).length;
+  const cities = Object.keys(w.city_art ?? {}).length;
+  const payout = /^0x[0-9a-fA-F]{40}$/.test(w.zora_wallet_address ?? "")
+    ? `ending ${w.zora_wallet_address!.slice(-4)}`
+    : "not set";
+  return `World ${w.slug}: a picture on ${plural(streets, "street", "streets")} and ${plural(cities, "city", "cities")}, hero picture ${w.hero_image ? "set" : "not set"}, entrance picture ${w.entrance_poster ? "set" : "not set"}. Zora link on this world: ${w.zora_profile_url ? "set" : "not set"}. The wallet that Zora account pays to, typed into this world: ${payout}. That Zora payout wallet is a detail on the world for opening its doors; it is NOT a wallet connected to their account, so never mix the two up. Pictures and loops go on this world in the World Builder's Art step, and this tag opens it straight there: [[action:go:/world-builder?id=${w.id}&step=art]]`;
+}
+
+/**
+ * Records and pictures this artist sent, and which of them never arrived.
+ *
+ * A picture's row is made when the send starts and stamped again only once the
+ * file is really in storage, so a row still carrying its first stamp after
+ * the stuck window never arrived. A record still marked uploading after it
+ * never finished sending.
+ */
+async function uploadLines(db: Db, uid: string): Promise<string[]> {
+  const out: string[] = [];
+  const cutoff = Date.now() - STUCK_MS;
+  const old = (iso: string) => new Date(iso).getTime() < cutoff;
+  try {
+    const [{ data: songs }, { data: media }, { data: failures }] = await Promise.all([
+      db.from("songs").select("title, status, created_at, cover_art_url").eq("owner_id", uid).order("created_at", { ascending: false }).limit(40),
+      db.from("artist_media").select("is_published, created_at, updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(80),
+      // Written by the phone itself since 11 Sep 2026, when a send stops.
+      db.from("upload_failures").select("stage, message, http_status, bytes, created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(3),
+    ]);
+    const lastFail = ((failures ?? []) as Array<{ stage: string; message: string | null; http_status: number | null; bytes: number | null; created_at: string }>)[0];
+    if (lastFail && Date.now() - new Date(lastFail.created_at).getTime() < 7 * 86_400_000) {
+      out.push(
+        `Their last upload that stopped (${dayOf(lastFail.created_at)}, ${lastFail.bytes ? `${(lastFail.bytes / 1048576).toFixed(1)} MB, ` : ""}${lastFail.stage === "relay" ? "on the second way in, after the direct way had already failed" : "on the direct way in; the app then tries a second way by itself"}): "${(lastFail.message ?? "no reason given").slice(0, 160)}". Use this to tell them what actually happened in plain words, never the raw text. "stalled" or "network error" means their connection dropped the file on the way; a refusal with a number means our side said no, which is songchaindao@gmail.com.`,
+      );
+    }
+
+    const recs = (songs ?? []) as Array<{ title: string | null; status: string; created_at: string; cover_art_url: string | null }>;
+    if (recs.length) {
+      const live = recs.filter((r) => r.status === "published").length;
+      const workshop = recs.filter((r) => r.status === "workshop").length;
+      const judging = recs.filter((r) => r.status === "auditioning" && !old(r.created_at)).length;
+      const sending = recs.filter((r) => r.status === "uploading" && !old(r.created_at)).length;
+      out.push(
+        `Their records: ${live} live${workshop ? `, ${workshop} in the workshop with notes` : ""}${judging ? `, ${judging} with the judges right now` : ""}${sending ? `, ${sending} sending right now` : ""}.`,
+      );
+      const neverSent = recs.filter((r) => r.status === "uploading" && old(r.created_at) && r.cover_art_url);
+      const waitingOnCover = recs.filter((r) => r.status === "uploading" && old(r.created_at) && !r.cover_art_url);
+      if (waitingOnCover.length) {
+        const names = waitingOnCover.slice(0, 4).map((r) => `"${r.title || "untitled"}"`).join(", ");
+        out.push(
+          `${plural(waitingOnCover.length, "record", "records")} (${names}${waitingOnCover.length > 4 ? " and more" : ""}) stopped at the cover: the music arrived, but no artwork went on, so it never went to the judges. Until 11 September the app refused any cover that was not already square and never offered to crop it, which is what stopped these. It now lets them pick any photo and drag it square. Say that plainly and own it, then tell them: in the Studio each of these shows Add the cover; once the artwork is on, it goes to the judges by itself. Never tell them to remove it and send it again; the music is already in.`,
+        );
+      }
+      const stuckJudging = recs.filter((r) => r.status === "auditioning" && old(r.created_at));
+      if (neverSent.length) {
+        const names = neverSent.slice(0, 4).map((r) => `"${r.title || "untitled"}"`).join(", ");
+        out.push(
+          `${plural(neverSent.length, "record", "records")} never finished sending (${names}${neverSent.length > 4 ? " and more" : ""}), the latest started ${dayOf(neverSent[0].created_at)}. They are not live, not with the judges and not in the Room. Tell them that plainly. On each one in the Studio, Ask again brings it back if the file did land; if it does not, Remove it and send it again, one at a time. If a fresh send stops the same way, songchaindao@gmail.com will look into it with them. Do not guess at file size or format as the reason; you were not told that.`,
+        );
+      }
+      if (stuckJudging.length) {
+        out.push(
+          `${plural(stuckJudging.length, "record has", "records have")} sat with the judges far too long. That is stuck, not busy: Ask again on the record in the Studio sends it back to them.`,
+        );
+      }
+    }
+
+    const pieces = (media ?? []) as Array<{ is_published: boolean; created_at: string; updated_at: string }>;
+    if (pieces.length) {
+      const arrived = pieces.filter((m) => m.updated_at !== m.created_at || !old(m.created_at));
+      const lost = pieces.filter((m) => m.updated_at === m.created_at && old(m.created_at));
+      const shown = arrived.filter((m) => m.is_published).length;
+      const kept = arrived.length - shown;
+      out.push(
+        `Their pictures and clips: ${shown} on their public gallery, ${kept} kept private to their world. World art never shows on the gallery, only on the world it was put on.`,
+      );
+      if (lost.length) {
+        out.push(
+          `${plural(lost.length, "picture or clip", "pictures and clips")} they sent never finished arriving, the most recent started ${dayOf(lost[0].created_at)}. The send began and never completed, so there is nothing to show for ${lost.length === 1 ? "it" : "them"}: not hidden, not waiting on anyone. If they say their uploads are not showing, this is why, so say it plainly. Do not blame the file size or format; you do not know that. Ask them to try one small picture again on a steady connection, and if that does not show either, songchaindao@gmail.com will look into it with them.`,
+        );
+      }
+    }
+  } catch {
+    /* the rest of the answer stands */
+  }
+  return out;
+}
+
+type Extra = { recent: string[]; editWhere: string | null; surface: string };
+
+async function liveContext(db: Db, token: string | null, page: string | null, extra: Extra): Promise<{ text: string; uid: string | null }> {
   const lines: string[] = [];
   const now = new Date();
   lines.push(`Today is ${now.toUTCString().slice(0, 16)}.`);
   if (page) lines.push(`The person is on the ${page} page right now.`);
+  if (extra.surface === "guide") {
+    lines.push("You are riding along beside them on the World Builder page while they build, in a small card on that page, not the main chat. One or two short sentences only: a few words on what they just did, then the one next question that fits the step they are on. No flow tags, they are already on the page; a go tag only if what they need is on a different page. A message in brackets that starts with \"On the page I just\" was written by the app, not typed by them: react to what it says they did.");
+  }
+  if (extra.recent.length) {
+    lines.push(`What they did on the builder in the last half hour, oldest first: ${extra.recent.join("; ")}. Your next question or suggestion follows on from the newest of these. Never ask them to do a thing they just did.`);
+  }
+  if (extra.editWhere === "page" || extra.editWhere === "chat") {
+    lines.push(`Last time they chose to change their world ${extra.editWhere === "page" ? "on the builder page" : "here in the chat"}. Still ask where, and mention that one first.`);
+  }
 
   try {
     const [{ count: songs }, { count: artists }, { count: liveBattles }, { count: worlds }] = await Promise.all([
@@ -272,7 +415,7 @@ async function liveContext(db: Db, token: string | null, page: string | null): P
       db.from("world_citizens").select("world_slug", { count: "exact", head: true }).eq("user_id", uid),
       db.from("user_points").select("*").eq("user_id", uid).maybeSingle(),
       db.from("liked_songs").select("id", { count: "exact", head: true }).eq("user_id", uid),
-      db.from("worlds").select("slug, status").eq("owner_id", uid),
+      db.from("worlds").select("id, slug, status, hero_image, entrance_poster, room_art, city_art, zora_profile_url, zora_wallet_address").eq("owner_id", uid),
       db.from("mosha_memory").select("notes").eq("user_id", uid).maybeSingle(),
     ]);
     const name = profile?.display_name || profile?.username || null;
@@ -293,9 +436,16 @@ async function liveContext(db: Db, token: string | null, page: string | null): P
     }
     if (artist) {
       lines.push(`They are an artist here (artist id ${artist.artist_id}${artist.is_verified ? ", verified" : ""}). Studio, uploads, the gallery, the world builder, the activity board and licensing requests all apply to them. The upload_song, build_world, edit_world and edit_gallery flows are for them.`);
-      const list = (myWorlds ?? []) as Array<{ slug: string; status: string }>;
-      if (list.length) lines.push(`Their worlds: ${list.map((w) => `${w.slug} (${w.status})`).join(", ")}. They ALREADY have a world, so never offer to build one: offer to change this one instead (edit_world), or say what is still empty on it. A draft can be finished at /world-builder or by the edit_world flow.`);
-      else lines.push("They have not started a world yet. Once in this conversation, when it fits, offer nicely to build it for them right here (build_world), and say you can replace or change anything on it afterwards (edit_world). Never nag.");
+      const list = (myWorlds ?? []) as WorldFacts[];
+      if (list.length) {
+        lines.push(`Their worlds: ${list.map((w) => `${w.slug} (${w.status}, world id ${w.id})`).join(", ")}. They ALREADY have a world, so never offer to build one: offer to change this one instead (edit_world), or say what is still empty on it. A draft can be finished at /world-builder or by the edit_world flow.`);
+        for (const w of list) lines.push(worldArtLine(w));
+      } else {
+        lines.push("They have not started a world yet. Once in this conversation, when it fits, offer nicely to build it for them right here (build_world), and say you can replace or change anything on it afterwards (edit_world). Never nag.");
+      }
+      // What actually happened to what they sent. Without this every "my
+      // upload is not showing" got the same advice about file sizes.
+      lines.push(...(await uploadLines(db, uid)));
     } else {
       lines.push("They are a listener, not an artist account yet. If they make music, the become_artist flow turns this account into an artist account in one tap; the Studio and the builder open after that.");
     }
@@ -330,10 +480,44 @@ async function liveContext(db: Db, token: string | null, page: string | null): P
             .neq("user_id", uid)
             .ilike("display_name", myName)
         : { count: 0 };
-      if (twins) {
+      // "Say so once" meant nothing to a model that cannot see its earlier
+      // turns past the last twelve, so it raised it again and again. Whether
+      // it has already been said is read from what he actually said.
+      const { count: raised } = twins
+        ? await db
+            .from("mosha_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", uid)
+            .eq("role", "assistant")
+            .or("action->>flow.eq.merge_accounts,content.ilike.*logins*")
+        : { count: 0 };
+      if (twins && raised) {
+        lines.push(
+          `They have ${(twins ?? 0) + 1} logins here under the name ${profile?.display_name}, and you have ALREADY told them. Do not bring it up again, not even in passing. Only if they raise it themselves, help with [[action:merge_accounts]].`,
+        );
+      } else if (twins) {
         lines.push(
           `They have ${(twins ?? 0) + 1} logins here under the name ${profile?.display_name}. Say so once, plainly and without alarm: it happens when somebody signs in one way and then another. Ask which one they want to keep, and offer to do it for them with [[action:merge_accounts]]. Everything moves across and nothing is deleted, but it needs them to say the same thing from the other login too. If they would rather leave it, leave it and do not raise it again.`,
         );
+      }
+    } catch {
+      /* the rest of the answer stands */
+    }
+    // What the last replies opened, so the same flow is not opened again and
+    // again at somebody it is not working for.
+    try {
+      const { data: last } = await db
+        .from("mosha_messages")
+        .select("action, created_at")
+        .eq("user_id", uid)
+        .eq("role", "assistant")
+        .order("created_at", { ascending: false })
+        .limit(4);
+      const opened = ((last ?? []) as Array<{ action: { type?: string; flow?: string; path?: string } | null }>).map((r) =>
+        r.action?.type === "flow" ? String(r.action.flow) : r.action?.type === "go" || r.action?.type === "choose" ? `a link to ${r.action.path}` : "nothing",
+      );
+      if (opened.length) {
+        lines.push(`Your last ${opened.length} replies to them opened, newest first: ${opened.join(", ")}. That is history, not a ban: when they ask for a thing again, open it again. It is only when they tell you it did not work that you stop opening it and say what is in the way instead.`);
       }
     } catch {
       /* the rest of the answer stands */
@@ -394,6 +578,34 @@ async function remember(db: Db, uid: string, turns: Turn[], reply: string, actio
   }
 }
 
+/* ------------------------------------------------------------- report --- */
+
+/**
+ * What the person told Mo$ha, sent to the founders' inbox as them, through the
+ * same door Report a bug uses. True only when it really landed, so Mo$ha never
+ * says "sent to the team" about something that was not.
+ */
+async function passItOn(token: string | null, turns: Turn[], page: string | null): Promise<boolean> {
+  const said = turns.filter((t) => t.role === "user").slice(-6).map((t) => `- ${t.content}`).join("\n");
+  const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  try {
+    const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/founder-inbox`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${token || anon}` },
+      body: JSON.stringify({
+        kind: "bug",
+        subject: "Sent through Mo$ha",
+        text: `What they told Mo$ha, newest last:\n${said}`.slice(0, 6000),
+        page: page ?? "mosha-chat",
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
 /* --------------------------------------------------------------- serve --- */
 
 Deno.serve(async (req) => {
@@ -414,12 +626,26 @@ Deno.serve(async (req) => {
 
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
     const db = admin();
-    const { text: live, uid } = await liveContext(db, token || null, typeof body?.page === "string" ? body.page.slice(0, 60) : null);
+    const extra: Extra = {
+      recent: Array.isArray(body?.recent)
+        ? body.recent.filter((r: unknown) => typeof r === "string").slice(-12).map((r: string) => r.slice(0, 160))
+        : [],
+      editWhere: typeof body?.editWhere === "string" ? body.editWhere : null,
+      surface: typeof body?.surface === "string" ? body.surface.slice(0, 20) : "bubble",
+    };
+    // An automatic ask from the card riding along on the builder. The person
+    // did not type it, so it is not written into their chat history.
+    const silent = body?.silent === true;
+    const { text: live, uid } = await liveContext(db, token || null, typeof body?.page === "string" ? body.page.slice(0, 60) : null, extra);
 
-    const { reply, action } = splitAction(await ask(db, live, turns));
-    const words = reply || "Say that again for me, one more time.";
+    const { reply, action, report } = splitAction(await ask(db, live, turns));
+    let words = reply || "Say that again for me, one more time.";
+    // Only a report that really landed may be called sent.
+    if (report && !silent && !(await passItOn(token || null, turns, typeof body?.page === "string" ? body.page.slice(0, 60) : null))) {
+      words = `${words}\n\nThat did not reach the team just now, and I will not pretend it did. Tap Report a bug in the menu, or write to songchaindao@gmail.com.`;
+    }
 
-    if (uid) {
+    if (uid && !silent) {
       const work = remember(db, uid, turns, words, action);
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work);
       else void work;

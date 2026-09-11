@@ -18,6 +18,7 @@ import type {
   WorldConfig,
   WorldRoomAccess,
   WorldRoomDef,
+  WorldStage,
 } from './types';
 import { WORLDS, getWorldBySlug as getCodeWorldBySlug } from './registry';
 
@@ -62,6 +63,7 @@ interface CityRow {
   hue: string;
   sort_order: number;
   hidden?: boolean | null;
+  stage?: string | null;
   buildings: string[];
 }
 
@@ -80,9 +82,17 @@ interface StreetRow {
   key_threshold?: string | number | null;
   key_nft_id?: string | null;
   hidden?: boolean | null;
+  stage?: string | null;
 }
 
 const ACCESS: WorldRoomAccess[] = ['public', 'fan', 'insider', 'council', 'event'];
+const STAGES: WorldStage[] = ['open', 'soon', 'away'];
+
+/** A stage the database gave us, or 'open' when it said nothing useful. */
+function toStage(row: { stage?: string | null; hidden?: boolean | null }): WorldStage {
+  if (STAGES.includes(row.stage as WorldStage)) return row.stage as WorldStage;
+  return row.hidden ? 'away' : 'open';
+}
 const KINDS: CityContentKind[] = ['music', 'canvas', 'motion', 'vault', 'word'];
 
 function asRecord(value: unknown): Record<string, string> {
@@ -113,6 +123,7 @@ function toRoom(row: StreetRow): WorldRoomDef {
         ? { songId: String(row.key_song_id), threshold: String(row.key_threshold ?? '1') }
         : null,
     nftKey: row.key_kind === 'nft' && row.key_nft_id ? { nftId: String(row.key_nft_id) } : null,
+    stage: toStage(row),
   };
 }
 
@@ -127,6 +138,7 @@ function toCity(row: CityRow): WorldCityDef {
     hue: row.hue,
     order: row.sort_order,
     buildings: row.buildings ?? [],
+    stage: toStage(row),
   };
 }
 
@@ -137,6 +149,10 @@ export function rowsToWorldConfig(
 ): WorldConfig {
   return {
     slug: world.slug,
+    id: world.id,
+    // A draft is a real world to the person who made it. Carrying this through
+    // is what lets the viewer say so, and link them back into the builder.
+    draft: world.status !== 'published',
     // Unpublished worlds have no number yet. 0 reads as "unnumbered" and the
     // map never prints it, which is the point of earning it at publish.
     worldNumber: world.world_number ?? 0,
@@ -153,8 +169,14 @@ export function rowsToWorldConfig(
     story: world.story ?? [],
     featuredSongIds: world.featured_song_ids ?? [],
     // A street the artist put away is not on the map and not a door.
-    rooms: [...streets].filter((s) => !s.hidden).sort((a, b) => a.sort_order - b.sort_order).map(toRoom),
-    cities: [...cities].sort((a, b) => a.sort_order - b.sort_order).map(toCity),
+    rooms: [...streets]
+      .map(toRoom)
+      .filter((r) => r.stage !== 'away')
+      .sort((a, b) => a.order - b.order),
+    cities: [...cities]
+      .map(toCity)
+      .filter((c) => c.stage !== 'away')
+      .sort((a, b) => a.order - b.order),
     accent: world.accent,
     heroImage: world.hero_image ?? undefined,
     roomArt: asRecord(world.room_art),
@@ -200,11 +222,11 @@ export async function fetchWorldBySlug(slug: string | undefined): Promise<WorldC
   const [{ data: cities }, { data: streets }] = await Promise.all([
     supabase
       .from('world_cities')
-      .select('slug, name, kind, tagline, teaser, empty_line, hue, sort_order, buildings')
+      .select('slug, name, kind, tagline, teaser, empty_line, hue, sort_order, buildings, stage')
       .eq('world_id', (world as unknown as WorldRow).id),
     supabase
       .from('world_streets')
-      .select('slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden')
+      .select('slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden, stage')
       .eq('world_id', (world as unknown as WorldRow).id),
   ]);
 

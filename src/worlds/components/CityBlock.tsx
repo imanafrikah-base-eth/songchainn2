@@ -22,10 +22,13 @@ export function CityBlock({
   world,
   city,
   index,
+  soon = false,
 }: {
   world: WorldConfig;
   city: WorldCityDef;
   index: number;
+  /** The artist marked it Coming soon and this viewer is not the artist. */
+  soon?: boolean;
 }) {
   const hue = DOOR_HUES[city.hue] ?? DOOR_HUES.amber;
   // Height against the rest of the skyline comes from one shared source, so
@@ -53,8 +56,8 @@ export function CityBlock({
       transition={{ delay: index * 0.08, duration: 0.5, ease: 'easeOut' }}
       className="h-full"
     >
-      {isEmpty ? (
-        <FencedPlot city={city} />
+      {isEmpty || soon ? (
+        <FencedPlot city={city} soon={soon} />
       ) : (
         <Link
           to={`/world/${world.slug}/${city.slug}`}
@@ -131,7 +134,7 @@ export function CityBlock({
  * go, and a door that opens onto an empty room is worse than a fence that is
  * honest about being a building site.
  */
-function FencedPlot({ city }: { city: WorldCityDef }) {
+function FencedPlot({ city, soon = false }: { city: WorldCityDef; soon?: boolean }) {
   const hue = DOOR_HUES[city.hue] ?? DOOR_HUES.amber;
   return (
     <div className="relative flex h-full min-h-[340px] flex-col justify-end overflow-hidden rounded-md border border-dashed border-white/20 bg-white/[0.02] p-5">
@@ -145,11 +148,13 @@ function FencedPlot({ city }: { city: WorldCityDef }) {
       />
       <div className="relative">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
-          <Hammer className="h-3 w-3" /> Building site
+          <Hammer className="h-3 w-3" /> {soon ? 'Coming soon' : 'Building site'}
         </span>
         <h3 className="mt-3 font-heading text-xl font-bold text-white/80">{city.name}</h3>
         <p className={`mt-0.5 text-xs font-medium ${hue.text} opacity-70`}>{city.tagline}</p>
-        <p className="mt-2 text-sm leading-relaxed text-white/45">{city.emptyLine}</p>
+        <p className="mt-2 text-sm leading-relaxed text-white/45">
+          {soon ? 'The artist is still building this one. Check back soon.' : city.emptyLine}
+        </p>
       </div>
     </div>
   );

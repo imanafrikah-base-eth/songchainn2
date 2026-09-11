@@ -54,7 +54,9 @@ export default function AudienceProfile() {
     isFollowing,
     getPostComments,
     addComment,
-    untagSelf
+    untagSelf,
+    editPost,
+    editComment,
   } = useSocial();
   /* This person's posts, all of them. The page used to filter the viewer's
      own fifty-post feed by author, so a stranger's profile showed only what
@@ -555,6 +557,8 @@ export default function AudienceProfile() {
                   post={post}
                   onLike={toggleLikePost}
                   onDelete={handleDeletePost}
+                  onEdit={editPost}
+                  onEditComment={editComment}
                   onFollow={followUser}
                   isFollowing={isFollowing(post.user_id)}
                   onGetComments={getPostComments}

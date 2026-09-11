@@ -1,3 +1,4 @@
+import { songPath } from '@/lib/slugRoutes';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
@@ -30,6 +31,7 @@ import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { HomeHero, type HeroFeature } from '@/components/HomeHero';
 import { useMoshaTour } from '@/hooks/useMoshaTour';
+import { useSettledHero } from '@/hooks/useSettledHero';
 import { pickHeroSong } from '@/lib/heroPick';
 import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
 import { ZABAL_GAMEZ_ENABLED, WORLDS_ENABLED } from '@/lib/features';
@@ -88,7 +90,7 @@ function getPlaylistGradient(playlist: { id: string; name: string; mood?: string
 export default function Home() {
   const { rankedArtists } = useRankedArtists();
   const { audienceProfile, refreshProfile, user } = useAuth();
-  const { data: todayHotSongs = [] } = useTodayHotSongs(10);
+  const { data: todayHotSongs = [], isPlaceholderData: hotStillComing } = useTodayHotSongs(10);
   const { playlists, createPlaylist, addSongsToPlaylist, likedArtists } = useAudienceInteractions();
   const { toast } = useToast();
   const { createPost } = useSocial();
@@ -228,7 +230,7 @@ export default function Home() {
 
   // Same ranking as the landing page, from the same helper, so the two can
   // never disagree about what the record of the day is. See src/lib/heroPick.ts.
-  const heroFeature = useMemo<HeroFeature | null>(() => {
+  const heroPick = useMemo<HeroFeature | null>(() => {
     const pick = pickHeroSong({
       hotToday: hotTodaySongs.map(({ song }) => song),
       newMusic: songsFromCatalogs(newReleases),
@@ -242,9 +244,13 @@ export default function Home() {
       artistId: pick.song.artistId,
       coverImage: pick.song.coverImage,
       label: pick.label,
-      href: `/song/${pick.song.id}`,
+      href: songPath(pick.song),
     };
   }, [hotTodaySongs, newReleases, allSongs, songsFromCatalogs]);
+  // Nothing is shown until today's counts have actually landed, otherwise the
+  // newest release wins the pick for a moment and is then swapped for the real
+  // number one, which reads as a flash.
+  const heroFeature = useSettledHero(heroPick, !hotStillComing && !catalogLoading);
 
   const handlePlayAllHotToday = useCallback(() => {
     const queueSongs = hotTodaySongs.map((entry) => entry.song);
@@ -471,7 +477,14 @@ export default function Home() {
         )}
         {heroFeature ? (
           <HomeHero feature={heroFeature} onPlay={handlePlayHero} faces={heroFaces} />
-        ) : null}
+        ) : (
+          // Holds the space while today's counts arrive, so the page does not
+          // jump when the record of the day lands.
+          <section
+            aria-hidden
+            className="relative -mx-4 mb-7 h-[280px] animate-pulse bg-secondary/40 sm:-mx-6 sm:mb-10 sm:h-[320px] lg:-mx-8"
+          />
+        )}
 
         <section className="mb-4 sm:mb-6">
           <div className="flex items-center justify-between gap-3 mb-3">

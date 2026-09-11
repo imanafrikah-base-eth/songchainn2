@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { rememberEditWhere } from '@/lib/moshaWatch';
 import { Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
 import { askMoshaFull, MOSHA_INTRO, type MoshaAction, type MoshaTurn } from '@/lib/mosha';
 import { getCache, loadEarlier, loadGuest, loadRecent, saveGuest, setCache, type StoredTurn } from '@/lib/moshaHistory';
@@ -32,6 +33,8 @@ interface ChatTurn extends MoshaTurn {
   flow?: MoshaFlowName;
   /** Opened from a chip, not said: shown now, never written down. */
   local?: boolean;
+  /** Mo$ha asked where to change their world: here, or on this builder page. */
+  choice?: { path: string };
 }
 
 function toChat(t: StoredTurn): ChatTurn {
@@ -92,6 +95,7 @@ export function MoshaChat({
   compact?: boolean;
 }) {
   const { isArtist, user } = useAuth();
+  const navigate = useNavigate();
   // Sorting out logins is only offered to somebody who actually has more than one.
   const { data: twins = [] } = useDuplicateAccounts();
   // What they already have decides what is worth offering. Mo$ha reading
@@ -184,16 +188,17 @@ export function MoshaChat({
       const { reply, action: moshaAction } = await askMoshaFull(next.map(({ role, content }) => ({ role, content })), 'bubble');
       const flow = moshaAction?.type === 'flow' ? moshaAction.flow : undefined;
       const go = moshaAction?.type === 'go' ? moshaAction : undefined;
+      const choose = moshaAction?.type === 'choose' ? moshaAction : undefined;
       // A page Mo$ha points at gets a button; the old keyword door stays as a
       // fallback for the account questions when the model gave no action.
       const action = go
         ? { label: 'Take me there', to: go.path }
-        : !flow && ARTIST_ACCOUNT_ASK.test(clean)
+        : !flow && !choose && ARTIST_ACCOUNT_ASK.test(clean)
           ? isArtist
             ? { label: 'Open the Studio', to: '/studio' }
             : { label: 'Switch to artist account', to: '/claim' }
           : undefined;
-      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow, at: new Date().toISOString() }]);
+      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow, choice: choose ? { path: choose.path } : undefined, at: new Date().toISOString() }]);
       setBusy(false);
       input.current?.focus();
     },
@@ -274,6 +279,36 @@ export function MoshaChat({
                 flow={t.flow}
                 onClose={() => setTurns((prev) => prev.map((x, j) => (j === i ? { ...x, flow: undefined } : x)))}
               />
+            )}
+            {/* Where to change it. Here opens the editor under this message;
+                the page takes them to that step of the builder, with Mo$ha
+                riding along and watching what they do there. */}
+            {t.choice && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    rememberEditWhere('chat');
+                    setTurns((prev) => prev.map((x, j) => (j === i ? { ...x, choice: undefined, flow: 'edit_world' } : x)));
+                  }}
+                  className="inline-flex min-h-10 items-center rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground"
+                >
+                  Here in chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const path = t.choice!.path;
+                    rememberEditWhere('page');
+                    setTurns((prev) => prev.map((x, j) => (j === i ? { ...x, choice: undefined } : x)));
+                    navigate(`${path}${path.includes('?') ? '&' : '?'}guide=1`);
+                    onClose?.();
+                  }}
+                  className="inline-flex min-h-10 items-center rounded-full border border-primary/40 bg-primary/10 px-4 text-xs font-semibold text-primary"
+                >
+                  Take me to the page
+                </button>
+              </div>
             )}
             {t.action && (
               <Link

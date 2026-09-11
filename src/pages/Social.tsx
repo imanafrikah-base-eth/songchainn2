@@ -49,6 +49,8 @@ export default function Social() {
     untagSelf,
     fetchPostById,
     refetchPosts,
+    editPost,
+    editComment,
   } = useSocial();
   const playerState = useSafePlayerState();
   const { playSong } = usePlayerActions();
@@ -419,6 +421,7 @@ export default function Social() {
                 isFollowing={isFollowing(post.user_id)}
                 onComment={() => handleOpenComments(post.id)}
                 onDelete={handleDeletePost}
+                onEdit={editPost}
                 onUntagSelf={untagSelf}
               />
             </div>
@@ -639,6 +642,7 @@ export default function Social() {
         isLoading={loadingComments}
         onAddComment={handleAddComment}
         onDeleteComment={handleDeleteComment}
+        onEditComment={editComment}
         commentsCount={currentComments.length}
       />
     </div>

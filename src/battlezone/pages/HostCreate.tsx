@@ -888,6 +888,11 @@ const HostCreate = () => {
                 <HostFeeNotice />
               </>
             )}
+            <p className="text-xs text-muted-foreground">
+              {stage === "main_stage"
+                ? "In-app voice: once the battle is up, turn it on from the room. It costs $3 in $WWAT. Without it, the X Space link above still carries the sound."
+                : "The Open Mic takes no money, so it keeps the X Space link above for sound."}
+            </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <button
                 onClick={() => createBattle(false)}

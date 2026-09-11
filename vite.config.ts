@@ -37,12 +37,48 @@ export default defineConfig(() => ({
     port: 5173,
     host: true,
     strictPort: true,
-    open: true,
+    // Opening a fresh browser tab on every start cost this 8 GB machine a
+    // few hundred megabytes each time; open the app yourself.
+    open: false,
+    watch: {
+      // The dev server was killed for low memory. It was watching thousands of
+      // files nothing in src imports: the Android build output (2,000+ files),
+      // the separate BattleZone apps, dist, the Supabase functions, scripts and
+      // old test reports. Changes there never need a reload of the web app.
+      ignored: [
+        "**/android/**",
+        "**/BattleZone/**",
+        "**/dist/**",
+        "**/supabase/**",
+        "**/scripts/**",
+        "**/e2e-audit/**",
+        "**/shots/**",
+        "**/WORLDS/**",
+        "**/Song Arts/**",
+        "**/docs/**",
+        "**/.private/**",
+        "**/.agents/**",
+        "**/.claude/**",
+        "**/test-results/**",
+        "**/playwright-report/**",
+        "**/*.log",
+        "**/*.pdf",
+      ],
+    },
   },
   esbuild: {
     sourcemap: false,
   },
   optimizeDeps: {
+    // Without this Vite crawls EVERY .html file under the project to find what
+    // to pre-bundle: dist/index.html (the whole minified production bundle),
+    // the Android build copy of it, and the separate BattleZone app with its
+    // own imports. That scan was the memory spike on start. The app has one
+    // entry, so scan one entry.
+    entries: ["index.html"],
+    // Found late otherwise (first visit to a world or a battle room), which
+    // makes Vite re-optimise and reload the page in the middle of using it.
+    include: ["livekit-client"],
     esbuildOptions: {
       sourcemap: false,
     },

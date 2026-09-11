@@ -56,13 +56,29 @@ export default async function handler(req: any, res: any) {
     }
 
     const serviceClient = createClient(supabaseUrl, supabaseServiceRole, { auth: { persistSession: false } });
-    const { data: roomRoleRows } = await serviceClient
+
+    // In-app voice is on per battle since 11 Sep 2026, switched on only by the
+    // battle-voice function. No pass for a battle whose host has not turned it on.
+    const { data: battleRow, error: battleError } = await serviceClient
+      .from("battles")
+      .select("voice_enabled")
+      .eq("id", roomId)
+      .maybeSingle();
+    if (battleError) return sendJson(res, 503, { error: "Could not check this battle" });
+    if (battleRow?.voice_enabled !== true) {
+      return sendJson(res, 403, { error: "In-app voice is not on for this battle" });
+    }
+
+    const { data: roomRoleRows, error: roleError } = await serviceClient
       .from("battle_rooms")
       .select("role")
       .eq("battle_id", roomId)
       .eq("user_id", authUserId)
       .order("last_seen_at", { ascending: false })
       .limit(1);
+    // Fail closed, as the Supabase twin does: a lookup that did not answer is
+    // never read as "audience".
+    if (roleError) return sendJson(res, 503, { error: "Could not verify room membership" });
 
     const role = roomRoleRows?.[0]?.role || "audience";
     const canPublish = role === "host" || role === "co-host" || role === "speaker";

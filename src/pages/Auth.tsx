@@ -1,3 +1,4 @@
+import { songPath } from '@/lib/slugRoutes';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,6 +36,7 @@ import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
 import { MusicianCta } from '@/components/MusicianCta';
 import { WorldsPhase3 } from '@/components/worlds/WorldsPhase3';
 import { HomeHero, type HeroFeature } from '@/components/HomeHero';
+import { useSettledHero } from '@/hooks/useSettledHero';
 import { pickHeroSong } from '@/lib/heroPick';
 import { GenreExplorer } from '@/components/GenreExplorer';
 import { claimInterruption, releaseInterruption } from '@/lib/interruptions';
@@ -143,7 +145,7 @@ export default function Auth() {
   const { currentTime, duration } = usePlayerTime();
   const { rankedArtists } = useRankedArtists();
   const { data: popularityData = [] } = useSongPopularity();
-  const { data: hotTodaySongs = [] } = useTodayHotSongs(10);
+  const { data: hotTodaySongs = [], isPlaceholderData: hotStillComing } = useTodayHotSongs(10);
   const { data: songCoins = [] } = useSongCoins();
 
   const dailyMixSong = useMemo<Song>(() => ({
@@ -242,7 +244,7 @@ export default function Auth() {
     return releases.sort((a, b) => b.addedAt - a.addedAt).slice(0, 12);
   }, []);
 
-  const landingFeature = useMemo<HeroFeature | null>(() => {
+  const landingPick = useMemo<HeroFeature | null>(() => {
     const pick = pickHeroSong({
       hotToday: hotTodaySongs.map(({ song }) => song),
       newMusic: newMusicReleases.flatMap((r) => (r.kind === 'single' ? [r.song] : r.songs)),
@@ -256,9 +258,12 @@ export default function Auth() {
       artist: pick.song.artist,
       coverImage: pick.song.coverImage,
       label: pick.label,
-      href: `/song/${pick.song.id}`,
+      href: songPath(pick.song),
     };
   }, [hotTodaySongs, newMusicReleases, previewSongs, popularityBySongId]);
+  // Same rule as Home: wait for the counts rather than show a record that is
+  // about to be replaced.
+  const landingFeature = useSettledHero(landingPick, !hotStillComing);
 
   const handlePlayLanding = useCallback(() => {
     const id = landingFeature?.id;
@@ -957,7 +962,11 @@ export default function Auth() {
             {/* Landing hero: one real record, its own artwork, at size. */}
             {landingFeature ? (
               <HomeHero feature={landingFeature} onPlay={handlePlayLanding} faces={landingFaces} />
-            ) : null}
+            ) : (
+              // Holds the space while today's counts arrive, so the page does not
+              // jump when the record of the day lands.
+              <section aria-hidden className="mb-7 h-[260px] animate-pulse rounded-xl bg-secondary/40 sm:h-[300px]" />
+            )}
 
             {hotTodaySongs.length > 0 && (
             <section id="hot-today" className="mb-7 lg:hidden">

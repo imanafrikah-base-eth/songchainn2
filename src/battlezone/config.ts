@@ -2,11 +2,12 @@
 //
 // VOICE_ENABLED gates every in-app voice surface (LiveKit connection, mic
 // controls, speaker requests/management, host music broadcast, audio status).
-// While it is false, live audio for battles runs on an X (Twitter) Space that
-// the host links when creating the battle; the app keeps voting + text chat.
-// Flip this to true to bring the in-app LiveKit voice stack back, the code
-// paths are all still in place.
-export const VOICE_ENABLED = false;
+// Since 11 Sep 2026 it is on, and each battle decides for itself through
+// battles.voice_enabled: the host turns voice on from the room ($3 in $WWAT on
+// the Main Stage, free for the hosts the founder named). A battle without it
+// keeps the X Space link, voting and text chat, exactly as before. Setting this
+// back to false hides in-app voice everywhere at once.
+export const VOICE_ENABLED: boolean = true;
 
 // ---------------------------------------------------------------------------
 // The Trading Ground

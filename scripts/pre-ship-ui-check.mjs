@@ -88,7 +88,11 @@ let failed = false;
 try {
   output = execFileSync('node', args, {
     encoding: 'utf8',
-    timeout: 240000,
+    // This machine has 8 GB and the scan walks every route at three widths in
+    // both themes. Four minutes was not enough and the gate was timing out,
+    // which reads as a failure rather than as a slow pass. The hook's own
+    // timeout in .claude/settings.json is set above this on purpose.
+    timeout: 840000,
     env: { ...process.env, MSYS_NO_PATHCONV: '1' },
   });
 } catch (err) {

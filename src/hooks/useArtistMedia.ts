@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { shrinkImage } from '@/lib/shrinkImage';
+import { sendFile } from '@/lib/storageUpload';
 
 /**
  * An artist's visual work: artwork, photographs, video.
@@ -143,7 +144,7 @@ export function useMediaUpload() {
         }
 
         setState((s) => ({ ...s, phase: 'uploading', progress: 0 }));
-        await putWithProgress(ticket.uploadUrl, sending, (progress) =>
+        await sendFile(ticket.uploadUrl, sending, { kind: 'visual', id: ticket.mediaId }, (progress) =>
           setState((s) => (s.phase === 'uploading' ? { ...s, progress } : s)),
         );
 
@@ -228,25 +229,14 @@ export function useMediaActions() {
 
 /* ------------------------------------------------------------ helpers --- */
 
-function putWithProgress(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url, true);
-    xhr.setRequestHeader('Content-Type', file.type);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`Upload failed (${xhr.status}). Check your connection and try again.`));
-    };
-    xhr.onerror = () => reject(new Error('Upload failed. Check your connection and try again.'));
-    xhr.ontimeout = () => reject(new Error('Upload timed out. Try again on a stronger connection.'));
-    xhr.send(file);
-  });
-}
+/** How long a picture or clip may take to say its size before we go on without it. */
+const MEASURE_MS = 10_000;
 
-/** Width, height and, for video, how long it runs. */
+/**
+ * Width, height and, for video, how long it runs. Gives up after MEASURE_MS:
+ * a video the browser cannot read never fires either event, and without the
+ * time limit the upload sat at 100% forever with the file already in storage.
+ */
 function measure(
   file: File,
   kind: MediaKind,
@@ -257,6 +247,7 @@ function measure(
     return v;
   };
   return new Promise((resolve, reject) => {
+    setTimeout(() => reject(done(new Error('took too long to read'))), MEASURE_MS);
     if (kind === 'image') {
       const img = new Image();
       img.onload = () => resolve(done({ width: img.naturalWidth, height: img.naturalHeight, duration: null }));

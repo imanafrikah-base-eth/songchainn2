@@ -22,6 +22,7 @@ import { getBlockType } from '@/worlds/blocks';
 import { UploadProgress } from '@/components/studio/UploadProgress';
 import { EMPTY_DETAILS } from '@/lib/songDetails';
 import { checkCover, COVER_ACCEPT } from '@/lib/coverArt';
+import { CoverCropDialog, prepareCover } from '@/components/studio/CoverCrop';
 import { useAccountLinkActions, useDuplicateAccounts, type DuplicateAccount } from '@/hooks/useAccountLinks';
 
 export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery' | 'merge_accounts';
@@ -123,6 +124,7 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   const { tracks, busy, landing, finished, add, remove, setTitle, start, reset, setDefaults } = useBatchUpload();
   const [artistName, setArtistName] = useState('');
   const [cover, setCover] = useState<File | null>(null);
+  const [cropping, setCropping] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const coverRef = useRef<HTMLInputElement>(null);
 
@@ -143,16 +145,23 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
   const ready = queued.length > 0 && queued.every((t) => t.title.trim()) && artistName.trim() && !!cover && !busy;
   const send = () => void start({ artistName: artistName.trim(), cover, details: EMPTY_DETAILS }).catch((err) => toast.error((err as Error)?.message || 'That did not go through. Try again.'));
-  const pickCover = async (f: File | null) => {
-    if (!f) return;
+  const acceptCover = async (f: File) => {
     const check = await checkCover(f);
     if (check.block) { toast.error(check.block); return; }
     if (check.warn) toast(check.warn);
     setCover(f);
   };
+  // Any photo: one that is not square opens the square window first.
+  const pickCover = async (f: File | null) => {
+    if (!f) return;
+    const prepared = await prepareCover(f);
+    if (prepared.needsCrop) { setCropping(f); return; }
+    await acceptCover(prepared.file);
+  };
 
   return (
     <div className="space-y-2">
+      <CoverCropDialog file={cropping} onCancel={() => setCropping(null)} onDone={(f) => { setCropping(null); void acceptCover(f); }} />
       {!finished && (
         <>
           <input ref={fileRef} type="file" multiple accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg" className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
@@ -188,7 +197,7 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
           <Button asChild size="sm" variant="ghost" className="h-10 rounded-full text-xs"><Link to="/studio">See it in the Studio</Link></Button>
         </div>
       )}
-      <p className="text-[11px] text-muted-foreground">WAV or MP3, up to 100 MB each, and a square cover: nothing goes live without it. Lyrics, credits and the artwork can be changed any time from the Studio.</p>
+      <p className="text-[11px] text-muted-foreground">WAV or MP3, up to 100 MB each, and a cover: nothing goes live without it. Any photo works, you drag it square right here. Lyrics, credits and the artwork can be changed any time from the Studio.</p>
     </div>
   );
 }

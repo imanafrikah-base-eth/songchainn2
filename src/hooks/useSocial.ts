@@ -137,6 +137,7 @@ async function enrichPostRows(rows: any[], viewerId: string | null): Promise<Soc
     metadata: (post as any).metadata ?? null,
     created_at: post.created_at,
     updated_at: post.updated_at,
+    edited_at: (post as any).edited_at ?? null,
     profile: profilesMap.get(String(post.user_id)),
     likes_count: likesCount.get(String(post.id)) || 0,
     comments_count: commentsCount.get(String(post.id)) || 0,
@@ -556,6 +557,43 @@ export function useSocial() {
     return true;
   }, [user, toast]);
 
+  /**
+   * Change the words on your own post.
+   *
+   * Fixing a typo used to mean deleting the post, which threw away its likes,
+   * its comments and its place in everybody's feed. Only the text moves: the
+   * media, the tags and the world it was posted in are untouched, and the row
+   * is stamped so a reader can see it was edited.
+   */
+  const editPost = useCallback(async (postId: string, content: string): Promise<boolean> => {
+    if (!user) return false;
+    const text = content.trim();
+    if (!text) return false;
+    const { data, error } = await (supabase as any).rpc('edit_my_post', { _post_id: postId, _content: text });
+    if (error) {
+      toast({ title: 'Could not save that edit', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    const stamp = typeof data === 'string' ? data : new Date().toISOString();
+    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, content: text, edited_at: stamp } : p)));
+    toast({ title: 'Post updated' });
+    return true;
+  }, [user, toast]);
+
+  /** Same, for one of your own comments. */
+  const editComment = useCallback(async (commentId: string, content: string): Promise<boolean> => {
+    if (!user) return false;
+    const text = content.trim();
+    if (!text) return false;
+    const { error } = await (supabase as any).rpc('edit_my_comment', { _comment_id: commentId, _content: text });
+    if (error) {
+      toast({ title: 'Could not save that edit', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    toast({ title: 'Comment updated' });
+    return true;
+  }, [user, toast]);
+
   const toggleLikePost = useCallback(async (postId: string) => {
     if (!user) return;
 
@@ -715,6 +753,7 @@ export function useSocial() {
       user_id: c.user_id,
       content: c.content,
       created_at: c.created_at,
+      edited_at: (c as any).edited_at ?? null,
       profile: profilesMap.get(String(c.user_id)),
       artist_id: null,
       artist_is_verified: null,
@@ -857,6 +896,8 @@ export function useSocial() {
     createPost,
     deletePost,
     deleteComment,
+    editPost,
+    editComment,
     toggleLikePost,
     followUser,
     isFollowing,

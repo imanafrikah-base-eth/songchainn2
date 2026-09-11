@@ -1,8 +1,9 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { artistPath, songPath } from '@/lib/slugRoutes';
 import { PhotoPositioner } from '@/components/PhotoPositioner';
+import { StatTiles, type StatTileSpec } from '@/components/profile/StatTiles';
 import { ArtistName } from '@/components/ArtistName';
 import { cropImage, CENTRE_CROP, type PhotoCrop } from '@/lib/cropImage';
-import { type ChangeEvent, type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Camera, Edit3, ExternalLink, Gift, Heart, ListMusic, Loader2, Save, Star, Users, X as XIcon, HardDrive, Plus, Lock, Globe, Trash2, Flame, Download, Music } from 'lucide-react';
@@ -586,6 +587,7 @@ export default function Profile() {
   };
 
   const savedCatalogsData = CATALOGS.filter((catalog) => savedCatalogs.includes(catalog.id));
+
   const artistSongsData = isArtist && artistId ? SONGS.filter(s => s.artistId === artistId) : [];
 
   const { data: artistFollowerCount = 0 } = useQuery({
@@ -602,6 +604,76 @@ export default function Profile() {
     enabled: !!isArtist && !!artistId,
     refetchInterval: 15000,
   });
+/* Every count on the profile says what it is and what to do about it, so a
+     number is a way into the app rather than a thing to look at. */
+  const scrollToSavedCatalogs = useCallback(() => {
+    document.getElementById('saved-catalogs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+  const profileStats: StatTileSpec[] = useMemo(() => {
+    const tiles: StatTileSpec[] = [
+      {
+        key: 'saved',
+        label: 'Saved Catalogs',
+        value: savedCatalogs.length,
+        icon: Heart,
+        meaning: 'Bodies of work you kept. Saving one puts every song on it a tap away and tells the artist their record found somebody.',
+        nextStep: savedCatalogs.length ? 'They are further down this page.' : 'Open any catalog and tap Save to start.',
+        actions: savedCatalogs.length
+          ? [{ label: 'See them', run: scrollToSavedCatalogs }, { label: 'Find more', to: '/discover' }]
+          : [{ label: 'Find a catalog', to: '/discover' }],
+      },
+      {
+        key: 'playlists',
+        label: 'Playlists',
+        value: playlists.length,
+        icon: ListMusic,
+        meaning: 'Your own running orders. A public one can be followed by anybody and plays like a station.',
+        actions: [{ label: 'Open playlists', to: '/playlists' }],
+      },
+    ];
+    if (isArtist) {
+      tiles.push({
+        key: 'followers',
+        label: 'Followers',
+        value: artistFollowerCount,
+        icon: Users,
+        meaning: 'People who get told the moment you release something. This is the number that turns a drop into a first day.',
+        nextStep: 'Posting and releasing is what moves it. A quiet account stops being followed.',
+        actions: [{ label: 'Go to my artist page', to: artistId ? artistPath(artistId) : '/profile' }],
+      });
+    }
+    tiles.push(
+      {
+        key: 'points',
+        label: 'Points',
+        value: lifetimePoints,
+        icon: Star,
+        meaning: 'What you have earned for listening, posting, inviting and turning up. Points set your standing on the leaderboard and unlock early access to drops.',
+        nextStep: 'Listening every day and inviting a friend are the two fastest ways to add to them.',
+        actions: [{ label: 'See the leaderboard', to: '/leaderboard' }],
+      },
+      {
+        key: 'streak',
+        label: 'Streak',
+        value: streak,
+        icon: Flame,
+        tone: 'text-orange-500',
+        meaning: 'Days in a row you have listened. A streak multiplies what each day of listening is worth, and it resets the first day you miss.',
+        nextStep: streak > 0 ? 'Play one song today and it carries on.' : 'Play one song today and it starts.',
+        actions: [{ label: 'Play something', to: '/discover' }],
+      },
+      {
+        key: 'referrals',
+        label: 'Referrals',
+        value: completedReferrals,
+        icon: Users,
+        meaning: 'Friends who joined on your invite. You get 100 points for each one and they start with 50.',
+        actions: [{ label: 'Invite a friend', run: () => setShowInviteModal(true) }],
+      },
+    );
+    return tiles;
+  }, [savedCatalogs.length, playlists.length, isArtist, artistFollowerCount, artistId, lifetimePoints, streak, completedReferrals, scrollToSavedCatalogs]);
+
 
   // An artist's /profile is their artist page. Their account settings still
   // live here (wallet, links, email, password, library, blocked people), so
@@ -1220,7 +1292,7 @@ export default function Profile() {
               {artistSongsData.map(song => (
                 <Link
                   key={song.id}
-                  to={`/song/${song.id}`}
+                  to={songPath(song)}
                   className="flex items-center gap-3 p-3 bg-card border border-border rounded-xl hover:bg-card/70 transition-colors"
                 >
                   <img
@@ -1240,40 +1312,7 @@ export default function Profile() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <Heart className="w-5 h-5 mx-auto text-primary mb-2" />
-            <p className="text-2xl font-bold text-foreground">{savedCatalogs.length}</p>
-            <p className="text-sm text-muted-foreground">Saved Catalogs</p>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <ListMusic className="w-5 h-5 mx-auto text-primary mb-2" />
-            <p className="text-2xl font-bold text-foreground">{playlists.length}</p>
-            <p className="text-sm text-muted-foreground">Playlists</p>
-          </div>
-          {isArtist && (
-            <div className="bg-card border border-border rounded-xl p-4 text-center">
-              <Users className="w-5 h-5 mx-auto text-primary mb-2" />
-              <p className="text-2xl font-bold text-foreground">{artistFollowerCount.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Followers</p>
-            </div>
-          )}
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <Star className="w-5 h-5 mx-auto text-primary mb-2" />
-            <p className="text-2xl font-bold text-foreground">{lifetimePoints.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">Points</p>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <Flame className="w-5 h-5 mx-auto text-orange-500 mb-2" />
-            <p className="text-2xl font-bold text-foreground">{streak}</p>
-            <p className="text-sm text-muted-foreground">Streak</p>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <Users className="w-5 h-5 mx-auto text-primary mb-2" />
-            <p className="text-2xl font-bold text-foreground">{completedReferrals}</p>
-            <p className="text-sm text-muted-foreground">Referrals</p>
-          </div>
-        </div>
+        <StatTiles stats={profileStats} />
 
         {/* What this person has liked, played and kept. Same components the
             public profile uses, pointed at the signed-in account. */}
@@ -1324,7 +1363,7 @@ export default function Profile() {
                         </div>
                         <div className="min-w-0 flex-1">
                           {known ? (
-                            <Link to={'/song/' + known.id} className="block truncate text-sm font-semibold text-foreground hover:text-primary">
+                            <Link to={songPath(known)} className="block truncate text-sm font-semibold text-foreground hover:text-primary">
                               {title}
                             </Link>
                           ) : (
@@ -1524,7 +1563,7 @@ export default function Profile() {
         </div>
 
         {savedCatalogsData.length > 0 && (
-          <div className="mb-8">
+          <div id="saved-catalogs" className="mb-8 scroll-mt-24">
             <h2 className="font-heading text-lg font-semibold text-foreground mb-4">
               Saved Catalogs
             </h2>

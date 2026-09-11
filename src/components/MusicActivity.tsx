@@ -1,4 +1,4 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { artistPath, songPath } from '@/lib/slugRoutes';
 import { Link } from 'react-router-dom';
 import { ArtistName } from '@/components/ArtistName';
 import { formatDistanceToNow } from 'date-fns';
@@ -108,7 +108,7 @@ export function MusicActivity({
             {a.topSongs.map(({ song, plays }, i) => (
               <Link
                 key={song.id}
-                to={`/song/${song.id}`}
+                to={songPath(song)}
                 className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 transition-colors hover:bg-muted/50"
               >
                 <span className="w-5 shrink-0 text-center font-heading text-sm font-bold text-muted-foreground">
@@ -160,7 +160,7 @@ export function MusicActivity({
             {a.recent.map(({ song, at }) => (
               <Link
                 key={`${song.id}-${at}`}
-                to={`/song/${song.id}`}
+                to={songPath(song)}
                 className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted/50"
               >
                 <Cover src={song.coverImage} alt={song.title} />

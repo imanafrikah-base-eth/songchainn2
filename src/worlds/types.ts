@@ -8,6 +8,23 @@
 
 export type WorldRoomAccess = 'public' | 'fan' | 'insider' | 'council' | 'event';
 
+/**
+ * How a street or a city is shown while it is being built.
+ *
+ * There used to be two states, on the map or put away, which forced an artist
+ * with a half-built gallery to choose between showing visitors an empty room
+ * and hiding the room altogether. Three states, theirs to pick per street and
+ * per city:
+ *
+ *   open  shown and enterable, the normal thing
+ *   soon  shown on the map with a Coming soon plate; nobody walks in yet
+ *   away  off the map entirely, kept with everything on it
+ *
+ * The owner always walks in, whatever the stage says. It is about what
+ * visitors see, not about locking the artist out of their own work.
+ */
+export type WorldStage = 'open' | 'soon' | 'away';
+
 export interface WorldRoomDef {
   /** Concept-locked string. Changing a slug later is a migration. */
   slug: string;
@@ -33,6 +50,8 @@ export interface WorldRoomDef {
    * visitor's real balance on Base.
    */
   nftKey?: { nftId: string; title?: string } | null;
+  /** How visitors see this street while it is being built. Absent means open. */
+  stage?: WorldStage;
 }
 
 /**
@@ -63,11 +82,17 @@ export interface WorldCityDef {
   order: number;
   /** Room slugs that stand as buildings in this city, in display order. */
   buildings: string[];
+  /** How visitors see this city while it is being built. Absent means open. */
+  stage?: WorldStage;
 }
 
 export interface WorldConfig {
   /** URL slug under /world/. Matches the artist's vanity slug. */
   slug: string;
+  /** The worlds row id, for a world built in the builder. Absent for coded ones. */
+  id?: string;
+  /** True until the doors have been opened. Only the owner can see one. */
+  draft?: boolean;
   /** World #001, #002, ... in launch order. */
   worldNumber: number;
   /** musicData ARTISTS id — links the world to its artist profile + catalog. */
@@ -181,15 +206,35 @@ export interface WorldRings {
    * chain, never by the browser.
    */
   heldNfts?: Record<string, number>;
+  /**
+   * True when the person asking owns this world.
+   *
+   * An artist was locked out of the rooms they had just built, because the only
+   * way in was holding enough of their own coin, and a draft world has no coin
+   * at all. Owning it is a stronger claim than holding a balance, so an owner
+   * walks through every door. Set by world-gate from worlds.owner_id against
+   * their session, never from anything the browser says.
+   */
+  isOwner?: boolean;
+  /** An owner who asked to see it the way a stranger sees it. */
+  viewingAsVisitor?: boolean;
 }
 
-export type WorldDoorState = 'open' | 'locked' | 'no-wallet' | 'council' | 'event';
+export type WorldDoorState = 'open' | 'locked' | 'no-wallet' | 'council' | 'event' | 'soon';
 
 export function doorStateFor(
   room: WorldRoomDef,
   rings: WorldRings | null,
   connected: boolean,
 ): WorldDoorState {
+  // The artist is not a visitor to their own world. Every door they made is
+  // open to them, including the ones locked with a drop, a song or an event,
+  // because otherwise they cannot see what they are building. Asking for the
+  // visitor's view drops this and every rule below applies as normal.
+  if (rings?.isOwner && !rings.viewingAsVisitor) return 'open';
+  // The artist said this one is not ready. It stands on the map so people know
+  // it is coming, and nobody walks in until they say so.
+  if (room.stage === 'soon') return 'soon';
   // A drop on the door is the artist's own decision about this one door, so it
   // is answered before the ring rules, and it can open a door the rings would
   // shut. Same for a song key below.

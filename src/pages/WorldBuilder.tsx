@@ -16,7 +16,11 @@ import { StreetKey } from '@/worlds/builder/StreetKey';
 import { DropsPanel } from '@/worlds/builder/DropsPanel';
 import { ArtPicker } from '@/worlds/builder/ArtPicker';
 import { MoshaPanel } from '@/worlds/builder/MoshaPanel';
+import { PublishBar, type Requirement } from '@/worlds/builder/PublishBar';
+import { StagePicker } from '@/worlds/builder/StagePicker';
 import { MoshaSuggest } from '@/worlds/builder/MoshaSuggest';
+import { MoshaOnPage } from '@/worlds/builder/MoshaOnPage';
+import { guidingWorld, noteDid, startGuiding, stopGuiding } from '@/lib/moshaWatch';
 import { MoshaChat, MoshaOptIn } from '@/worlds/builder/MoshaChat';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { useArtistGallery } from '@/hooks/useArtistMedia';
@@ -97,7 +101,26 @@ export default function WorldBuilder() {
   const { data: myWorlds = [] } = useMyWorlds();
   const unopened = myWorlds.filter((w) => w.id !== worldId);
 
-  const [step, setStep] = useState<Step>(worldId ? 'streets' : 'name');
+  /* Mo$ha can send an artist straight to one step (the Art step, most often)
+     instead of dropping them at the start of the rail. */
+  const askedStep = params.get('step');
+  const [step, setStep] = useState<Step>(
+    worldId && STEPS.some((s) => s.id === askedStep) ? (askedStep as Step) : worldId ? 'streets' : 'name',
+  );
+
+  /* Mo$ha riding along on this page, for somebody who asked him to take them
+     here from the chat. Stays for this world until they stop him. */
+  const [guideOn, setGuideOn] = useState(() => params.get('guide') === '1' || (Boolean(worldId) && guidingWorld() === worldId));
+  useEffect(() => {
+    if (guideOn && worldId) startGuiding(worldId);
+  }, [guideOn, worldId]);
+  /* Which step they are on is part of what they are doing, for whichever Mo$ha
+     they talk to next. */
+  useEffect(() => {
+    if (!worldId) return;
+    const label = STEPS.find((s) => s.id === step)?.label;
+    if (label) noteDid('step', `went to the ${label} step`);
+  }, [step, worldId]);
   const [draft, setDraft] = useState({ name: '', artistName: '', positioning: '', useTemplate: true });
   const [creating, setCreating] = useState(false);
   const [activeStreet, setActiveStreet] = useState<string | null>(null);
@@ -224,13 +247,21 @@ export default function WorldBuilder() {
 
   const fitOf = (key: string) => b.world?.art_fit?.[key];
   const setFit = (key: string) => (fit: ArtFit | null) => {
-    const next = { ...(b.world?.art_fit ?? {}) };
-    if (fit) next[key] = fit; else delete next[key];
-    void b.saveWorld({ art_fit: next });
+    void b.saveWorldKey('art_fit', key, fit);
   };
 
   const zoraLinkOk = /^https?:\/\/([a-z0-9-]+\.)*zora\.co\//i.test(b.world?.zora_profile_url ?? '');
   const zoraWalletOk = /^0x[0-9a-fA-F]{40}$/.test(b.world?.zora_wallet_address ?? '');
+
+  /* What the server actually requires, named once. The publish screen and the
+     bar at the top both read this, so they can never tell an artist two
+     different stories about what is left. */
+  const requirements: Requirement[] = [
+    { ok: true, label: 'A key is set' },
+    { ok: (b.world?.story?.length ?? 0) > 0, label: 'A story on the gate' },
+    { ok: filledStreets >= 3, label: `Something on three streets (${filledStreets} so far)` },
+    { ok: zoraLinkOk && zoraWalletOk, label: 'Your Zora account is on the world' },
+  ];
 
   const doPublish = useCallback(async () => {
     const res = await b.publish();
@@ -291,6 +322,31 @@ export default function WorldBuilder() {
             })}
           </ol>
         </nav>
+
+        {/* Opening the doors used to live only on the last screen of the rail,
+            where an artist who had finished building could not find it. It now
+            travels with them, says what is left, and offers a look at the world
+            as it stands. */}
+        {b.world ? (
+          <PublishBar
+            slug={b.world.slug}
+            published={b.world.status === 'published'}
+            worldNumber={b.world.world_number}
+            requirements={requirements}
+            onPublish={() => void doPublish()}
+            onOpenPublishStep={() => setStep('publish')}
+          />
+        ) : null}
+
+        {guideOn && b.world ? (
+          <MoshaOnPage
+            stepLabel={STEPS.find((s) => s.id === step)?.label ?? step}
+            onStop={() => {
+              stopGuiding();
+              setGuideOn(false);
+            }}
+          />
+        ) : null}
 
         {/* Mo$ha. One question per screen, real examples, no answer required.
             Everybody gets this, including lite: it is the intro, and on lite it
@@ -467,14 +523,14 @@ export default function WorldBuilder() {
                     <span className="text-xs text-muted-foreground">
                       {(b.blocksByStreet[s.id]?.length ?? 0)} on it
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => b.saveStreet(s.id, { hidden: !s.hidden })}
-                      className={`h-10 rounded-full border px-3 text-xs font-medium focus-ring ${s.hidden ? 'border-amber-500/50 text-amber-500' : 'border-border text-muted-foreground'}`}
-                    >
-                      {s.hidden ? 'Hidden. Show it' : 'Hide'}
-                    </button>
                   </div>
+                  {/* A street that is not finished does not have to be a
+                      choice between an empty room and no room at all. */}
+                  <StagePicker
+                    className="mt-2.5"
+                    stage={s.stage ?? (s.hidden ? 'away' : 'open')}
+                    onChange={(stage) => b.saveStreet(s.id, { stage, hidden: stage === 'away' })}
+                  />
                   <StreetKey street={s} worldSlug={b.world?.slug} onSave={(patch) => b.saveStreet(s.id, patch)} />
                 </li>
               ))}
@@ -493,6 +549,11 @@ export default function WorldBuilder() {
                         maxLength={40}
                         aria-label="City name"
                         onChange={(e) => b.saveCity(c.id, { name: e.target.value })}
+                      />
+                      <StagePicker
+                        className="mt-2"
+                        stage={c.stage}
+                        onChange={(stage) => b.saveCity(c.id, { stage })}
                       />
                     </li>
                   ))}
@@ -672,11 +733,7 @@ export default function WorldBuilder() {
                         fit={fitOf(`room:${s.slug}`)}
                         onFit={setFit(`room:${s.slug}`)}
                         value={b.world?.room_art?.[s.slug]}
-                        onChange={(v) => {
-                          const next = { ...(b.world?.room_art ?? {}) };
-                          if (v) next[s.slug] = v; else delete next[s.slug];
-                          void b.saveWorld({ room_art: next });
-                        }}
+                        onChange={(v) => void b.saveWorldKey('room_art', s.slug, v)}
                       />
                       <ArtPicker
                         label={`${s.name} loop`}
@@ -685,11 +742,7 @@ export default function WorldBuilder() {
                         kind="video"
                         aspect="aspect-[16/9] max-h-24"
                         value={b.world?.room_video?.[s.slug]}
-                        onChange={(v) => {
-                          const next = { ...(b.world?.room_video ?? {}) };
-                          if (v) next[s.slug] = v; else delete next[s.slug];
-                          void b.saveWorld({ room_video: next });
-                        }}
+                        onChange={(v) => void b.saveWorldKey('room_video', s.slug, v)}
                       />
                     </div>
                   ))}
@@ -709,11 +762,7 @@ export default function WorldBuilder() {
                         fit={fitOf(`city:${c.slug}`)}
                         onFit={setFit(`city:${c.slug}`)}
                         value={b.world?.city_art?.[c.slug]}
-                        onChange={(v) => {
-                          const next = { ...(b.world?.city_art ?? {}) };
-                          if (v) next[c.slug] = v; else delete next[c.slug];
-                          void b.saveWorld({ city_art: next });
-                        }}
+                        onChange={(v) => void b.saveWorldKey('city_art', c.slug, v)}
                       />
                       <ArtPicker
                         label={`${c.name} loop`}
@@ -722,11 +771,7 @@ export default function WorldBuilder() {
                         kind="video"
                         aspect="aspect-[16/9] max-h-24"
                         value={b.world?.city_video?.[c.slug]}
-                        onChange={(v) => {
-                          const next = { ...(b.world?.city_video ?? {}) };
-                          if (v) next[c.slug] = v; else delete next[c.slug];
-                          void b.saveWorld({ city_video: next });
-                        }}
+                        onChange={(v) => void b.saveWorldKey('city_video', c.slug, v)}
                       />
                     </div>
                   ))}
@@ -738,9 +783,9 @@ export default function WorldBuilder() {
               <summary className="cursor-pointer text-sm font-semibold text-foreground">The world with depth</summary>
               <p className="mt-1 text-xs text-muted-foreground">Three textures for the 3D city. Skip it and the city keeps its flat colours, which is a valid world, just a barer one.</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <ArtPicker label="Sky" help="Night sky, 2:1, wrapped around everything." aspect="aspect-[2/1]" value={b.world.depth?.sky} onChange={(v) => b.saveWorld({ depth: { ...(b.world?.depth ?? {}), sky: v ?? undefined } })} />
-                <ArtPicker label="Facade" help="Seamless tile on every tower." aspect="aspect-square" value={b.world.depth?.facade} onChange={(v) => b.saveWorld({ depth: { ...(b.world?.depth ?? {}), facade: v ?? undefined } })} />
-                <ArtPicker label="Ground" help="Seamless tile on the ground." aspect="aspect-square" value={b.world.depth?.ground} onChange={(v) => b.saveWorld({ depth: { ...(b.world?.depth ?? {}), ground: v ?? undefined } })} />
+                <ArtPicker label="Sky" help="Night sky, 2:1, wrapped around everything." aspect="aspect-[2/1]" value={b.world.depth?.sky} onChange={(v) => void b.saveWorldKey('depth', 'sky', v)} />
+                <ArtPicker label="Facade" help="Seamless tile on every tower." aspect="aspect-square" value={b.world.depth?.facade} onChange={(v) => void b.saveWorldKey('depth', 'facade', v)} />
+                <ArtPicker label="Ground" help="Seamless tile on the ground." aspect="aspect-square" value={b.world.depth?.ground} onChange={(v) => void b.saveWorldKey('depth', 'ground', v)} />
               </div>
             </details>
 
@@ -1004,12 +1049,7 @@ export default function WorldBuilder() {
             </header>
 
             <ul className="space-y-2">
-              {[
-                { ok: true, label: 'A key is set' },
-                { ok: (b.world.story?.length ?? 0) > 0, label: 'A story on the gate' },
-                { ok: filledStreets >= 3, label: `Something on three streets (${filledStreets} so far)` },
-                { ok: zoraLinkOk && zoraWalletOk, label: 'Your Zora account is on the world' },
-              ].map((r) => (
+              {requirements.map((r) => (
                 <li
                   key={r.label}
                   className="flex items-center gap-2.5 rounded-lg border border-border bg-card p-3.5 text-sm"

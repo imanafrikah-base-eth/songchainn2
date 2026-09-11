@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { saveSongDetails, type SongDetails } from '@/lib/songDetails';
 import { landCover as landCoverFile, NO_COVER } from '@/lib/coverArt';
+import { sendFile } from '@/lib/storageUpload';
 
 /**
  * The artist side of SONGCHAINN: upload a track, have it auditioned, and see
@@ -390,7 +391,7 @@ export function useBatchUpload() {
         }
         reservedSongId = typeof ticket.songId === 'string' ? ticket.songId : null;
         patch(key, { songId: ticket.songId, phase: 'uploading', progress: 0 });
-        await putWithProgress(ticket.uploadUrl, file, (progress) =>
+        await sendFile(ticket.uploadUrl, file, { kind: 'song', id: ticket.songId }, (progress) =>
           patch(key, (t) => (t.phase === 'uploading' ? { progress } : {})),
         );
         patch(key, { phase: 'ready', progress: 100 });
@@ -578,24 +579,3 @@ function safeMessage(raw: string): string {
   return raw;
 }
 
-/**
- * XHR rather than fetch: a real progress bar matters when the connection is
- * slow, and plenty of the artists this is built for are on slow connections.
- */
-function putWithProgress(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url, true);
-    xhr.setRequestHeader('Content-Type', file.type);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`Upload failed (${xhr.status}). Check your connection and try again.`));
-    };
-    xhr.onerror = () => reject(new Error('Upload failed. Check your connection and try again.'));
-    xhr.ontimeout = () => reject(new Error('Upload timed out. Try again on a stronger connection.'));
-    xhr.send(file);
-  });
-}

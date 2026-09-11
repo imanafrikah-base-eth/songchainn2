@@ -97,7 +97,9 @@ export function BuySheet({ open, onOpenChange, coinAddress, what, note, amounts 
   const askMosha = () => {
     const line = failed
       ? `I tried to buy ${what} for ${amount} ETH and it did not work. It said: ${failed.message}${failed.advice ? ` (${failed.advice})` : ''}. What should I do?`
-      : `I want to buy ${what}. Walk me through it?`;
+      : check?.problem
+        ? `I want to buy ${what} for ${amount} ETH but it says: ${check.problem} What should I do?`
+        : `I want to buy ${what}. Walk me through it?`;
     window.dispatchEvent(new CustomEvent('songchainn:open-mosha', { detail: { ask: line } }));
     onOpenChange(false);
   };
@@ -111,9 +113,7 @@ export function BuySheet({ open, onOpenChange, coinAddress, what, note, amounts 
         <DialogHeader>
           <DialogTitle>{done ? 'It is yours' : what}</DialogTitle>
           <DialogDescription>
-            {done
-              ? 'Paid from your own wallet, straight to the artist. Nothing sits with us.'
-              : note ?? 'Paid from your own wallet on Base. We never hold your money.'}
+            {done ? 'Paid straight to the artist.' : note ?? 'Paid from your wallet on Base.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -196,9 +196,14 @@ export function BuySheet({ open, onOpenChange, coinAddress, what, note, amounts 
             {/* 3. Anything in the way, said before they sign. */}
             {checking && <p className="text-xs text-muted-foreground">Checking your balance.</p>}
             {check?.problem && (
-              <p className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {check.problem}
-              </p>
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+                <p className="flex items-start gap-2 text-xs text-amber-200">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {check.problem}
+                </p>
+                <Button size="sm" variant="outline" className="mt-2 h-9 rounded-full text-xs" onClick={askMosha}>
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Ask Mo$ha what to do
+                </Button>
+              </div>
             )}
             {check?.warning && !check.problem && (
               <p className="text-xs text-muted-foreground">{check.warning}</p>
@@ -209,9 +214,7 @@ export function BuySheet({ open, onOpenChange, coinAddress, what, note, amounts 
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {failed.message}
                 </p>
                 {!failed.nothingSpent && (
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    Check your wallet before trying again, so you never pay twice.
-                  </p>
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">Check your wallet before trying again.</p>
                 )}
                 <Button size="sm" variant="outline" className="mt-2 h-9 rounded-full text-xs" onClick={askMosha}>
                   <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Ask Mo$ha what to do
@@ -223,7 +226,7 @@ export function BuySheet({ open, onOpenChange, coinAddress, what, note, amounts 
               {busy ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Waiting for your wallet</> : `Buy for ${amount} ETH`}
             </Button>
             <p className="text-center text-[11px] text-muted-foreground">
-              Your wallet shows the exact cost before you approve. Nothing can be taken without you tapping approve.
+              Nothing moves until you approve it in your wallet.
             </p>
           </div>
         )}

@@ -1,3 +1,4 @@
+import { songPath } from '@/lib/slugRoutes';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Loader2 } from 'lucide-react';
@@ -69,7 +70,7 @@ export default function Licensing() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-6 sm:px-6">
-        <Link to={song ? `/song/${song.id}` : '/'} className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link to={song ? songPath(song) : '/'} className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back
         </Link>
 

@@ -39,6 +39,8 @@ export interface SocialPost {
   metadata?: SocialPostMetadata | null;
   created_at: string;
   updated_at: string;
+  /** Set the first time the words were changed after posting. */
+  edited_at?: string | null;
 }
 
 export interface SocialPostWithProfile extends SocialPost {
@@ -80,6 +82,8 @@ export interface PostComment {
   post_id: string;
   content: string;
   created_at: string;
+  /** Set the first time the words were changed after posting. */
+  edited_at?: string | null;
   profile?: AudienceProfile;
   artist_id?: string | null;
   artist_is_verified?: boolean | null;

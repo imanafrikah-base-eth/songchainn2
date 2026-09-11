@@ -2,7 +2,7 @@ import { artistPath } from '@/lib/slugRoutes';
 import { useState, type SyntheticEvent } from 'react';
 import { ArtistName, VerifiedMark } from '@/components/ArtistName';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check, CheckCircle2, Flag, UserMinus } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Play, Trash2, MoreHorizontal, Copy, Check, CheckCircle2, Flag, UserMinus, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -24,11 +24,15 @@ import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useUserPresence } from '@/hooks/useUserPresence';
 import { ReportDialog } from '@/components/ReportDialog';
 import { OfficialBadge } from '@/components/OfficialBadge';
+import { InlineEdit, EditedMark } from '@/components/social/InlineEdit';
 
 interface PostCardProps {
   post: SocialPostWithProfile;
   onLike: (postId: string) => void;
   onDelete: (postId: string) => void;
+  /** Optional so existing callers keep working; without it Edit stays hidden. */
+  onEdit?: (postId: string, content: string) => Promise<boolean>;
+  onEditComment?: (commentId: string, content: string) => Promise<boolean>;
   onFollow: (userId: string) => void;
   isFollowing: boolean;
   onGetComments: (postId: string) => Promise<PostComment[]>;
@@ -40,7 +44,9 @@ interface PostCardProps {
 export function PostCard({ 
   post, 
   onLike, 
-  onDelete, 
+  onDelete,
+  onEdit,
+  onEditComment,
   onFollow, 
   isFollowing,
   onGetComments,
@@ -57,6 +63,9 @@ export function PostCard({
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [reporting, setReporting] = useState(false);
+  /* Fixing one word should not cost a post its likes and its comments. */
+  const [editingPost, setEditingPost] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const { isOnline } = useUserPresence(post.user_id, { includeLastSeen: false, includeNowPlayingFallback: false });
 
   const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
@@ -208,10 +217,18 @@ export function PostCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {isOwnPost ? (
-              <DropdownMenuItem onClick={() => onDelete(post.id)} className="text-destructive">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Post
-              </DropdownMenuItem>
+              <>
+                {onEdit && (
+                  <DropdownMenuItem onClick={() => setEditingPost(true)}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit post
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => onDelete(post.id)} className="text-destructive">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Post
+                </DropdownMenuItem>
+              </>
             ) : (
               <>
                 {/* Being tagged is not consent to stay tagged. TagPeople has
@@ -243,8 +260,20 @@ export function PostCard({
       )}
 
       {/* Content */}
-      {post.content && (
-        <p className="text-foreground/90">{post.content}</p>
+      {editingPost && onEdit ? (
+        <InlineEdit
+          value={post.content || ''}
+          placeholder="Say something"
+          onSave={(next) => onEdit(post.id, next)}
+          onCancel={() => setEditingPost(false)}
+        />
+      ) : (
+        post.content && (
+          <p className="text-foreground/90">
+            {post.content}
+            {post.edited_at ? <EditedMark at={post.edited_at} className="ml-2" /> : null}
+          </p>
+        )
       )}
 
       {/* Song Share */}
@@ -327,7 +356,10 @@ export function PostCard({
               <p className="text-sm text-muted-foreground">Loading comments...</p>
             ) : (
               <>
-                {comments.map(comment => (
+                {comments.map(comment => {
+                  const isMine = !!user?.id && comment.user_id === user.id;
+                  const isEditing = editingCommentId === comment.id;
+                  return (
                   <div key={comment.id} className="flex gap-2">
                     <Avatar className="w-7 h-7">
                       <AvatarImage src={comment.profile?.profile_picture_url || ''} />
@@ -337,10 +369,42 @@ export function PostCard({
                     </Avatar>
                     <div className="flex-1 bg-background/50 rounded-lg p-2">
                       <span className="font-medium text-sm">{comment.profile?.profile_name}</span>
-                      <p className="text-sm text-foreground/80">{comment.content}</p>
+                      {isEditing && onEditComment ? (
+                        <InlineEdit
+                          value={comment.content}
+                          rows={2}
+                          maxLength={2000}
+                          placeholder="Your comment"
+                          onSave={async (next) => {
+                            const ok = await onEditComment(comment.id, next);
+                            if (ok) {
+                              setComments((prev) => prev.map((c) => (c.id === comment.id ? { ...c, content: next, edited_at: new Date().toISOString() } : c)));
+                            }
+                            return ok;
+                          }}
+                          onCancel={() => setEditingCommentId(null)}
+                        />
+                      ) : (
+                        <>
+                          <p className="text-sm text-foreground/80">
+                            {comment.content}
+                            {comment.edited_at ? <EditedMark at={comment.edited_at} className="ml-2" /> : null}
+                          </p>
+                          {isMine && onEditComment && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingCommentId(comment.id)}
+                              className="mt-1 inline-flex min-h-8 items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                            >
+                              <Pencil className="h-3 w-3" /> Edit
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 <div className="flex gap-2">
                   <Input
                     placeholder="Write a comment..."

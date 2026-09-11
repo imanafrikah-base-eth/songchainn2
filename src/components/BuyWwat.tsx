@@ -43,9 +43,12 @@ export function BuyWwat({ compact = false }: { compact?: boolean }) {
           description: res.message,
           action: {
             label: 'Ask Mo$ha',
-            onClick: () => window.dispatchEvent(new CustomEvent('songchainn:open-mosha', {
-              detail: { ask: `I tried to buy $WWAT for ${ethAmount} ETH and it did not work. It said: ${res.message}${res.advice ? ` (${res.advice})` : ''}. What should I do?` },
-            })),
+            onClick: () => {
+              setOpen(false);
+              window.dispatchEvent(new CustomEvent('songchainn:open-mosha', {
+                detail: { ask: `I tried to buy $WWAT for ${ethAmount} ETH and it did not work. It said: ${res.message}${res.advice ? ` (${res.advice})` : ''}. What should I do?` },
+              }));
+            },
           },
         });
       }
