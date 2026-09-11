@@ -17,6 +17,7 @@ import { useBattles } from "@/battlezone/hooks/useBattles";
 import { useUserPoints } from "@/hooks/useUserPoints";
 import { ARTISTS, SONGS, type Song } from "@/data/musicData";
 import { BattleSongPicker, type SongOption } from "@/battlezone/components/BattleSongPicker";
+import { BattleArtistPicker } from "@/battlezone/components/BattleArtistPicker";
 import { usePublishedCatalog } from "@/hooks/usePublishedCatalog";
 import { durationsFromUrls } from "@/battlezone/lib/songDuration";
 import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
@@ -109,7 +110,9 @@ const HostCreate = () => {
         // that offers everybody and lets the server explain the refusal, which
         // is exactly what an empty ready-list did the first time round.
         .filter((artist) => stage !== "main_stage" || !readyIds || readyIds.size === 0 || readyIds.has(String(artist.id)))
-        .map((artist) => ({ id: artist.id, name: artist.name }))
+        // Their face comes with them: a name in a grey dropdown is the driest
+        // way to show an artist, and the picture is already in the catalogue.
+        .map((artist) => ({ id: artist.id, name: artist.name, image: artist.profileImage ?? null, region: artist.location ?? null }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [stage, readyIds]
   );
@@ -675,37 +678,23 @@ const HostCreate = () => {
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Artist A</label>
-              <SelectWrapper icon={Music}>
-                <select
-                  value={form.artistAId}
-                  onChange={(e) => selectArtist("A", e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Select Artist A</option>
-                  {artistOptions.map((artist) => (
-                    <option key={artist.id} value={artist.id}>
-                      {artist.name}
-                    </option>
-                  ))}
-                </select>
-              </SelectWrapper>
+              <BattleArtistPicker
+                artists={artistOptions}
+                value={form.artistAId}
+                onChange={(artistId) => selectArtist("A", artistId)}
+                label={"Artist A"}
+                placeholder="Pick Artist A"
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Artist B</label>
-              <SelectWrapper icon={Music}>
-                <select
-                  value={form.artistBId}
-                  onChange={(e) => selectArtist("B", e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Select Artist B</option>
-                  {artistOptions.map((artist) => (
-                    <option key={artist.id} value={artist.id}>
-                      {artist.name}
-                    </option>
-                  ))}
-                </select>
-              </SelectWrapper>
+              <BattleArtistPicker
+                artists={artistOptions}
+                value={form.artistBId}
+                onChange={(artistId) => selectArtist("B", artistId)}
+                label={"Artist B"}
+                placeholder="Pick Artist B"
+              />
             </div>
           </div>
 
@@ -725,6 +714,7 @@ const HostCreate = () => {
                   disabled={!form.artistAId}
                   placeholder={requiredSongs === 1 ? "Pick a song" : `Pick the round ${index + 1} song`}
                   emptyLabel={form.artistAId ? "No songs on this artist yet" : "Pick Artist A first"}
+                  artistName={form.artistA}
                 />
               ))}
             </div>
@@ -742,6 +732,7 @@ const HostCreate = () => {
                   disabled={!form.artistBId}
                   placeholder={requiredSongs === 1 ? "Pick a song" : `Pick the round ${index + 1} song`}
                   emptyLabel={form.artistBId ? "No songs on this artist yet" : "Pick Artist B first"}
+                  artistName={form.artistB}
                 />
               ))}
             </div>
