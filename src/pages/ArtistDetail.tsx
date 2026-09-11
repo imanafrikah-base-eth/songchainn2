@@ -209,10 +209,13 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
     if (!named.startsWith('/artist/') && named !== '/artists') navigate(named, { replace: true });
   }, [artistIdOverride, id, artist, navigate]);
   const displayBio = (artistProfile as any)?.bio || artist?.bio;
+  // The picture the artist last put up wins over the one the catalog shipped
+  // with. Uploads write avatar_url, so the catalog photo must come after it or
+  // a new picture vanishes on the next reload. api/artist-og reads the same order.
   const displayProfileImage =
     (artistProfile as any)?.profile_picture_url ||
-    artist?.profileImage ||
     (artistProfile as any)?.avatar_url ||
+    artist?.profileImage ||
     null;
   const displayCoverPhoto = (artistProfile as any)?.cover_photo_url || null;
   const isOwner = !!user && !!ownerUserId && user.id === ownerUserId;

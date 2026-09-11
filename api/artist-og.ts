@@ -9,6 +9,8 @@ function esc(str: string): string {
 const R2B = "https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev";
 const R2C = "https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev";
 
+// The pictures the founding artists shipped with. Only used when the artist
+// has not put up a picture of their own.
 interface ArtistMeta { name: string; img: string }
 const ARTIST_META: Record<string, ArtistMeta> = {
   "1": { name: "7ROO7H BASED", img: `${R2B}/7ROO7H%20%20Based/7ROO7H%20Based%20(1).png` },
@@ -24,60 +26,83 @@ const ARTIST_META: Record<string, ArtistMeta> = {
   "11": { name: "N3M3SIS", img: `${R2C}/NEMESIS%20VS%20LADYRYN/NEMESIS%20VS%20LADYRN%20PFP.jpg` },
 };
 
+const slugOf = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+type Row = Record<string, any>;
+
+async function db() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    "";
+  if (!supabaseUrl || !supabaseKey) return null;
+  const { createClient } = await import("@supabase/supabase-js");
+  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+}
+
 export default async function handler(req: any, res: any) {
-  const slugOf = (s: string) =>
-    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  // Reached by id (/artist/11, /share/artist/11) or by name (/n3m3sis).
-  const slugParam = String(req.query?.slug || "").trim().toLowerCase();
-  const id =
+  // Reached by name (/n3m3sis, any artist, founding or joined through the
+  // app) or by id (/artist/11, /share/artist/11).
+  const slugParam = slugOf(String(req.query?.slug || ""));
+  let id =
     String(req.query?.id || "").trim() ||
     Object.keys(ARTIST_META).find((k) => slugOf(ARTIST_META[k].name) === slugParam) ||
     "";
 
-  if (!id || !/^\d+$/.test(id)) {
+  const logoUrl = "https://songchainn.xyz/songchainn-logo.webp";
+  let name = "";
+  let picture = "";
+
+  try {
+    const supabase = await db();
+    if (supabase) {
+      const { data: accounts } = await supabase.from("artist_accounts").select("artist_id, user_id");
+      const rows = (accounts ?? []) as Row[];
+      const userIds = rows.map((r) => r.user_id).filter(Boolean);
+      const { data: profiles } = userIds.length
+        ? await supabase
+            .from("audience_profiles")
+            .select("user_id, id, profile_name, display_name, profile_picture_url, avatar_url")
+            .in("user_id", userIds)
+        : { data: [] as Row[] };
+      const profileOf = (userId: string) =>
+        ((profiles ?? []) as Row[]).find((p) => p.user_id === userId || p.id === userId);
+
+      // An artist who joined through the app is found by the name they go by.
+      if (!id && slugParam) {
+        const hit = rows.find((r) => {
+          const p = r.user_id ? profileOf(r.user_id) : undefined;
+          const n = p?.profile_name || p?.display_name;
+          return n && slugOf(n) === slugParam;
+        });
+        if (hit) id = hit.artist_id;
+      }
+
+      const account = rows.find((r) => r.artist_id === id);
+      const profile = account?.user_id ? profileOf(account.user_id) : undefined;
+      if (profile) {
+        // Same order as the artist page: the picture they last put up first.
+        picture = profile.profile_picture_url || profile.avatar_url || "";
+        if (!ARTIST_META[id]) name = profile.profile_name || profile.display_name || "";
+      }
+    }
+  } catch {
+    // keep what the catalog knows
+  }
+
+  if (!id || !/^(\d+|u-[0-9a-f-]{36})$/i.test(id)) {
     res.statusCode = 302;
     res.setHeader("Location", "/");
     res.end();
     return;
   }
 
-  const logoUrl = "https://songchainn.xyz/songchainn-logo.webp";
-
   const meta = ARTIST_META[id];
-  let name = meta?.name || "$ongChainn";
-  let img = meta?.img || logoUrl;
-
-  // Enrich from DB for unlisted artist IDs
-  if (!meta) {
-    const supabaseUrl =
-      process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-    const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_ANON_KEY ||
-      process.env.VITE_SUPABASE_ANON_KEY ||
-      "";
-
-    if (supabaseUrl && supabaseKey) {
-      try {
-        const { createClient } = await import("@supabase/supabase-js");
-        const supabase = createClient(supabaseUrl, supabaseKey, {
-          auth: { persistSession: false },
-        });
-        const { data } = await supabase
-          .from("artist_accounts")
-          .select("display_name, avatar_url")
-          .eq("id", id)
-          .maybeSingle();
-
-        if (data) {
-          if (data.display_name) name = data.display_name;
-          if (data.avatar_url) img = data.avatar_url;
-        }
-      } catch {
-        // keep defaults
-      }
-    }
-  }
+  name = meta?.name || name || "$ongChainn";
+  const img = picture || meta?.img || logoUrl;
 
   // The address people share is the artist's name, never the catalog number.
   const artistUrl =
@@ -135,9 +160,7 @@ export default async function handler(req: any, res: any) {
 
   res.statusCode = 200;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader(
-    "Cache-Control",
-    "public, s-maxage=3600, stale-while-revalidate=86400"
-  );
+  // Short, so a new picture shows up in previews within minutes.
+  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");
   res.end(html);
 }

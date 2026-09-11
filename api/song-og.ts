@@ -56,6 +56,9 @@ const ASHD = `${R2C}/NEMESIS%20VS%20LADYRYN/grey/SHADOW/SHADOW%20ARTWORK.jpg`;
 const R2E = "https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev";
 const ACHILL = `${R2E}/n3m/NEW%20RAP%20EP/N3M3SIS%20-%20CHILL%20N3M%20artwork.jpg`;
 const ACALL = `${R2E}/n3m/NEW%20RAP%20EP/N3M3SIS%20-%20THE%20CALL%20OUT%20artwork.jpg`;
+const AVTOP = `${R2D}/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20TOPIER%20ARTWORK.jpg`;
+const AVIVR = `${R2D}/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/ISLAND%20VILLA%20RIDDIM%20ARTWORK%20SANTANA.jpg`;
+const AVIMY = `${R2D}/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%20-%20I%20MISS%20YOU%20BAD/I%20Miss%20you%20bad%20artwork%20IMan%20Afrikah.jpg`;
 
 interface SongMeta { t: string; a: string; img: string }
 const SONG_META: Record<string, SongMeta> = {
@@ -326,10 +329,76 @@ const SONG_META: Record<string, SongMeta> = {
   // N3M3SIS NEW RAP EP singles
   "233": { t: "CHILL N3M", a: "N3M3SIS", img: ACHILL },
   "234": { t: "THE CALL OUT", a: "N3M3SIS", img: ACALL },
+  // VAPACHALO catalog
+  "222": { t: "TOPIER (ISLAND VILLA RIDDIM)", a: "IMAN AFRIKAH x RVSSIAN", img: AVTOP },
+  "223": { t: "ISLAND VILLA RIDDIM FREESTYLE", a: "SANTANA x RVSSIAN", img: AVIVR },
+  "224": { t: "I Miss You Bad", a: "IMan Afrikah", img: AVIMY },
 };
 
+const slugOf = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+// "IMan Afrikah ft Santana" and "IMAN AFRIKAH x RVSSIAN" live under iman-afrikah.
+const leadArtist = (a: string) => a.split(/\s+(?:ft\.?|feat\.?|x)\s+/i)[0];
+
+// A title an artist used twice carries the song id on the end, the way the
+// app writes it (src/lib/slugRoutes.ts). The first one keeps the plain name.
+function foundingSlug(id: string): string {
+  const m = SONG_META[id];
+  const base = slugOf(m.t);
+  const artist = slugOf(leadArtist(m.a));
+  const earlier = Object.keys(SONG_META).find(
+    (k) => k !== id && Number(k) < Number(id) && slugOf(SONG_META[k].t) === base && slugOf(leadArtist(SONG_META[k].a)) === artist
+  );
+  return earlier ? `${base}-${id}` : base;
+}
+
+async function db() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    "";
+  if (!supabaseUrl || !supabaseKey) return null;
+  const { createClient } = await import("@supabase/supabase-js");
+  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+}
+
 export default async function handler(req: any, res: any) {
-  const id = String(req.query?.id || "").trim();
+  // Reached by name (/n3m3sis/block-is-hot) or by id (/song/212, /share/212).
+  const artistSlug = slugOf(String(req.query?.artist || ""));
+  const songSlug = String(req.query?.song || "").trim().toLowerCase();
+  let id = String(req.query?.id || "").trim();
+
+  let supabase: Awaited<ReturnType<typeof db>> = null;
+  try {
+    supabase = await db();
+  } catch {
+    supabase = null;
+  }
+
+  if (!id && artistSlug && songSlug) {
+    id =
+      Object.keys(SONG_META).find(
+        (k) => slugOf(leadArtist(SONG_META[k].a)) === artistSlug && foundingSlug(k) === songSlug
+      ) || "";
+    if (!id && supabase) {
+      try {
+        const { data } = await supabase
+          .from("songs")
+          .select("id, title, artist_name")
+          .eq("is_published", true)
+          .not("artist_id", "is", null);
+        const hit = ((data ?? []) as Array<{ id: string; title: string | null; artist_name: string | null }>).find(
+          (s) => s.title && s.artist_name && slugOf(s.artist_name) === artistSlug && slugOf(s.title) === songSlug
+        );
+        if (hit) id = hit.id;
+      } catch {
+        // not found by name
+      }
+    }
+  }
 
   // Founding catalog ids are numbers; every uploaded record is a uuid. Both
   // are real songs, and the uuid ones are exactly the ones the DB lookup
@@ -342,47 +411,49 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const songUrl = `https://songchainn.xyz/song/${id}`;
   const logoUrl = "https://songchainn.xyz/songchainn-logo.webp";
 
-  // Use hardcoded lookup as primary source
+  // The founding catalog ships its artwork with the app, the same picture the
+  // song page shows.
   const meta = SONG_META[id];
   let title = meta?.t || "$ongChainn";
   let artist = meta?.a || "";
-  let img = meta?.img || logoUrl;
+  let img = meta?.img || "";
 
-  // Enrich from DB if available (fills gaps for songs not in SONG_META)
-  if (!meta) {
-    const supabaseUrl =
-      process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-    const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_ANON_KEY ||
-      process.env.VITE_SUPABASE_ANON_KEY ||
-      "";
+  // An uploaded record shows the artwork it has now: its own cover, else the
+  // cover of the release it belongs to, the same order the song page uses.
+  if (!meta && supabase) {
+    try {
+      const { data } = await supabase
+        .from("songs")
+        .select("title, artist_name, cover_art_url, release_id")
+        .eq("id", id)
+        .maybeSingle();
 
-    if (supabaseUrl && supabaseKey) {
-      try {
-        const { createClient } = await import("@supabase/supabase-js");
-        const supabase = createClient(supabaseUrl, supabaseKey, {
-          auth: { persistSession: false },
-        });
-        const { data } = await supabase
-          .from("songs")
-          .select("title, artist_name, cover_art_url")
-          .eq("id", id)
-          .maybeSingle();
-
-        if (data) {
-          if (data.title) title = data.title;
-          if (data.artist_name) artist = data.artist_name;
-          if (data.cover_art_url) img = data.cover_art_url;
+      if (data) {
+        if (data.title) title = data.title;
+        if (data.artist_name) artist = data.artist_name;
+        if (data.cover_art_url) img = data.cover_art_url;
+        if (!img && data.release_id) {
+          const { data: release } = await supabase
+            .from("releases")
+            .select("cover_art_url")
+            .eq("id", data.release_id)
+            .maybeSingle();
+          if (release?.cover_art_url) img = release.cover_art_url;
         }
-      } catch {
-        // keep defaults
       }
+    } catch {
+      // keep defaults
     }
   }
+  img = img || logoUrl;
+
+  // The address is the artist's name and the song's name, never the number.
+  const nameSlug = artist ? slugOf(leadArtist(artist)) : "";
+  const titleSlug = songSlug || (meta ? foundingSlug(id) : title !== "$ongChainn" ? slugOf(title) : "");
+  const songUrl =
+    nameSlug && titleSlug ? `https://songchainn.xyz/${nameSlug}/${titleSlug}` : `https://songchainn.xyz/song/${id}`;
 
   const displayTitle = artist ? `${title} · ${artist}` : title;
   const description = artist
@@ -437,9 +508,7 @@ export default async function handler(req: any, res: any) {
 
   res.statusCode = 200;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader(
-    "Cache-Control",
-    "public, s-maxage=3600, stale-while-revalidate=86400"
-  );
+  // Short, so new artwork shows up in previews within minutes.
+  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");
   res.end(html);
 }

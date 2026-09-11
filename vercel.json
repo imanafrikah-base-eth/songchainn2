@@ -70,7 +70,7 @@
       "destination": "/api/artist-og?id=:id"
     },
     {
-      "source": "/:slug(7roo7h-based|denajah|iman-afrikah|nda|prp|sanchy|santana|faith|jmn|sammie|n3m3sis)",
+      "source": "/:slug((?!(?:about|admin|api|artist|artists|assets|audience|auth|bettercallzaal|catalog|claim|community|console|delete-account|discover|dj-shuffle|drops|guidelines|inbox|install|keys|launch|leaderboard|license|marketplace|node_modules|nft|not-found|playlist|playlists|post|privacy|profile|reset-password|room|share|social|song|studio|terms|w|wallet|wavewarz-africa|world|world-assets|world-builder|worlds)(?:/|$))[^/.]+)",
       "has": [
         {
           "type": "header",
@@ -79,6 +79,17 @@
         }
       ],
       "destination": "/api/artist-og?slug=:slug"
+    },
+    {
+      "source": "/:artist((?!(?:about|admin|api|artist|artists|assets|audience|auth|bettercallzaal|catalog|claim|community|console|delete-account|discover|dj-shuffle|drops|guidelines|inbox|install|keys|launch|leaderboard|license|marketplace|node_modules|nft|not-found|playlist|playlists|post|privacy|profile|reset-password|room|share|social|song|studio|terms|w|wallet|wavewarz-africa|world|world-assets|world-builder|worlds)(?:/|$))[^/.]+)/:song([^/.]+)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot).*"
+        }
+      ],
+      "destination": "/api/song-og?artist=:artist&song=:song"
     },
     {
       "source": "/world/:slug",
