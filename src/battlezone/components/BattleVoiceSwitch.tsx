@@ -70,7 +70,7 @@ export function BattleVoiceSwitch({ battleId, onEnabled }: { battleId: string; o
           <p className="text-xs text-muted-foreground">
             {quote.exempt
               ? 'Talk to the room from here, bring people up to speak, and take requests. Free for you.'
-              : `Talk to the room from here, bring people up to speak, and take requests. It costs $${quote.usd} in $WWAT${quote.amountDisplay ? `, about ${quote.amountDisplay} $WWAT at today's price` : ''}, paid from your wallet to the WaveWarz treasury.`}
+              : `Talk to the room from here, bring people up to speak, and take requests. It costs $${quote.usd} in $WWAT${quote.amountDisplay ? `, about ${quote.amountDisplay} $WWAT at today's price` : ''}, paid from your wallet to the WaveWarz Africa treasury.`}
           </p>
           {paidTx ? (
             <p className="mt-2 text-xs text-foreground">

@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
   const transfer = receipt.logs.find(
     (l) => l.address?.toLowerCase() === WWAT && l.topics?.[0]?.toLowerCase() === TRANSFER_TOPIC && l.topics?.[2]?.toLowerCase() === recipientTopic,
   );
-  if (!transfer) return json(origin, { error: "That transaction is not a $WWAT payment to the WaveWarz treasury." }, 400);
+  if (!transfer) return json(origin, { error: "That transaction is not a $WWAT payment to the WaveWarz Africa treasury." }, 400);
 
   const payer = ("0x" + transfer.topics[1].slice(26)).toLowerCase();
   const paid = BigInt(transfer.data);

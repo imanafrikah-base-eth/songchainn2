@@ -32,6 +32,9 @@ import BattleStage from "@/battlezone/components/BattleStage";
 import { BattleCountdown } from "@/battlezone/components/BattleCountdown";
 import { STAGES } from "@/battlezone/lib/battleStages";
 import { BattleVoiceSwitch } from "@/battlezone/components/BattleVoiceSwitch";
+import { TradingGround } from "@/battlezone/components/TradingGround";
+import { useSongCoinAddresses } from "@/battlezone/hooks/useSongCoinAddresses";
+import { useAuth as useSongchainnAuth } from "@/context/AuthContext";
 
 /* A counter, not a clock: two mounts in the same millisecond would share a
    channel name and therefore share one channel object. */
@@ -85,6 +88,14 @@ const LiveRoom = () => {
   const [showSongPicker, setShowSongPicker] = useState(false);
   const [clockClosed, setClockClosed] = useState(false);
   const liveKitRoomRef = useRef<Room | null>(null);
+
+  /* The wallet on the SONGCHAINN account, because backing a corner buys the
+     song into that same wallet. */
+  const { walletAddress } = useSongchainnAuth();
+  /* This round's two records, and whether either has a coin to back. */
+  const roundSongA = battle?.songsA?.[round - 1] ?? battle?.songsA?.[0];
+  const roundSongB = battle?.songsB?.[round - 1] ?? battle?.songsB?.[0];
+  const { data: songCoins } = useSongCoinAddresses([roundSongA?.id, roundSongB?.id]);
 
   const hostAudio = useHostAudio();
   
@@ -185,12 +196,20 @@ const LiveRoom = () => {
      leaving a row that says open while every screen refuses to vote. */
   useEffect(() => {
     if (!clockClosed || !roomId || battleEnded) return;
-    if (myRole !== "host" || !votingOpen) return;
+    if (myRole !== "host") return;
     /* Awaited, not fired and forgotten. A Supabase query builder is lazy: it
        only sends the request when something calls then on it, so "void query"
        builds a request that never leaves the browser. */
+    /* The music has finished and the last call window with it, so the battle
+       is over. The host's screen writes it down for everyone, and the judges
+       are asked for their cards straight away. A host who wants to end it
+       sooner still has the button. */
     void (async () => {
-      await supabase.from("battles").update({ voting_open: false }).eq("id", roomId);
+      await supabase
+        .from("battles")
+        .update({ status: "ended", voting_open: false, ended_time: new Date().toISOString() })
+        .eq("id", roomId);
+      void requestHikuluVerdict(roomId);
     })();
   }, [clockClosed, roomId, battleEnded, myRole, votingOpen]);
 
@@ -431,7 +450,7 @@ const LiveRoom = () => {
     if (!voiceOn) return;
     if (!roomId || !user) return;
     let cancelled = false;
-    const participantName = profile?.display_name || profile?.username || "WaveWarz Listener";
+    const participantName = profile?.display_name || profile?.username || "WWA Listener";
 
     const connectLiveKit = async () => {
       try {
@@ -672,6 +691,32 @@ const LiveRoom = () => {
             isHost={iAmHostOrCoHost}
             compact={isVerySmallMobile}
           />
+
+          {/* The trading ground, in the room where the battle is. It was built
+              and then never put on a page, so nobody could find the thing the
+              Learn page told them to tap. */}
+          {STAGES[battle.stage].tradingEnabled && roundSongA && roundSongB && (
+            <TradingGround
+              battleId={roomId || ""}
+              cornerA={{
+                side: "a",
+                artistName: battle.artistA.name,
+                songTitle: roundSongA.title,
+                songId: roundSongA.id,
+                coinAddress: songCoins?.get(roundSongA.id) ?? null,
+              }}
+              cornerB={{
+                side: "b",
+                artistName: battle.artistB.name,
+                songTitle: roundSongB.title,
+                songId: roundSongB.id,
+                coinAddress: songCoins?.get(roundSongB.id) ?? null,
+              }}
+              walletAddress={walletAddress ?? null}
+              userId={user?.id ?? null}
+              isOpen={!battleEnded && !clockClosed}
+            />
+          )}
 
           {/* Battle Panel */}
           <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>

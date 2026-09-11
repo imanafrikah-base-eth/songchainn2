@@ -18,6 +18,7 @@ import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transpa
 import { BattleCountdown } from "@/battlezone/components/BattleCountdown";
 import { STAGES, buildClock } from "@/battlezone/lib/battleStages";
 import { ARTISTS, SONGS } from "@/data/musicData";
+import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
 
 const BattleDetail = () => {
   const { isEmbedded, embedTo } = useEmbedMode();
@@ -30,6 +31,40 @@ const BattleDetail = () => {
   const queryClient = useQueryClient();
   const verdictRequested = useRef(false);
   const [isGoingLive, setIsGoingLive] = useState(false);
+  /* Taking a battle down is not something a host can do. It belongs to the two
+     artists testing WaveWarz Africa, and the database refuses anybody else. */
+  const perks = useHostPerks();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [takingDown, setTakingDown] = useState(false);
+  const [keptInHistory, setKeptInHistory] = useState(false);
+
+  const keepInHistory = async () => {
+    if (!battle || takingDown) return;
+    setTakingDown(true);
+    const { error } = await supabase.rpc("set_battle_hidden" as never, { p_id: battle.id, p_hidden: true } as never);
+    setTakingDown(false);
+    if (error) {
+      toast({ title: "That did not go through", description: error.message });
+      return;
+    }
+    setKeptInHistory(true);
+    await queryClient.invalidateQueries({ queryKey: ["battles"] });
+    toast({ title: "Kept in history", description: "It is off the boards. Anyone with the link can still open this page." });
+  };
+
+  const deleteBattle = async () => {
+    if (!battle || takingDown) return;
+    setTakingDown(true);
+    const { error } = await supabase.rpc("delete_battle" as never, { p_id: battle.id } as never);
+    setTakingDown(false);
+    if (error) {
+      toast({ title: "Not deleted", description: error.message });
+      return;
+    }
+    await queryClient.invalidateQueries({ queryKey: ["battles"] });
+    toast({ title: "Deleted", description: "The battle and its room are gone." });
+    navigate(embedTo("/battles/results"));
+  };
 
   // Self-heal: an ended battle without a verdict asks $HIKULU once, then refetches.
   useEffect(() => {
@@ -193,6 +228,45 @@ const BattleDetail = () => {
         )}
 
         <h1 className="text-3xl font-display font-black text-foreground">{battle.title}</h1>
+
+        {perks.canDelete && (
+          <div className="rounded-2xl border border-border bg-card/60 p-4">
+            <p className="text-sm font-semibold text-foreground">This battle is yours to take down.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              You and N3M3SIS are the only accounts that can do this while you are testing. Keeping it in
+              history takes it off the boards and leaves the page, the verdict and the votes standing for
+              anyone holding the link. Deleting takes the whole room with it and cannot be undone, and a
+              battle where money changed hands can only be kept, never deleted.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={keepInHistory}
+                disabled={takingDown || keptInHistory}
+                className="min-h-11 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-60"
+              >
+                {keptInHistory ? "Kept in history" : "Keep it in history"}
+              </button>
+              <button
+                type="button"
+                onClick={() => (confirmDelete ? deleteBattle() : setConfirmDelete(true))}
+                disabled={takingDown}
+                className="min-h-11 rounded-xl border border-destructive/40 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-60"
+              >
+                {takingDown ? "Working" : confirmDelete ? "Tap again to delete it" : "Delete this battle"}
+              </button>
+              {confirmDelete && !takingDown && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="min-h-11 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Keep it
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {isHost && battle.status === "upcoming" && (
           <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-muted-foreground">

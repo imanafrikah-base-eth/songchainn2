@@ -144,7 +144,7 @@ const TermsOfUse = () => {
           </ul>
         </Section>
 
-        <Section title="10. WaveWarz battles">
+        <Section title="10. WaveWarz Africa battles">
           <p>
             Battles are community events. Hosts run them, audiences vote, and results come from real votes.
             Live battle audio may run on an X Space hosted by the battle host; joining that Space happens on X

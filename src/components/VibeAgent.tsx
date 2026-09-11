@@ -754,7 +754,7 @@ export function VibeAgent() {
           {step === 'welcome' && (
             <div className="space-y-3">
               <div className="flex items-start gap-2">
-                <p className="text-sm text-foreground">Hey {displayName}, want to vibe-chat, explore WaveWarz, or just play music?</p>
+                <p className="text-sm text-foreground">Hey {displayName}, want to vibe-chat, explore WaveWarz Africa, or just play music?</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Button type="button" className="h-10 text-xs" onClick={() => setStep('mode-picker')}>
@@ -769,7 +769,7 @@ export function VibeAgent() {
                   Call DJ Shuffle
                 </Button>
                 <Button type="button" variant="outline" className="h-10 text-xs" onClick={openWaveWarzPrimer}>
-                  WaveWarz Info
+                  WaveWarz Africa Info
                 </Button>
               </div>
               <Button type="button" variant="outline" className="h-10 w-full text-xs" onClick={() => window.dispatchEvent(new CustomEvent('songchainn:open-suggestion-form'))}>
@@ -885,7 +885,7 @@ export function VibeAgent() {
                   Want DJ Shuffle?
                 </Button>
                 <Button type="button" variant="outline" className="h-10 text-xs" onClick={openWaveWarzPrimer}>
-                  Tell me about WaveWarz
+                  Tell me about WaveWarz Africa
                 </Button>
               </div>
               {lanePlaylist && (

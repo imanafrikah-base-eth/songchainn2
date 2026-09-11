@@ -36,7 +36,7 @@ export default async function handler(req: any, res: any) {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
     const roomId = String(body.roomId || "").trim();
     const requestedUserId = String(body.userId || "").trim();
-    const participantName = String(body.participantName || "").trim() || "WaveWarz Listener";
+    const participantName = String(body.participantName || "").trim() || "WWA Listener";
     if (!roomId || !requestedUserId) {
       return sendJson(res, 400, { error: "roomId and userId are required" });
     }

@@ -990,24 +990,9 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
                 <ArtistCoinPanel artistId={artist.id} />
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4">
-                <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
-                  <MapPin className="w-4 h-4" />
-                  <span>{artist.location}</span>
-                </div>
-                <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
-                  <Music className="w-4 h-4" />
-                  <span>{artistSongs.length} songs</span>
-                </div>
-                <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
-                  <PlayCircle className="w-4 h-4" />
-                  <span>{artistStats.totalPlays.toLocaleString()} streams</span>
-                </div>
-                <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
-                  <Users className="w-4 h-4" />
-                  <span>{artistFollowers.toLocaleString()} followers</span>
-                </div>
-              </div>
+              {/* The songs, streams and followers used to be written out here
+                  as grey text and then again as tiles a few lines below. The
+                  tiles say it better and can be tapped, so this row is gone. */}
 
               {isOwner && isEditingProfile ? (
                 <div className="mb-6 max-w-2xl space-y-2">

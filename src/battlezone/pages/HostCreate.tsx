@@ -16,6 +16,10 @@ import { toast } from "@/battlezone/hooks/use-toast";
 import { useBattles } from "@/battlezone/hooks/useBattles";
 import { useUserPoints } from "@/hooks/useUserPoints";
 import { ARTISTS, SONGS, type Song } from "@/data/musicData";
+import { BattleSongPicker, type SongOption } from "@/battlezone/components/BattleSongPicker";
+import { usePublishedCatalog } from "@/hooks/usePublishedCatalog";
+import { durationsFromUrls } from "@/battlezone/lib/songDuration";
+import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
 
 /* A counter, not a clock: two mounts in the same millisecond would share a
    channel name and therefore share one channel object. */
@@ -66,6 +70,12 @@ const HostCreate = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stage, setStage] = useState<BattleStage>("main_stage");
   const { points: myPoints } = useUserPoints();
+  /* IMan Afrikah and N3M3SIS host free with everything on while they test.
+     The database enforces it; this only decides what the screen says. */
+  const perks = useHostPerks();
+  /* Everything an artist has here, not just what shipped with the app. A
+     record sent in through the Studio could never be picked for a battle. */
+  const { songs: publishedSongs } = usePublishedCatalog();
   const coHostDropdownRef = useRef<HTMLDivElement>(null);
   const { data: liveBattles = [] } = useBattles("live");
   // Battles stuck on 'live' for over a day are stale and must not brick the
@@ -114,13 +124,16 @@ const HostCreate = () => {
 
   const songsByArtist = useMemo(() => {
     const map = new Map<string, Song[]>();
-    SONGS.forEach((song) => {
+    const seen = new Set<string>();
+    [...SONGS, ...publishedSongs].forEach((song) => {
+      if (seen.has(song.id)) return;
+      seen.add(song.id);
       const current = map.get(song.artistId) || [];
       current.push(song);
       map.set(song.artistId, current);
     });
     return map;
-  }, []);
+  }, [publishedSongs]);
   
   // Fetch songchainn users for co-host search
   useEffect(() => {
@@ -231,11 +244,18 @@ const HostCreate = () => {
    * buildClock falls back to a sane length for any it does not, so a battle can
    * never think it has no music and close the second it opens.
    */
-  const liveClock = () => {
-    const chosen = [...form.songAIds, ...form.songBIds]
-      .filter(Boolean)
-      .map((id) => SONGS.find((s) => s.id === id)?.duration);
-    const clock = buildClock(chosen as (number | null | undefined)[]);
+  const liveClock = async () => {
+    /* How long the battle runs is how long the music runs. The browser reads
+       the real length of each chosen record from its file, which takes a
+       moment and is worth it: a battle used to be given a flat slot per song
+       and ended while the music was still playing. Anything that will not say
+       falls back to the slot. */
+    const ids = [...form.songAIds, ...form.songBIds].filter(Boolean);
+    const everySong = [...SONGS, ...publishedSongs];
+    const chosen = await durationsFromUrls(
+      ids.map((id) => everySong.find((s) => s.id === id)?.audioUrl ?? null),
+    );
+    const clock = buildClock(chosen);
     const startedAt = Date.now();
     return {
       music_ends_at: new Date(startedAt + clock.musicEndsAt * 1000).toISOString(),
@@ -478,7 +498,7 @@ const HostCreate = () => {
       return;
     }
 
-    if (isLaunchNow && stage === "open_mic" && myPoints < STAGES.open_mic.pointsCost) {
+    if (isLaunchNow && stage === "open_mic" && !perks.freeHost && myPoints < STAGES.open_mic.pointsCost) {
       toast({
         title: "Not enough points yet",
         description: `Hosting an Open Mic costs ${STAGES.open_mic.pointsCost.toLocaleString()} points and you have ${myPoints.toLocaleString()}. Listening, voting and liking all earn them.`,
@@ -486,7 +506,7 @@ const HostCreate = () => {
       return;
     }
 
-    if (isLaunchNow && liveBattlesCount >= 5) {
+    if (isLaunchNow && !perks.freeHost && liveBattlesCount >= 5) {
       toast({
         title: "Live battle limit reached",
         description:
@@ -498,6 +518,7 @@ const HostCreate = () => {
     setIsSubmitting(true);
     try {
       const status = isLaunchNow ? "live" : "upcoming";
+      const clockFields = isLaunchNow ? await liveClock() : {};
       const scheduledTime = isLaunchNow ? null : form.schedule || null;
       const artistA = artistById.get(form.artistAId);
       const artistB = artistById.get(form.artistBId);
@@ -523,7 +544,7 @@ const HostCreate = () => {
              device, so everyone in the room counts down to the same instant
              however long ago their page loaded. Only set when going live: a
              scheduled battle has no start yet to measure from. */
-          ...(status === "live" ? liveClock() : {}),
+          ...clockFields,
           host_user_id: user.id,
           host_name: hostName,
           co_hosts: selectedCoHosts.map((c) => c.display_name || c.username || ""),
@@ -695,27 +716,16 @@ const HostCreate = () => {
                 {form.artistA ? `${form.artistA} Songs` : "Artist A Songs"}
               </label>
               {Array.from({ length: requiredSongs }).map((_, index) => (
-                <SelectWrapper key={`song-a-${index}`} icon={Music}>
-                  <select
-                    value={form.songAIds[index] || ""}
-                    onChange={(e) => selectSong("A", index, e.target.value)}
-                    className={selectClass}
-                    disabled={!form.artistAId}
-                  >
-                    <option value="">
-                      {form.artistAId
-                        ? requiredSongs === 1 ? "Select song" : `Select round ${index + 1} song`
-                        : "Select Artist A first"}
-                    </option>
-                    {(songsByArtist.get(form.artistAId) || [])
-                      .filter((song) => song.id === form.songAIds[index] || !form.songAIds.includes(song.id))
-                      .map((song) => (
-                        <option key={song.id} value={song.id}>
-                          {song.title}
-                        </option>
-                      ))}
-                  </select>
-                </SelectWrapper>
+                <BattleSongPicker
+                  key={`song-a-${index}`}
+                  songs={(songsByArtist.get(form.artistAId) || []) as SongOption[]}
+                  value={form.songAIds[index] || ""}
+                  onChange={(songId) => selectSong("A", index, songId)}
+                  takenIds={form.songAIds}
+                  disabled={!form.artistAId}
+                  placeholder={requiredSongs === 1 ? "Pick a song" : `Pick the round ${index + 1} song`}
+                  emptyLabel={form.artistAId ? "No songs on this artist yet" : "Pick Artist A first"}
+                />
               ))}
             </div>
             <div className="space-y-2">
@@ -723,27 +733,16 @@ const HostCreate = () => {
                 {form.artistB ? `${form.artistB} Songs` : "Artist B Songs"}
               </label>
               {Array.from({ length: requiredSongs }).map((_, index) => (
-                <SelectWrapper key={`song-b-${index}`} icon={Music}>
-                  <select
-                    value={form.songBIds[index] || ""}
-                    onChange={(e) => selectSong("B", index, e.target.value)}
-                    className={selectClass}
-                    disabled={!form.artistBId}
-                  >
-                    <option value="">
-                      {form.artistBId
-                        ? requiredSongs === 1 ? "Select song" : `Select round ${index + 1} song`
-                        : "Select Artist B first"}
-                    </option>
-                    {(songsByArtist.get(form.artistBId) || [])
-                      .filter((song) => song.id === form.songBIds[index] || !form.songBIds.includes(song.id))
-                      .map((song) => (
-                        <option key={song.id} value={song.id}>
-                          {song.title}
-                        </option>
-                      ))}
-                  </select>
-                </SelectWrapper>
+                <BattleSongPicker
+                  key={`song-b-${index}`}
+                  songs={(songsByArtist.get(form.artistBId) || []) as SongOption[]}
+                  value={form.songBIds[index] || ""}
+                  onChange={(songId) => selectSong("B", index, songId)}
+                  takenIds={form.songBIds}
+                  disabled={!form.artistBId}
+                  placeholder={requiredSongs === 1 ? "Pick a song" : `Pick the round ${index + 1} song`}
+                  emptyLabel={form.artistBId ? "No songs on this artist yet" : "Pick Artist B first"}
+                />
               ))}
             </div>
           </div>

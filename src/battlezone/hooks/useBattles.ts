@@ -162,6 +162,11 @@ async function fetchBattles(status?: string): Promise<Battle[]> {
     .from("battles")
     .select("*");
 
+  // A battle kept in history is off every board. Only the artists testing
+  // WaveWarz Africa can put one there, and its page still works for anyone
+  // holding the link.
+  query = query.is("hidden_at", null);
+
   if (status) query = query.eq("status", status);
   query = query.order("created_at", { ascending: false });
 

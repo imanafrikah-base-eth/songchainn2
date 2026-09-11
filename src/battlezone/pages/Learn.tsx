@@ -362,7 +362,7 @@ const Learn = () => {
               <div className="rounded-2xl border border-border bg-card/80 p-5">
                 <Lightbulb className="h-6 w-6 text-accent mb-2" />
                 <h3 className="font-bold text-foreground mb-1">Golden rule</h3>
-                <p className="text-sm text-muted-foreground">Back songs you love with amounts you are comfortable with. The best portfolio in WaveWarz is a good ear.</p>
+                <p className="text-sm text-muted-foreground">Back songs you love with amounts you are comfortable with. The best portfolio in WaveWarz Africa is a good ear.</p>
               </div>
             </div>
           </div>

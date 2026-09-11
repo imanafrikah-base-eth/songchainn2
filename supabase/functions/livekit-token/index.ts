@@ -123,7 +123,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const body = await req.json().catch(() => ({}));
     const roomName = String((body as any)?.roomName || "").trim();
-    const participantName = String((body as any)?.participantName || "").trim() || "WaveWarz Listener";
+    const participantName = String((body as any)?.participantName || "").trim() || "WWA Listener";
     if (!roomName) return json(origin, { error: "roomName is required" }, { status: 400 });
 
     // In-app voice is on per battle since 11 Sep 2026. A battle whose host has

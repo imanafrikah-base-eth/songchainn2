@@ -36,7 +36,7 @@ function readError(error: unknown, data: unknown): string {
   } catch {
     /* fall through */
   }
-  return 'Could not reach WaveWarz just now. Try again in a moment.';
+  return 'Could not reach WaveWarz Africa just now. Try again in a moment.';
 }
 
 export async function quoteVoice(battleId: string): Promise<VoiceQuote> {

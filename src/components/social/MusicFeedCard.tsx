@@ -571,7 +571,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
           <button type="button" onClick={(e) => { e.stopPropagation(); navigate(`/wavewarz-africa/room/${battleMatch[1]}`); }}
             className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-rose-300/40 bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-100 min-h-10">
             <Flame className="h-3.5 w-3.5" />
-            Live on WaveWarz{battleMatch[2]?.trim() ? `: ${battleMatch[2].trim()}` : ''}
+            Live on WaveWarz Africa{battleMatch[2]?.trim() ? `: ${battleMatch[2].trim()}` : ''}
           </button>
         )}
 

@@ -26,7 +26,17 @@ export const VOICE_ENABLED: boolean = true;
  * the battle itself, the judges, the poll and the chat all work exactly as they
  * do today. Flip this to true once both are done.
  */
-export const BATTLE_MARKET_ENABLED = false;
+export const BATTLE_MARKET_ENABLED = true;
+
+/**
+ * The host fee, separately.
+ *
+ * Hosting a Main Stage battle is written about as costing $1 in $WWAT, but
+ * nothing has ever charged it: no code path writes a battle_host_fee and the
+ * table is empty. So the notice that promises it stays off until the charge is
+ * real. The trading ground above does not depend on it and is its own switch.
+ */
+export const HOST_FEE_ENABLED = false;
 
 /**
  * $WWAT, the WaveWarz Africa token. Hosting a battle is paid in it.

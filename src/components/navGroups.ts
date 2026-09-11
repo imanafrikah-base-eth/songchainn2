@@ -70,7 +70,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/social', label: 'Feed', icon: MessageCircle, description: 'Posts, clips and what people are playing' },
       { path: '/community', label: 'People', icon: Users, description: 'Artists and listeners on $ongChainn' },
-      { path: '/wavewarz-africa', label: 'WaveWarz', icon: Flame, description: 'Battles, voting and the AI judges' },
+      { path: '/wavewarz-africa', label: 'WaveWarz Africa', icon: Flame, description: 'Battles, voting and the AI judges' },
       { path: '/inbox', label: 'Inbox', icon: Inbox, description: 'Your messages' },
     ],
   },

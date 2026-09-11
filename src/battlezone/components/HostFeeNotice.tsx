@@ -1,6 +1,6 @@
 import { Ticket } from 'lucide-react';
 import { HOST_FEE_USD, HOST_FEE_SPLIT_BPS } from '@/battlezone/lib/battleMarket';
-import { battleMarketIsLive } from '@/battlezone/config';
+import { HOST_FEE_ENABLED } from '@/battlezone/config';
 
 /**
  * What hosting a battle costs, said before the host commits to anything.
@@ -14,7 +14,7 @@ import { battleMarketIsLive } from '@/battlezone/config';
  * money in deserves to know most of it reaches the musicians they picked.
  */
 export function HostFeeNotice() {
-  if (!battleMarketIsLive()) return null;
+  if (!HOST_FEE_ENABLED) return null;
 
   const artistPct = Number(HOST_FEE_SPLIT_BPS.artists) / 100;
 

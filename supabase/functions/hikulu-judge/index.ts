@@ -344,7 +344,7 @@ async function fetchAudioExcerpt(url: string): Promise<{ data: string; mime: str
   }
 }
 
-const LISTEN_PROMPT = `You are the ear of the WaveWarz bench. Listen to this recording and report what is actually in it. This is analysis, not opinion, and no one is being ranked here.
+const LISTEN_PROMPT = `You are the ear of the WaveWarz Africa bench. Listen to this recording and report what is actually in it. This is analysis, not opinion, and no one is being ranked here.
 
 Respond with ONLY a JSON object, no markdown fences, in this exact shape:
 {
