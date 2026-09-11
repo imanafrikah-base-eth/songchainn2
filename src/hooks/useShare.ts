@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { fcOpenUrl } from '@/lib/farcasterActions';
 import { SONGS, ARTISTS } from '@/data/musicData';
-import { getSongSlugUrl, getArtistSlugById } from '@/lib/slugRoutes';
+import { getSongSlugUrl, artistPath } from '@/lib/slugRoutes';
 
 interface ShareOptions {
   title: string;
@@ -22,10 +22,10 @@ export function useShare() {
       }
       case 'post':
         return `${base}/post/${id}`;
-      case 'artist': {
-        const slug = getArtistSlugById(id);
-        return `${base}/${slug}`;
-      }
+      case 'artist':
+        // By name, including artists who joined through the app; a bare
+        // catalog id or u-<uuid> is never what gets shared.
+        return `${base}${artistPath(id)}`;
       case 'profile':
         return `${base}/audience/${id}`;
       default:

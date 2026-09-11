@@ -1,4 +1,5 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { artistPath } from '@/lib/slugRoutes';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { motion } from 'framer-motion';
 import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound, Mic2 } from 'lucide-react';
@@ -53,8 +54,11 @@ function isArtistNew(addedAt?: string) {
   return Date.now() - ts < NEW_ARTIST_WINDOW_MS;
 }
 
-export default function ArtistDetail() {
-  const { id } = useParams<{ id: string }>();
+export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: string } = {}) {
+  const params = useParams<{ id: string }>();
+  // Shown at /artist-name by SlugResolver, or at the old /artist/:id.
+  const id = artistIdOverride ?? params.id;
+  const navigate = useNavigate();
   const { user, isArtist, artistId } = useAuth();
   const { isArtistLiked, toggleLikeArtist } = useAudienceInteractions();
   const { data: popularityData } = useSongPopularity();
@@ -196,6 +200,14 @@ export default function ArtistDetail() {
     : undefined);
 
   const displayName = (artistProfile as any)?.profile_name || artist?.name;
+
+  // The catalog number is for the backend. Reached by /artist/11, the page
+  // swaps the address for the artist's name the moment it knows the name.
+  useEffect(() => {
+    if (artistIdOverride || !id || !artist) return;
+    const named = artistPath(id, artist.name);
+    if (!named.startsWith('/artist/') && named !== '/artists') navigate(named, { replace: true });
+  }, [artistIdOverride, id, artist, navigate]);
   const displayBio = (artistProfile as any)?.bio || artist?.bio;
   const displayProfileImage =
     (artistProfile as any)?.profile_picture_url ||

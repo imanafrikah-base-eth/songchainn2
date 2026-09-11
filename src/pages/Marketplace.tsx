@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState, useMemo } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
@@ -178,7 +179,7 @@ function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
               {song.title}
             </h3>
             <Link 
-              to={`/artist/${song.artistId}`}
+              to={artistPath(song.artistId)}
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               <ArtistName name={song.artist} artistId={song.artistId} size={12} />

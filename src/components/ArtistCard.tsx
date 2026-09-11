@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { memo, useMemo } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
@@ -30,7 +31,7 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
   }, [artist.id, pulseCounts, streamTotals, followerCounts]);
 
   return (
-    <Link to={`/artist/${artist.id}`}>
+    <Link to={artistPath(artist.id)}>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

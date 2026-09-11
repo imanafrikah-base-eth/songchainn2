@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
@@ -1682,7 +1683,7 @@ export default function Room() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      navigate(`/artist/${currentArtist.id}`);
+                      navigate(artistPath(currentArtist.id));
                     }}
                   >
                     <ArtistName name={currentSong?.artist} artistId={currentArtist.id} size={14} />

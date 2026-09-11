@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ListMusic, ListPlus, MoreHorizontal, Share2, User } from 'lucide-react';
@@ -59,7 +60,7 @@ export function SongMenu({
   }, [shareSong, song]);
 
   const handleGoToArtist = useCallback(() => {
-    navigate(`/artist/${song.artistId}`);
+    navigate(artistPath(song.artistId));
   }, [navigate, song.artistId]);
 
   return (

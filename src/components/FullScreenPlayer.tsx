@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { memo, useEffect, useState, useRef, useCallback } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
@@ -487,7 +488,7 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
                 </h2>
                 <button
                   type="button"
-                  onClick={() => { onClose(); navigate(`/artist/${currentSong.artistId}`); }}
+                  onClick={() => { onClose(); navigate(artistPath(currentSong.artistId)); }}
                   className="text-lg text-muted-foreground truncate hover:text-primary transition-colors text-left"
                 >
                   <ArtistName name={currentSong.artist} artistId={currentSong.artistId} size={16} />

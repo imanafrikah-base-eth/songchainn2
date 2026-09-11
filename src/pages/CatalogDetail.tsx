@@ -1,4 +1,5 @@
 ﻿import { useMemo } from 'react';
+import { artistPath } from '@/lib/slugRoutes';
 import { ArtistName } from '@/components/ArtistName';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -111,7 +112,7 @@ export default function CatalogDetail() {
 
               {artist && (
                 <Link
-                  to={`/artist/${artist.id}`}
+                  to={artistPath(artist.id)}
                   className="inline-flex items-center gap-3 mb-6 group"
                 >
                   <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">

@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { PhotoPositioner } from '@/components/PhotoPositioner';
 import { ArtistName } from '@/components/ArtistName';
 import { cropImage, CENTRE_CROP, type PhotoCrop } from '@/lib/cropImage';
@@ -607,7 +608,7 @@ export default function Profile() {
   // the artist page and the Studio open this with ?settings=1 rather than
   // bouncing them straight back.
   if (isArtist && artistId && !wantsSettings) {
-    return <Navigate to={`/artist/${artistId}`} replace />;
+    return <Navigate to={artistPath(artistId)} replace />;
   }
 
   if (!audienceProfile) {
@@ -891,7 +892,7 @@ export default function Profile() {
               <p className="text-sm text-muted-foreground">{isArtist ? 'Artist' : 'Audience Member'}</p>
               <span className="text-xs text-muted-foreground whitespace-nowrap">{profilePresenceLabel}</span>
               {isArtist && artistId && (
-                <Link to={`/artist/${artistId}`} className="text-sm text-primary hover:underline">
+                <Link to={artistPath(artistId)} className="text-sm text-primary hover:underline">
                   View Artist Page
                 </Link>
               )}

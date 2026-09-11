@@ -1,4 +1,5 @@
 ﻿import { useMemo } from 'react';
+import { artistPath } from '@/lib/slugRoutes';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { Users, Music, TrendingUp, PlayCircle } from 'lucide-react';
@@ -134,7 +135,7 @@ export default function Artists() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {artistsWithStats.map((artist, index) => (
               <motion.div key={artist.id} variants={itemVariants}>
-                <Link to={`/artist/${artist.id}`}>
+                <Link to={artistPath(artist.id)}>
                   <motion.div
                     whileHover={{ y: -8, scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}

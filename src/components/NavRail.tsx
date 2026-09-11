@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -15,7 +16,7 @@ export function NavRail() {
   const location = useLocation();
   const { user, isArtist, artistId } = useAuth();
   const roomOnlineCount = useRoomOnlineCount({ roomId: 'global', viewerUserId: user?.id });
-  const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
+  const profilePath = isArtist && artistId ? artistPath(artistId) : '/profile';
   const groups = resolveNavGroups(profilePath, Boolean(isArtist));
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 

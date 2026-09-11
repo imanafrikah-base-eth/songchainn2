@@ -70,6 +70,17 @@
       "destination": "/api/artist-og?id=:id"
     },
     {
+      "source": "/:slug(7roo7h-based|denajah|iman-afrikah|nda|prp|sanchy|santana|faith|jmn|sammie|n3m3sis)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot).*"
+        }
+      ],
+      "destination": "/api/artist-og?slug=:slug"
+    },
+    {
       "source": "/world/:slug",
       "has": [
         {

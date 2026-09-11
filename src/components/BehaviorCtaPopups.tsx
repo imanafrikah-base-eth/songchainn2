@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInterruption } from '@/hooks/useInterruption';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -266,7 +267,7 @@ export function BehaviorCtaPopups() {
               ? `Keep your $ongChainn vibe neat. Follow now and I will keep this artist close in your picks.`
               : `You just ran two tracks from ${artist.name}. Follow to keep new drops in your flow.`,
             ctaLabel: 'Follow Now',
-            ctaPath: `/artist/${artist.id}`,
+            ctaPath: artistPath(artist.id),
           });
         }
       }

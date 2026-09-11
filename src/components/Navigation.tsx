@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -71,7 +72,7 @@ export function Navigation() {
     username: roomUsername,
   });
   const { showRoom } = usePlayerActions();
-  const profilePath = isArtist && artistId ? `/artist/${artistId}` : '/profile';
+  const profilePath = isArtist && artistId ? artistPath(artistId) : '/profile';
   const navGroups = resolveNavGroups(profilePath, Boolean(isArtist));
   const showReturnToRoom =
     Boolean(playerState?.isRoomMode) && Boolean(playerState?.isRoomHidden) && location.pathname !== '/room';

@@ -25,7 +25,14 @@ const ARTIST_META: Record<string, ArtistMeta> = {
 };
 
 export default async function handler(req: any, res: any) {
-  const id = String(req.query?.id || "").trim();
+  const slugOf = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  // Reached by id (/artist/11, /share/artist/11) or by name (/n3m3sis).
+  const slugParam = String(req.query?.slug || "").trim().toLowerCase();
+  const id =
+    String(req.query?.id || "").trim() ||
+    Object.keys(ARTIST_META).find((k) => slugOf(ARTIST_META[k].name) === slugParam) ||
+    "";
 
   if (!id || !/^\d+$/.test(id)) {
     res.statusCode = 302;
@@ -34,7 +41,6 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const artistUrl = `https://songchainn.xyz/artist/${id}`;
   const logoUrl = "https://songchainn.xyz/songchainn-logo.webp";
 
   const meta = ARTIST_META[id];
@@ -72,6 +78,12 @@ export default async function handler(req: any, res: any) {
       }
     }
   }
+
+  // The address people share is the artist's name, never the catalog number.
+  const artistUrl =
+    name !== "$ongChainn" && slugOf(name)
+      ? `https://songchainn.xyz/${slugOf(name)}`
+      : `https://songchainn.xyz/artist/${id}`;
 
   const description = `${name}, straight from the artist on $ongChainn. Stream free, hold the records you love.`;
 

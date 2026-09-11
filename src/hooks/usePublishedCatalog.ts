@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ARTISTS, GENRES, type Song, type Artist, type Genre } from '@/data/musicData';
+import { registerArtistNames } from '@/lib/slugRoutes';
 
 interface PublishedSongRow {
   id: string;
@@ -144,7 +145,10 @@ export function usePublishedCatalog() {
         addedAt: row.created_at ?? undefined,
       });
     });
-    return Array.from(artistsById.values());
+    const list = Array.from(artistsById.values());
+    // Artists who joined through the app get their name as their address.
+    registerArtistNames(list);
+    return list;
   }, [rows]);
 
   return {

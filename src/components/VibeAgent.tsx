@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { claimInterruption, releaseInterruption } from '@/lib/interruptions';
@@ -818,7 +819,7 @@ export function VibeAgent() {
                 {recommendedArtist && (
                   <button
                     type="button"
-                    onClick={() => navigate(`/artist/${recommendedArtist.id}`)}
+                    onClick={() => navigate(artistPath(recommendedArtist.id))}
                     className="w-full text-left rounded-lg border border-border/60 bg-secondary/20 px-2.5 py-2 hover:bg-secondary/35 transition-colors"
                   >
                     <p className="text-xs text-muted-foreground">Artist to watch</p>

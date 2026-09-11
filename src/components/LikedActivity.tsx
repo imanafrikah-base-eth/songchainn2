@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { Link } from 'react-router-dom';
 import { ArtistName } from '@/components/ArtistName';
 import { formatDistanceToNow } from 'date-fns';
@@ -76,7 +77,7 @@ export function LikedActivity({
             {artists.map((a) => (
               <Link
                 key={a.artistId}
-                to={`/artist/${a.artistId}`}
+                to={artistPath(a.artistId)}
                 className="flex items-center gap-2 rounded-full border border-border bg-card py-1.5 pl-1.5 pr-3.5 transition-colors hover:bg-muted/50"
               >
                 <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-muted">

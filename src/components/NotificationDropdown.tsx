@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState, type ComponentType } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
@@ -105,7 +106,7 @@ function routeFor(notification: Notification): string {
       return postId ? `/post/${postId}` : '/social';
     case 'new_release':
       if (typeof meta.song_id === 'string' && meta.song_id) return `/song/${meta.song_id}`;
-      if (typeof meta.artist_id === 'string' && meta.artist_id) return `/artist/${meta.artist_id}`;
+      if (typeof meta.artist_id === 'string' && meta.artist_id) return artistPath(meta.artist_id);
       return '/';
     case 'artist_claim':
       return meta.status === 'approved' ? '/studio' : '/claim';

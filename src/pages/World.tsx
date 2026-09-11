@@ -12,6 +12,7 @@
 // reads the visitor's key balance and lights up what they can open. Whatever
 // is playing dresses the whole layer, because music runs under every city.
 
+import { artistPath } from '@/lib/slugRoutes';
 import { useEffect, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link, Navigate, useParams } from 'react-router-dom';
@@ -221,7 +222,7 @@ function WorldInner({ world, segment, fromDb = false }: { world: WorldConfig; se
             <header className="mb-8">
               <div className="mb-6 flex items-center justify-between gap-3">
                 <Link
-                  to={artist ? `/artist/${artist.id}` : '/'}
+                  to={artist ? artistPath(artist.id) : '/'}
                   className="inline-flex items-center gap-1.5 text-xs text-white/50 transition hover:text-white"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" /> Leave the world

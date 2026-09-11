@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState, useEffect, useMemo, useCallback, useRef, type SyntheticEvent } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -449,7 +450,7 @@ export default function Community() {
       .eq('user_id', userId)
       .maybeSingle();
     if (data?.artist_id) {
-      navigate(`/artist/${data.artist_id}`);
+      navigate(artistPath(data.artist_id));
       return;
     }
     navigate(`/audience/${userId}`);

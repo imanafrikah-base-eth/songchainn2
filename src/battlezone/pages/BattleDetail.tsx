@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -437,7 +438,7 @@ function BattleArtistName({ name }: { name: string }) {
   const id = artistIdFor(name);
   if (!id) return <h3 className="font-bold text-foreground">{name}</h3>;
   return (
-    <AppLink to={`/artist/${id}`} className="font-bold text-foreground hover:text-primary transition-colors">
+    <AppLink to={artistPath(id)} className="font-bold text-foreground hover:text-primary transition-colors">
       {name}
     </AppLink>
   );

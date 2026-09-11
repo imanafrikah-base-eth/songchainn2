@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
@@ -235,7 +236,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
         const song = allSongs.find((s) => s.id === result.id);
         if (song) playSong(song);
       } else if (result.kind === 'artist') {
-        navigate(`/artist/${result.id}`);
+        navigate(artistPath(result.id));
       } else {
         navigate(`/catalog/${result.id}`);
       }

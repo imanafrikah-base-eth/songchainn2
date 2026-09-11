@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { memo } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
@@ -121,7 +122,7 @@ export const HomeHero = memo(function HomeHero({ feature, onPlay, faces = [] }: 
           <ul className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
             {faces.map((f) => (
               <li key={f.id} className="w-16 shrink-0 text-center sm:w-[4.5rem]">
-                <Link to={`/artist/${f.id}`} className="group block focus-ring rounded-full">
+                <Link to={artistPath(f.id)} className="group block focus-ring rounded-full">
                   {f.image ? (
                     <img
                       src={f.image}

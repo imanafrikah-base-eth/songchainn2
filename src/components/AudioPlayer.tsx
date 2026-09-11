@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -238,7 +239,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                 <p className="text-sm text-foreground truncate">{currentSong.title}</p>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); navigate(`/artist/${currentSong.artistId}`); }}
+                  onClick={(e) => { e.stopPropagation(); navigate(artistPath(currentSong.artistId)); }}
                   className="text-[11px] text-muted-foreground truncate hover:text-primary transition-colors text-left"
                 >
                   <ArtistName name={currentSong.artist} artistId={currentSong.artistId} size={12} />
@@ -311,7 +312,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                   )}
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); navigate(`/artist/${currentSong.artistId}`); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(artistPath(currentSong.artistId)); }}
                     className="text-xs sm:text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
                   >
                     <ArtistName name={currentSong.artist} artistId={currentSong.artistId} size={12} />

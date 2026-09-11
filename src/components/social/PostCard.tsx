@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState, type SyntheticEvent } from 'react';
 import { ArtistName, VerifiedMark } from '@/components/ArtistName';
 import { formatDistanceToNow } from 'date-fns';
@@ -79,7 +80,7 @@ export function PostCard({
 
   const goToProfile = () => {
     if (post.artist_id) {
-      navigate(`/artist/${post.artist_id}`);
+      navigate(artistPath(post.artist_id));
       return;
     }
     navigate(`/audience/${post.user_id}`);

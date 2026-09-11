@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
@@ -267,7 +268,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             </div>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
+              onClick={(e) => { e.stopPropagation(); navigate(artistPath(song.artistId)); }}
               className="text-xs sm:text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
             >
               <ArtistName name={song.artist} artistId={song.artistId} size={12} />
@@ -441,7 +442,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               </h3>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
+                onClick={(e) => { e.stopPropagation(); navigate(artistPath(song.artistId)); }}
                 className="text-sm text-muted-foreground truncate hover:text-primary transition-colors text-left"
               >
                 <ArtistName name={song.artist} artistId={song.artistId} size={12} />
@@ -583,7 +584,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
         </div>
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); navigate(`/artist/${song.artistId}`); }}
+          onClick={(e) => { e.stopPropagation(); navigate(artistPath(song.artistId)); }}
           className="text-sm text-muted-foreground truncate mb-3 hover:text-primary transition-colors text-left block w-full"
         >
           <ArtistName name={song.artist} artistId={song.artistId} size={12} />

@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState, useEffect, useCallback, useRef, type ChangeEvent, type SyntheticEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -511,7 +512,7 @@ export default function AudienceProfile() {
             <Button
               variant="outline"
               className="mt-6"
-              onClick={() => navigate(isArtist && artistId ? `/artist/${artistId}` : '/profile')}
+              onClick={() => navigate(isArtist && artistId ? artistPath(artistId) : '/profile')}
             >
               Edit Profile
             </Button>

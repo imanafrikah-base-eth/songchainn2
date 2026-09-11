@@ -1,3 +1,4 @@
+import { artistPath } from '@/lib/slugRoutes';
 import { useState, useRef, useEffect, useMemo, type SyntheticEvent } from 'react';
 import { ArtistName, VerifiedMark } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -160,7 +161,7 @@ export function CommentSheet({
   const goToProfile = async (userId: string, artistId?: string | null) => {
     onClose();
     if (artistId) {
-      navigate(`/artist/${artistId}`);
+      navigate(artistPath(artistId));
       return;
     }
     const { data } = await (supabase as any)
@@ -169,7 +170,7 @@ export function CommentSheet({
       .eq('user_id', userId)
       .maybeSingle();
     if (data?.artist_id) {
-      navigate(`/artist/${data.artist_id}`);
+      navigate(artistPath(data.artist_id));
       return;
     }
     navigate(`/audience/${userId}`);

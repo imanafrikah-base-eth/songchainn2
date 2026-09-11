@@ -1,4 +1,6 @@
-﻿import { useParams, Link } from 'react-router-dom';
+﻿import { useParams, Link, useNavigate } from 'react-router-dom';
+import { artistPath } from '@/lib/slugRoutes';
+import { songPath } from '@/lib/slugRoutes';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music, ListMusic, ListPlus, Clock, Headphones } from 'lucide-react';
@@ -30,8 +32,11 @@ function formatDuration(seconds: number): string {
   return mins + ':' + secs.toString().padStart(2, '0');
 }
 
-export default function SongDetail() {
-  const { id } = useParams<{ id: string }>();
+export default function SongDetail({ songIdOverride }: { songIdOverride?: string } = {}) {
+  const params = useParams<{ id: string }>();
+  // Shown at /artist-name/song-title by SlugResolver, or at the old /song/:id.
+  const id = songIdOverride ?? params.id;
+  const navigate = useNavigate();
   const { currentSong, isPlaying } = usePlayerState();
   const { playSong, togglePlay, addToQueue } = usePlayerActions();
   const { toggleLike, isLiked } = useEngagement();
@@ -53,6 +58,13 @@ export default function SongDetail() {
   const durationSeconds = song && typeof song.duration === 'number' && Number.isFinite(song.duration) && song.duration > 0
     ? song.duration
     : null;
+
+  // The old /song/97 address gives way to the song's name as soon as it is known.
+  useEffect(() => {
+    if (songIdOverride || !song) return;
+    const named = songPath(song);
+    if (!named.startsWith('/song/')) navigate(named, { replace: true });
+  }, [songIdOverride, song, navigate]);
 
   const handleAddToQueue = useCallback(() => {
     if (!song) return;
@@ -86,7 +98,7 @@ export default function SongDetail() {
         meta.setAttribute('content', content);
       };
 
-      const shareUrl = `${window.location.origin}/song/${song.id}`;
+      const shareUrl = `${window.location.origin}${songPath(song)}`;
       const description = `Listen to "${song.title}" by ${artist.name} on $ongChainn and shape your discovery in real time.`;
       const imageUrl = song.coverImage || `${window.location.origin}/og.png`;
 
@@ -233,7 +245,7 @@ export default function SongDetail() {
               </div>
               
               <Link 
-                to={`/artist/${artist.id}`}
+                to={artistPath(artist.id)}
                 className="inline-flex items-center gap-3 mb-6 group"
               >
                 <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">
@@ -357,7 +369,7 @@ export default function SongDetail() {
                 More from <ArtistName name={artist.name} artistId={artist.id} size={14} />
               </h2>
               <Link 
-                to={`/artist/${artist.id}`}
+                to={artistPath(artist.id)}
                 className="text-sm text-primary hover:underline"
               >
                 View all
