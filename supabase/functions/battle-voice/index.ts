@@ -240,14 +240,26 @@ Deno.serve(async (req) => {
 
   // The payment has to come from a wallet on the host's own account, so
   // somebody else's payment cannot be brought to this battle.
-  const [{ data: wallets }, { data: profile }] = await Promise.all([
-    db.from("user_wallets").select("address").eq("user_id", user.id),
-    db.from("audience_profiles").select("wallet_address").eq("user_id", user.id).maybeSingle(),
-  ]);
-  const mine = new Set<string>([
-    ...((wallets ?? []) as Array<{ address: string }>).map((w) => w.address.toLowerCase()),
-    ...(profile?.wallet_address ? [String(profile.wallet_address).toLowerCase()] : []),
-  ]);
+  // WHOSE PAYMENT THIS IS, AND WHY THE PROFILE COLUMN IS NOT ASKED.
+  //
+  // This used to also trust audience_profiles.wallet_address. That column sits
+  // on the person's own profile row, and audience_profiles carries four
+  // overlapping "you may update your own row" policies with no restriction on
+  // which columns. So anybody could set it to somebody else's address with one
+  // ordinary update, then claim that person's payment: Base is public, so a
+  // real host's fee transfer and its from address are visible to everyone the
+  // moment they are mined. Only user_wallets counts now, which at least cannot
+  // be written directly (it has no insert policy at all; add_my_wallet is the
+  // only way in).
+  //
+  // That is a narrowing, not a proof. add_my_wallet still binds any address on
+  // nothing but a format check, so a determined attacker can still register an
+  // address they do not control. The real fix is proof of key control before an
+  // address counts here, the way wallet-auth already does it with SIWE.
+  const { data: wallets } = await db.from("user_wallets").select("address").eq("user_id", user.id);
+  const mine = new Set<string>(
+    ((wallets ?? []) as Array<{ address: string }>).map((w) => w.address.toLowerCase()),
+  );
   if (!mine.has(payer)) {
     return json(origin, { error: "That payment came from a wallet that is not on your account. Add that wallet on your wallet page, then try again." }, 403);
   }

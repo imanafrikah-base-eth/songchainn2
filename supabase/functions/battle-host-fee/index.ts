@@ -312,13 +312,26 @@ Deno.serve(async (req) => {
   // Each leg, read back off Base. A leg is only accepted when a transfer of
   // this token, to this exact address, for at least this much, sits in a
   // successful transaction paid from a wallet on the host's own account.
+  // WHOSE PAYMENT THIS IS, AND WHY THE PROFILE COLUMN IS NOT ASKED.
+  //
+  // This used to also trust audience_profiles.wallet_address. That column sits
+  // on the person's own profile row, and audience_profiles carries four
+  // overlapping "you may update your own row" policies with no restriction on
+  // which columns. So anybody could set it to somebody else's address with one
+  // ordinary update, then claim that person's payment: Base is public, so a
+  // real host's fee transfer and its from address are visible to everyone the
+  // moment they are mined. Only user_wallets counts now, which at least cannot
+  // be written directly (it has no insert policy at all; add_my_wallet is the
+  // only way in).
+  //
+  // That is a narrowing, not a proof. add_my_wallet still binds any address on
+  // nothing but a format check, so a determined attacker can still register an
+  // address they do not control. The real fix is proof of key control before an
+  // address counts here, the way wallet-auth already does it with SIWE.
   const { data: wallets } = await db.from("user_wallets").select("address").eq("user_id", user.id);
-  const { data: profile } = await db
-    .from("audience_profiles").select("wallet_address").eq("user_id", user.id).maybeSingle();
-  const mine = new Set<string>([
-    ...((wallets ?? []) as Array<{ address: string }>).map((w) => w.address.toLowerCase()),
-    ...(profile?.wallet_address ? [String(profile.wallet_address).toLowerCase()] : []),
-  ]);
+  const mine = new Set<string>(
+    ((wallets ?? []) as Array<{ address: string }>).map((w) => w.address.toLowerCase()),
+  );
 
   type Log = { address: string; topics: string[]; data: string };
   const rows: Array<Record<string, unknown>> = [];
