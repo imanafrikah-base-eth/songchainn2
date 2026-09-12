@@ -129,15 +129,32 @@ Deno.serve(async (req) => {
     // The fallback is not a weakening: ECDSA recovery accepts a signature only
     // when it genuinely recovers to this address. It just cannot speak for a
     // contract wallet, which is the case the on-chain path is there for.
+    // "Wrong signature" and "could not check" are different answers, and on the
+    // sign-in path the difference decides whether somebody thinks their wallet
+    // is broken or ours is. The public Base endpoint is rate limited, and when
+    // it refuses, the ECDSA fallback cannot speak for a smart wallet, so
+    // reporting a verification failure there would be untrue.
+    const verifyArgs = { address, message, signature: signature as `0x${string}` };
     let valid = false;
+    let couldNotCheck = false;
     try {
-      valid = await publicClient.verifyMessage({ address, message, signature: signature as `0x${string}` });
+      valid = await publicClient.verifyMessage(verifyArgs);
     } catch {
+      // One retry before giving up on the chain.
       try {
-        valid = await verifyMessageEcdsa({ address, message, signature: signature as `0x${string}` });
+        valid = await publicClient.verifyMessage(verifyArgs);
       } catch {
-        valid = false;
+        try {
+          valid = await verifyMessageEcdsa(verifyArgs);
+        } catch {
+          valid = false;
+        }
+        if (!valid) couldNotCheck = true;
       }
+    }
+
+    if (couldNotCheck) {
+      return json(origin, { error: 'Could not reach Base to check your signature. Nothing was changed, please try signing in again in a moment.' }, 503);
     }
     if (!valid) return json(origin, { error: 'Signature verification failed' }, 401);
 

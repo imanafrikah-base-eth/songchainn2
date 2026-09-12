@@ -209,23 +209,44 @@ Deno.serve(async (req) => {
   // recovers to this address. It simply cannot speak for a contract wallet,
   // which is exactly what the on-chain path is for, so a smart wallet still
   // fails closed and is told to try again rather than being let through.
+  // "WRONG SIGNATURE" AND "COULD NOT CHECK" ARE DIFFERENT ANSWERS.
+  //
+  // The public Base endpoint is rate limited. When it refuses, the ECDSA
+  // fallback returns false for a smart wallet, and telling that person their
+  // signature did not come from their wallet is simply untrue: it did, we just
+  // could not ask the chain. So the two cases are kept apart, and somebody who
+  // signed honestly is told to try again rather than being called a liar.
+  const args = {
+    address: address as `0x${string}`,
+    message: String(challenge.message),
+    signature: signature as `0x${string}`,
+  };
+
   let valid = false;
+  let couldNotCheck = false;
   try {
-    valid = await publicClient.verifyMessage({
-      address: address as `0x${string}`,
-      message: String(challenge.message),
-      signature: signature as `0x${string}`,
-    });
+    valid = await publicClient.verifyMessage(args);
   } catch {
+    // One retry. A rate limited endpoint usually answers the second time, and
+    // it is much better to wait a beat than to refuse a genuine wallet.
     try {
-      valid = await verifyMessageEcdsa({
-        address: address as `0x${string}`,
-        message: String(challenge.message),
-        signature: signature as `0x${string}`,
-      });
+      valid = await publicClient.verifyMessage(args);
     } catch {
-      valid = false;
+      try {
+        valid = await verifyMessageEcdsa(args);
+      } catch {
+        valid = false;
+      }
+      // The authoritative check never ran. If plain key recovery did not
+      // vouch for it either, we do not actually know that it is wrong.
+      if (!valid) couldNotCheck = true;
     }
+  }
+
+  if (couldNotCheck) {
+    // The challenge is deliberately NOT spent here, so the same signature works
+    // on the next try and nobody is asked to sign twice for our outage.
+    return json(origin, { error: "Could not reach Base to check that signature, so nothing changed. Try again in a moment." }, 503);
   }
   if (!valid) {
     return json(origin, { error: "That signature did not come from this wallet, so it was not added." }, 401);
