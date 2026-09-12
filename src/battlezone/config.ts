@@ -31,12 +31,19 @@ export const BATTLE_MARKET_ENABLED = true;
 /**
  * The host fee, separately.
  *
- * Hosting a Main Stage battle is written about as costing $1 in $WWAT, but
- * nothing has ever charged it: no code path writes a battle_host_fee and the
- * table is empty. So the notice that promises it stays off until the charge is
- * real. The trading ground above does not depend on it and is its own switch.
+ * This was off for months because the fee was only ever written about: no code
+ * path charged it, splitHostFee in battleMarket.ts had no callers, and every
+ * fee table was empty. The notice promising artists 40% was a promise nothing
+ * kept.
+ *
+ * It is on now because the charge is real. battle-host-fee quotes $1 in $WWAT
+ * at the live price, the host's wallet pays each artist their share DIRECTLY,
+ * the pooled part goes to the treasury, and the server reads every leg back off
+ * Base before it records anything. A battle whose artists have no payout wallet
+ * on file is not charged at all, because money that cannot reach the artist it
+ * was promised to should never leave the host's wallet.
  */
-export const HOST_FEE_ENABLED = false;
+export const HOST_FEE_ENABLED = true;
 
 /**
  * $WWAT, the WaveWarz Africa token. Hosting a battle is paid in it.

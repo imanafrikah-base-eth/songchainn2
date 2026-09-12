@@ -21,6 +21,8 @@ import { BattleArtistPicker } from "@/battlezone/components/BattleArtistPicker";
 import { usePublishedCatalog } from "@/hooks/usePublishedCatalog";
 import { durationsFromUrls } from "@/battlezone/lib/songDuration";
 import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
+import { HOST_FEE_ENABLED } from "@/battlezone/config";
+import { quoteHostFee, payHostFee, confirmHostFee } from "@/battlezone/lib/hostFee";
 
 /* A counter, not a clock: two mounts in the same millisecond would share a
    channel name and therefore share one channel object. */
@@ -456,6 +458,47 @@ const HostCreate = () => {
     }
   };
 
+  /**
+   * Pay for the battle, the artists first, before it goes anywhere.
+   *
+   * Returns true when there is nothing to pay or it has been paid. On a refusal
+   * the battle row is deleted again: a battle nobody paid for should not sit in
+   * the upcoming feed waiting for an audience.
+   */
+  const settleHostFee = async (battleId: string): Promise<boolean> => {
+    try {
+      const quote = await quoteHostFee(battleId);
+      if (!quote.due) {
+        // Exempt, already paid, or it cannot be charged because an artist has
+        // no payout wallet on file. In that last case the battle still runs:
+        // taking money we could not pass on would be the worse answer.
+        if (quote.reason && !quote.exempt) {
+          toast({ title: "Hosting this one is free", description: quote.reason });
+        }
+        return true;
+      }
+
+      toast({
+        title: "Paying for the battle",
+        description: "The artists' share goes straight to their own wallets, one payment each.",
+      });
+      const hashes = await payHostFee(quote);
+      await confirmHostFee(battleId, hashes);
+      toast({
+        title: "Paid, and the artists have theirs",
+        description: "Their share went straight to their own wallets. You can see it on Base.",
+      });
+      return true;
+    } catch (err) {
+      await supabase.from("battles").delete().eq("id", battleId);
+      toast({
+        title: "That battle was not created",
+        description: (err as Error)?.message || "The host fee did not go through.",
+      });
+      return false;
+    }
+  };
+
   const createBattle = async (isLaunchNow: boolean) => {
     if (!user) {
       toast({
@@ -520,8 +563,13 @@ const HostCreate = () => {
 
     setIsSubmitting(true);
     try {
-      const status = isLaunchNow ? "live" : "upcoming";
-      const clockFields = isLaunchNow ? await liveClock() : {};
+      // A battle that has to be paid for is created quiet and only goes live
+      // once the money has actually moved. Inserting it live first would fire
+      // notify_battle_live at every user in the app for a battle nobody has
+      // paid for yet, and there is no unringing that bell.
+      const feeFirst = HOST_FEE_ENABLED && !perks.freeHost && stage === "main_stage";
+      const status = isLaunchNow && !feeFirst ? "live" : "upcoming";
+      const clockFields = isLaunchNow && !feeFirst ? await liveClock() : {};
       const scheduledTime = isLaunchNow ? null : form.schedule || null;
       const artistA = artistById.get(form.artistAId);
       const artistB = artistById.get(form.artistBId);
@@ -569,6 +617,24 @@ const HostCreate = () => {
       }
 
       await sendCoHostInvites(data.id, form.title);
+
+      if (feeFirst) {
+        if (!(await settleHostFee(data.id))) return;
+        if (isLaunchNow) {
+          const { error: liveError } = await supabase
+            .from("battles")
+            .update({ status: "live", ...(await liveClock()) })
+            .eq("id", data.id);
+          if (liveError) {
+            toast({
+              title: "Paid, but it did not go live",
+              description: "Your payment went through and the artists have their share. Open the battle and start it from there.",
+            });
+            navigate(embedTo(`/room/${data.id}`));
+            return;
+          }
+        }
+      }
 
       if (isLaunchNow) {
         await upsertHostInRoom(data.id, hostName);

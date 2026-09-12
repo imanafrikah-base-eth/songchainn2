@@ -26,9 +26,10 @@ export function HostFeeNotice() {
           Hosting a battle costs ${HOST_FEE_USD}, paid in $WWAT.
         </p>
         <p className="mt-1 text-muted-foreground">
-          {artistPct}% of it goes straight to the artists whose songs you picked. The rest
-          goes to the pot the winning side's backers share when the battle ends. You pay
-          from your own wallet when you launch.
+          {artistPct}% of it goes straight to the artists whose songs you picked, paid from
+          your wallet to theirs, so it never passes through us. The rest goes to the pot the
+          winning side's backers share when the battle ends. You pay when you launch, and if
+          an artist has no payout wallet on file yet you are not charged at all.
         </p>
       </div>
     </div>
