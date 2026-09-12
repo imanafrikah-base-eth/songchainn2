@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useMyWallets, WALLET_NAMES, shortAddress } from '@/hooks/useMyWallets';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { buyAsset, checkBeforeBuying, type BuyCheck } from '@/lib/safeBuy';
+import { reportPayment } from '@/lib/paymentReceipt';
 
 /**
  * Buying anything, in one sheet.
@@ -83,6 +84,7 @@ export function BuySheet({ open, onOpenChange, coinAddress, what, note, amounts 
       const out = await buyAsset({ coinAddress, ethAmount: amount, address, checked: check?.ok === true });
       if (out.success) {
         setDone(out.txHash);
+        reportPayment(out.txHash, 'coin_buy');
         toast.success('Done. It is yours.');
         onDone?.(out.txHash);
       } else {

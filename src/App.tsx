@@ -43,6 +43,7 @@ const Wallet = lazyWithRecovery(() => import("./pages/Wallet"));
 const Admin = lazyWithRecovery(() => import("./pages/Admin"));
 const Auth = lazyWithRecovery(() => import("./pages/Auth"));
 const Onboarding = lazyWithRecovery(() => import("./pages/Onboarding"));
+const NameStep = lazyWithRecovery(() => import("./components/NameStep"));
 const Profile = lazyWithRecovery(() => import("./pages/Profile"));
 const Social = lazyWithRecovery(() => import("./pages/Social"));
 const Community = lazyWithRecovery(() => import("./pages/Community"));
@@ -110,6 +111,17 @@ function AppShell() {
   // Artist Worlds are a full-screen immersive layer with their own chrome
   const isWorldRoute = location.pathname.startsWith('/world/');
   const hideFloatingChrome = hideChrome || isWaveWarzEmbedRoute || isWorldRoute;
+  /**
+   * A live battle room is dense and every row has its own control on the right:
+   * approve a speaker, close voting, end the battle. A floating button parked in
+   * that corner sits ON TOP of them — it was covering the Approve button on a
+   * speaker request, so the host could see the request and not act on it.
+   *
+   * Only the back-to-top button is dropped here, not the whole chrome. The tab
+   * bar is how the host leaves the room, and `/room` already hides everything,
+   * so widening that rule would take navigation away rather than give it back.
+   */
+  const isLiveBattleRoom = /^\/wavewarz-africa\/(room|host\/control)\//.test(location.pathname);
   const [isGlobalPulsing, setIsGlobalPulsing] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const pulseTimeoutRef = useRef<number | null>(null);
@@ -237,7 +249,7 @@ function AppShell() {
       {/* The way back up a long page. It parks above the tab bar, and it leaves
           the feed alone by nature: that page scrolls its own snap container,
           so the window never moves and this never appears there. */}
-      {!hideFloatingChrome && <ErrorBoundary fallback={null}><BackToTop /></ErrorBoundary>}
+      {!hideFloatingChrome && !isLiveBattleRoom && <ErrorBoundary fallback={null}><BackToTop /></ErrorBoundary>}
       {/* Accounts that existed before we asked for a date of birth. The age
           checks fail closed, so without this every one of them quietly loses
           uploads and messaging. */}
@@ -266,7 +278,7 @@ function isPublicRoute(pathname: string) {
 
 // AppContent must be rendered inside AuthProvider and BrowserRouter
 function AppContent() {
-  const { isAuthenticated, isLoading, needsOnboarding, user } = useAuth();
+  const { isAuthenticated, isLoading, needsOnboarding, needsName, user } = useAuth();
   const { isInFarcaster, quickAuthFailed } = useFarcasterContext();
   const location = useLocation();
   useUserPresence(user?.id ?? null, { includeLastSeen: true });
@@ -391,6 +403,12 @@ function AppContent() {
               </Suspense>
             </EngagementProvider>
           </PlayerProvider>
+        </ErrorBoundary>
+      ) : needsName ? (
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <NameStep />
+          </Suspense>
         </ErrorBoundary>
       ) : (
         <ErrorBoundary>

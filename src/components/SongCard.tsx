@@ -9,7 +9,7 @@ import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/Playe
 import { useEngagement } from '@/context/EngagementContext';
 import { useSongPopularity, usePulseCounts } from '@/hooks/usePopularity';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
-import { cn } from '@/lib/utils';
+import { cn, compactCount, exactCount } from '@/lib/utils';
 import { SpinningSongArt } from './SpinningSongArt';
 import { ShareSongButton } from './ShareSongButton';
 import { SongMenu } from './song/SongMenu';
@@ -282,12 +282,15 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                   Saved
                 </span>
               )}
-              <span>{totalStreams.toLocaleString()} streams</span>
-              <span>{totalLikes.toLocaleString()} likes</span>
+              <span title={`${exactCount(totalStreams)} streams`}>{compactCount(totalStreams)} streams</span>
+              <span title={`${exactCount(totalLikes)} likes`}>{compactCount(totalLikes)} likes</span>
             </span>
             {totalPulses > 0 && (
-              <span className="text-[10px] sm:text-xs text-primary tabular-nums hidden xs:block">
-                ❤️‍🔥 {totalPulses.toLocaleString()}
+              <span
+                className="text-[10px] sm:text-xs text-primary tabular-nums hidden xs:block"
+                title={`${exactCount(totalPulses)} pulses`}
+              >
+                ❤️‍🔥 {compactCount(totalPulses)}
               </span>
             )}
             <ShareSongButton 
@@ -476,13 +479,19 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           </div>
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="tabular-nums">{totalStreams.toLocaleString()} streams</span>
+            <span className="tabular-nums" title={`${exactCount(totalStreams)} streams`}>
+              {compactCount(totalStreams)} streams
+            </span>
             <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-            <span className="tabular-nums">{totalLikes.toLocaleString()} likes</span>
+            <span className="tabular-nums" title={`${exactCount(totalLikes)} likes`}>
+              {compactCount(totalLikes)} likes
+            </span>
             {totalPulses > 0 && (
               <>
                 <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-                <span className="tabular-nums text-primary">❤️‍🔥 {totalPulses.toLocaleString()}</span>
+                <span className="tabular-nums text-primary" title={`${exactCount(totalPulses)} pulses`}>
+                  ❤️‍🔥 {compactCount(totalPulses)}
+                </span>
               </>
             )}
           </div>
@@ -603,13 +612,13 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 Saved
               </span>
             )}
-            <span>{totalStreams.toLocaleString()} streams</span>
-            <span>{totalLikes.toLocaleString()} likes</span>
+            <span title={`${exactCount(totalStreams)} streams`}>{compactCount(totalStreams)} streams</span>
+            <span title={`${exactCount(totalLikes)} likes`}>{compactCount(totalLikes)} likes</span>
           </span>
           <div className="flex items-center gap-1">
             {totalPulses > 0 && (
-              <span className="text-xs text-primary tabular-nums mr-1">
-                ❤️‍🔥 {totalPulses.toLocaleString()}
+              <span className="text-xs text-primary tabular-nums mr-1" title={`${exactCount(totalPulses)} pulses`}>
+                ❤️‍🔥 {compactCount(totalPulses)}
               </span>
             )}
             <ShareSongButton 

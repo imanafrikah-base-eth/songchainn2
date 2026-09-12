@@ -18,6 +18,7 @@ import moshaAvatar from '@/assets/Mo$ha chat pop up.webp';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { fcOpenUrl } from '@/lib/farcasterActions';
 import { MoshaChat } from '@/components/mosha/MoshaChat';
+import { useMoshaGreeting } from '@/hooks/useMoshaGreeting';
 
 type AgentMode = 'unset' | 'music' | 'chill' | 'turnup' | 'focus' | 'feelings' | 'explore';
 type MoodChoice = 'loving' | 'cool' | 'not_my_vibe';
@@ -258,6 +259,12 @@ export function VibeAgent() {
   const inABattle = /^\/wavewarz-africa\/(battle|room|live)/.test(location.pathname);
   /* A question handed in with the call, asked for them the moment it opens. */
   const [chatAsk, setChatAsk] = useState<string | null>(null);
+  /**
+   * A congratulations waiting to be said: a record went live, or an account was
+   * verified. Mo$ha opens himself for this one rather than waiting to be
+   * tapped, because the artist has no reason to know there is anything to open.
+   */
+  const { greeting: pendingGreeting, dismiss: dismissGreeting } = useMoshaGreeting();
   const [discoveryArtistName, setDiscoveryArtistName] = useState<string | null>(null);
   const [sessionStartAt, setSessionStartAt] = useState<number>(Date.now());
   const [externalPrompt, setExternalPrompt] = useState<ExternalPrompt | null>(null);
@@ -358,6 +365,42 @@ export function VibeAgent() {
   useEffect(() => {
     if (step !== 'external-prompt') releaseInterruption('mosha-prompt');
   }, [step]);
+
+  /**
+   * A record went live, or an account was verified. Open and say so.
+   *
+   * This deliberately does NOT go through the interruption budget or the
+   * dismissal cooldown that app-initiated prompts respect. Those exist to stop
+   * marketing landing on somebody; this is the artist's own news about their
+   * own work, they are owed it once, and it is marked said either way.
+   */
+  const [onOwnProfile, setOnOwnProfile] = useState(
+    () => Boolean((window as Window & { __songchainnOwnProfile?: boolean }).__songchainnOwnProfile),
+  );
+  useEffect(() => {
+    const onSignal = (e: Event) => setOnOwnProfile(Boolean((e as CustomEvent<boolean>).detail));
+    window.addEventListener('mosha:own-profile', onSignal);
+    return () => window.removeEventListener('mosha:own-profile', onSignal);
+  }, []);
+
+  /**
+   * Whether this is the right moment for the greeting at all.
+   *  - The full welcome for a first record is said on the artist's own musician
+   *    page and nowhere else, so it lands where it is true on screen.
+   *  - A short "your song is live" or "you are verified" can be said anywhere
+   *    Mo$ha is allowed, but never in the middle of a battle.
+   * Until then the row simply waits; nothing is lost by waiting.
+   */
+  const greetingHere =
+    pendingGreeting && !noMoshaHere && !inABattle && (pendingGreeting.kind !== 'first_song_live' || onOwnProfile)
+      ? pendingGreeting
+      : null;
+
+  useEffect(() => {
+    if (!greetingHere) return;
+    if (chatOpen || step) return;
+    setChatOpen(true);
+  }, [greetingHere, chatOpen, step]);
 
   useEffect(() => {
     const handleOpen = (event: Event) => {
@@ -673,7 +716,18 @@ export function VibeAgent() {
             <MoshaChat
               ask={chatAsk}
               onAsked={() => setChatAsk(null)}
-              onClose={() => setChatOpen(false)}
+              greeting={greetingHere?.body ?? null}
+              suggestions={greetingHere?.suggestions ?? null}
+              onClose={() => {
+                // Said. Cleared on close rather than on open so that a panel
+                // opened and shut in the same second still counts as read, and
+                // a greeting can never be lost to a re-render before anyone
+                // has seen it. Only the one actually shown: opening Mo$ha by
+                // hand on another page must not use up a first-record welcome
+                // that is still waiting for the artist's own page.
+                if (greetingHere) dismissGreeting(greetingHere.id);
+                setChatOpen(false);
+              }}
               extraChips={[
                 {
                   label: mode === 'unset' ? 'Set my vibe' : `Change my vibe (${modeLabel(mode)})`,

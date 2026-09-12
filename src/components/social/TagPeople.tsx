@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, X, UserPlus, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { profileHasRealName } from '@/lib/realName';
 
 /**
  * Put people in a post.
@@ -89,7 +90,11 @@ export function TagPeople({ selected, onChange, onClose }: Props) {
           .select(COLUMNS)
           .or(`display_name.ilike.%${safe}%,username.ilike.%${safe}%,profile_name.ilike.%${safe}%`)
           .limit(20);
-        setResults(((data ?? []) as Record<string, unknown>[]).map(rowToPerson));
+        setResults(
+          ((data ?? []) as Record<string, unknown>[])
+            .filter((row) => profileHasRealName(row as { display_name?: string | null; profile_name?: string | null }))
+            .map(rowToPerson),
+        );
         setSearching(false);
       })();
     }, 300);

@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { fcOpenUrl } from '@/lib/farcasterActions';
 import { SONGS, ARTISTS } from '@/data/musicData';
-import { getSongSlugUrl, artistPath } from '@/lib/slugRoutes';
+import { getSongSlugUrl, artistPath, songPath } from '@/lib/slugRoutes';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 
 interface ShareOptions {
   title: string;
@@ -13,11 +14,23 @@ interface ShareOptions {
 export function useShare() {
   const [copied, setCopied] = useState(false);
 
+  /**
+   * Songs uploaded through the app are not in the static SONGS list. Looking
+   * only there sent every one of them out as /song/<uuid>, which is what
+   * people saw pasted into their stories. The published catalogue knows them,
+   * and their artist, so the link reads as the artist's name and the title.
+   */
+  const { songs: publishedSongs } = usePublishedCatalog();
+  const findSong = useCallback(
+    (id: string) => SONGS.find((s) => s.id === id) ?? publishedSongs.find((s) => s.id === id),
+    [publishedSongs],
+  );
+
   const getShareUrl = useCallback((type: 'song' | 'post' | 'artist' | 'profile', id: string) => {
     const base = window.location.origin;
     switch (type) {
       case 'song': {
-        const s = SONGS.find(s => s.id === id);
+        const s = findSong(id);
         return s ? `${base}${getSongSlugUrl(s)}` : `${base}/song/${id}`;
       }
       case 'post':
@@ -31,13 +44,15 @@ export function useShare() {
       default:
         return base;
     }
-  }, []);
+  }, [findSong]);
 
   const getSongShareUrl = useCallback((song: { id: string; title?: string; artist?: string; coverImage?: string }) => {
     const base = window.location.origin;
-    const full = SONGS.find(s => s.id === song.id);
-    return full ? `${base}${getSongSlugUrl(full)}` : `${base}/song/${song.id}`;
-  }, []);
+    const full = findSong(song.id);
+    // Not in any catalogue we hold yet: build the address from the title and
+    // the artist's name we were handed, and only then fall back to the id.
+    return `${base}${full ? getSongSlugUrl(full) : songPath({ id: song.id, title: song.title, artist: song.artist })}`;
+  }, [findSong]);
 
   const copyToClipboard = useCallback(async (url: string) => {
     const tryClipboardApi = async () => {

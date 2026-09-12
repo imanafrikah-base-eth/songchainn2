@@ -33,8 +33,14 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-export function useArtistCoin(artistId: string | undefined) {
-  const meta = artistId ? getArtistCoin(artistId) : null;
+/**
+ * @param artistId  who to read.
+ * @param override  a coin record resolved elsewhere (the database registry).
+ *                  When given it wins, so an artist who added their own coin is
+ *                  read from their row rather than from the static file.
+ */
+export function useArtistCoin(artistId: string | undefined, override?: ArtistCoin | null) {
+  const meta = override ?? (artistId ? getArtistCoin(artistId) : null);
 
   return useQuery<ArtistCoinStats | null>({
     queryKey: ['artist-coin', meta?.coinAddress ?? null],

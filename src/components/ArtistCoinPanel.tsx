@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Coins, TrendingUp, TrendingDown, Users, ExternalLink, Loader2 } from 'lucide-react';
 import { useArtistCoin } from '@/hooks/useArtistCoin';
-import { artistHasCoin } from '@/lib/artistCoins';
+import { useArtistCoinMeta } from '@/hooks/useArtistCoinMeta';
 
 /**
  * An artist's coin, on their own page, behind a button.
@@ -21,10 +21,13 @@ function money(n: number | null, dp = 2): string {
 
 export function ArtistCoinPanel({ artistId }: { artistId: string | undefined }) {
   const [open, setOpen] = useState(false);
-  const { data, isLoading, isError } = useArtistCoin(open ? artistId : undefined);
+  // The database first, the static file as the fallback, so an artist who adds
+  // their own coin gets this panel without waiting for a deploy.
+  const meta = useArtistCoinMeta(artistId);
+  const { data, isLoading, isError } = useArtistCoin(open ? artistId : undefined, meta);
 
   // No coin recorded for this artist, so there is nothing honest to show.
-  if (!artistId || !artistHasCoin(artistId)) return null;
+  if (!artistId || !meta) return null;
 
   if (!open) {
     return (

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell, Check, Flame, Heart, MessageCircle, UserPlus, X, ListMusic, Sparkles,
-  AtSign, Tag, Music, BadgeCheck,
+  AtSign, Tag, Music, BadgeCheck, ArrowDownLeft, ArrowUpRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,7 +40,11 @@ const notificationIcons: Record<string, IconComponent> = {
   comment_like: Heart,
   new_release: Music,
   artist_claim: BadgeCheck,
+  payment_sent: ArrowUpRight,
+  payment_received: ArrowDownLeft,
 };
+
+const isPayment = (type: string) => type === 'payment_sent' || type === 'payment_received';
 
 const iconFor = (type: string): IconComponent => notificationIcons[type] ?? Bell;
 
@@ -63,6 +67,8 @@ function defaultMessage(notification: Notification): string {
       return meta.status === 'approved'
         ? 'Your artist page is yours. Open the Studio to get started.'
         : 'Your artist claim was not approved this time.';
+    case 'payment_sent': return 'Your payment went through.';
+    case 'payment_received': return 'You got paid.';
     default: return '';
   }
 }
@@ -112,6 +118,11 @@ function routeFor(notification: Notification): string {
       return meta.status === 'approved' ? '/studio' : '/claim';
     case 'playlist':
       return typeof meta.playlist_id === 'string' && meta.playlist_id ? `/playlist/${meta.playlist_id}` : '/playlists';
+    case 'payment_sent':
+    case 'payment_received':
+      if (typeof meta.cta_path === 'string' && meta.cta_path.startsWith('/')) return meta.cta_path;
+      if (typeof meta.song_id === 'string' && meta.song_id) return songPath({ id: meta.song_id });
+      return '/wallet';
     default:
       return postId ? `/post/${postId}` : '/social';
   }
@@ -182,7 +193,10 @@ function NotificationItem({
               through to the sender branch used to print the literal word "Someone"
               and throw the title away, which is how a moderation notice reached
               people reading "Someone" above a message with no heading. */}
-          {!profile ? (
+          {/* A payment notice is a complete sentence with its own heading
+              ("You paid ..."), so it is never prefixed with the other
+              party's name even when their profile is known. */}
+          {!profile || isPayment(notification.type) ? (
             <p className="text-sm">
               {notification.title && (
                 <span className="font-semibold text-foreground block">{notification.title}</span>
@@ -230,11 +244,20 @@ export function NotificationDropdown() {
   const {
     notifications,
     unreadCount,
+    unseenCount,
     isLoading,
     markAsRead,
     markAllAsRead,
+    markAllSeen,
     deleteNotification
   } = useNotifications();
+
+  // Opening the tray clears the badge number. Items stay highlighted until
+  // each one is tapped, so nothing is thrown away unread.
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next && unseenCount > 0) void markAllSeen();
+  };
 
   const filteredNotifications = filter === 'all'
     ? notifications
@@ -256,22 +279,22 @@ export function NotificationDropdown() {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           className="relative"
-          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+          aria-label={unseenCount > 0 ? `Notifications, ${unseenCount} new` : 'Notifications'}
         >
           <Bell className="w-5 h-5" />
-          {unreadCount > 0 && (
+          {unseenCount > 0 && (
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center"
             >
-              {unreadCount > 9 ? '9+' : unreadCount}
+              {unseenCount > 9 ? '9+' : unseenCount}
             </motion.span>
           )}
         </Button>

@@ -4,6 +4,7 @@ import { AudienceProfile } from '@/types/database';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { subscribeWalletChanges } from '@/lib/walletGate';
 import { ensureProfile, getProfile, upsertProfile } from '@/lib/localDb';
+import { profileHasRealName } from '@/lib/realName';
 import { hasWalletProvider, getWalletProvider, connectWallet, signMessage, generateNonce, selectWallet, subscribeWallets, toChecksumAddress } from '@/lib/baseWallet';
 
 /* The profile row's own Update type, so a write never carries a column the
@@ -22,6 +23,8 @@ interface AuthContextType {
   isLoading: boolean;
   audienceProfile: AudienceProfile | null;
   needsOnboarding: boolean;
+  /** Onboarding is done but the profile's name is empty, an email or a wallet handle. */
+  needsName: boolean;
   walletAddress: string | null;
   isWalletDetected: boolean;
   signInWithWallet: (walletRdns?: string) => Promise<{ error: Error | null }>;
@@ -153,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isVerifiedArtist, setIsVerifiedArtist] = useState(false);
   const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(bootProfile);
   const [needsOnboarding, setNeedsOnboarding] = useState(bootUser ? false : shouldRequireOnboardingFromStorage());
+  const [needsName, setNeedsName] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isWalletDetected, setIsWalletDetected] = useState(false);
   const userRef = React.useRef(user);
@@ -221,12 +225,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSyntheticUserId(user.id)) {
       // Synthetic fc-/fb- users are local-only — no Supabase profile lookup.
       setNeedsOnboarding(false);
+      setNeedsName(false);
       try { localStorage.setItem('songchainn_needs_onboarding', '0'); } catch { void 0; }
       return;
     }
     if (!isSupabaseConfigured) {
       setAudienceProfile(null);
       setNeedsOnboarding(false);
+      setNeedsName(false);
       return;
     }
 
@@ -251,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAudienceProfile(cached);
         const completed = (cached as any).onboarding_completed === true;
         setNeedsOnboarding(!completed);
+        setNeedsName(completed && !profileHasRealName(cached as any, user.email));
         try {
           localStorage.setItem('songchainn_needs_onboarding', completed ? '0' : '1');
         } catch {
@@ -259,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setAudienceProfile(null);
         setNeedsOnboarding(true);
+        setNeedsName(false);
         try {
           localStorage.setItem('songchainn_needs_onboarding', '1');
         } catch {
@@ -281,6 +289,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const completed = (profileData as any).onboarding_completed === true || hasName;
       const needsOnboardingFlag = !completed;
       setNeedsOnboarding(needsOnboardingFlag);
+      // Onboarding done but the name is an email, a wallet handle or empty:
+      // ask for a name only, not the whole form again. Onboarding itself
+      // refuses those names, so a new account never reaches this step.
+      setNeedsName(completed && !profileHasRealName(profileData as any, user.email));
       try {
         localStorage.setItem('songchainn_needs_onboarding', needsOnboardingFlag ? '1' : '0');
       } catch {
@@ -291,6 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setAudienceProfile(null);
     setNeedsOnboarding(true);
+    setNeedsName(false);
     try {
       localStorage.setItem('songchainn_needs_onboarding', '1');
     } catch {
@@ -390,6 +403,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) {
       setAudienceProfile(null);
       setNeedsOnboarding(false);
+      setNeedsName(false);
       return;
     }
     void refreshProfile();
@@ -893,6 +907,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsVerifiedArtist(false);
     setAudienceProfile(null);
     setNeedsOnboarding(false);
+    setNeedsName(false);
     setWalletAddress(null);
   }, []);
 
@@ -905,8 +920,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       artistId,
       isVerifiedArtist,
       isLoading,
-      audienceProfile, 
+      audienceProfile,
       needsOnboarding,
+      needsName,
       walletAddress,
       isWalletDetected,
       signInWithWallet,
@@ -947,6 +963,7 @@ export function useAuth() {
       isLoading: false,
       audienceProfile: null,
       needsOnboarding: false,
+      needsName: false,
       walletAddress: null,
       isWalletDetected: false,
       signInWithWallet: async () => ({ error: new Error('AuthProvider missing') }),

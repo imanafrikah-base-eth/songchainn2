@@ -107,10 +107,12 @@ export function artistPath(id: string | number | null | undefined, name?: string
 }
 
 /** Where a song lives, by the artist's name and the song's title. */
-export function songPath(song: { id: string; title?: string | null; artistId?: string | null }): string {
+export function songPath(song: { id: string; title?: string | null; artistId?: string | null; artist?: string | null }): string {
   const full = fullSlugBySongId.get(song.id);
   if (full) return `/${full}`;
-  const artist = artistPath(song.artistId);
+  // The artist's name is the fallback when their address has not been learned
+  // yet, so a song uploaded through the app is never shared as a bare id.
+  const artist = artistPath(song.artistId, song.artist);
   const title = song.title ? toSlug(song.title) : '';
   if (artist.startsWith('/artist/') || artist === '/artists' || !title) return `/song/${song.id}`;
   return `${artist}/${title}`;

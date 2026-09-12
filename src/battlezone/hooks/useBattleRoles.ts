@@ -309,8 +309,14 @@ export const useBattleRoles = (battleId: string) => {
     return () => clearInterval(heartbeat);
   }, [battleId, user?.id]);
 
+  // This user's own row. Its is_muted flag is honoured by MicControls, so a host
+  // muting someone from SpeakerManagement (a DB write) turns that person's
+  // LiveKit mic off on their own client when the change arrives via realtime.
+  const myParticipant = user ? participants.find((p) => p.user_id === user.id) ?? null : null;
+
   return {
     participants,
+    myParticipant,
     myRole,
     loading,
     error,

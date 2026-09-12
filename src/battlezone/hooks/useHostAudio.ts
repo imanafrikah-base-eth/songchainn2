@@ -36,6 +36,7 @@ export function useHostAudio(): UseHostAudioReturn {
   const songGainRef = useRef<GainNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const publishedTrackRef = useRef<LocalAudioTrack | null>(null);
+  const publishedRoomRef = useRef<Room | null>(null);
 
   const getAudioCtx = useCallback(() => {
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
@@ -62,6 +63,8 @@ export function useHostAudio(): UseHostAudioReturn {
       micStreamRef.current = stream;
 
       const { ctx, dest } = getAudioCtx();
+      // Created after an await, so the browser may have started it suspended.
+      await ctx.resume();
       const source = ctx.createMediaStreamSource(stream);
       const gain = ctx.createGain();
       gain.gain.value = micVolume;
@@ -154,29 +157,50 @@ export function useHostAudio(): UseHostAudioReturn {
   }, []);
 
   const publishToRoom = useCallback(async (room: Room) => {
-    const { dest } = getAudioCtx();
-    if (!dest.stream) return;
+    const { ctx, dest } = getAudioCtx();
+    const source = dest.stream?.getAudioTracks()[0];
+    if (!source) return;
+    await ctx.resume();
 
-    // Unpublish any previously published track
+    // Already on air in this very room: the mix feeds the same track, so there
+    // is nothing to republish (and republishing would briefly drop the audio).
+    if (publishedTrackRef.current && publishedRoomRef.current === room) return;
+
+    // A track from a previous room (before a reconnect) is dead: drop it.
     if (publishedTrackRef.current) {
-      await room.localParticipant.unpublishTrack(publishedTrackRef.current);
+      const oldRoom = publishedRoomRef.current;
+      try { if (oldRoom) await oldRoom.localParticipant.unpublishTrack(publishedTrackRef.current); } catch { void 0; }
       publishedTrackRef.current.stop();
       publishedTrackRef.current = null;
+      publishedRoomRef.current = null;
     }
 
-    const track = new LocalAudioTrack(dest.stream.getAudioTracks()[0], undefined, false);
+    // Publish a clone: disconnecting a room stops its local tracks, and stopping
+    // the destination's own track would kill the mix for every later room.
+    const track = new LocalAudioTrack(source.clone(), undefined, false);
     publishedTrackRef.current = track;
-    await room.localParticipant.publishTrack(track, {
-      name: 'host-audio',
-      simulcast: false,
-    });
+    publishedRoomRef.current = room;
+    try {
+      await room.localParticipant.publishTrack(track, {
+        name: 'host-audio',
+        simulcast: false,
+      });
+    } catch (err) {
+      track.stop();
+      publishedTrackRef.current = null;
+      publishedRoomRef.current = null;
+      throw err;
+    }
   }, [getAudioCtx]);
 
   const unpublishFromRoom = useCallback((room: Room) => {
     if (publishedTrackRef.current) {
-      room.localParticipant.unpublishTrack(publishedTrackRef.current);
+      if (publishedRoomRef.current === room) {
+        void room.localParticipant.unpublishTrack(publishedTrackRef.current).catch(() => undefined);
+      }
       publishedTrackRef.current.stop();
       publishedTrackRef.current = null;
+      publishedRoomRef.current = null;
     }
   }, []);
 

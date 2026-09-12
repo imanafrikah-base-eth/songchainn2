@@ -26,6 +26,7 @@ import { getConnectedAccounts } from '@/lib/baseWallet';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { getBuyQuote, getCoinTokenBalance } from '@/lib/zoraTrading';
 import { buyAsset } from '@/lib/safeBuy';
+import { reportPayment } from '@/lib/paymentReceipt';
 import { getEthUsdPrice } from '@/lib/ethPrice';
 
 const PRESETS_USD = [2, 5, 20];
@@ -157,6 +158,7 @@ export function GetKeyModal({
         return;
       }
       setTxHash(res.txHash ?? null);
+      reportPayment(res.txHash, 'world_key', worldSlug);
       toast.success(`${symbol} is in your wallet`, { description: 'Your doors are being checked now.' });
       onBought?.();
     } finally {

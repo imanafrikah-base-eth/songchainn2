@@ -30,6 +30,7 @@ import {
   type DropTerms,
 } from '@/lib/nft';
 import { useWorldDrops, type WorldNft } from '@/hooks/useWorldNfts';
+import { reportPayment } from '@/lib/paymentReceipt';
 import { usePlayerActions } from '@/context/PlayerContext';
 import { SONGS } from '@/data/musicData';
 import type { Address } from 'viem';
@@ -157,6 +158,7 @@ export function DropCard({
         onStage: setStage,
       });
       setDone(txHash);
+      reportPayment(txHash, 'drop_collect', drop.world_slug);
       toast.success(`${drop.title} is in your wallet`, {
         description: qty > 1 ? `${qty} copies, on Base.` : 'One copy, on Base.',
       });

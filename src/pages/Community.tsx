@@ -37,7 +37,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useArtistDirectory } from '@/hooks/useArtistDirectory';
 import { AnimatedBackground } from '@/components/ui/animated-background';
+import { hasRealName } from '@/lib/realName';
 const logo = '/songchainn-logo.webp';
+
+/* Community only shows people with a name they chose. The RPC already drops
+   rows whose name is empty, an email, a wallet handle or the email's local
+   part; this repeats the checks that can run without the email, so the direct
+   table fallback and the live realtime inserts obey the same rule. */
+function rawHasRealName(raw: any): boolean {
+  if (!raw) return false;
+  const name =
+    (typeof raw.display_name === 'string' && raw.display_name.trim()) ||
+    (typeof raw.profile_name === 'string' && raw.profile_name.trim()) ||
+    (typeof raw.username === 'string' && raw.username.trim()) ||
+    '';
+  return hasRealName(name);
+}
 
 interface UserProfile {
   id: string;
@@ -199,6 +214,9 @@ export default function Community() {
         supabase
           .from('audience_profiles')
           .select('id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,cover_photo_url,bio,location,is_public,created_at,updated_at')
+          .not('display_name', 'is', null)
+          .not('display_name', 'ilike', '%@%')
+          .not('display_name', 'ilike', 'wallet-0x%')
           .order('updated_at', { ascending: false })
           .limit(300)
           .then((r) => r),
@@ -221,6 +239,7 @@ export default function Community() {
     }
 
     const normalizedProfiles: UserProfile[] = ((profiles as any[]) || [])
+      .filter(rawHasRealName)
       .map((p) => normalizeProfile(p))
       .filter((p): p is UserProfile => Boolean(p));
 
@@ -312,13 +331,24 @@ export default function Community() {
           const updated = payload.new as UserProfile;
           const nextUserId = updated?.user_id ?? (updated as any)?.id;
           if (!nextUserId) return;
-          setUsers((prev) =>
-            prev.map((profile) =>
-              profile.user_id === String(nextUserId)
-                ? { ...profile, ...updated, user_id: String(nextUserId) }
+          const id = String(nextUserId);
+          // Losing a real name takes somebody off the page; gaining one (the
+          // name step just saved) puts them on it.
+          if (!rawHasRealName(updated)) {
+            setUsers((prev) => prev.filter((profile) => profile.user_id !== id));
+            return;
+          }
+          setUsers((prev) => {
+            if (!prev.some((profile) => profile.user_id === id)) {
+              const added = normalizeProfile(updated);
+              return added ? [...prev, added] : prev;
+            }
+            return prev.map((profile) =>
+              profile.user_id === id
+                ? { ...profile, ...updated, user_id: id }
                 : profile
-            )
-          );
+            );
+          });
         }
       )
       // Live follower count: any INSERT/DELETE on user_follows updates the target profile's count
@@ -357,6 +387,7 @@ export default function Community() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audience_profiles' },
         (payload) => {
+          if (!rawHasRealName(payload.new)) return;
           const profile = normalizeProfile(payload.new as any);
           if (!profile) return;
           upsertProfile(profile as any);

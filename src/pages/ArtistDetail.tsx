@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { artistPath } from '@/lib/slugRoutes';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound, Mic2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound, Mic2, MessageSquare } from 'lucide-react';
 import { ARTISTS, SONGS, getRelatedArtists, type Artist } from '@/data/musicData';
 import { getWorldByArtistId } from '@/worlds/registry';
 import { ArtistCoinPanel } from '@/components/ArtistCoinPanel';
@@ -29,6 +29,9 @@ import { useSocial } from '@/hooks/useSocial';
 import { PostComposer } from '@/components/social/PostComposer';
 import { PostCard } from '@/components/social/PostCard';
 import { BlockButton } from '@/components/social/BlockButton';
+import { ArtistDmGateDialog } from '@/components/social/ArtistDmGateDialog';
+import { useArtistDmGate, isCoinRequiredError, type ArtistDmAccess } from '@/hooks/useArtistDmAccess';
+import { openConversationWith, friendlyDmError } from '@/hooks/useDirectMessages';
 import { ArtistGallery } from '@/components/gallery/ArtistGallery';
 import { ArtistStats } from '@/components/ArtistStats';
 import { useArtistGallery } from '@/hooks/useArtistMedia';
@@ -228,6 +231,64 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
     null;
   const displayCoverPhoto = (artistProfile as any)?.cover_photo_url || null;
   const isOwner = !!user && !!ownerUserId && user.id === ownerUserId;
+
+  /**
+   * Tell Mo$ha the artist is standing on their own musician page. The welcome
+   * for a first record waits for exactly this moment: it is the page where
+   * "you are a musician here now" is true on screen, not a line that lands on
+   * top of whatever they happened to be doing. A flag as well as the event,
+   * because Mo$ha can mount after this page already has.
+   */
+  useEffect(() => {
+    if (!isOwner) return;
+    const w = window as Window & { __songchainnOwnProfile?: boolean };
+    w.__songchainnOwnProfile = true;
+    window.dispatchEvent(new CustomEvent('mosha:own-profile', { detail: true }));
+    return () => {
+      w.__songchainnOwnProfile = false;
+      window.dispatchEvent(new CustomEvent('mosha:own-profile', { detail: false }));
+    };
+  }, [isOwner]);
+
+  /**
+   * Messaging the musician. A fan needs to hold the artist's coin; the
+   * artist-dm-gate function reads it and the DM RPCs enforce it. Signed out,
+   * the button is a way in to sign in.
+   */
+  const dmGate = useArtistDmGate(isOwner ? null : ownerUserId);
+  const checkDmAccess = dmGate.check;
+  const [dmGateOpen, setDmGateOpen] = useState(false);
+  const [dmOpening, setDmOpening] = useState(false);
+  const handleMessageArtist = useCallback(async (force = false) => {
+    if (!user) {
+      navigate('/?auth=signin');
+      return;
+    }
+    if (!ownerUserId || isOwner) return;
+    setDmOpening(true);
+    try {
+      let access: ArtistDmAccess = await checkDmAccess(force);
+      let opened = access.allowed ? await openConversationWith(ownerUserId) : null;
+      // A remembered yes can outlive the server's 15 minute window. Ask again once.
+      if (opened && !opened.id && isCoinRequiredError(opened.error) && !force) {
+        access = await checkDmAccess(true);
+        opened = access.allowed ? await openConversationWith(ownerUserId) : null;
+      }
+      if (opened?.id) {
+        setDmGateOpen(false);
+        navigate(`/inbox?c=${opened.id}`);
+        return;
+      }
+      if (!opened || isCoinRequiredError(opened.error)) {
+        setDmGateOpen(true);
+        return;
+      }
+      toast.error('Could not open the conversation', { description: friendlyDmError(opened.error) });
+    } finally {
+      setDmOpening(false);
+    }
+  }, [user, ownerUserId, isOwner, checkDmAccess, navigate]);
+
   const isVerified = artistAccount?.is_verified ?? false;
   const profileTheme = (artistAccount?.profile_theme || 'default').toLowerCase();
   const isNewArtist = isArtistNew(artist?.addedAt);
@@ -905,6 +966,34 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
                       artist link here, so this is where somebody bothered by
                       one comes to make it stop. Hidden on your own page and
                       until the artist's account is known. */}
+                  {/* Fans message a musician by holding their coin. The gate
+                      explains what is missing when they do not. */}
+                  {!isOwner && ownerUserId && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        className="min-h-11"
+                        disabled={dmOpening}
+                        onClick={() => void handleMessageArtist()}
+                      >
+                        {dmOpening ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                        )}
+                        Message
+                      </Button>
+                      <ArtistDmGateDialog
+                        open={dmGateOpen}
+                        onOpenChange={setDmGateOpen}
+                        artistName={displayName || artist.name}
+                        access={dmGate.access}
+                        checking={dmOpening}
+                        onRecheck={() => void handleMessageArtist(true)}
+                        symbol={WORLDS.find((w) => w.artistId === artist.id)?.tokenSymbol}
+                      />
+                    </>
+                  )}
                   {user && !isOwner && ownerUserId && (
                     <BlockButton userId={ownerUserId} displayName={displayName || artist.name} />
                   )}

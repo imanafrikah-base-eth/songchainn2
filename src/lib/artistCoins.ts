@@ -104,6 +104,21 @@ export const ARTIST_COINS: ArtistCoin[] = [
     payoutAddress: '0x9a61c15677f23997bf7156b3ad9f1f7476ae6a29',
     marketCapUsdAt20260901: 1252,
   },
+  {
+    // Added 12 Sep 2026, and NOT from a guessed handle. The handle came from
+    // her own profile row (audience_profiles.zora_handle = 'n3m3siss'), and the
+    // wallet Zora publishes on it, 0xdd2c9b0c..., is byte for byte the address
+    // Ernest supplied for her on 31 Aug and which already sits in
+    // artist_wallets. Two independent records agreeing is what makes this a
+    // confirmation rather than the kind of guess that found strangers' coins.
+    artistId: '11',
+    name: 'N3M3SIS',
+    zoraHandle: 'n3m3siss',
+    coinAddress: '0x6e07337a8e89514abfa38ba0e1c7d02a1ced04c2',
+    wallet: '0xdd2c9b0c159d56aea6ccccb45bebf5b371e468b7',
+    payoutAddress: '0xdd2c9b0c159d56aea6ccccb45bebf5b371e468b7',
+    marketCapUsdAt20260901: 8153,
+  },
 ];
 
 /**
@@ -118,10 +133,10 @@ export const SONGCHAINN_ZORA = {
 
 /**
  * Artists on the roster with no coin recorded yet: FAITH (8), JMN (9),
- * SAMMIE (10), N3M3SIS (11). They are not missing, they simply have not sent a
- * profile link. Ask, then add a row. Do not guess a handle.
+ * SAMMIE (10). They are not missing, they simply have not sent a profile link.
+ * Ask, then add a row. Do not guess a handle.
  */
-export const ARTISTS_AWAITING_COIN = ['8', '9', '10', '11'] as const;
+export const ARTISTS_AWAITING_COIN = ['8', '9', '10'] as const;
 
 const BY_ARTIST_ID = new Map(ARTIST_COINS.map((a) => [a.artistId, a]));
 const BY_HANDLE = new Map(ARTIST_COINS.map((a) => [a.zoraHandle.toLowerCase(), a]));

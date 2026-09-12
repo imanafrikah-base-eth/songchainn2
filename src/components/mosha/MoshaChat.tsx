@@ -84,6 +84,8 @@ export function MoshaChat({
   ask,
   onAsked,
   compact = false,
+  greeting,
+  suggestions,
 }: {
   onClose?: () => void;
   /** Extra one-tap actions shown beside the starters, e.g. "Set my vibe". */
@@ -93,6 +95,15 @@ export function MoshaChat({
   ask?: string | null;
   onAsked?: () => void;
   compact?: boolean;
+  /**
+   * Mo$ha's opening line, when he has something of his own to say: a record
+   * went live, an account was verified. Replaces the standing introduction,
+   * because congratulating someone and then introducing yourself reads like
+   * two different people talking.
+   */
+  greeting?: string | null;
+  /** The questions offered under a greeting, in place of the usual starters. */
+  suggestions?: string[] | null;
 }) {
   const { isArtist, user } = useAuth();
   const navigate = useNavigate();
@@ -242,11 +253,11 @@ export function MoshaChat({
             {pulling ? 'Pulling up' : 'Earlier chats'}
           </button>
         )}
-        {turns.length === 0 && <Bubble role="assistant">{MOSHA_INTRO}</Bubble>}
+        {turns.length === 0 && <Bubble role="assistant">{greeting || MOSHA_INTRO}</Bubble>}
         {/* Only to an artist who has not built one. Offering to build a world
             to somebody who already has one is the app telling them it never
             looked, and that is the fastest way to lose their trust. */}
-        {isArtist && myWorlds.length === 0 && turns.length === 0 && (
+        {isArtist && myWorlds.length === 0 && turns.length === 0 && !greeting && (
           <Bubble role="assistant">Want me to build your world for you? Say the word and it is done in a few taps. I can replace or change anything on it after, whenever you like.</Bubble>
         )}
         {isArtist && myWorlds.length > 0 && turns.length === 0 && (
@@ -332,7 +343,7 @@ export function MoshaChat({
         )}
         {turns.length === 0 && !busy && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {STARTERS.map((s) => (
+            {(suggestions?.length ? suggestions : STARTERS).map((s) => (
               <button key={s} type="button" onClick={() => send(s)} className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted min-h-10">
                 {s}
               </button>

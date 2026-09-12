@@ -25,32 +25,68 @@ import { ArrowUp } from 'lucide-react';
 
 /** Nothing shows until the page is this far down. */
 const SHOW_AFTER_SCREENS = 1.5;
+/** Scrolling back up by at least this much counts as wanting the way home. */
+const UP_INTENT_PX = 24;
+/** It leaves again this long after the last scroll. */
+const HIDE_AFTER_MS = 2200;
 
+/**
+ * WHEN IT SHOWS. It used to stay parked on the right the whole time you were
+ * past the first screen, which put it on top of whatever card sat under it:
+ * the "Start building" link on the home page, an Approve button in a battle.
+ * A button that covers the thing you came to tap is worse than no button.
+ *
+ * Now it only comes when it is wanted: when you start scrolling back UP (the
+ * moment people reach for "top"), and it leaves a couple of seconds after the
+ * scrolling stops. Reading and tapping happen while the page is still, and
+ * while the page is still, nothing is floating over it.
+ */
 export function BackToTop() {
   const [visible, setVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const frame = useRef<number | null>(null);
+  const lastY = useRef(0);
+  const upFrom = useRef<number | null>(null);
+  const hideTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const read = () => {
       frame.current = null;
       const y = window.scrollY || document.documentElement.scrollTop || 0;
       const height = document.documentElement.scrollHeight - window.innerHeight;
-      setVisible(y > window.innerHeight * SHOW_AFTER_SCREENS);
       setProgress(height > 0 ? Math.min(1, Math.max(0, y / height)) : 0);
+
+      const deepEnough = y > window.innerHeight * SHOW_AFTER_SCREENS;
+      if (y < lastY.current) {
+        if (upFrom.current === null) upFrom.current = lastY.current;
+        if (deepEnough && upFrom.current - y >= UP_INTENT_PX) setVisible(true);
+      } else if (y > lastY.current) {
+        // Heading down again: reading, not leaving.
+        upFrom.current = null;
+        setVisible(false);
+      }
+      if (!deepEnough) setVisible(false);
+      lastY.current = y;
+
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+      hideTimer.current = window.setTimeout(() => {
+        upFrom.current = null;
+        setVisible(false);
+      }, HIDE_AFTER_MS);
     };
     const onScroll = () => {
       if (frame.current !== null) return;
       frame.current = requestAnimationFrame(read);
     };
-    read();
+    lastY.current = window.scrollY || 0;
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
       if (frame.current !== null) cancelAnimationFrame(frame.current);
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
     };
   }, []);
 

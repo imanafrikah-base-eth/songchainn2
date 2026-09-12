@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Bell, Zap, Users, Trophy, Music, MessageCircle, X } from "lucide-react";
+import { Bell, Zap, Users, Trophy, Music, MessageCircle, X, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { supabase } from "@/battlezone/integrations/supabase/client";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
 
@@ -32,6 +32,8 @@ function relativeTime(input: string) {
 
 function iconForType(type: string | null) {
   const normalized = String(type || "").toLowerCase();
+  if (normalized === "payment_received") return { icon: ArrowDownLeft, accentClass: "text-primary" };
+  if (normalized === "payment_sent") return { icon: ArrowUpRight, accentClass: "text-muted-foreground" };
   if (normalized.includes("battle_live")) return { icon: Zap, accentClass: "text-primary" };
   if (normalized.includes("cohost")) return { icon: Users, accentClass: "text-secondary" };
   if (normalized.includes("battle_ended")) return { icon: Trophy, accentClass: "text-neon-gold" };
@@ -45,6 +47,9 @@ const NotificationsDropdown = () => {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  /* The badge: every notification never shown in an opened tray, counted
+     exactly on the server rather than out of the 40 on screen. */
+  const [unseenCount, setUnseenCount] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -52,8 +57,17 @@ const NotificationsDropdown = () => {
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) {
       setNotifications([]);
+      setUnseenCount(0);
       return;
     }
+    void supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .is("seen_at" as never, null)
+      .then(({ count, error }) => {
+        if (!error) setUnseenCount(count ?? 0);
+      });
     const { data } = await supabase
       .from("notifications")
       .select("id,type,title,message,is_read,created_at")
@@ -101,6 +115,18 @@ const NotificationsDropdown = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }, [user?.id]);
 
+  /* Opening the tray clears the badge at once; items keep their highlight. */
+  const toggleOpen = useCallback(() => {
+    setOpen((was) => {
+      const next = !was;
+      if (next && user?.id) {
+        setUnseenCount(0);
+        void Promise.resolve(supabase.rpc("mark_notifications_seen" as never)).catch(() => {});
+      }
+      return next;
+    });
+  }, [user?.id]);
+
   const markRead = useCallback(async (id: string) => {
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
@@ -130,15 +156,15 @@ const NotificationsDropdown = () => {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
-        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+        onClick={toggleOpen}
+        aria-label={unseenCount > 0 ? `Notifications, ${unseenCount} new` : "Notifications"}
         aria-expanded={open}
         className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 hover:bg-muted transition-colors"
       >
         <Bell className="h-5 w-5 text-muted-foreground" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-live text-[10px] font-bold text-foreground">
-            {unreadCount}
+        {unseenCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 px-0.5 items-center justify-center rounded-full bg-live text-[10px] font-bold text-foreground">
+            {unseenCount > 9 ? "9+" : unseenCount}
           </span>
         )}
       </button>

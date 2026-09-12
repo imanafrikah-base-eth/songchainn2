@@ -8,9 +8,11 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
  * Every kind of notification the app knows how to draw.
  *
  * 'follow', 'like', 'comment', 'new_release' and 'artist_claim' are written by
- * database triggers; 'post_tag' and 'comment_like' by the client. The open
- * string at the end is deliberate: a type the database learns before the app
- * does must fall through to a sensible default, never crash the tray.
+ * database triggers; 'post_tag' and 'comment_like' by the client;
+ * 'payment_sent' and 'payment_received' by the money triggers and the
+ * payment-receipt edge function. The open string at the end is deliberate: a
+ * type the database learns before the app does must fall through to a
+ * sensible default, never crash the tray.
  */
 export type KnownNotificationType =
   | 'follow'
@@ -22,7 +24,9 @@ export type KnownNotificationType =
   | 'post_tag'
   | 'comment_like'
   | 'new_release'
-  | 'artist_claim';
+  | 'artist_claim'
+  | 'payment_sent'
+  | 'payment_received';
 
 export type NotificationType = KnownNotificationType | (string & {});
 
@@ -36,6 +40,8 @@ export interface NotificationMetadata {
   title?: string;
   status?: 'approved' | 'rejected' | string;
   playlist_id?: string;
+  tx_hash?: string;
+  amount?: string | null;
   [key: string]: unknown;
 }
 
@@ -49,17 +55,26 @@ export interface Notification {
   title?: string | null;
   metadata?: NotificationMetadata | null;
   is_read: boolean;
+  /** Set when the tray was opened with this row in it. Drives the badge only. */
+  seen_at?: string | null;
   created_at: string;
   from_profile?: AudienceProfile;
 }
 
 const PROFILE_COLUMNS = 'id,user_id,display_name,profile_name,username,avatar_url,profile_picture_url,is_official';
 
+type InsertListener = (payload: any) => Promise<void>;
+
+/*
+ * One realtime channel per user, shared by every mounted consumer. It used to
+ * keep only the FIRST consumer's callback, so when Home mounted the hook before
+ * the bell did, the bell never heard a new notification arrive.
+ */
 const notificationChannelsByUser = new Map<string, RealtimeChannel>();
-const notificationConsumersByUser = new Map<string, number>();
+const notificationListenersByUser = new Map<string, Set<InsertListener>>();
 const notificationTeardownTimersByUser = new Map<string, ReturnType<typeof setTimeout>>();
 
-function ensureNotificationsChannel(userId: string, onInsert: (payload: any) => Promise<void>) {
+function ensureNotificationsChannel(userId: string) {
   const existing = notificationChannelsByUser.get(userId);
   if (existing) return existing;
 
@@ -74,7 +89,10 @@ function ensureNotificationsChannel(userId: string, onInsert: (payload: any) => 
         filter: `user_id=eq.${userId}`,
       },
       (payload) => {
-        void onInsert(payload);
+        const listeners = notificationListenersByUser.get(userId);
+        listeners?.forEach((listener) => {
+          void listener(payload);
+        });
       }
     )
     .subscribe();
@@ -86,12 +104,27 @@ function ensureNotificationsChannel(userId: string, onInsert: (payload: any) => 
 export function useNotifications() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  /** Rows in the list still highlighted as unread. */
   const [unreadCount, setUnreadCount] = useState(0);
+  /** The badge: every row never shown in an opened tray, not capped at the list. */
+  const [unseenCount, setUnseenCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUnseenCount = useCallback(async () => {
+    if (!user) return;
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .is('seen_at' as never, null);
+    if (!error) setUnseenCount(count ?? 0);
+  }, [user]);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
+
+    void fetchUnseenCount();
 
     const { data: notificationsData } = await supabase
       .from('notifications')
@@ -133,6 +166,7 @@ export function useNotifications() {
         title: (n as any).title ?? null,
         metadata: (n as any).metadata ?? null,
         is_read: n.is_read,
+        seen_at: (n as any).seen_at ?? null,
         created_at: n.created_at,
         from_profile: n.from_user_id ? profilesMap.get(String(n.from_user_id)) : undefined,
       }));
@@ -145,6 +179,23 @@ export function useNotifications() {
     }
 
     setIsLoading(false);
+  }, [user, fetchUnseenCount]);
+
+  /**
+   * Opening the tray. The badge goes to zero at once and the server is told
+   * afterwards; nothing is marked read, so every row keeps its highlight until
+   * it is tapped.
+   */
+  const markAllSeen = useCallback(async () => {
+    if (!user) return;
+    setUnseenCount(0);
+    const now = new Date().toISOString();
+    setNotifications(prev => prev.map(n => (n.seen_at ? n : { ...n, seen_at: now })));
+    try {
+      await supabase.rpc('mark_notifications_seen' as never);
+    } catch {
+      /* the badge already cleared; the next fetch will reconcile */
+    }
   }, [user]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
@@ -204,7 +255,7 @@ export function useNotifications() {
     if (!user) return;
 
     const notification = notifications.find(n => n.id === notificationId);
-    
+
     await supabase
       .from('notifications')
       .delete()
@@ -213,6 +264,9 @@ export function useNotifications() {
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
     if (notification && !notification.is_read) {
       setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+    if (notification && !notification.seen_at) {
+      setUnseenCount(prev => Math.max(0, prev - 1));
     }
   }, [user, notifications]);
 
@@ -234,8 +288,7 @@ export function useNotifications() {
       notificationTeardownTimersByUser.delete(userId);
     }
 
-    notificationConsumersByUser.set(userId, (notificationConsumersByUser.get(userId) || 0) + 1);
-    const channel = ensureNotificationsChannel(userId, async (payload) => {
+    const listener: InsertListener = async (payload) => {
       const newNotification = payload.new as Notification;
 
       // Fetch the from_user's profile. A trigger-written release or claim
@@ -262,20 +315,28 @@ export function useNotifications() {
 
       setNotifications(prev => [enrichedNotification, ...prev]);
       setUnreadCount(prev => prev + 1);
-    });
+      setUnseenCount(prev => prev + 1);
+    };
+
+    const listeners = notificationListenersByUser.get(userId) ?? new Set<InsertListener>();
+    listeners.add(listener);
+    notificationListenersByUser.set(userId, listeners);
+    ensureNotificationsChannel(userId);
 
     return () => {
-      const current = Math.max(0, (notificationConsumersByUser.get(userId) || 0) - 1);
-      notificationConsumersByUser.set(userId, current);
-      if (current === 0) {
+      const current = notificationListenersByUser.get(userId);
+      current?.delete(listener);
+      if (!current || current.size === 0) {
         // Delay cleanup to survive React StrictMode remount cycle in development.
         const timer = setTimeout(() => {
-          if ((notificationConsumersByUser.get(userId) || 0) === 0) {
+          const live = notificationListenersByUser.get(userId);
+          if (!live || live.size === 0) {
             const liveChannel = notificationChannelsByUser.get(userId);
             if (liveChannel) {
               supabase.removeChannel(liveChannel);
               notificationChannelsByUser.delete(userId);
             }
+            notificationListenersByUser.delete(userId);
           }
           notificationTeardownTimersByUser.delete(userId);
         }, 1500);
@@ -287,9 +348,11 @@ export function useNotifications() {
   return {
     notifications,
     unreadCount,
+    unseenCount,
     isLoading,
     markAsRead,
     markAllAsRead,
+    markAllSeen,
     createNotification,
     deleteNotification,
     refetch: fetchNotifications,

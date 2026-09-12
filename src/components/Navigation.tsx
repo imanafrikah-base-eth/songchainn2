@@ -2,7 +2,7 @@ import { useProfilePath } from '@/hooks/useProfilePath';
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Flame, Gift, Menu, X, LogOut, Wallet, Headphones, Sparkles, Disc3, Bot, Lightbulb, Bug, Search, MoreHorizontal, ChevronDown, RefreshCw, type LucideIcon , Globe2 } from 'lucide-react';
+import { Flame, Gift, Menu, X, LogOut, Wallet, Headphones, Sparkles, Disc3, Bot, Lightbulb, Bug, Search, MoreHorizontal, ChevronDown, RefreshCw, MessageSquare, type LucideIcon , Globe2 } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { applyAppUpdate, subscribeAppUpdate, getAppUpdate } from '@/lib/appUpdate';
 import { useEngagement } from '@/context/EngagementContext';
@@ -14,6 +14,7 @@ import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { cn } from '@/lib/utils';
 const logo = '/songchainn-logo.webp';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
+import { useInboxUnread } from '@/hooks/useInboxUnread';
 import { NavRail } from '@/components/NavRail';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { InviteFriends } from '@/components/InviteFriends';
@@ -33,6 +34,7 @@ export function Navigation() {
   const navigate = useNavigate();
   const { lifetimePoints, streak } = useUserPoints();
   const { signOut, walletAddress, user, isArtist } = useAuth();
+  const inboxUnread = useInboxUnread();
   const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const [showInvite, setShowInvite] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -249,6 +251,22 @@ export function Navigation() {
               <WalletChip />
 
               <UpdateButton />
+
+              {/* The inbox, one tap from anywhere, beside the bell. */}
+              {user && (
+                <Link
+                  to="/inbox"
+                  aria-label={inboxUnread > 0 ? `Messages, ${inboxUnread} unread` : 'Messages'}
+                  className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  {inboxUnread > 0 && (
+                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground">
+                      {inboxUnread > 9 ? '9+' : inboxUnread}
+                    </span>
+                  )}
+                </Link>
+              )}
 
               <NotificationDropdown />
 

@@ -2,15 +2,15 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { ARTISTS, SONGS } from '@/data/musicData';
+import { songPath } from '@/lib/slugRoutes';
 
 /**
  * Real pictures where there used to be only words.
  *
- * ArtMosaic is a drifting strip of actual record covers from the catalog;
- * ArtistFaces is the artists themselves. Both are decoration for a section
- * that has a point to make, so they stay quiet: no captions, no links, and
- * hidden from screen readers. The order is fixed per page load so the strip
- * does not reshuffle under somebody's eyes.
+ * ArtMosaic is a drifting strip of actual record covers from the catalog, and
+ * every cover opens its song. ArtistFaces is the artists themselves and stays
+ * decoration. The order is fixed per page load so the strip does not reshuffle
+ * under somebody's eyes.
  */
 
 function pick<T>(list: T[], n: number, seed: number): T[] {
@@ -36,6 +36,26 @@ export function useCoverArt(count: number, seed = 7): string[] {
   }, [songs, count, seed]);
 }
 
+/** One song per cover, so every picture in the strip knows where it leads. */
+function useCoverSongs(count: number, seed: number) {
+  const { songs } = usePublishedCatalog();
+  return useMemo(() => {
+    const seen = new Set<string>();
+    const pool = (songs.length ? songs : SONGS).filter((s) => {
+      if (!s.coverImage || seen.has(s.coverImage)) return false;
+      seen.add(s.coverImage);
+      return true;
+    });
+    return pick(pool, count, seed);
+  }, [songs, count, seed]);
+}
+
+/**
+ * The strip of real covers. Each cover opens its own song: a picture of a
+ * record that does nothing when tapped reads as broken, not as decoration.
+ * The drift stops while a finger or pointer is on it, so a moving target
+ * never slides out from under a tap.
+ */
 export function ArtMosaic({
   count = 14,
   seed = 7,
@@ -50,15 +70,39 @@ export function ArtMosaic({
   drift?: boolean;
   className?: string;
 }) {
-  const covers = useCoverArt(count, seed);
+  const covers = useCoverSongs(count, seed);
   if (!covers.length) return null;
   const tile = size === 'sm' ? 'h-12 w-12' : size === 'lg' ? 'h-24 w-24 sm:h-28 sm:w-28' : 'h-16 w-16 sm:h-20 sm:w-20';
   const row = [...covers, ...covers];
   return (
-    <div className={`pointer-events-none select-none overflow-hidden ${className}`} aria-hidden="true">
-      <div className={`flex w-max gap-2 ${drift ? 'motion-safe:animate-[drift_60s_linear_infinite]' : ''}`}>
-        {row.map((src, i) => (
-          <img key={`${src}-${i}`} src={src} alt="" loading="lazy" decoding="async" className={`${tile} shrink-0 rounded-lg object-cover shadow-md shadow-black/40`} />
+    <div className={`select-none overflow-hidden ${className}`}>
+      <div
+        className={`flex w-max gap-2 ${
+          drift
+            ? 'motion-safe:animate-[drift_60s_linear_infinite] hover:[animation-play-state:paused] active:[animation-play-state:paused] focus-within:[animation-play-state:paused]'
+            : ''
+        }`}
+      >
+        {row.map((song, i) => (
+          <Link
+            key={`${song.id}-${i}`}
+            to={songPath(song)}
+            // The second copy exists only so the loop is seamless; keep it out of
+            // the tab order and away from screen readers so nothing is read twice.
+            tabIndex={i >= covers.length ? -1 : undefined}
+            aria-hidden={i >= covers.length ? true : undefined}
+            aria-label={`${song.title}${song.artist ? `, ${song.artist}` : ''}`}
+            className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            <img
+              src={song.coverImage}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              className={`${tile} rounded-lg object-cover shadow-md shadow-black/40 transition-transform active:scale-95`}
+            />
+          </Link>
         ))}
       </div>
     </div>

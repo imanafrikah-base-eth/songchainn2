@@ -49,7 +49,12 @@ export default function SlugResolver() {
     if (known) return <SongDetail songIdOverride={known.id} />;
     if (isLoading) return <Waiting />;
     const want = songSlug.toLowerCase();
-    const joined = songs.find((s) => artistPath(s.artistId) === `/${slug}` && toSlug(s.title) === want);
+    // By the artist's learned address, or by the artist name on the record
+    // itself: a share link is built from that name, and it has to open even
+    // before the name map has learned this artist.
+    const joined = songs.find(
+      (s) => (artistPath(s.artistId) === `/${slug}` || toSlug(s.artist ?? '') === slug) && toSlug(s.title) === want,
+    );
     if (joined) return <SongDetail songIdOverride={joined.id} />;
     return <Navigate to="/not-found" replace />;
   }

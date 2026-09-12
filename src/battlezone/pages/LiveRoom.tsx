@@ -1,22 +1,24 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Mic, MicOff, Hand, Send, Play, Pause, SkipForward,
-  Square, UserPlus, Volume2, ExternalLink, Crown, Shield, Smile, Music, X, Radio, Heart,
+  ArrowLeft, Mic, Hand, Send, Play, Pause, SkipForward,
+  Square, UserPlus, Volume2, ExternalLink, Crown, Smile, Music, X, Radio, Heart,
   Feather, Music2, Flame, Hourglass, type LucideIcon,
 } from "lucide-react";
 import { VOICE_ENABLED } from "@/battlezone/config";
 import LiveBadge from "@/battlezone/components/LiveBadge";
 import { useBattle } from "@/battlezone/hooks/useBattles";
 import { useBattles } from "@/battlezone/hooks/useBattles";
-import { useBattleRoles, type BattleParticipant } from "@/battlezone/hooks/useBattleRoles";
+import { useBattleRoles } from "@/battlezone/hooks/useBattleRoles";
+import { useSpeakingLevels } from "@/battlezone/hooks/useSpeakingLevels";
+import { NowTalkingCaption, SpeakingAvatar, SpeakingStatus } from "@/battlezone/components/SpeakingAvatar";
 import { supabase } from "@/battlezone/integrations/supabase/client";
 import type { Tables } from "@/battlezone/integrations/supabase/types";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import { useToast } from "@/battlezone/hooks/use-toast";
-import { Room, RoomEvent } from "livekit-client";
+import { Room, RoomEvent, Track, type RemoteTrack } from "livekit-client";
 import { getLiveKitToken } from "@/battlezone/lib/livekit";
 import MicControls from "@/battlezone/components/MicControls";
 import SpeakerManagement from "@/battlezone/components/SpeakerManagement";
@@ -85,9 +87,19 @@ const LiveRoom = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isVerySmallMobile, setIsVerySmallMobile] = useState(false);
   const [audioConnected, setAudioConnected] = useState(false);
+  /* connecting until the first connect, then connected / reconnecting / offline. */
+  const [voiceStatus, setVoiceStatus] = useState<"connecting" | "connected" | "reconnecting" | "offline">("connecting");
+  /* False when the browser blocked autoplay (mobile Safari especially). */
+  const [canPlayAudio, setCanPlayAudio] = useState(true);
   const [showSongPicker, setShowSongPicker] = useState(false);
   const [clockClosed, setClockClosed] = useState(false);
   const liveKitRoomRef = useRef<Room | null>(null);
+  /* The current room as state too, so children and effects see a room created
+     after a reconnect. A ref alone never re-renders anything. */
+  const [liveRoom, setLiveRoom] = useState<Room | null>(null);
+  /* Remote voices are attached here as hidden audio elements. */
+  const audioBoxRef = useRef<HTMLDivElement>(null);
+  const speakingStore = useSpeakingLevels(liveRoom);
 
   /* The wallet on the SONGCHAINN account, because backing a corner buys the
      song into that same wallet. */
@@ -386,18 +398,28 @@ const LiveRoom = () => {
     }
   };
 
-  // Publish host mixed audio (mic + song) to LiveKit room when state changes
+  /* The host's broadcast track carries the MUSIC only. The host's voice goes
+     out once, as the ordinary LiveKit microphone track that MicControls owns;
+     mixing the mic in here as well made listeners hear the host twice.
+     Re-runs when the room connects or a new room replaces it after a
+     reconnect, so the song goes back on air instead of silently staying off. */
   const { audioState: hostAudioState, publishToRoom: hostPublish, unpublishFromRoom: hostUnpublish } = hostAudio;
   useEffect(() => {
     if (!voiceOn) return;
-    const room = liveKitRoomRef.current;
-    if (!room || myRole !== 'host') return;
-    if (hostAudioState === 'idle') {
+    const room = liveRoom;
+    if (!room || !audioConnected || myRole !== 'host') return;
+    if (hostAudioState === 'idle' || hostAudioState === 'error') {
       hostUnpublish(room);
-    } else {
-      void hostPublish(room);
+      return;
     }
-  }, [hostAudioState, myRole, hostPublish, hostUnpublish, voiceOn]);
+    hostPublish(room).catch((error) => {
+      console.error("[LiveKit] host broadcast publish failed", error);
+      toast({
+        title: "Music is not reaching the room",
+        description: "The broadcast could not start. Stop the music and play it again.",
+      });
+    });
+  }, [hostAudioState, myRole, hostPublish, hostUnpublish, voiceOn, liveRoom, audioConnected, toast]);
 
   const host = getParticipantsByRole('host')[0];
   const coHosts = getParticipantsByRole('co-host');
@@ -452,12 +474,29 @@ const LiveRoom = () => {
     let cancelled = false;
     const participantName = profile?.display_name || profile?.username || "WWA Listener";
 
+    /* Every remote voice has to be attached to an audio element or nobody hears
+       anything. Elements are tracked per room so a late event from an old room
+       never removes the new room's voices. */
+    let room: Room | null = null;
+    const attached = new Set<HTMLMediaElement>();
+    const detachAll = () => {
+      attached.forEach((el) => el.remove());
+      attached.clear();
+      room?.remoteParticipants.forEach((p) =>
+        p.audioTrackPublications.forEach((pub) => {
+          pub.track?.detach().forEach((el) => el.remove());
+        }),
+      );
+    };
+
     const connectLiveKit = async () => {
+      setVoiceStatus("connecting");
       try {
         const { token, wsUrl } = await getLiveKitToken(roomId, user.id, participantName);
         if (cancelled) return;
 
         if (!wsUrl || !token) {
+          setVoiceStatus("offline");
           toast({
             title: "Voice connection unavailable",
             description: "Live audio is not configured for this deployment. Contact support.",
@@ -465,27 +504,67 @@ const LiveRoom = () => {
           return;
         }
 
-        const room = new Room({
+        room = new Room({
           adaptiveStream: true,
           dynacast: true,
           stopLocalTrackOnUnpublish: true,
         });
-        liveKitRoomRef.current = room;
+        const current = room;
+        liveKitRoomRef.current = current;
+        setLiveRoom(current);
 
-        room
+        current
           .on(RoomEvent.Connected, () => {
             if (cancelled) return;
             setAudioConnected(true);
+            setVoiceStatus("connected");
+            setCanPlayAudio(current.canPlaybackAudio);
+          })
+          .on(RoomEvent.Reconnecting, () => {
+            if (cancelled) return;
+            setAudioConnected(false);
+            setVoiceStatus("reconnecting");
+          })
+          .on(RoomEvent.Reconnected, () => {
+            if (cancelled) return;
+            setAudioConnected(true);
+            setVoiceStatus("connected");
           })
           .on(RoomEvent.Disconnected, () => {
             if (cancelled) return;
             setAudioConnected(false);
+            setVoiceStatus("offline");
+            detachAll();
+          })
+          .on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
+            if (cancelled || track.kind !== Track.Kind.Audio) return;
+            const el = track.attach();
+            attached.add(el);
+            audioBoxRef.current?.appendChild(el);
+          })
+          .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+            track.detach().forEach((el) => {
+              attached.delete(el);
+              el.remove();
+            });
+          })
+          .on(RoomEvent.AudioPlaybackStatusChanged, () => {
+            if (cancelled) return;
+            setCanPlayAudio(current.canPlaybackAudio);
           });
 
-        await room.connect(wsUrl, token, { autoSubscribe: true });
+        await current.connect(wsUrl, token, { autoSubscribe: true });
+        if (cancelled) return;
+        setCanPlayAudio(current.canPlaybackAudio);
       } catch (error) {
         console.error("[LiveKit] connect failed", error);
-        if (!cancelled) setAudioConnected(false);
+        if (cancelled) return;
+        setAudioConnected(false);
+        setVoiceStatus("offline");
+        toast({
+          title: "Could not join the room's voice",
+          description: "Check your connection and reload the room. Voting and chat still work.",
+        });
       }
     };
 
@@ -493,9 +572,11 @@ const LiveRoom = () => {
 
     return () => {
       cancelled = true;
-      const room = liveKitRoomRef.current;
-      liveKitRoomRef.current = null;
-      if (room) room.disconnect();
+      const current = room;
+      detachAll();
+      if (liveKitRoomRef.current === current) liveKitRoomRef.current = null;
+      setLiveRoom((prev) => (prev === current ? null : prev));
+      if (current) void current.disconnect();
       setAudioConnected(false);
     };
     // canPublishAudio is included so that when a host approves a speaker request
@@ -550,25 +631,19 @@ const LiveRoom = () => {
   const sidebarTabs = getSidebarTabs();
   const switchableBattles = liveBattles.filter((b) => b.id !== roomId).slice(0, 4);
 
-  const ParticipantCircle = ({ p, size = "md" }: { p: BattleParticipant; size?: "sm" | "md" | "lg" }) => {
-    const sizes = {
-      sm: "h-10 w-10 text-xs",
-      md: "h-14 w-14 text-sm",
-      lg: "h-20 w-20 text-xl",
-    };
-    return (
-      <div className="flex flex-col items-center gap-1">
-        <div className={`relative rounded-full bg-muted flex items-center justify-center font-bold ${sizes[size]} ${p.is_speaking ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}>
-          {(p.display_name || "?").charAt(0)}
-          {p.role === "host" && <Crown className="absolute -top-1 -right-1 h-4 w-4 text-neon-gold" />}
-          {p.role === "co-host" && <Shield className="absolute -top-1 -right-1 h-4 w-4 text-neon-cyan" />}
-        </div>
-        <div className="flex items-center gap-1">
-          {p.is_muted ? <MicOff className="h-3 w-3 text-live" /> : <Mic className="h-3 w-3 text-primary" />}
-        </div>
-        <span className="text-[10px] text-muted-foreground text-center max-w-16 truncate">{p.display_name || "Anonymous"}</span>
-      </div>
-    );
+  /* Stage order is fixed (host, co-hosts, speakers, by join time). People are
+     never reordered as they talk; the caption says who is talking instead. */
+  const stage = [...(host ? [host] : []), ...coHosts, ...speakers];
+
+  const startRoomAudio = () => {
+    const room = liveKitRoomRef.current;
+    if (!room) return;
+    room
+      .startAudio()
+      .then(() => setCanPlayAudio(room.canPlaybackAudio))
+      .catch(() => {
+        toast({ title: "Sound is still blocked", description: "Tap again, or check that this tab is not muted." });
+      });
   };
 
   const formatTime = (date: Date) => {
@@ -608,9 +683,24 @@ const LiveRoom = () => {
               {myRole === "host" ? "Host" : myRole === "co-host" ? "Co-Host" : myRole === "speaker" ? "Speaker" : "Audience"}
             </div>
             {voiceOn ? (
-              <div className={`rounded-lg border ${audioConnected ? "border-primary/40 text-primary" : "border-border text-muted-foreground"} bg-card ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
-                {audioConnected ? "Audio On" : "Audio Reconnecting"}
-              </div>
+              audioConnected && !canPlayAudio ? (
+                <button
+                  onClick={startRoomAudio}
+                  className={`rounded-lg border border-primary/40 bg-primary/10 font-semibold text-primary hover:bg-primary/20 min-h-11 ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}
+                >
+                  Tap to hear
+                </button>
+              ) : (
+                <div className={`rounded-lg border ${audioConnected ? "border-primary/40 text-primary" : "border-border text-muted-foreground"} bg-card ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
+                  {audioConnected
+                    ? "Audio On"
+                    : voiceStatus === "reconnecting"
+                      ? "Audio Reconnecting"
+                      : voiceStatus === "offline"
+                        ? "Audio Off"
+                        : "Audio Connecting"}
+                </div>
+              )
             ) : battle.xSpaceUrl ? (
               <a
                 href={battle.xSpaceUrl}
@@ -645,17 +735,36 @@ const LiveRoom = () => {
           {/* Speaking Area (in-app voice) */}
           {voiceOn && (
             <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
-              <h3 className="text-sm font-bold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-muted-foreground mb-2 flex items-center gap-2">
                 <Mic className="h-4 w-4" /> Speaking Now
               </h3>
-              <div className={`flex flex-wrap justify-center ${isVerySmallMobile ? "gap-3" : "gap-4 sm:gap-6"}`}>
-                {host && <ParticipantCircle p={host} size="lg" />}
-                {coHosts.map((p) => <ParticipantCircle key={p.id} p={p} />)}
-                {speakers.map((p) => <ParticipantCircle key={p.id} p={p} />)}
-                {participants.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No speakers yet - join the room!</p>
+              {audioConnected && !canPlayAudio && (
+                <button
+                  onClick={startRoomAudio}
+                  className="mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20"
+                >
+                  <Volume2 className="h-4 w-4" /> Tap to hear the room
+                </button>
+              )}
+              {stage.length > 0 && <NowTalkingCaption store={speakingStore} stage={stage} />}
+              {/* One scrollable line on phones; wraps and centres from sm up. */}
+              <div className={`-mx-1 flex flex-nowrap items-start overflow-x-auto px-1 pb-1 pt-1.5 sm:flex-wrap sm:justify-center sm:overflow-visible ${isVerySmallMobile ? "gap-3" : "gap-4 sm:gap-6"}`}>
+                {stage.map((p, i) => (
+                  <SpeakingAvatar
+                    key={p.user_id}
+                    store={speakingStore}
+                    userId={p.user_id}
+                    name={p.display_name}
+                    role={p.role}
+                    muted={p.is_muted}
+                    size={i === 0 && p.role === "host" ? "lg" : "md"}
+                  />
+                ))}
+                {stage.length === 0 && (
+                  <p className="w-full text-center text-sm text-muted-foreground">Nobody is on stage yet.</p>
                 )}
               </div>
+              <div ref={audioBoxRef} className="hidden" aria-hidden />
             </div>
           )}
 
@@ -862,7 +971,7 @@ const LiveRoom = () => {
               <h3 className="text-sm font-bold text-muted-foreground mb-3">Audio Controls</h3>
               <MicControls
                 battleId={roomId || ''}
-                liveKitRoom={liveKitRoomRef.current}
+                liveKitRoom={liveRoom}
               />
             </div>
           )}
@@ -916,23 +1025,9 @@ const LiveRoom = () => {
                   <p className="text-xs text-live">{hostAudio.error}</p>
                 )}
 
+                <p className="text-xs text-muted-foreground">Your voice goes out through Mute and Unmute in Audio Controls.</p>
+
                 <div className="flex flex-wrap gap-2">
-                  {/* Mic toggle for host broadcast */}
-                  {!hostAudio.isMicEnabled ? (
-                    <button
-                      onClick={() => hostAudio.startMic()}
-                      className="rounded-xl bg-card border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted transition-all flex items-center gap-2"
-                    >
-                      <MicOff className="h-4 w-4" /> Enable Mic
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => hostAudio.stopMic()}
-                      className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2"
-                    >
-                      <Mic className="h-4 w-4" /> Mic On
-                    </button>
-                  )}
                   {/* Song toggle */}
                   {!hostAudio.isSongPlaying ? (
                     <button
@@ -979,9 +1074,10 @@ const LiveRoom = () => {
                         key={song.id}
                         onClick={async () => {
                           setShowSongPicker(false);
+                          // Publishing is done by the effect above once the
+                          // broadcast state changes, so it is never done twice.
+                          void liveKitRoomRef.current?.startAudio().catch(() => undefined);
                           await hostAudio.playSong(song.audioUrl);
-                          const room = liveKitRoomRef.current;
-                          if (room) await hostAudio.publishToRoom(room);
                         }}
                         className="w-full text-left rounded-lg px-3 py-2 hover:bg-primary/10 transition-colors flex items-center gap-3"
                       >
@@ -1031,22 +1127,23 @@ const LiveRoom = () => {
                   <p className="text-sm text-muted-foreground text-center py-4">No participants yet</p>
                 )}
                 {participants.map((p) => (
-                  <div key={p.user_id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/30">
-                    <div className={`relative h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0 ${p.is_speaking && !p.is_muted ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""}`}>
-                      {(p.display_name || "?").charAt(0).toUpperCase()}
-                      {p.role === "host" && <Crown className="absolute -top-1 -right-1 h-3 w-3 text-neon-gold" />}
-                      {p.role === "co-host" && <Shield className="absolute -top-1 -right-1 h-3 w-3 text-neon-cyan" />}
-                    </div>
+                  <div key={p.user_id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-muted/30">
+                    <SpeakingAvatar
+                      store={speakingStore}
+                      userId={p.user_id}
+                      name={p.display_name}
+                      role={p.role}
+                      muted={p.is_muted}
+                      size="sm"
+                      showLabel={false}
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-foreground truncate">{p.display_name || "Anonymous"}</p>
                       <p className="text-[10px] text-muted-foreground capitalize">{p.role}</p>
                     </div>
-                    {voiceOn && p.is_speaking && !p.is_muted
-                      ? <Volume2 className="h-3 w-3 text-primary shrink-0" />
-                      : voiceOn && p.is_muted && p.role !== "audience"
-                      ? <MicOff className="h-3 w-3 text-muted-foreground shrink-0" />
-                      : null
-                    }
+                    {voiceOn && (
+                      <SpeakingStatus store={speakingStore} userId={p.user_id} role={p.role} muted={p.is_muted} />
+                    )}
                   </div>
                 ))}
               </div>

@@ -3,7 +3,7 @@ import { artistPath } from '@/lib/slugRoutes';
 import { ArtistName } from '@/components/ArtistName';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play, Pause, Heart, Music } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Heart, Music, Headphones } from 'lucide-react';
 import { CATALOGS, SONGS, ARTISTS, buildCatalogs, type Song } from '@/data/musicData';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { Navigation } from '@/components/Navigation';
@@ -13,6 +13,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SongCard } from '@/components/SongCard';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useSongPopularity } from '@/hooks/usePopularity';
+import { compactCount, exactCount } from '@/lib/utils';
 
 export default function CatalogDetail() {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +38,29 @@ export default function CatalogDetail() {
       .map((songId) => allSongs.find((song) => song.id === songId))
       .filter(Boolean) as Song[];
   }, [catalog, allSongs]);
+
+  /**
+   * What this catalogue has actually been played and liked.
+   *
+   * The likes shown here used to come from a hard coded number in musicData.ts,
+   * so a handful of catalogues displayed figures like "567 likes" that no
+   * person had ever given. Plays were not shown at all, which is the odd gap:
+   * it is the first thing anybody wants to know about a record.
+   *
+   * Both are now summed from the same source every song card reads, so the
+   * album page and the tracks inside it can never disagree.
+   */
+  const { data: popularityData } = useSongPopularity();
+  const catalogStats = useMemo(() => {
+    if (!catalog) return { plays: 0, likes: 0 };
+    const ids = new Set(catalog.songIds);
+    return (popularityData ?? []).reduce(
+      (sum, row) => (ids.has(row.song_id)
+        ? { plays: sum.plays + (row.play_count || 0), likes: sum.likes + (row.like_count || 0) }
+        : sum),
+      { plays: 0, likes: 0 },
+    );
+  }, [popularityData, catalog]);
 
   const isCurrentCatalog = Boolean(currentSong && catalog?.songIds.includes(currentSong.id));
   const isSaved = Boolean(catalog && isCatalogSaved(catalog.id));
@@ -130,10 +155,24 @@ export default function CatalogDetail() {
                 </Link>
               )}
 
-              <div className="flex items-center gap-6 mb-6">
+              <div className="flex flex-wrap items-center gap-6 mb-6">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Headphones className="w-5 h-5" />
+                  <span
+                    className="text-lg font-medium tabular-nums"
+                    title={`${exactCount(catalogStats.plays)} plays`}
+                  >
+                    {compactCount(catalogStats.plays)} plays
+                  </span>
+                </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Heart className="w-5 h-5" />
-                  <span className="text-lg font-medium">{catalog.totalLikes.toLocaleString()} likes</span>
+                  <span
+                    className="text-lg font-medium tabular-nums"
+                    title={`${exactCount(catalogStats.likes)} likes`}
+                  >
+                    {compactCount(catalogStats.likes)} likes
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Music className="w-5 h-5" />

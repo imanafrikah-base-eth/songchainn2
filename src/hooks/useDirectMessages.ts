@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
@@ -14,6 +15,10 @@ import { useAuth } from '@/context/AuthContext';
  * Every write goes through an RPC rather than a raw insert, so a block is
  * enforced on the way in. There is deliberately no client insert grant on any of
  * these tables.
+ *
+ * A fan messages a musician only while holding the musician's artist coin. The
+ * RPCs refuse with an error starting COIN_REQUIRED; see useArtistDmAccess for
+ * the check that lifts it.
  */
 
 export interface Conversation {
@@ -39,8 +44,25 @@ export interface DirectMessage {
   created_at: string;
 }
 
+/** An RPC error as something a person can read, without the machine prefix. */
+export function friendlyDmError(message: string | null | undefined): string {
+  if (!message) return 'Something went wrong. Try again.';
+  if (message.includes('COIN_REQUIRED')) return "Hold this artist's coin to message them";
+  return message;
+}
+
+/** Open (or find) the one-to-one conversation with somebody. */
+export async function openConversationWith(otherUserId: string): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('open_conversation' as never, {
+    _other_user_id: otherUserId,
+  } as never);
+  if (error || !data) return { id: null, error: error?.message ?? 'Could not open the conversation' };
+  return { id: data as unknown as string, error: null };
+}
+
 export function useConversations() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -53,7 +75,9 @@ export function useConversations() {
     const { data } = await supabase.rpc('list_my_conversations' as never);
     setConversations(((data ?? []) as unknown as Conversation[]).filter((c) => !c.is_archived));
     setIsLoading(false);
-  }, [user]);
+    // The header badge counts the same thing, so keep it in step.
+    void queryClient.invalidateQueries({ queryKey: ['inbox-unread'] });
+  }, [user, queryClient]);
 
   useEffect(() => {
     void load();
@@ -77,12 +101,10 @@ export function useConversations() {
   }, [user, load]);
 
   const openWith = useCallback(async (otherUserId: string): Promise<string | null> => {
-    const { data, error } = await supabase.rpc('open_conversation' as never, {
-      _other_user_id: otherUserId,
-    } as never);
-    if (error) return null;
+    const { id } = await openConversationWith(otherUserId);
+    if (!id) return null;
     await load();
-    return data as unknown as string;
+    return id;
   }, [load]);
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
@@ -92,6 +114,7 @@ export function useConversations() {
 
 export function useConversation(conversationId: string | null) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const markedRef = useRef<string | null>(null);
@@ -120,8 +143,11 @@ export function useConversation(conversationId: string | null) {
   useEffect(() => {
     if (!conversationId || markedRef.current === conversationId) return;
     markedRef.current = conversationId;
-    void supabase.rpc('mark_conversation_read' as never, { _conversation_id: conversationId } as never);
-  }, [conversationId, messages.length]);
+    void (async () => {
+      await supabase.rpc('mark_conversation_read' as never, { _conversation_id: conversationId } as never);
+      void queryClient.invalidateQueries({ queryKey: ['inbox-unread'] });
+    })();
+  }, [conversationId, messages.length, queryClient]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -193,16 +219,17 @@ export async function reportMessage(messageId: string, reportedId: string, reaso
   } as never);
 }
 
-/** Send a song straight into a conversation with somebody, from anywhere. */
+/**
+ * Send a song straight into a conversation with somebody, from anywhere.
+ * Gated like any message: a fan needs the artist's coin to send one to an artist.
+ */
 export async function sendSongTo(otherUserId: string, songId: string, note?: string) {
-  const { data: convId, error } = await supabase.rpc('open_conversation' as never, {
-    _other_user_id: otherUserId,
-  } as never);
-  if (error || !convId) return { ok: false, error: error?.message ?? 'Could not open the conversation' };
+  const { id: convId, error } = await openConversationWith(otherUserId);
+  if (!convId) return { ok: false, error: friendlyDmError(error) };
   const { error: sendErr } = await supabase.rpc('send_direct_message' as never, {
     _conversation_id: convId,
     _body: note || null,
     _song_id: songId,
   } as never);
-  return sendErr ? { ok: false, error: sendErr.message } : { ok: true };
+  return sendErr ? { ok: false, error: friendlyDmError(sendErr.message) } : { ok: true };
 }

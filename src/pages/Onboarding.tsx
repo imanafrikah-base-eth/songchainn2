@@ -17,6 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { uploadPublicImage } from '../lib/storage';
 import { MIN_AGE, POLICY_VERSIONS } from '@/legal/policies';
 import { yearsSince } from '@/hooks/useCompliance';
+import { realNameProblem } from '@/lib/realName';
 
 // Validation schema
 const profileSchema = z.object({
@@ -169,6 +170,15 @@ export default function Onboarding() {
     }
 
     if (!user) return;
+
+    // A name somebody chose, never their email or wallet handle. Community
+    // only shows people with a real name, so nobody gets through without one.
+    const nameProblem = realNameProblem(profileName, user.email);
+    if (nameProblem) {
+      setErrors({ profileName: nameProblem });
+      toast({ title: 'Please fix the errors below', variant: 'destructive' });
+      return;
+    }
 
     setIsLoading(true);
     try {

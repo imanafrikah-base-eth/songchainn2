@@ -13,7 +13,7 @@ import { usePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { useEngagement } from '@/context/EngagementContext';
 import { useSongPopularity } from '@/hooks/usePopularity';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
-import { cn } from '@/lib/utils';
+import { cn, compactCount, exactCount } from '@/lib/utils';
 import { SongCard } from '@/components/SongCard';
 import { SongComments } from '@/components/SongComments';
 import { ShareSongButton } from '@/components/ShareSongButton';
@@ -272,11 +272,21 @@ export default function SongDetail({ songIdOverride }: { songIdOverride?: string
               <div className="flex flex-wrap items-center gap-6 mb-6">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Headphones className="w-5 h-5" />
-                  <span className="text-lg font-medium tabular-nums">{songStats.plays.toLocaleString()} plays</span>
+                  <span
+                    className="text-lg font-medium tabular-nums"
+                    title={`${exactCount(songStats.plays)} plays`}
+                  >
+                    {compactCount(songStats.plays)} plays
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Heart className="w-5 h-5" />
-                  <span className="text-lg font-medium tabular-nums">{songStats.likes.toLocaleString()} likes</span>
+                  <span
+                    className="text-lg font-medium tabular-nums"
+                    title={`${exactCount(songStats.likes)} likes`}
+                  >
+                    {compactCount(songStats.likes)} likes
+                  </span>
                 </div>
               </div>
 

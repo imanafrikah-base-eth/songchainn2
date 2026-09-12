@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Coins, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { buyAsset } from '@/lib/safeBuy';
+import { reportPayment } from '@/lib/paymentReceipt';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
 
@@ -36,6 +37,7 @@ export function BuyWwat({ compact = false }: { compact?: boolean }) {
       }
       const res = await buyAsset({ coinAddress: WWAT_TOKEN_ADDRESS, ethAmount, address });
       if (res.success) {
+        reportPayment(res.txHash, 'wwat');
         toast.success('You hold $WWAT', { description: 'You can host a battle with it now.' });
         setOpen(false);
       } else {

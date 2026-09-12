@@ -9,6 +9,7 @@ import {
   decrementOfflinePlays,
   clearPreviewData
 } from '@/lib/songRegistry';
+import { reportPayment } from '@/lib/paymentReceipt';
 
 export type OwnershipStatus = 'free' | 'preview' | 'preview_used' | 'owned' | 'offline_ready';
 
@@ -142,6 +143,7 @@ export function useSongOwnership(songId: string): SongOwnership {
     });
 
     if (result.success) {
+      reportPayment(result.txHash, 'song_copy', songId);
       onStatusUpdate?.('Finalizing...');
       clearPreviewData(songId, addressToUse);
       await checkOwnership();
@@ -177,12 +179,13 @@ export function useSongOwnership(songId: string): SongOwnership {
     });
 
     if (result.success) {
+      reportPayment(result.txHash, 'song_sell', songId);
       onStatusUpdate?.('Finalizing...');
       await checkOwnership();
     }
 
     return result;
-  }, [coinAddress, userAddress, balance, checkOwnership]);
+  }, [coinAddress, userAddress, balance, checkOwnership, songId]);
 
   const recordPreviewPlay = useCallback(() => {}, []);
 

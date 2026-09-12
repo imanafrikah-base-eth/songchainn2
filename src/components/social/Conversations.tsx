@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
-import { Send, ArrowLeft, MoreVertical, Ban, Flag, Play, Music, MessageSquare } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Send, ArrowLeft, MoreVertical, Ban, Flag, Play, Music, MessageSquare, Lock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { AdultOnly } from '@/components/AdultOnly';
 import {
   useConversations, useConversation, blockUser, reportMessage,
   type Conversation,
 } from '@/hooks/useDirectMessages';
+import { useArtistDmGate, isCoinRequiredError } from '@/hooks/useArtistDmAccess';
+import { ArtistDmGateDialog } from '@/components/social/ArtistDmGateDialog';
+import { HOLDER_PERK_USD } from '@/hooks/useArtistCoinHolding';
+import { supabase } from '@/integrations/supabase/client';
 import { SONGS } from '@/data/musicData';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { toast } from 'sonner';
@@ -20,6 +25,10 @@ import { toast } from 'sonner';
  *
  * A message can carry a song, and when it does it arrives playable. That is the
  * whole point of messaging inside a music app rather than sending a link to one.
+ *
+ * A fan messages a musician only while holding the musician's coin. When a send
+ * is refused for that, the holding is checked again and the send retried once;
+ * if it is still refused, the fan is told why and how to fix it.
  */
 
 function timeAgo(iso: string | null): string {
@@ -67,13 +76,42 @@ function SongInMessage({ songId }: { songId: string }) {
   );
 }
 
+/** Whether somebody is a musician on the app. */
+function useIsArtistUser(userId: string | null | undefined) {
+  const { data = false } = useQuery({
+    queryKey: ['is-artist-user', userId ?? null],
+    enabled: Boolean(userId),
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const { data: rows } = await supabase
+        .from('artist_accounts')
+        .select('artist_id')
+        .eq('user_id', userId as string)
+        .limit(1);
+      return (rows ?? []).length > 0;
+    },
+  });
+  return data;
+}
+
 function Thread({ conversation, onBack }: { conversation: Conversation; onBack: () => void }) {
   const { user } = useAuth();
   const { messages, send, unsend } = useConversation(conversation.conversation_id);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
+  const [rechecking, setRechecking] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+
+  // A musician who has written in this thread has opened it for the fan.
+  const otherIsArtist = useIsArtistUser(conversation.other_user_id);
+  const theyWrote = messages.some((m) => m.sender_user_id === conversation.other_user_id);
+  const gate = useArtistDmGate(otherIsArtist ? conversation.other_user_id : null, {
+    autoCheck: otherIsArtist && !theyWrote,
+  });
+  const locked =
+    otherIsArtist && !theyWrote && !!gate.access && !gate.access.allowed && gate.access.reason !== 'check_failed';
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -85,13 +123,32 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
     if (!text || sending) return;
     setSending(true);
     setDraft('');
-    const res = await send(text);
+    let res = await send(text);
+    if (!res.ok && isCoinRequiredError(res.error) && otherIsArtist) {
+      // The server's holdings check may simply have gone stale. Ask again once.
+      const access = await gate.check(true);
+      if (access.allowed) res = await send(text);
+    }
     setSending(false);
     if (!res.ok) {
       setDraft(text);
+      if (isCoinRequiredError(res.error)) {
+        setGateOpen(true);
+        return;
+      }
       toast.error(res.error === 'You cannot message this person'
         ? 'You cannot message this person'
         : 'Message not sent', { description: res.error });
+    }
+  };
+
+  const recheck = async () => {
+    setRechecking(true);
+    const access = await gate.check(true);
+    setRechecking(false);
+    if (access.allowed) {
+      setGateOpen(false);
+      toast.success(`You can message ${conversation.other_name} now`);
     }
   };
 
@@ -203,6 +260,25 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
           this app where an adult can reach a child unobserved. The thread stays
           readable so nothing already sent vanishes, but nothing new goes out. */}
       <div className="border-t border-border">
+        {locked && (
+          <div className="flex items-center gap-2 px-3 pt-1.5 text-xs text-muted-foreground">
+            <Lock size={12} className="shrink-0" />
+            <span className="min-w-0 flex-1">
+              {gate.access?.reason === 'no_coin'
+                ? `${conversation.other_name} has not launched a coin yet, so messages are closed for now.`
+                : `Hold $${HOLDER_PERK_USD.toFixed(2)} of ${conversation.other_name}'s coin to message them.`}
+            </span>
+            {gate.access?.reason !== 'no_coin' && (
+              <button
+                type="button"
+                onClick={() => setGateOpen(true)}
+                className="min-h-11 shrink-0 px-2 font-semibold text-foreground underline underline-offset-4"
+              >
+                Unlock
+              </button>
+            )}
+          </div>
+        )}
         <AdultOnly reason="messaging">
           <form onSubmit={submit} className="flex items-center gap-2 px-3 py-2.5">
             <input
@@ -223,6 +299,17 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
           </form>
         </AdultOnly>
       </div>
+
+      {otherIsArtist && (
+        <ArtistDmGateDialog
+          open={gateOpen}
+          onOpenChange={setGateOpen}
+          artistName={conversation.other_name}
+          access={gate.access}
+          checking={rechecking || gate.isChecking}
+          onRecheck={() => void recheck()}
+        />
+      )}
     </div>
   );
 }
@@ -258,7 +345,7 @@ export function Conversations() {
         <p className="mb-1 text-sm font-semibold text-foreground">No conversations yet</p>
         <p className="mx-auto max-w-xs text-sm text-muted-foreground">
           Open somebody's profile and tap Message. You can send them a song, and it arrives ready to
-          play.
+          play. To message a musician, hold their artist coin.
         </p>
         <Link
           to="/community"

@@ -1,15 +1,40 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Hand, Users, Volume2, VolumeX } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Mic, MicOff, Hand, Users, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { useBattleRoles } from '@/battlezone/hooks/useBattleRoles';
 import { useToast } from '@/battlezone/hooks/use-toast';
 import { useAuth } from '@/battlezone/contexts/AuthContext';
-import { Room } from 'livekit-client';
+import { ConnectionState, ParticipantEvent, Room, RoomEvent } from 'livekit-client';
 
 interface MicControlsProps {
   battleId: string;
+  /** The CURRENT LiveKit room (state, not a ref), so a room created after a reconnect is picked up. */
   liveKitRoom: Room | null;
   onAudioPermissionChange?: (granted: boolean) => void;
 }
+
+/** Turns a getUserMedia / LiveKit failure into something a person can act on. */
+function describeMicError(error: unknown): { title: string; description: string } {
+  const name = error instanceof Error ? error.name : '';
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return {
+      title: 'Microphone blocked',
+      description: 'Allow microphone access for this site in your browser settings, then tap Unmute.',
+    };
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    return { title: 'No microphone found', description: 'Plug in or turn on a microphone, then tap Unmute.' };
+  }
+  if (name === 'NotReadableError') {
+    return {
+      title: 'Microphone is busy',
+      description: 'Another app is using your microphone. Close it, then tap Unmute.',
+    };
+  }
+  return { title: 'Your mic did not turn on', description: 'Please tap Unmute to try again.' };
+}
+
+const isPermissionError = (error: unknown) =>
+  error instanceof Error && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
 
 export const MicControls: React.FC<MicControlsProps> = ({
   battleId,
@@ -20,94 +45,173 @@ export const MicControls: React.FC<MicControlsProps> = ({
   const { user } = useAuth();
   const {
     myRole,
+    myParticipant,
     requestToSpeak,
     removeSpeaker,
     toggleParticipantMute,
     hasPermission,
   } = useBattleRoles(battleId);
 
-  const [isMuted, setIsMuted] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const roleCanPublish = hasPermission('canPublishAudio');
+
+  // Truth comes from LiveKit, never from the role.
+  const [micOn, setMicOn] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [tokenCanPublish, setTokenCanPublish] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [micPermission, setMicPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [isRequestingToSpeak, setIsRequestingToSpeak] = useState(false);
-  const prevRoleRef = useRef<string>(myRole);
 
-  // Check microphone permissions
-  const checkMicPermission = async () => {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      setMicPermission('denied');
-      onAudioPermissionChange?.(false);
-      return false;
+  /** Rooms we have already auto-enabled the mic in, so a manual mute is not undone. */
+  const autoEnabledRooms = useRef(new WeakSet<Room>());
+  /** Set while this client changes its own mute, so the DB echo is not read as a host mute. */
+  const selfChangeRef = useRef(false);
+
+  const dbMuted = myParticipant?.is_muted ?? true;
+  const dbMutedRef = useRef(dbMuted);
+  dbMutedRef.current = dbMuted;
+
+  // Mirror the room: connection, publish grant and whether the mic is really live.
+  useEffect(() => {
+    if (!liveKitRoom) {
+      setMicOn(false);
+      setConnected(false);
+      setTokenCanPublish(false);
+      return;
     }
+    const room = liveKitRoom;
+    const sync = () => {
+      setConnected(room.state === ConnectionState.Connected);
+      setMicOn(room.localParticipant.isMicrophoneEnabled);
+      setTokenCanPublish(room.localParticipant.permissions?.canPublish === true);
+    };
+    const lp = room.localParticipant;
+    room
+      .on(RoomEvent.Connected, sync)
+      .on(RoomEvent.Reconnected, sync)
+      .on(RoomEvent.Reconnecting, sync)
+      .on(RoomEvent.Disconnected, sync)
+      .on(RoomEvent.ParticipantPermissionsChanged, sync);
+    lp.on(ParticipantEvent.LocalTrackPublished, sync)
+      .on(ParticipantEvent.LocalTrackUnpublished, sync)
+      .on(ParticipantEvent.TrackMuted, sync)
+      .on(ParticipantEvent.TrackUnmuted, sync);
+    sync();
+    return () => {
+      room
+        .off(RoomEvent.Connected, sync)
+        .off(RoomEvent.Reconnected, sync)
+        .off(RoomEvent.Reconnecting, sync)
+        .off(RoomEvent.Disconnected, sync)
+        .off(RoomEvent.ParticipantPermissionsChanged, sync);
+      lp.off(ParticipantEvent.LocalTrackPublished, sync)
+        .off(ParticipantEvent.LocalTrackUnpublished, sync)
+        .off(ParticipantEvent.TrackMuted, sync)
+        .off(ParticipantEvent.TrackUnmuted, sync);
+    };
+  }, [liveKitRoom]);
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
-      setMicPermission('granted');
-      onAudioPermissionChange?.(true);
-      return true;
-    } catch {
-      setMicPermission('denied');
-      onAudioPermissionChange?.(false);
-      toast({
-        title: 'Microphone permission denied',
-        description: 'Allow microphone access in your browser to speak live in this room.',
-      });
-      return false;
-    }
-  };
-
-  // Request microphone access
-  const requestMicAccess = async () => {
-    const granted = await checkMicPermission();
-    if (!granted) {
-      toast({
-        title: 'Microphone unavailable',
-        description: 'Your device/browser does not expose microphone access in this session.',
-      });
-    }
-    return granted;
-  };
-
-  // Toggle microphone
-  const toggleMicrophone = async () => {
-    if (!hasPermission('canPublishAudio')) return;
-
-    // If trying to unmute and no permission, request it
-    if (isMuted && micPermission !== 'granted') {
-      const granted = await requestMicAccess();
-      if (!granted) return;
-    }
-
-    try {
-      const newMutedState = !isMuted;
-      
-      // Update LiveKit
-      if (liveKitRoom) {
-        await liveKitRoom.localParticipant.setMicrophoneEnabled(!newMutedState);
+  const setLiveMic = useCallback(
+    async (room: Room, enabled: boolean, { quiet = false }: { quiet?: boolean } = {}) => {
+      try {
+        await room.localParticipant.setMicrophoneEnabled(enabled);
+        if (enabled) {
+          setMicPermission('granted');
+          onAudioPermissionChange?.(true);
+        }
+        setMicOn(room.localParticipant.isMicrophoneEnabled);
+        return true;
+      } catch (error) {
+        console.error('[MicControls] setMicrophoneEnabled failed', error);
+        if (isPermissionError(error)) {
+          setMicPermission('denied');
+          onAudioPermissionChange?.(false);
+        }
+        setMicOn(room.localParticipant.isMicrophoneEnabled);
+        if (!quiet || enabled) toast(describeMicError(error));
+        return false;
       }
+    },
+    [onAudioPermissionChange, toast],
+  );
 
-      // Update database
-      await toggleParticipantMute(user?.id || '', newMutedState);
-      
-      setIsMuted(newMutedState);
-      setIsSpeaking(!newMutedState);
-    } catch (error) {
-      console.error('Failed to toggle microphone:', error);
-      toast({
-        title: 'Audio error',
-        description: 'Failed to toggle microphone. Please try again.',
-      });
+  // Whenever the CURRENT room is connected with a token that can publish, and the
+  // role can publish, turn the mic on once for that room (unless the DB says muted).
+  // The token grant is checked so a role flip that lands on the old, listen-only
+  // room does not fail; LiveRoom reconnects with a new token and we run again.
+  useEffect(() => {
+    const room = liveKitRoom;
+    if (!room || !connected || !tokenCanPublish || !roleCanPublish) return;
+    if (autoEnabledRooms.current.has(room)) return;
+    if (!myParticipant) return; // wait for our row so the DB mute flag is known
+    autoEnabledRooms.current.add(room);
+    if (myParticipant.is_muted) return;
+    void setLiveMic(room, true);
+  }, [liveKitRoom, connected, tokenCanPublish, roleCanPublish, myParticipant, setLiveMic]);
+
+  // Back in the audience: the mic goes off.
+  useEffect(() => {
+    if (roleCanPublish || !liveKitRoom) return;
+    setIsRequestingToSpeak(false);
+    if (liveKitRoom.localParticipant.isMicrophoneEnabled) void setLiveMic(liveKitRoom, false, { quiet: true });
+  }, [roleCanPublish, liveKitRoom, setLiveMic]);
+
+  // Promoted: the pending request is done.
+  useEffect(() => {
+    if (roleCanPublish) setIsRequestingToSpeak(false);
+  }, [roleCanPublish]);
+
+  // Honour the DB mute flag. A host muting this person only writes the DB; this
+  // client is the one that can actually turn its own mic off.
+  useEffect(() => {
+    if (!dbMuted || !liveKitRoom || !roleCanPublish) return;
+    if (selfChangeRef.current) return;
+    if (!liveKitRoom.localParticipant.isMicrophoneEnabled) return;
+    void setLiveMic(liveKitRoom, false, { quiet: true }).then((ok) => {
+      if (ok) toast({ title: 'You were muted', description: 'The host muted your mic. Tap Unmute when you are asked to speak.' });
+    });
+  }, [dbMuted, liveKitRoom, roleCanPublish, setLiveMic, toast]);
+
+  const toggleMicrophone = async () => {
+    if (!roleCanPublish || busy) return;
+    const room = liveKitRoom;
+    if (!room || room.state !== ConnectionState.Connected) {
+      toast({ title: 'Voice is still connecting', description: 'Give it a moment, then try again.' });
+      return;
+    }
+    if (!room.localParticipant.permissions?.canPublish) {
+      toast({ title: 'Joining the stage', description: 'Your speaker access is still being set up. Try again in a moment.' });
+      return;
+    }
+
+    const turnOn = !room.localParticipant.isMicrophoneEnabled;
+    setBusy(true);
+    selfChangeRef.current = true;
+    try {
+      // A tap is a user gesture: use it to unblock playback too.
+      void room.startAudio().catch(() => undefined);
+      const ok = await setLiveMic(room, turnOn);
+      if (ok) {
+        const saved = await toggleParticipantMute(user?.id || '', !turnOn);
+        if (!saved) {
+          toast({ title: 'Mic changed, but not saved', description: 'Others may see the wrong mute state for a moment.' });
+        }
+      }
+    } finally {
+      setBusy(false);
+      // Let the realtime echo of our own write arrive before honouring DB mutes again.
+      window.setTimeout(() => {
+        selfChangeRef.current = false;
+      }, 1500);
     }
   };
 
-  // Request to speak
   const handleRequestToSpeak = async () => {
     if (!hasPermission('canRequestToSpeak') || isRequestingToSpeak) return;
 
     setIsRequestingToSpeak(true);
     const success = await requestToSpeak();
-    
+
     if (success) {
       toast({
         title: 'Request sent',
@@ -122,115 +226,61 @@ export const MicControls: React.FC<MicControlsProps> = ({
     }
   };
 
-  // Leave speaker stage
   const handleLeaveStage = async () => {
+    if (liveKitRoom) await setLiveMic(liveKitRoom, false, { quiet: true });
     const success = await removeSpeaker(user?.id || '');
-    
+
     if (success) {
-      setIsMuted(true);
-      setIsSpeaking(false);
       setIsRequestingToSpeak(false);
-      
-      // Mute in LiveKit
-      if (liveKitRoom) {
-        await liveKitRoom.localParticipant.setMicrophoneEnabled(false);
-      }
-      
       toast({
         title: 'Left speaker stage',
         description: 'You are now in the audience.',
       });
+    } else {
+      toast({ title: 'Could not leave the stage', description: 'Please try again.' });
     }
   };
 
-  // Update UI state and LiveKit mic on role changes
-  useEffect(() => {
-    const prevRole = prevRoleRef.current;
-    prevRoleRef.current = myRole;
+  const ready = connected && tokenCanPublish;
 
-    if (myRole === 'speaker' || myRole === 'host' || myRole === 'co-host') {
-      setIsMuted(false);
-      setIsSpeaking(true);
-      setIsRequestingToSpeak(false);
-      // Enable mic when promoted from audience
-      if (prevRole === 'audience' && liveKitRoom) {
-        liveKitRoom.localParticipant.setMicrophoneEnabled(true).catch(console.error);
-      }
-    } else {
-      setIsMuted(true);
-      setIsSpeaking(false);
-      setIsRequestingToSpeak(false);
-      // Disable mic when moved back to audience
-      if (prevRole !== 'audience' && liveKitRoom) {
-        liveKitRoom.localParticipant.setMicrophoneEnabled(false).catch(console.error);
-      }
-    }
-  }, [myRole, liveKitRoom]);
-
-  // Check initial mic permission
-  useEffect(() => {
-    if (hasPermission('canPublishAudio')) {
-      checkMicPermission();
-    }
-  }, [myRole]);
-
-  // Render different controls based on role
-  const renderHostControls = () => (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={toggleMicrophone}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-          isMuted
-            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-            : 'bg-green-100 text-green-700 hover:bg-green-200'
-        }`}
-      >
-        {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-        {isMuted ? 'Unmute' : 'Mute'}
-      </button>
-      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-        <Users className="h-4 w-4" />
-        Host Controls
-      </div>
-    </div>
+  const renderMuteButton = () => (
+    <button
+      onClick={toggleMicrophone}
+      disabled={busy}
+      aria-pressed={micOn}
+      className={`flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 font-medium transition-colors disabled:opacity-60 ${
+        micOn
+          ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20'
+          : 'border-border bg-muted text-foreground hover:bg-muted/70'
+      }`}
+    >
+      {busy ? (
+        <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+      ) : micOn ? (
+        <Mic className="h-4 w-4" />
+      ) : (
+        <MicOff className="h-4 w-4" />
+      )}
+      {!ready ? 'Connecting mic' : micOn ? 'Mute' : 'Unmute'}
+    </button>
   );
 
-  const renderCoHostControls = () => (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={toggleMicrophone}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-          isMuted
-            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-            : 'bg-green-100 text-green-700 hover:bg-green-200'
-        }`}
-      >
-        {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-        {isMuted ? 'Unmute' : 'Mute'}
-      </button>
+  const renderHostControls = (label: string) => (
+    <div className="flex flex-wrap items-center gap-2">
+      {renderMuteButton()}
       <div className="flex items-center gap-1 text-sm text-muted-foreground">
         <Users className="h-4 w-4" />
-        Co-Host
+        {label}
       </div>
     </div>
   );
 
   const renderSpeakerControls = () => (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={toggleMicrophone}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-          isMuted
-            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-            : 'bg-green-100 text-green-700 hover:bg-green-200'
-        }`}
-      >
-        {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-        {isMuted ? 'Unmute' : 'Mute'}
-      </button>
+    <div className="flex flex-wrap items-center gap-2">
+      {renderMuteButton()}
       <button
         onClick={handleLeaveStage}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
+        className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 font-medium text-foreground transition-colors hover:bg-muted"
       >
         <Hand className="h-4 w-4" />
         Leave Stage
@@ -239,14 +289,14 @@ export const MicControls: React.FC<MicControlsProps> = ({
   );
 
   const renderAudienceControls = () => (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <button
         onClick={handleRequestToSpeak}
         disabled={isRequestingToSpeak}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+        className={`flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 font-medium transition-colors ${
           isRequestingToSpeak
-            ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+            ? 'cursor-not-allowed border-border bg-muted text-muted-foreground'
+            : 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20'
         }`}
       >
         <Hand className="h-4 w-4" />
@@ -259,28 +309,22 @@ export const MicControls: React.FC<MicControlsProps> = ({
     </div>
   );
 
-  const renderPermissionError = () => (
-    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-100 text-red-700">
-      <VolumeX className="h-4 w-4" />
-      <span className="text-sm font-medium">Mic Permission Required</span>
-    </div>
-  );
-
-  // Render based on role and permissions
-  if (!hasPermission('canPublishAudio') && !hasPermission('canRequestToSpeak')) {
+  if (!roleCanPublish && !hasPermission('canRequestToSpeak')) {
     return null;
   }
 
-  if (micPermission === 'denied' && hasPermission('canPublishAudio')) {
-    return renderPermissionError();
-  }
-
   return (
-    <div className="mic-controls">
-      {myRole === 'host' && renderHostControls()}
-      {myRole === 'co-host' && renderCoHostControls()}
+    <div className="mic-controls space-y-2">
+      {myRole === 'host' && renderHostControls('Host Controls')}
+      {myRole === 'co-host' && renderHostControls('Co-Host')}
       {myRole === 'speaker' && renderSpeakerControls()}
       {myRole === 'audience' && renderAudienceControls()}
+      {micPermission === 'denied' && roleCanPublish && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <VolumeX className="h-3.5 w-3.5 shrink-0" />
+          Microphone access is blocked. Allow it for this site in your browser settings, then tap Unmute.
+        </p>
+      )}
     </div>
   );
 };

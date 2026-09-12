@@ -5,6 +5,7 @@ import { Playlist, PlaylistCollaboratorWithProfile } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
+import { profileHasRealName } from '@/lib/realName';
 import { getLikedArtists, getLikedSongs, getPlaylistSongs as getLocalPlaylistSongs, listPlaylists, savePlaylists, setPlaylistSongs, setLikedArtists as saveLocalLikedArtists, setLikedSongs as saveLocalLikedSongs } from '@/lib/localDb';
 
 function isSyntheticId(id: string | null | undefined): boolean {
@@ -740,7 +741,7 @@ export function useAudienceInteractions() {
       .or(`username.ilike.%${escaped}%,display_name.ilike.%${escaped}%`)
       .limit(8);
     return ((data || []) as any[])
-      .filter((p) => p.user_id && p.user_id !== user.id)
+      .filter((p) => p.user_id && p.user_id !== user.id && profileHasRealName(p))
       .map((p) => ({
         user_id: p.user_id as string,
         display_name: (p.display_name || p.profile_name || p.username || null) as string | null,
