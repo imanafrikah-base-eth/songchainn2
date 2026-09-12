@@ -17,6 +17,7 @@ import RoomEntry from "@/battlezone/pages/RoomEntry";
 import HostCreate from "@/battlezone/pages/HostCreate";
 import HostControl from "@/battlezone/pages/HostControl";
 import NotFound from "@/battlezone/pages/NotFound";
+import { RequireSignIn } from "@/battlezone/components/RequireSignIn";
 import "@/battlezone/index.css";
 
 const battleZoneQueryClient = new QueryClient();
@@ -40,10 +41,14 @@ export default function WaveWarzBattleZoneFeature() {
               <Route path="battles/upcoming" element={<UpcomingBattles />} />
               <Route path="battles/results" element={<Results />} />
               <Route path="battle/:battleId" element={<BattleDetail />} />
-              <Route path="entry/:roomId" element={<RoomEntry />} />
-              <Route path="room/:roomId" element={<LiveRoom />} />
+              {/* Watching is public; the rooms are not. These three had no gate
+                  at all, so a signed out visitor could open a live room, read
+                  the audience by name and reach the host console for somebody
+                  else's battle. */}
+              <Route path="entry/:roomId" element={<RequireSignIn what="this battle room"><RoomEntry /></RequireSignIn>} />
+              <Route path="room/:roomId" element={<RequireSignIn what="this battle room"><LiveRoom /></RequireSignIn>} />
               <Route path="host/create" element={<HostCreate />} />
-              <Route path="host/control/:roomId" element={<HostControl />} />
+              <Route path="host/control/:roomId" element={<RequireSignIn what="the host controls"><HostControl /></RequireSignIn>} />
               <Route path="live" element={<Navigate to="/wavewarz-africa/battles/live" replace />} />
               <Route path="create" element={<Navigate to="/wavewarz-africa/host/create" replace />} />
               <Route path="results" element={<Navigate to="/wavewarz-africa/battles/results" replace />} />

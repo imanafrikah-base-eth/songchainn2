@@ -81,6 +81,13 @@ const HostControl = () => {
       .update({ status: "ended", winner, voting_open: false, ended_time: new Date().toISOString() })
       .eq("id", roomId);
     void requestHikuluVerdict(roomId);
+    // Work out the winners' pot the moment there is a winner to share it with.
+    //
+    // Not awaited and not fatal on purpose. Declaring the result is the host's
+    // act and must not fail because some arithmetic did. battle-settle is
+    // idempotent and keyed on the battle, so if this call never lands the pot
+    // is still settled correctly by the next one, and never settled twice.
+    void supabase.functions.invoke("battle-settle", { body: { battleId: roomId } });
   };
 
   const handleEndRoom = async () => {
