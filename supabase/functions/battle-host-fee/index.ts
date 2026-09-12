@@ -50,7 +50,18 @@ function json(origin: string | null, body: unknown, status = 200) {
 
 /* ------------------------------------------------------------ the terms --- */
 
-const HOST_FEE_USD = 1;
+/**
+ * What hosting costs, held as an exact fraction.
+ *
+ * A fraction rather than a number because the amount somebody is actually
+ * charged should never pass through floating point, and because a rehearsal
+ * needs to run the identical code path at a few cents without editing the
+ * maths. The real terms are one dollar: 1n over 1n.
+ */
+const HOST_FEE_USD_NUM = 1n;
+const HOST_FEE_USD_DEN = 1n;
+/** For display and for the row we write down. */
+const HOST_FEE_USD = Number(HOST_FEE_USD_NUM) / Number(HOST_FEE_USD_DEN);
 /** $WWAT on Base. */
 const WWAT = "0xefa920796416daf8dc8df7e5ceaeee45ae3350be";
 const WWAT_DECIMALS = 18n;
@@ -87,7 +98,7 @@ function fraction(decimal: string): { num: bigint; den: bigint } | null {
   return { num, den: 10n ** BigInt(frac.length) };
 }
 
-async function wwatAmountForUsd(usd: number): Promise<{ priceUsd: number; amountRaw: bigint } | null> {
+async function wwatAmountForUsd(): Promise<{ priceUsd: number; amountRaw: bigint } | null> {
   try {
     const res = await fetch(`https://api-sdk.zora.engineering/coin?address=${WWAT}&chain=8453`, {
       signal: AbortSignal.timeout(10_000),
@@ -97,8 +108,12 @@ async function wwatAmountForUsd(usd: number): Promise<{ priceUsd: number; amount
     const raw = String(body?.zora20Token?.tokenPrice?.priceInUsdc ?? "");
     const f = fraction(raw);
     if (!f) return null;
-    const top = BigInt(usd) * f.den * 10n ** WWAT_DECIMALS;
-    const amountRaw = (top + f.num - 1n) / f.num;
+    // tokens = usd / price = (NUM/DEN) / (num/den) = NUM*den / (DEN*num),
+    // then scaled to the token's smallest unit and rounded up, so the host is
+    // never a hair short of what the server will check for.
+    const top = HOST_FEE_USD_NUM * f.den * 10n ** WWAT_DECIMALS;
+    const bottom = HOST_FEE_USD_DEN * f.num;
+    const amountRaw = (top + bottom - 1n) / bottom;
     return { priceUsd: Number(raw), amountRaw };
   } catch {
     return null;
@@ -247,7 +262,7 @@ Deno.serve(async (req) => {
   }
   const artists = names.map((n) => ({ name: n, wallet: byName.get(n)! }));
 
-  const price = await wwatAmountForUsd(HOST_FEE_USD);
+  const price = await wwatAmountForUsd();
   if (!price) {
     return json(origin, { error: "Could not read the $WWAT price just now. Try again in a minute." }, 503);
   }
@@ -355,11 +370,18 @@ Deno.serve(async (req) => {
     return json(origin, { error: "The payments checked out but could not be recorded. Press it again; you will not be charged twice." }, 500);
   }
 
+  // What was actually paid, not what a fresh quote says it would cost now.
+  // The price moves between paying and confirming, so recomputing here wrote
+  // down a total that never matched the transfers: the first rehearsal logged
+  // 174,171.88 WWAT against 174,847.61 genuinely sent. The legs that were
+  // verified on chain are the truth, so the row is their sum.
+  const paidTotal = rows.reduce((sum, r) => sum + BigInt(String(r.amount_raw)), 0n);
+
   const { error: feeError } = await db.from("battle_host_fees").insert({
     battle_id: battleId,
     host_user_id: user.id,
     wallet_address: payer,
-    amount_raw: price.amountRaw.toString(),
+    amount_raw: paidTotal.toString(),
     token_address: WWAT,
     token_symbol: "WWAT",
     quoted_usd: HOST_FEE_USD,
