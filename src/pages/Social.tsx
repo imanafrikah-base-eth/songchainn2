@@ -432,7 +432,9 @@ export default function Social() {
       {/* ── Overlay header ── */}
       <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
         <div className="bg-gradient-to-b from-black/70 to-transparent">
-          <div className="max-w-lg mx-auto px-4 pt-3 pb-8">
+          {/* The cards are full bleed, so a 512px strip floating over them read
+              as a different page sitting on top of the feed. */}
+          <div className="max-w-3xl mx-auto px-4 pt-3 pb-8">
             <div className="flex items-center justify-between pointer-events-auto">
               {/* Back + title */}
               <div className="flex items-center gap-2">
@@ -467,23 +469,22 @@ export default function Social() {
               {/* Feed tabs + discover */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-white/10 backdrop-blur-sm rounded-full p-0.5">
+                  {/* px-3 py-1 padded these for about 24px and then min-h-10
+                      forced them to 40, so the label floated in an oversized
+                      pill. One height, stated once. */}
                   <button
                     onClick={() => setFeedType('foryou')}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      feedType === 'foryou'
-                        ? 'bg-white text-black'
-                        : 'text-white/70'
-                    } min-h-10`}
+                    className={`inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors ${
+                      feedType === 'foryou' ? 'bg-white text-black' : 'text-white/70 hover:text-white'
+                    }`}
                   >
                     For You
                   </button>
                   <button
                     onClick={() => setFeedType('following')}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      feedType === 'following'
-                        ? 'bg-white text-black'
-                        : 'text-white/70'
-                    } min-h-10`}
+                    className={`inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors ${
+                      feedType === 'following' ? 'bg-white text-black' : 'text-white/70 hover:text-white'
+                    }`}
                   >
                     Following
                   </button>

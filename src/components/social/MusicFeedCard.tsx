@@ -3,7 +3,7 @@ import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, Play, Pause, Music,
-  UserPlus, Check, Disc3, Copy, PartyPopper, Sparkles, Flame, UserCheck,
+  UserPlus, Check, Copy, PartyPopper, Sparkles, Flame, UserCheck,
   ListMusic, Headphones, MoreHorizontal, Trash2, Flag, UserMinus, Link2, Pencil,
 } from 'lucide-react';
 import { ReportDialog } from '@/components/ReportDialog';
@@ -151,13 +151,17 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
       ) : coverUrl && !imgErr ? (
         <>
           <img src={coverUrl} alt="" aria-hidden onError={handleImgError}
-            className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50" />
-          <div className="absolute inset-0 bg-black/55" />
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60" />
         </>
       ) : (
         <div className="absolute inset-0 bg-secondary" />
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-black/40 pointer-events-none" />
+      {/* ONE scrim, not three. The artwork used to be dimmed by a 50% opacity
+          blur, then a flat black 55%, then a gradient on top of that, which is
+          why every card read as grey mud. This darkens the top and the foot,
+          where the text actually sits, and leaves the middle of the picture
+          alone. */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/20 to-black/90 pointer-events-none" />
 
       {/* Tap to play */}
       <div className="absolute inset-0 cursor-pointer" onClick={activeSong ? handlePlayPause : undefined}>
@@ -322,8 +326,15 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
         </div>
       </div>
 
-      {/* Right action bar */}
-      <div className="absolute right-3 bottom-32 flex flex-col items-center gap-5 z-10">
+      {/* Right action bar.
+          Six identical 44px circles in a column had no hierarchy at all: the
+          thing you do most looked exactly like the overflow menu. Like and
+          comment stay full size and keep their counts; share and the menu step
+          back; the spinning disc that used to sit at the foot is gone, because
+          the now playing pill in the caption already shows that same artwork.
+          The bottom anchor matches the caption's so the two stop drifting
+          apart on a wide screen. */}
+      <div className="absolute right-3 bottom-24 md:bottom-4 flex flex-col items-center gap-4 z-10">
         <div className="relative mb-1">
           <button onClick={goToProfile}>
             <Avatar className="w-11 h-11 border-2 border-white shadow-lg">
@@ -333,9 +344,15 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
               </AvatarFallback>
             </Avatar>
           </button>
+          {/* A 44px pip centred on a 44px avatar covered the face it was
+              attached to. The badge is small now and the tap target is kept by
+              an invisible ring around it rather than by the badge itself. */}
           {!isOwnPost && (
-            <button onClick={(e) => { e.stopPropagation(); onFollow(post.user_id); }}
-              className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white shadow-lg transition-colors ${isFollowing ? 'bg-white/30' : 'bg-primary'}`}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onFollow(post.user_id); }}
+              aria-label={isFollowing ? `Following ${post.profile?.profile_name ?? 'them'}` : `Follow ${post.profile?.profile_name ?? 'them'}`}
+              className={`absolute -bottom-2 left-1/2 -translate-x-1/2 flex h-6 w-6 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-black/50 transition-colors after:absolute after:-inset-3 after:content-[''] ${isFollowing ? 'bg-white/30' : 'bg-primary'}`}
+            >
               {isFollowing ? <Check className="w-3 h-3" /> : <UserPlus className="w-3 h-3" />}
             </button>
           )}
@@ -357,11 +374,10 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex flex-col items-center gap-1" onClick={(e) => e.stopPropagation()}>
-              <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                <Share2 className="w-6 h-6 text-white" />
+            <button aria-label="Share" className="flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+              <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                <Share2 className="w-5 h-5 text-white/90" />
               </div>
-              <span className="text-[11px] text-white/90 font-medium">Share</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
@@ -392,11 +408,11 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
             <button
               type="button"
               aria-label="More options"
-              className="flex flex-col items-center gap-1"
+              className="flex flex-col items-center"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                <MoreHorizontal className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                <MoreHorizontal className="w-5 h-5 text-white/90" />
               </div>
             </button>
           </DropdownMenuTrigger>
@@ -432,19 +448,6 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <motion.div
-          animate={isThisSongPlaying ? { rotate: 360 } : {}}
-          transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
-          className="w-11 h-11 rounded-full border-2 border-white/40 overflow-hidden shadow-lg"
-        >
-          {coverUrl && !imgErr ? (
-            <img src={coverUrl} alt="" className="w-full h-full object-cover" onError={handleImgError} />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center">
-              <Disc3 className="w-5 h-5 text-white" />
-            </div>
-          )}
-        </motion.div>
       </div>
 
       {/* Bottom info */}
@@ -453,12 +456,12 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
           post underneath it. The bar is 56px plus the home indicator; this
           clears both and goes back to normal padding on desktop, where the bar
           does not exist. */}
-      <div className="absolute bottom-0 left-0 right-16 p-4 pb-24 md:pb-4 z-10">
+      <div className="absolute bottom-0 left-0 right-20 p-4 pb-24 md:pb-4 z-10">
         <button onClick={goToProfile} className="flex items-center gap-2 mb-2">
           <span className="font-bold text-white text-base truncate max-w-[220px]">
             <ArtistName prefix="@" name={post.profile?.profile_name || 'Anonymous'} userId={post.user_id} size={14} />
           </span>
-          {isFollowing && <span className="text-[10px] text-white/50 bg-white/10 px-1.5 py-0.5 rounded-full shrink-0">Following</span>}
+          {isFollowing && <span className="text-[11px] text-white/70 bg-white/10 px-2 py-0.5 rounded-full shrink-0">Following</span>}
         </button>
 
         {isWelcomePost && (
@@ -596,7 +599,7 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
           </div>
         )}
 
-        <p className="text-white/40 text-[11px] mt-2">
+        <p className="text-white/60 text-xs mt-2">
           {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
         </p>
       </div>
