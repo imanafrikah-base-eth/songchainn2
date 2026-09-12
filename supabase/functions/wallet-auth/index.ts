@@ -3,7 +3,27 @@
 // sends here → we verify signature → issue Supabase magic-link OTP →
 // client calls supabase.auth.verifyOtp() to establish a real session.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { verifyMessage } from 'npm:viem';
+import { createPublicClient, http, verifyMessage as verifyMessageEcdsa } from 'npm:viem';
+import { base } from 'npm:viem/chains';
+
+/**
+ * SMART WALLETS COULD NOT SIGN IN HERE, AND NOBODY HAD NOTICED.
+ *
+ * This imported viem's plain verifyMessage utility, whose own docs say: "Only
+ * supports Externally Owned Accounts. Does not support Contract Accounts." A
+ * Coinbase or Zora smart wallet is a contract, and proves a signature by
+ * answering isValidSignature on chain (ERC-1271) rather than by key recovery.
+ * So anybody whose wallet is a smart wallet was told their signature failed,
+ * with no way to get in that way at all.
+ *
+ * Found on 12 Sep while wiring up N3M3SIS, whose Zora account is a SMART_WALLET.
+ * The public action does the on-chain check and still handles ordinary keys, so
+ * this widens who can sign in and locks nobody out. Costs one eth_call.
+ */
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(Deno.env.get('BASE_RPC_URL') || 'https://mainnet.base.org'),
+});
 
 // SIWE domain allowlist. The domain line in a signed message is the only thing
 // binding that signature to this site, so anything on this list can spend a
@@ -103,7 +123,22 @@ Deno.serve(async (req) => {
     }
 
     // 4. Cryptographic signature verification (never skipped)
-    const valid = await verifyMessage({ address, message, signature: signature as `0x${string}` });
+    // On chain first, so smart wallets can prove themselves at all. If that
+    // call cannot be made (an RPC wobble, Base unreachable) fall back to plain
+    // key recovery rather than locking every ordinary wallet out of sign-in.
+    // The fallback is not a weakening: ECDSA recovery accepts a signature only
+    // when it genuinely recovers to this address. It just cannot speak for a
+    // contract wallet, which is the case the on-chain path is there for.
+    let valid = false;
+    try {
+      valid = await publicClient.verifyMessage({ address, message, signature: signature as `0x${string}` });
+    } catch {
+      try {
+        valid = await verifyMessageEcdsa({ address, message, signature: signature as `0x${string}` });
+      } catch {
+        valid = false;
+      }
+    }
     if (!valid) return json(origin, { error: 'Signature verification failed' }, 401);
 
     // 5. Find-or-create Supabase user keyed by wallet address

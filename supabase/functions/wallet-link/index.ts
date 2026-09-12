@@ -25,7 +25,31 @@
 //           verify    -> { ok: true, verifiedAt } | { error }
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { verifyMessage } from "npm:viem";
+import { createPublicClient, http, verifyMessage as verifyMessageEcdsa } from "npm:viem";
+import { base } from "npm:viem/chains";
+
+/**
+ * SMART WALLETS DO NOT SIGN LIKE KEYS, AND THIS AUDIENCE HAS THEM.
+ *
+ * viem ships two things called verifyMessage. The plain utility, the one
+ * wallet-auth imports and this function first shipped with, says in its own
+ * docs: "Only supports Externally Owned Accounts. Does not support Contract
+ * Accounts." A Coinbase or Zora smart wallet is a CONTRACT: it proves a
+ * signature by answering isValidSignature on chain (ERC-1271), not by a key
+ * recovery that arithmetic alone can check.
+ *
+ * That was not hypothetical. The first artist wired up after this shipped,
+ * N3M3SIS, has walletType SMART_WALLET, so the gate would have refused her own
+ * wallet forever and told her the signature did not come from it.
+ *
+ * The public ACTION does the on-chain check and handles both kinds, so it needs
+ * a client and an RPC. Verification now costs one eth_call, which is the price
+ * of accepting the wallets people actually use.
+ */
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(Deno.env.get("BASE_RPC_URL") || "https://mainnet.base.org"),
+});
 
 const ALLOWED_ORIGINS = new Set<string>(
   (Deno.env.get("ALLOWED_ORIGINS") ??
@@ -51,7 +75,14 @@ function json(origin: string | null, body: unknown, status = 200) {
 }
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
-const SIGNATURE = /^0x[0-9a-fA-F]{130}$/;
+/**
+ * NOT a fixed 130 characters. That is the length of a plain key's signature,
+ * and demanding it would throw out every smart wallet before the signature was
+ * even looked at: an ERC-1271 or ERC-6492 signature is whatever the wallet's
+ * own contract returns, and is routinely much longer. Bounded, so an absurd
+ * payload still cannot be posted at us.
+ */
+const SIGNATURE = /^0x[0-9a-fA-F]{64,20000}$/;
 
 /** A challenge is good for five minutes. Long enough to read, short enough to matter. */
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -169,15 +200,32 @@ Deno.serve(async (req) => {
     return json(origin, { error: "That request expired. Try proving the wallet again." }, 409);
   }
 
+  // One on-chain check, so a smart wallet and a plain key are both accepted on
+  // their own terms. See the note beside publicClient above.
+  //
+  // If that call cannot be made at all (an RPC wobble, Base unreachable) fall
+  // back to plain key recovery instead of refusing everybody. That is not a
+  // weakening: ECDSA recovery accepts a signature only when it genuinely
+  // recovers to this address. It simply cannot speak for a contract wallet,
+  // which is exactly what the on-chain path is for, so a smart wallet still
+  // fails closed and is told to try again rather than being let through.
   let valid = false;
   try {
-    valid = await verifyMessage({
+    valid = await publicClient.verifyMessage({
       address: address as `0x${string}`,
       message: String(challenge.message),
       signature: signature as `0x${string}`,
     });
   } catch {
-    valid = false;
+    try {
+      valid = await verifyMessageEcdsa({
+        address: address as `0x${string}`,
+        message: String(challenge.message),
+        signature: signature as `0x${string}`,
+      });
+    } catch {
+      valid = false;
+    }
   }
   if (!valid) {
     return json(origin, { error: "That signature did not come from this wallet, so it was not added." }, 401);
