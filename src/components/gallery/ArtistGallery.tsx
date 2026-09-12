@@ -37,9 +37,22 @@ interface Props {
 
 type SectionKey = 'video' | 'image';
 
-const SECTIONS: Array<{ key: SectionKey; label: string; icon: typeof Clapperboard; grid: string; frame: string }> = [
-  { key: 'video', label: 'Clips', icon: Clapperboard, grid: 'grid-cols-2 sm:grid-cols-3', frame: 'aspect-video' },
-  { key: 'image', label: 'Pictures', icon: Images, grid: 'grid-cols-3 sm:grid-cols-4', frame: 'aspect-square' },
+/**
+ * How much of a section shows before the artist asks for the rest.
+ *
+ * A section used to render everything it had. One artist has twenty one
+ * published pictures at up to four megabytes each, so her page was a wall of
+ * full size photographs decoded into thumbnails, all at once. It read as
+ * content pouring down the page with no shape to it, and it made the page
+ * heavy enough to stall while scrolling. A preview and a count says what is
+ * there in one line; See all opens the rest when somebody actually wants it.
+ */
+const SECTIONS: Array<{
+  key: SectionKey; label: string; one: string; icon: typeof Clapperboard;
+  grid: string; frame: string; preview: number;
+}> = [
+  { key: 'video', label: 'Clips', one: 'clip', icon: Clapperboard, grid: 'grid-cols-2 sm:grid-cols-3', frame: 'aspect-video', preview: 6 },
+  { key: 'image', label: 'Pictures', one: 'picture', icon: Images, grid: 'grid-cols-3 sm:grid-cols-4', frame: 'aspect-square', preview: 8 },
 ];
 
 const MAX_IMAGE_MB = 20;
@@ -53,6 +66,8 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
   const items = (canManage ? mine.data : pub.data) ?? [];
   const isLoading = canManage ? mine.isLoading : pub.isLoading;
   const [openAt, setOpenAt] = useState<number | null>(null);
+  /** Which sections the visitor has asked to see in full. */
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   // Sections in a fixed order, and one flat list in that same order so the
   // viewer walks through the gallery the way the page shows it.
@@ -91,23 +106,53 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
   let offset = 0;
   return (
     <>
+      {/* What is in here, said in one line before any of it has to load. */}
+      <p className="mb-3 text-xs text-muted-foreground">
+        {sections
+          .map((s) => `${s.items.length} ${s.items.length === 1 ? s.one : s.label.toLowerCase()}`)
+          .join(' · ')}
+      </p>
+
       <div className="space-y-6">
         {sections.map((section) => {
           const start = offset;
           offset += section.items.length;
           const Icon = section.icon;
+          const isOpen = !!expanded[section.key];
+          // Sliced from the front, so a tile's place in this list is still its
+          // place in the flat list the viewer walks through.
+          const shown = isOpen ? section.items : section.items.slice(0, section.preview);
+          const hidden = section.items.length - shown.length;
           return (
             <section key={section.key} aria-label={section.label}>
               <div className="mb-2 flex items-center gap-2">
                 <Icon className="h-4 w-4 text-muted-foreground" />
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.label}</h4>
                 <span className="text-xs text-muted-foreground/70">{section.items.length}</span>
+                {(hidden > 0 || isOpen) && (
+                  <button
+                    type="button"
+                    onClick={() => setExpanded((e) => ({ ...e, [section.key]: !isOpen }))}
+                    className="ml-auto inline-flex min-h-10 items-center rounded-full px-3 text-xs font-semibold text-primary hover:bg-primary/10"
+                  >
+                    {isOpen ? 'Show less' : `See all ${section.items.length}`}
+                  </button>
+                )}
               </div>
               <div className={`grid gap-2 ${section.grid}`}>
-                {section.items.map((item, i) => (
+                {shown.map((item, i) => (
                   <Tile key={item.id} item={item} frame={section.frame} manage={canManage} onOpen={() => setOpenAt(start + i)} />
                 ))}
               </div>
+              {hidden > 0 && !isOpen && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded((e) => ({ ...e, [section.key]: true }))}
+                  className="mt-2 w-full rounded-xl border border-border py-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted min-h-10"
+                >
+                  {hidden} more {hidden === 1 ? section.one : section.label.toLowerCase()}
+                </button>
+              )}
             </section>
           );
         })}
@@ -148,6 +193,9 @@ function Tile({ item, frame, manage, onOpen }: { item: ArtistMediaItem; frame: s
             alt=""
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             loading="lazy"
+            /* These are full size photographs shown as thumbnails. Decoding
+               them off the main thread keeps a gridful from stalling a scroll. */
+            decoding="async"
           />
         )}
 
