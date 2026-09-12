@@ -12,6 +12,7 @@
 // deploy cannot send a phone into a reload loop.
 
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import { markUpdateAvailable } from "@/lib/appUpdate";
 
 const AUTO_RELOAD_COUNT_KEY = "__songchainn_reload_count";
 const AUTO_RELOAD_TS_KEY = "__songchainn_reload_at";
@@ -74,8 +75,11 @@ export function recoverFromStaleBuild(): boolean {
   if ("serviceWorker" in navigator) {
     Promise.all([
       navigator.serviceWorker.getRegistrations().then((regs) => Promise.all(regs.map((r) => r.unregister()))),
+      // Everything except the songs somebody saved for offline. Wiping those
+      // to fix a stale bundle costs them their music on a bad line, which is
+      // the one thing offline play exists for.
       typeof caches !== "undefined" && caches.keys
-        ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        ? caches.keys().then((keys) => Promise.all(keys.filter((k) => !/audio/i.test(k)).map((k) => caches.delete(k))))
         : Promise.resolve([]),
     ])
       .catch((err) => {
@@ -88,15 +92,25 @@ export function recoverFromStaleBuild(): boolean {
   return true;
 }
 
-/** Window-level catch for chunk failures that escape React (prefetches, event handlers). */
+/**
+ * Window-level catch for chunk failures that escape React: a background
+ * prefetch, an event handler, a wallet SDK loading itself.
+ *
+ * These do NOT reload the page. Nothing on screen is broken when a prefetch
+ * fails, and reloading under somebody who is typing or uploading to fix a file
+ * they never asked for is the rudest thing the app can do. It raises the
+ * Update button instead, and they take it when they are ready. A screen that
+ * really is broken still recovers: lazyWithRecovery below, and the error
+ * boundary, both still reload.
+ */
 export function installLoadErrorRecovery(): void {
   if (typeof window === "undefined" || !import.meta.env.PROD) return;
   window.addEventListener("error", (event) => {
     const e = event as ErrorEvent;
-    if (isRecoverableLoadError(e.error) || isRecoverableLoadError(e.message)) recoverFromStaleBuild();
+    if (isRecoverableLoadError(e.error) || isRecoverableLoadError(e.message)) markUpdateAvailable();
   });
   window.addEventListener("unhandledrejection", (event) => {
-    if (isRecoverableLoadError((event as PromiseRejectionEvent).reason)) recoverFromStaleBuild();
+    if (isRecoverableLoadError((event as PromiseRejectionEvent).reason)) markUpdateAvailable();
   });
 }
 

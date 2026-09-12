@@ -24,8 +24,18 @@ export type CoverCheck = { block: string | null; warn: string | null };
 
 /** What is wrong with a cover before a byte of it leaves the phone. */
 export async function checkCover(file: File): Promise<CoverCheck> {
-  if (file.size > MAX_COVER_MB * 1024 * 1024) {
-    return { block: `That image is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Covers are ${MAX_COVER_MB} MB at most.`, warn: null };
+  // Judge the size of what will actually be sent, not what came off the
+  // camera. landCover shrinks every cover to 1600 pixels before it leaves the
+  // phone, so refusing a 12 MB photo here turned away artwork that would have
+  // arrived at well under a megabyte. A phone photo is routinely 8 to 12 MB,
+  // and this one rule stopped artists uploading for days.
+  let sending = file;
+  if (sending.size > MAX_COVER_MB * 1024 * 1024) sending = await shrinkCover(sending);
+  if (sending.size > MAX_COVER_MB * 1024 * 1024) {
+    return {
+      block: `That image is still ${(sending.size / (1024 * 1024)).toFixed(1)} MB after shrinking. Covers are ${MAX_COVER_MB} MB at most.`,
+      warn: null,
+    };
   }
   const url = URL.createObjectURL(file);
   try {

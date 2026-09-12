@@ -1,4 +1,4 @@
-import { connectWallet, getDiscoveredWallets } from '@/lib/baseWallet';
+import { connectWallet, getDiscoveredWallets, getWalletProvider } from '@/lib/baseWallet';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { providerFromRdns, rememberWallet, type WalletProvider } from '@/hooks/useMyWallets';
 
@@ -117,7 +117,12 @@ async function alreadyConnected(): Promise<string | null> {
     // Saved is not the same as reachable: the wallet may be locked, or the
     // person may have switched accounts inside it. Ask the provider, and
     // only reuse the address when it still answers with that account.
-    const provider = (typeof window !== 'undefined' ? (window as any).ethereum : null) as
+    // getWalletProvider() knows the wallet they actually used: an extension on
+    // a computer, or the Base app or MetaMask restored through its own SDK on a
+    // phone. Reading window.ethereum directly, as this did, finds nothing on a
+    // phone, so every purchase asked a person to connect a wallet that was
+    // already connected. That was the single worst re-ask in the app.
+    const provider = (getWalletProvider() ?? (typeof window !== 'undefined' ? (window as any).ethereum : null)) as
       | { request: (args: { method: string }) => Promise<unknown> }
       | null;
     if (!provider?.request) return null;

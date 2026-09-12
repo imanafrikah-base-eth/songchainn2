@@ -45,6 +45,12 @@ const MAX_MB = 100;
 // so before a 90 MB upload rather than after it.
 const MIN_SECONDS = 30;
 
+// A record goes up once. The same song again is only a record when it is
+// genuinely another version, and the title has to say which one, so the
+// catalogue never shows the same song twice with nothing to tell them apart.
+const EDITION_WORDS =
+  /\b(remix|rmx|live|acoustic|unplugged|instrumental|edit|version|edition|remaster(ed)?|demo|radio|extended|slowed|sped|vip|dub|freestyle|reprise)\b/i;
+
 const TIER_CHIP: Record<ReleaseTier, string> = {
   master: 'bg-primary/15 text-primary',
   release: 'bg-emerald-500/15 text-emerald-500',
@@ -133,9 +139,13 @@ const Studio = () => {
 
   // What upload-url will let through today, so a ten-track album is told
   // here rather than refused on track seven.
+  // What the door actually let through today. A row stuck at 'uploading' never
+  // became a record: it is a reservation whose cover never landed. Counting
+  // those against the cap charged the artist for the app's own failure, and
+  // made every retry likelier to be refused than the try before it.
   const sentToday = useMemo(() => {
     const since = Date.now() - 24 * 60 * 60 * 1000;
-    return releases.filter((r) => new Date(r.created_at).getTime() > since).length;
+    return releases.filter((r) => new Date(r.created_at).getTime() > since && r.status !== 'uploading').length;
   }, [releases]);
   const leftToday = Math.max(0, UPLOADS_PER_DAY - sentToday);
   const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
@@ -150,6 +160,17 @@ const Studio = () => {
     if (t.seconds !== null && t.seconds < MIN_SECONDS) return `That runs ${Math.round(t.seconds)} seconds. A record has to be at least ${MIN_SECONDS}; anything shorter goes straight to the workshop as a snippet.`;
     if (!t.title.trim()) return 'Give it a title.';
     if (onRelease && (!t.trackNumber || t.trackNumber < 1)) return 'Give it a track number on the release.';
+    // The same record twice is not allowed. Another version is, and the title
+    // is where it says so.
+    const title = t.title.trim();
+    if (title && !EDITION_WORDS.test(title)) {
+      if (tracks.some((o) => o.key !== t.key && o.title.trim().toLowerCase() === title.toLowerCase())) {
+        return `Two tracks here are both called this. Name the other one as its own version, like "${title} (Remix)".`;
+      }
+      if (releases.some((r) => (r.title ?? '').trim().toLowerCase() === title.toLowerCase())) {
+        return `You already have a record called this. Send it again only as another version, and say so in the title, like "${title} (Remix)".`;
+      }
+    }
     return null;
   };
   const sameTitleOf = (t: QueuedTrack): ArtistRelease | null => {
@@ -684,12 +705,14 @@ function TrackRow({
             {t.file.name}{t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}, {mb} MB
           </p>
           {problem && editable && <p className="mt-1 text-xs text-destructive">{problem}</p>}
-          {!problem && editable && twice && (
-            <p className="mt-1 text-xs text-amber-500">Two tracks in this batch have this title.</p>
-          )}
-          {!problem && editable && !twice && sameTitle && (
-            <p className="mt-1 text-xs text-amber-500">
-              You already have a record called this ({STATUS_LABEL[sameTitle.status] ?? sameTitle.status}). Send it anyway if this is a different version, or edit the other one instead.
+          {/* A plain duplicate is stopped in trackProblem now. What is left to
+              say here is the allowed case: the title marks this as its own
+              version, so it goes up beside the other one instead of over it. */}
+          {!problem && editable && (twice || sameTitle) && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {twice
+                ? 'Another track here shares this name, and this one is marked as its own version.'
+                : `You already have a record called this (${STATUS_LABEL[sameTitle!.status] ?? sameTitle!.status}). This goes up beside it as its own version.`}
             </p>
           )}
           {(t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || t.phase === 'auditioning') && (

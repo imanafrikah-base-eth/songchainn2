@@ -70,7 +70,15 @@ const STREAK_BONUS = 5;
 export const PLAY_THRESHOLD_SECONDS = 30;
 
 const PLAY_DEDUPE_WINDOW_MS = 30_000;
-const PULSE_DEDUPE_WINDOW_MS = 500;
+/**
+ * One pulse every three seconds, per person.
+ *
+ * Half a second was only there to swallow a double tap. A pulse reaches every
+ * other listener, so at half a second one enthusiastic thumb can shake the
+ * whole app twenty times in ten seconds. Three seconds is still immediate to
+ * the person tapping and stops the room being spammed.
+ */
+const PULSE_DEDUPE_WINDOW_MS = 3000;
 const OFFLINE_PLAYS_KEY = 'songchainn_offline_plays_v1';
 
 interface OfflinePlay {

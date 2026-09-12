@@ -457,7 +457,14 @@ export function useBatchUpload() {
       // holds the file. The cover landed before this was called (start does
       // it once for the batch); with no cover nothing goes live, so nothing is sent.
       const coverUrl = coverUrlRef.current;
-      if (!coverUrl) return { audition: Promise.resolve() };
+      if (!coverUrl) {
+        // This used to return quietly. The audio was already in the bucket by
+        // then, so the row sat at 'uploading' for ever: no cover, no audition,
+        // and nothing on screen saying why. One artist stranded eleven records
+        // that way and sent the same song three times trying to get through.
+        patch(key, { phase: 'error', error: NO_COVER });
+        return { audition: Promise.resolve() };
+      }
       await supabase
         .from('songs')
         .update({
@@ -485,7 +492,7 @@ export function useBatchUpload() {
 
       return { audition: runAudition(key, songId, warnings) };
     },
-    [user, queueLanding, runAudition],
+    [user, queueLanding, runAudition, patch],
   );
 
   /** A track whose file landed but whose audition fell over: ask once more. */

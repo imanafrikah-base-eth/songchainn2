@@ -98,14 +98,9 @@ export function UpdateAvailableBanner() {
       });
     });
 
-    // Listen for controller change (update applied)
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
-    });
+    /* The reload on controllerchange lives in main.tsx and nowhere else.
+       Two listeners meant two reloads racing each other, and this one had no
+       guard for a first install, so it could reload a brand new visitor. */
 
     // Periodically check for updates (every 5 minutes)
     const interval = setInterval(() => {

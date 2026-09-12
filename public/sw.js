@@ -24,7 +24,10 @@ self.addEventListener('install', (event) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  self.skipWaiting();
+  // Deliberately NOT skipWaiting(). A new build waits until the person
+  // taps Update. Calling it here activated every deploy on its own, the page
+  // reloaded underneath whoever was typing or uploading, and the Update button
+  // was decoration. The SKIP_WAITING message below is the consented path.
 });
 
 self.addEventListener('activate', (event) => {

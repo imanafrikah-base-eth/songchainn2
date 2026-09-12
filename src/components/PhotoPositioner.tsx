@@ -21,6 +21,7 @@ export function PhotoPositioner({
   disabled = false,
   alt = '',
   className = '',
+  style,
 }: {
   src: string;
   onChange: (crop: PhotoCrop) => void;
@@ -29,6 +30,8 @@ export function PhotoPositioner({
   disabled?: boolean;
   alt?: string;
   className?: string;
+  /** For a shape the caller works out at runtime, such as aspectRatio. */
+  style?: React.CSSProperties;
 }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -151,7 +154,7 @@ export function PhotoPositioner({
     <div
       ref={boxRef}
       className={`${className.includes('absolute') ? '' : 'relative'} overflow-hidden select-none ${disabled ? '' : 'cursor-grab active:cursor-grabbing'} ${className}`}
-      style={{ touchAction: 'none', WebkitUserSelect: 'none' }}
+      style={{ touchAction: 'none', WebkitUserSelect: 'none', ...style }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}

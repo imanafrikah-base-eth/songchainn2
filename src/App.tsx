@@ -136,14 +136,10 @@ function AppShell() {
       triggerGlobalPulse('local', detail?.songId ?? null, detail?.userId ?? null);
     };
 
-    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'song_analytics' }, payload => {
-      const row = (payload as any)?.new as { event_type?: string; song_id?: string; user_id?: string | null } | undefined;
-      if (!row || row.event_type !== 'pulse') return;
-      if (row.user_id && row.user_id === user?.id) return;
-      triggerGlobalPulse('realtime', row.song_id ?? null, row.user_id ?? null);
-    });
-
-    channel.subscribe();
+    /* A stranger's pulse no longer shakes the page underneath somebody who is
+       reading, typing or uploading. It arrives as the alert they can tap
+       (PulseAlert), which is the thing worth noticing. The shake stays for the
+       pulse you sent yourself, as the answer to your own tap. */
     window.addEventListener('songchainn:pulse', onLocalPulse as EventListener);
     return () => {
       window.removeEventListener('songchainn:pulse', onLocalPulse as EventListener);

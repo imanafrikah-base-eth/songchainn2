@@ -38,6 +38,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
+import { PhotoCropDialog, preparePhoto } from '@/components/PhotoCropDialog';
+
+/** Nothing shows a profile picture larger than this. */
+const PFP_EDGE = 1024;
 
 
 
@@ -72,6 +76,8 @@ export default function AudienceProfile() {
   const [followList, setFollowList] = useState<FollowListMode | null>(null);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  /** A photo waiting to be framed. The framed version is what gets sent. */
+  const [croppingPfp, setCroppingPfp] = useState<File | null>(null);
   const { isOnline: isProfileOnline, lastSeenAt: profileLastSeenAt } = useUserPresence(
     profile?.user_id ?? profile?.id,
     { includeLastSeen: true }
@@ -225,22 +231,10 @@ export default function AudienceProfile() {
   }, [untagSelf, refetchUserPosts]);
   const profileStreak = Number((profile as any)?.current_streak ?? 0);
 
-  const handleProfilePictureChange = useCallback(
-    async (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      e.target.value = '';
-      if (!file) return;
+  /** Send the framed photo, and show it the moment it lands. */
+  const applyProfilePicture = useCallback(
+    async (file: File) => {
       if (!isOwnProfile || !userId) return;
-
-      if (file.size > 10 * 1024 * 1024) {
-        toast({ title: 'Image too large (max 10MB)' });
-        return;
-      }
-      if (!file.type.startsWith('image/')) {
-        toast({ title: 'Please select an image file' });
-        return;
-      }
-
       if (!isSupabaseConfigured) {
         toast({ title: 'Picture uploads are not switched on yet' });
         return;
@@ -282,6 +276,26 @@ export default function AudienceProfile() {
       }
     },
     [isOwnProfile, userId]
+  );
+
+  // No ten megabyte refusal any more: a photo off a phone is made small here
+  // before it is sent. One that is not already square opens the framer, and
+  // the version the person frames is the version that goes live.
+  const handleProfilePictureChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!isOwnProfile || !userId) return;
+      if (!file.type.startsWith('image/')) {
+        toast({ title: 'Please select an image file' });
+        return;
+      }
+      const prepared = await preparePhoto(file, 1, PFP_EDGE);
+      if (prepared.needsCrop) setCroppingPfp(file);
+      else await applyProfilePicture(prepared.file);
+    },
+    [isOwnProfile, userId, applyProfilePicture]
   );
 
   if (loading) {
@@ -346,6 +360,17 @@ export default function AudienceProfile() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
         >
+          <PhotoCropDialog
+            file={croppingPfp}
+            aspect={1}
+            outputWidth={PFP_EDGE}
+            circle
+            title="Frame your picture"
+            description="Drag it until your face is where you want it. This is exactly what everyone will see."
+            onCancel={() => setCroppingPfp(null)}
+            onDone={(f) => { setCroppingPfp(null); void applyProfilePicture(f); }}
+          />
+
           {/* Avatar */}
           <div className="relative inline-block">
             <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl">

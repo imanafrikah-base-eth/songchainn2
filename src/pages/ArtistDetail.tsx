@@ -45,6 +45,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { PhotoCropDialog, preparePhoto } from '@/components/PhotoCropDialog';
+
+/** The band across the top of the page is about three times as wide as it is tall. */
+const COVER_ASPECT = 3;
+/** Nothing shows a profile picture larger than this, or a cover wider than this. */
+const PFP_EDGE = 1024;
+const COVER_EDGE = 2048;
 
 const NEW_ARTIST_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
 function isArtistNew(addedAt?: string) {
@@ -242,6 +249,9 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  /** A photo waiting to be framed. The framed version is what gets sent. */
+  const [croppingPfp, setCroppingPfp] = useState<File | null>(null);
+  const [croppingCover, setCroppingCover] = useState<File | null>(null);
   const [profileNameDraft, setProfileNameDraft] = useState('');
   const [bioDraft, setBioDraft] = useState('');
 
@@ -354,19 +364,10 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
     };
   }, []);
 
-  const handleProfilePictureChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!isOwner) return;
+  /** Show the framed photo straight away, then send that exact file. */
+  const applyProfilePicture = useCallback(async (file: File) => {
     const userId = ownerUserId;
     if (!userId) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image too large', { description: 'Max size is 10MB.' });
-      return;
-    }
-
     if (profilePictureObjectUrlRef.current) {
       URL.revokeObjectURL(profilePictureObjectUrlRef.current);
       profilePictureObjectUrlRef.current = null;
@@ -376,27 +377,29 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
       if (!prev) return prev;
       return { ...prev, profile_picture_url: profilePictureObjectUrlRef.current };
     });
-
     await uploadProfilePicture(file);
-  }, [isOwner, ownerUserId, queryClient, uploadProfilePicture]);
+  }, [ownerUserId, queryClient, uploadProfilePicture]);
 
-  const handleCoverPhotoChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+  // No size limit to fall foul of: a photo off a phone is made small here
+  // before it is sent. One that is not already square opens the framer, and
+  // the version the artist frames is the version that goes live.
+  const handleProfilePictureChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!isOwner) return;
-    const userId = ownerUserId;
-    if (!userId) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image too large', { description: 'Max size is 10MB.' });
-      return;
-    }
+    if (!isOwner || !ownerUserId) return;
     if (!file.type.startsWith('image/')) {
       toast.error('That is not an image', { description: 'Pick a JPG, PNG or WebP.' });
       return;
     }
+    const prepared = await preparePhoto(file, 1, PFP_EDGE);
+    if (prepared.needsCrop) setCroppingPfp(file);
+    else await applyProfilePicture(prepared.file);
+  }, [isOwner, ownerUserId, applyProfilePicture]);
 
+  const applyCoverPhoto = useCallback(async (file: File) => {
+    const userId = ownerUserId;
+    if (!userId) return;
     if (coverPhotoObjectUrlRef.current) {
       URL.revokeObjectURL(coverPhotoObjectUrlRef.current);
       coverPhotoObjectUrlRef.current = null;
@@ -406,9 +409,25 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
       if (!prev) return prev;
       return { ...prev, cover_photo_url: coverPhotoObjectUrlRef.current };
     });
-
     await uploadCoverPhoto(file);
-  }, [isOwner, ownerUserId, queryClient, uploadCoverPhoto]);
+  }, [ownerUserId, queryClient, uploadCoverPhoto]);
+
+  // The band across the top is wide, and almost no photo is. Framing it here
+  // is the difference between choosing what it shows and letting the browser
+  // crop the middle out of it.
+  const handleCoverPhotoChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!isOwner || !ownerUserId) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('That is not an image', { description: 'Pick a JPG, PNG or WebP.' });
+      return;
+    }
+    const prepared = await preparePhoto(file, COVER_ASPECT, COVER_EDGE);
+    if (prepared.needsCrop) setCroppingCover(file);
+    else await applyCoverPhoto(prepared.file);
+  }, [isOwner, ownerUserId, applyCoverPhoto]);
 
   useEffect(() => {
     if (!isOwner) return;
@@ -688,6 +707,24 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
           animate={{ opacity: 1, y: 0 }}
           className="mb-10"
         >
+          <PhotoCropDialog
+            file={croppingPfp}
+            aspect={1}
+            outputWidth={PFP_EDGE}
+            title="Frame your picture"
+            description="Drag it until your face is where you want it. This is exactly what everyone will see."
+            onCancel={() => setCroppingPfp(null)}
+            onDone={(f) => { setCroppingPfp(null); void applyProfilePicture(f); }}
+          />
+          <PhotoCropDialog
+            file={croppingCover}
+            aspect={COVER_ASPECT}
+            outputWidth={COVER_EDGE}
+            title="Frame your cover photo"
+            description="The top of your page is wide. Drag the photo until the part you want is in the band."
+            onCancel={() => setCroppingCover(null)}
+            onDone={(f) => { setCroppingCover(null); void applyCoverPhoto(f); }}
+          />
           <div className="relative h-48 md:h-64 rounded-3xl overflow-hidden mb-8 bg-secondary">
             <input
               ref={coverPhotoInputRef}
