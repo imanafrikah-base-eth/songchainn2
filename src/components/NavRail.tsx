@@ -1,4 +1,4 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { useProfilePath } from '@/hooks/useProfilePath';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -14,9 +14,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 // it does: Home, then Music, Community and You, each opening a panel.
 export function NavRail() {
   const location = useLocation();
-  const { user, isArtist, artistId } = useAuth();
+  const { user, isArtist } = useAuth();
   const roomOnlineCount = useRoomOnlineCount({ roomId: 'global', viewerUserId: user?.id });
-  const profilePath = isArtist && artistId ? artistPath(artistId) : '/profile';
+  const profilePath = useProfilePath();
   const groups = resolveNavGroups(profilePath, Boolean(isArtist));
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 

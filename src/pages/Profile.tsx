@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useEngagement } from '@/context/EngagementContext';
 import { useUserPoints } from '@/hooks/useUserPoints';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useArtistDirectory } from '@/hooks/useArtistDirectory';
 import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useToast } from '@/hooks/use-toast';
@@ -161,6 +162,17 @@ const BaseIcon = () => (
 
 export default function Profile() {
   const { user, audienceProfile, refreshProfile, isArtist, artistId, needsOnboarding, isLoading } = useAuth();
+  /**
+   * Whether this account is shown to the world as an artist yet.
+   *
+   * Holding an artist page is not the same as being one. Ticking "I make
+   * music" writes that row at sign up, so somebody with nothing released was
+   * being called an artist and sent to an empty page. They are audience until
+   * their first record is live. This is display only: `isArtist` still opens
+   * the Studio, or nobody could upload the song that changes it.
+   */
+  const artistDirectory = useArtistDirectory();
+  const showsAsArtist = Boolean(isArtist && artistDirectory.isReleasedArtist(user?.id));
   // The server ledger, not the browser counter. These two used to disagree on
   // screen: the Leaderboard read user_points while this card read a localStorage
   // number that cleared with site data.
@@ -675,11 +687,16 @@ export default function Profile() {
   }, [savedCatalogs.length, playlists.length, isArtist, artistFollowerCount, artistId, lifetimePoints, streak, completedReferrals, scrollToSavedCatalogs]);
 
 
-  // An artist's /profile is their artist page. Their account settings still
-  // live here (wallet, links, email, password, library, blocked people), so
-  // the artist page and the Studio open this with ?settings=1 rather than
+  // A RELEASED artist's /profile is their artist page. Their account settings
+  // still live here (wallet, links, email, password, library, blocked people),
+  // so the artist page and the Studio open this with ?settings=1 rather than
   // bouncing them straight back.
-  if (isArtist && artistId && !wantsSettings) {
+  //
+  // This used to fire on the artist_accounts row alone, which meant somebody
+  // who ticked "I make music" at sign up was thrown off their own profile onto
+  // an empty artist page before they had uploaded anything. Until the first
+  // record is live this page is their home.
+  if (showsAsArtist && artistId && !wantsSettings) {
     return <Navigate to={artistPath(artistId)} replace />;
   }
 
@@ -961,7 +978,13 @@ export default function Profile() {
               </div>
             )}
             <div className="flex items-center gap-3">
-              <p className="text-sm text-muted-foreground">{isArtist ? 'Artist' : 'Audience Member'}</p>
+              <p className="text-sm text-muted-foreground">
+                {showsAsArtist
+                  ? 'Artist'
+                  : isArtist
+                    ? 'Artist once your first song is live'
+                    : 'Audience Member'}
+              </p>
               <span className="text-xs text-muted-foreground whitespace-nowrap">{profilePresenceLabel}</span>
               {isArtist && artistId && (
                 <Link to={artistPath(artistId)} className="text-sm text-primary hover:underline">

@@ -16,7 +16,8 @@ import {
   Filter,
   Grid3X3,
   List,
-  MapPin
+  MapPin,
+  Headphones
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -34,6 +35,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useArtistDirectory } from '@/hooks/useArtistDirectory';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 const logo = '/songchainn-logo.webp';
 
@@ -137,6 +139,10 @@ export default function Community() {
   const navigate = useNavigate();
   const { following, followUser, isFollowing } = useSocial();
   const { topProfiles } = useTopProfiles(100);
+  /* Who is an artist and who is still audience, in one lookup for the whole
+     page rather than a query per tap. Somebody counts as an artist once a
+     record of theirs is actually out. */
+  const directory = useArtistDirectory();
   
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
@@ -146,6 +152,7 @@ export default function Community() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'active'>('active');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [peopleTab, setPeopleTab] = useState<'everyone' | 'artists' | 'audience'>('everyone');
   const [presenceRefreshAt, setPresenceRefreshAt] = useState(Date.now());
   const { onlineUserIds, lastSeenByUserId } = useOnlineUsers(users.map((profile) => profile.user_id), { includeLastSeen: true });
   const onlineUsers = users.filter((profile) => onlineUserIds.has(profile.user_id));
@@ -391,6 +398,14 @@ export default function Community() {
       return name.includes(query) || bio.includes(query);
     });
 
+    // Artists and audience are different rooms. Everyone used to be poured into
+    // one list, so a person looking for musicians waded through listeners and a
+    // brand new account with no songs sat among the artists.
+    if (peopleTab !== 'everyone') {
+      const wantArtists = peopleTab === 'artists';
+      filtered = filtered.filter((u) => directory.isReleasedArtist(u.user_id) === wantArtists);
+    }
+
     switch (sortBy) {
       case 'newest':
         filtered = filtered.sort((a, b) =>
@@ -416,7 +431,14 @@ export default function Community() {
     }
 
     return filtered;
-  }, [users, searchQuery, sortBy, user?.id]);
+  }, [users, searchQuery, sortBy, user?.id, peopleTab, directory]);
+
+  /** How many sit in each room, so a tab says what is behind it before it is tapped. */
+  const peopleCounts = useMemo(() => {
+    let artists = 0;
+    for (const u of users) if (directory.isReleasedArtist(u.user_id)) artists += 1;
+    return { everyone: users.length, artists, audience: users.length - artists };
+  }, [users, directory]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -444,6 +466,21 @@ export default function Community() {
   };
 
   const goToProfile = async (userId: string) => {
+    // Their page, if they hold one. This asks the directory the whole page
+    // already loaded instead of querying artist_accounts on every single tap.
+    // Note it keys on holding an artist page, not on having released: an
+    // artist's page exists and should still be where their name leads, even
+    // while the directory itself still counts them as audience.
+    const known = directory.artistIdByUser.get(userId);
+    if (known) {
+      navigate(artistPath(known));
+      return;
+    }
+    if (directory.artistIdByUser.size > 0) {
+      navigate(`/audience/${userId}`);
+      return;
+    }
+    // Directory not back yet. Fall back to the single row it would have held.
     const { data } = await (supabase as any)
       .from('artist_accounts')
       .select('artist_id')
@@ -598,6 +635,29 @@ export default function Community() {
               </button>
             </div>
           </div>
+
+          {/* Who you are looking at. Artists and audience are different rooms,
+              and somebody only moves into the artists room once a record of
+              theirs is actually out. */}
+          <Tabs value={peopleTab} onValueChange={(v) => setPeopleTab(v as typeof peopleTab)}>
+            <TabsList className="w-full sm:w-auto">
+              <TabsTrigger value="everyone" className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Everyone
+                <span className="text-[11px] tabular-nums text-muted-foreground">{peopleCounts.everyone}</span>
+              </TabsTrigger>
+              <TabsTrigger value="artists" className="flex items-center gap-2">
+                <Music className="w-4 h-4" />
+                Artists
+                <span className="text-[11px] tabular-nums text-muted-foreground">{peopleCounts.artists}</span>
+              </TabsTrigger>
+              <TabsTrigger value="audience" className="flex items-center gap-2">
+                <Headphones className="w-4 h-4" />
+                Listeners
+                <span className="text-[11px] tabular-nums text-muted-foreground">{peopleCounts.audience}</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           {/* Sort Tabs */}
           <Tabs value={sortBy} onValueChange={(v) => handleSortChange(v as typeof sortBy)}>

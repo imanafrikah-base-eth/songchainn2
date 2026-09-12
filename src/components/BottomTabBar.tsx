@@ -1,4 +1,4 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { useProfilePath } from '@/hooks/useProfilePath';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,9 +18,9 @@ export function BottomTabBar() {
   const location = useLocation();
   const playerState = useSafePlayerState();
   const currentSong = playerState?.currentSong;
-  const { user, isArtist, artistId } = useAuth();
+  const { user, isArtist } = useAuth();
   const roomOnlineCount = useRoomOnlineCount({ roomId: 'global', viewerUserId: user?.id });
-  const profilePath = isArtist && artistId ? artistPath(artistId) : '/profile';
+  const profilePath = useProfilePath();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 

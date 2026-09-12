@@ -1,4 +1,4 @@
-import { artistPath } from '@/lib/slugRoutes';
+import { useProfilePath } from '@/hooks/useProfilePath';
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,7 +32,7 @@ export function Navigation() {
   const location = useLocation();
   const navigate = useNavigate();
   const { lifetimePoints, streak } = useUserPoints();
-  const { signOut, walletAddress, user, isArtist, artistId } = useAuth();
+  const { signOut, walletAddress, user, isArtist } = useAuth();
   const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const [showInvite, setShowInvite] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -72,7 +72,7 @@ export function Navigation() {
     username: roomUsername,
   });
   const { showRoom } = usePlayerActions();
-  const profilePath = isArtist && artistId ? artistPath(artistId) : '/profile';
+  const profilePath = useProfilePath();
   const navGroups = resolveNavGroups(profilePath, Boolean(isArtist));
   const showReturnToRoom =
     Boolean(playerState?.isRoomMode) && Boolean(playerState?.isRoomHidden) && location.pathname !== '/room';
