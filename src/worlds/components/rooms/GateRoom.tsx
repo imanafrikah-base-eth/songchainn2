@@ -2,7 +2,7 @@
 // in. Public to everyone, no wallet needed.
 
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, CameraOff } from 'lucide-react';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { getArtistSlugUrl } from '@/lib/slugRoutes';
 import { useRankedSongs } from '@/hooks/usePopularity';
@@ -31,6 +31,20 @@ export function GateRoom({ world, rings }: { world: WorldConfig; rings: WorldRin
           </p>
         ))}
         <p className="font-heading text-lg font-bold text-amber-300">{world.positioning}</p>
+
+        {/* The owner's wish, said once, on the way in. Worded as the ask it
+            actually is: we cannot stop a screenshot in a browser and will not
+            imply we can. Marked data-protect so that if the Android app ever
+            gains FLAG_SECURE there is one hook to honour, not two. */}
+        {world.noScreenshots && (
+          <p
+            data-protect=""
+            className="flex items-start gap-2 rounded-xl border border-white/15 px-3 py-2 text-sm text-white/70"
+          >
+            <CameraOff className="mt-0.5 h-4 w-4 shrink-0 text-white/50" aria-hidden="true" />
+            <span>{world.artistName} asks you not to screenshot this world. Please keep it between us.</span>
+          </p>
+        )}
       </section>
 
       <section>

@@ -937,6 +937,35 @@ export default function WorldBuilder() {
               </div>
             </div>
 
+            {/* Asking is all this can honestly be. A browser cannot stop a
+                screenshot, so the setting is worded as a request and the note
+                below says plainly where it does and does not hold. Promising
+                an artist their work cannot be captured, and then having it
+                turn up on somebody's timeline, is a lie we would have told. */}
+            <div className="rounded-lg border border-border bg-card p-3.5">
+              <h2 className="text-sm font-medium text-foreground">Ask visitors not to screenshot this world</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Your world says so on the way in, and the app holds to it wherever it can.
+              </p>
+              <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-border p-3">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={b.world?.no_screenshots ?? false}
+                  onChange={(e) => b.saveWorld({ no_screenshots: e.target.checked })}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">Ask them not to</span>
+                  <span className="block text-sm text-muted-foreground">
+                    Be straight with yourself about this one: on a phone browser or a computer nobody
+                    can stop a screenshot, and we will not pretend otherwise. What this does is state
+                    your wish where every visitor sees it, and hold to it in the Android app once that
+                    is built.
+                  </span>
+                </span>
+              </label>
+            </div>
+
             <Button onClick={() => setStep('drops')} size="lg" className="h-11 w-full rounded-full">
               Drops
               <ArrowRight className="ml-2 h-4 w-4" />

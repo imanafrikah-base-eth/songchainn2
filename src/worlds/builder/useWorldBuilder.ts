@@ -33,6 +33,16 @@ export interface DraftWorld {
   tier: string;
   /** Who, besides the owner, may post inside this world. Off unless set. */
   visitor_posts: 'off' | 'members' | 'everyone';
+  /**
+   * The owner asks visitors not to screenshot this world.
+   *
+   * A request, not a block, and the copy must never say otherwise. A browser
+   * cannot stop a screenshot: the operating system takes it and the page is
+   * never consulted. Android could, with FLAG_SECURE, but this is one webview
+   * serving every route, so per world enforcement needs a native plugin that
+   * does not exist yet.
+   */
+  no_screenshots: boolean;
   /** How much Mo$ha talks during the build. Only read on paid tiers. */
   mosha_mode: 'guided' | 'quiet';
   /* The art. Every slot World #001 has; all optional. */
@@ -137,6 +147,7 @@ const WORLD_FIELD_WORDS: Partial<Record<keyof DraftWorld, [string, string]>> = {
   artist_name: ['changed the name on the world', 'cleared the name on the world'],
   accent: ['changed the colour of the world', 'changed the colour of the world'],
   visitor_posts: ['changed who may post in the world', 'changed who may post in the world'],
+  no_screenshots: ['asked visitors not to screenshot the world', 'stopped asking visitors not to screenshot the world'],
   ad_kind: ['changed what the advert on Home shows', 'changed what the advert on Home shows'],
   ad_image: ['set the picture for the advert on Home', 'took the advert picture off'],
   ad_video: ['set the clip for the advert on Home', 'took the advert clip off'],
@@ -195,7 +206,7 @@ export function useWorldBuilder(worldId?: string) {
         const { data: w, error: we } = await supabase
           .from('worlds')
           .select(
-            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth, zora_profile_url, zora_wallet_address, ad_kind, ad_image, ad_video, art_fit',
+            'id, slug, artist_name, positioning, story, accent, hero_image, token_symbol, status, world_number, tier, visitor_posts, no_screenshots, mosha_mode, hero_video, entrance_poster, entrance_video, room_art, room_video, city_art, city_video, depth, zora_profile_url, zora_wallet_address, ad_kind, ad_image, ad_video, art_fit',
           )
           .eq('id', id)
           .maybeSingle();

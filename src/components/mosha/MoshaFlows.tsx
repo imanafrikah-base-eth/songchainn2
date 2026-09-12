@@ -802,6 +802,23 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
         </div>
 
         <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Screenshots</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {([[false, 'Fine by me'], [true, 'Please do not']] as const).map(([v, t]) => (
+              <button
+                key={String(v)}
+                type="button"
+                onClick={() => { void b.saveWorld({ no_screenshots: v }); done(`Screenshots: ${t}`); }}
+                className={`h-10 rounded-full px-3 text-xs font-medium ${(w.no_screenshots ?? false) === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">A request shown to visitors. No browser can actually block one.</p>
+        </div>
+
+        <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">The key</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {([['songchainn', '$ONGCHAINN'], ['points', 'Loyalty points'], ['pass', 'A pass'], ['token', zoraCoin ? 'My creator coin' : 'My own token']] as const).map(([v, t]) => (

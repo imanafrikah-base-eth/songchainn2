@@ -111,6 +111,17 @@ export interface WorldConfig {
   farcasterUrl?: string;
   /** The one-line positioning statement, rendered verbatim. */
   positioning: string;
+  /**
+   * The owner asks visitors not to screenshot this world.
+   *
+   * A request, and the interface must never dress it as anything stronger. A
+   * browser cannot stop a screenshot: the operating system takes it and the
+   * page is never asked. Android can, with FLAG_SECURE, but this app is one
+   * webview serving every route, so honouring it per world needs a native
+   * plugin that is not built yet. Until then this states the wish where
+   * visitors see it, and nothing claims the wish is enforced.
+   */
+  noScreenshots?: boolean;
   /** Gate room story, one paragraph per entry. */
   story: string[];
   /**
