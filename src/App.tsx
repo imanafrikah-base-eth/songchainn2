@@ -14,6 +14,7 @@ import { PlayerProvider } from "@/context/PlayerContext";
 import { EngagementProvider } from "@/context/EngagementContext";
 import { OfflineQueueProvider } from "@/hooks/useOfflineQueue";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { BackToTop } from "@/components/BackToTop";
 import { ConnectWalletModal } from "@/components/ConnectWalletModal";
 import { AgePrompt } from "@/components/AgePrompt";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
@@ -233,6 +234,10 @@ function AppShell() {
       {/* The Phase Two launch announcement has served its purpose. Nothing is
           in beta or in a phase any more; WhatsLive on Home says what is here. */}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
+      {/* The way back up a long page. It parks above the tab bar, and it leaves
+          the feed alone by nature: that page scrolls its own snap container,
+          so the window never moves and this never appears there. */}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><BackToTop /></ErrorBoundary>}
       {/* Accounts that existed before we asked for a date of birth. The age
           checks fail closed, so without this every one of them quietly loses
           uploads and messaging. */}

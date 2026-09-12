@@ -6,7 +6,8 @@
 // gets to say "it is paid": battles.voice_enabled can only be changed by the
 // service role (the guard_battle_voice trigger refuses everyone else).
 //
-//   Main Stage  $3 in $WWAT, at the live price Zora reports.
+//   Main Stage  $3 in $WWAT, at the live price Zora reports, but never more
+//               than the token ceiling below.
 //   Open Mic    takes no money at all, so voice there is only for the hosts
 //               the founder named.
 //   Free hosts  IMan Afrikah and N3M3SIS, the two main testers.
@@ -42,10 +43,35 @@ function json(origin: string | null, body: unknown, status = 200) {
 
 /* ------------------------------------------------------------ the terms --- */
 
-const VOICE_FEE_USD = 3;
+/**
+ * What in-app voice costs on the Main Stage, held as an exact fraction so the
+ * amount somebody is charged never passes through floating point.
+ */
+const VOICE_FEE_USD_NUM = 3n;
+const VOICE_FEE_USD_DEN = 1n;
+/** For display and for the row we write down. */
+const VOICE_FEE_USD = Number(VOICE_FEE_USD_NUM) / Number(VOICE_FEE_USD_DEN);
 /** $WWAT on Base. Public the moment it exists; the same address the app ships with. */
 const WWAT = "0xefa920796416daf8dc8df7e5ceaeee45ae3350be";
 const WWAT_DECIMALS = 18n;
+
+/**
+ * THE CEILING, AND WHY IT EXISTS.
+ *
+ * A price in dollars against a very cheap coin asks for an absurd number of
+ * tokens. $WWAT's whole supply is one billion, and at the September 2026 price
+ * three dollars came to about 26.4 million of them: roughly 2.6% of every
+ * token that will ever exist, for one battle. Charging that would drain the
+ * float faster than the battles could ever be worth.
+ *
+ * So the host pays the LESSER of the dollar price and this ceiling. While the
+ * coin is cheap the ceiling binds and a battle costs a few cents. As $WWAT
+ * appreciates the dollar price falls below the ceiling on its own and the real
+ * three dollars takes over, with no code change and no announcement. Keep this
+ * in step with MAX_FEE_TOKENS in battle-host-fee.
+ */
+const MAX_FEE_TOKENS = 250_000n * 10n ** WWAT_DECIMALS;
+
 /** The SONGCHAINN treasury, the same address src/lib/onchain.ts pays to. */
 const TREASURY = "0x70d211c7ed27cfa73d6fddaf43736159f19ea118";
 /** IMan Afrikah and N3M3SIS: they host voice battles free. */
@@ -75,7 +101,7 @@ function fraction(decimal: string): { num: bigint; den: bigint } | null {
   return { num, den: 10n ** BigInt(frac.length) };
 }
 
-async function wwatPrice(): Promise<{ priceUsd: number; amountRaw: bigint } | null> {
+async function wwatPrice(): Promise<{ priceUsd: number; amountRaw: bigint; capped: boolean } | null> {
   try {
     const res = await fetch(`https://api-sdk.zora.engineering/coin?address=${WWAT}&chain=8453`, {
       signal: AbortSignal.timeout(10_000),
@@ -86,9 +112,11 @@ async function wwatPrice(): Promise<{ priceUsd: number; amountRaw: bigint } | nu
     const f = fraction(raw);
     if (!f) return null;
     // tokens = usd / price = usd * den / num; raw = tokens * 10^decimals, rounded up.
-    const top = BigInt(VOICE_FEE_USD) * f.den * 10n ** WWAT_DECIMALS;
-    const amountRaw = (top + f.num - 1n) / f.num;
-    return { priceUsd: Number(raw), amountRaw };
+    const top = VOICE_FEE_USD_NUM * f.den * 10n ** WWAT_DECIMALS;
+    const bottom = VOICE_FEE_USD_DEN * f.num;
+    const atPrice = (top + bottom - 1n) / bottom;
+    const amountRaw = atPrice > MAX_FEE_TOKENS ? MAX_FEE_TOKENS : atPrice;
+    return { priceUsd: Number(raw), amountRaw, capped: atPrice > MAX_FEE_TOKENS };
   } catch {
     return null;
   }
@@ -163,6 +191,7 @@ Deno.serve(async (req) => {
       exempt: false,
       usd: VOICE_FEE_USD,
       priceUsd: price.priceUsd,
+      capped: price.capped,
       amountRaw: price.amountRaw.toString(),
       amountDisplay: tokens.toLocaleString("en-US"),
       token: WWAT,

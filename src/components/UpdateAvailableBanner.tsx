@@ -112,7 +112,9 @@ export function UpdateAvailableBanner() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleUpdate = () => applyAppUpdate();
+  // Deliberately not awaited: the store drives the spinner, and the reload
+  // that follows ends this component's life anyway.
+  const handleUpdate = () => void applyAppUpdate();
 
   // Put the banner away. The Update button in the navigation stays until
   // the update is taken, so "Later" never means "never".

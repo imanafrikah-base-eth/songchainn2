@@ -65,6 +65,24 @@ const HOST_FEE_USD = Number(HOST_FEE_USD_NUM) / Number(HOST_FEE_USD_DEN);
 /** $WWAT on Base. */
 const WWAT = "0xefa920796416daf8dc8df7e5ceaeee45ae3350be";
 const WWAT_DECIMALS = 18n;
+
+/**
+ * THE CEILING, AND WHY IT EXISTS.
+ *
+ * A price in dollars against a very cheap coin asks for an absurd number of
+ * tokens. $WWAT's whole supply is one billion, and at the September 2026 price
+ * one dollar came to about 8.8 million of them: nearly 1% of every token that
+ * will ever exist, for one battle. Charging that would drain the float faster
+ * than the battles could ever be worth.
+ *
+ * So the host pays the LESSER of the dollar price and this ceiling. While the
+ * coin is cheap the ceiling binds and a battle costs a few cents. As $WWAT
+ * appreciates the dollar price falls below the ceiling on its own and the real
+ * dollar takes over, with no code change and no announcement. Keep this in
+ * step with MAX_FEE_TOKENS in battle-voice.
+ */
+const MAX_FEE_TOKENS = 90_000n * 10n ** WWAT_DECIMALS;
+
 /** The SONGCHAINN treasury, the same address src/lib/onchain.ts pays to. */
 const TREASURY = "0x70d211c7ed27cfa73d6fddaf43736159f19ea118";
 
@@ -98,7 +116,7 @@ function fraction(decimal: string): { num: bigint; den: bigint } | null {
   return { num, den: 10n ** BigInt(frac.length) };
 }
 
-async function wwatAmountForUsd(): Promise<{ priceUsd: number; amountRaw: bigint } | null> {
+async function wwatAmountForUsd(): Promise<{ priceUsd: number; amountRaw: bigint; capped: boolean } | null> {
   try {
     const res = await fetch(`https://api-sdk.zora.engineering/coin?address=${WWAT}&chain=8453`, {
       signal: AbortSignal.timeout(10_000),
@@ -113,8 +131,9 @@ async function wwatAmountForUsd(): Promise<{ priceUsd: number; amountRaw: bigint
     // never a hair short of what the server will check for.
     const top = HOST_FEE_USD_NUM * f.den * 10n ** WWAT_DECIMALS;
     const bottom = HOST_FEE_USD_DEN * f.num;
-    const amountRaw = (top + bottom - 1n) / bottom;
-    return { priceUsd: Number(raw), amountRaw };
+    const atPrice = (top + bottom - 1n) / bottom;
+    const amountRaw = atPrice > MAX_FEE_TOKENS ? MAX_FEE_TOKENS : atPrice;
+    return { priceUsd: Number(raw), amountRaw, capped: atPrice > MAX_FEE_TOKENS };
   } catch {
     return null;
   }
@@ -275,6 +294,7 @@ Deno.serve(async (req) => {
       exempt: false,
       usd: HOST_FEE_USD,
       priceUsd: price.priceUsd,
+      capped: price.capped,
       token: WWAT,
       totalRaw: price.amountRaw.toString(),
       legs,

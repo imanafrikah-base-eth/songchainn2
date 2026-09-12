@@ -688,7 +688,7 @@ function UpdateButton() {
     <motion.button
       type="button"
       whileTap={{ scale: 0.95 }}
-      onClick={() => applyAppUpdate()}
+      onClick={() => void applyAppUpdate()}
       disabled={update.applying}
       aria-label="Update the app"
       className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-glow disabled:opacity-70"
