@@ -384,11 +384,18 @@ Deno.serve(async (req) => {
   // be written directly (it has no insert policy at all; add_my_wallet is the
   // only way in).
   //
-  // That is a narrowing, not a proof. add_my_wallet still binds any address on
-  // nothing but a format check, so a determined attacker can still register an
-  // address they do not control. The real fix is proof of key control before an
-  // address counts here, the way wallet-auth already does it with SIWE.
-  const { data: wallets } = await db.from("user_wallets").select("address").eq("user_id", user.id);
+  // PROVED, not merely registered, and that distinction is the whole point.
+  // verified_at is set only by wallet-link, after that address signed a
+  // challenge naming this account. Until 12 Sep this read every user_wallets
+  // row, and add_my_wallet binds any address on a format check alone: since
+  // every transfer on Base is public, claiming a stranger's fee payment was a
+  // matter of copying their address off a block explorer and registering it.
+  // An unproved wallet is a convenience note and never speaks for anybody here.
+  const { data: wallets } = await db
+    .from("user_wallets")
+    .select("address")
+    .eq("user_id", user.id)
+    .not("verified_at", "is", null);
   const mine = new Set<string>(
     ((wallets ?? []) as Array<{ address: string }>).map((w) => w.address.toLowerCase()),
   );

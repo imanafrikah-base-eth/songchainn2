@@ -4,6 +4,7 @@ import { getWalletProvider } from '@/lib/baseWallet';
 import { getPublicClient } from '@/lib/nft';
 import { ensureBase } from '@/lib/safeBuy';
 import { requestWalletConnection } from '@/lib/walletGate';
+import { proveWallet } from '@/lib/proveWallet';
 
 /**
  * Paying for a battle, and paying the artists in the same breath.
@@ -104,11 +105,13 @@ export async function payHostFee(quote: HostFeeQuote, onLeg?: (done: number, tot
     throw new Error('Not enough $WWAT in this wallet for the host fee, so nothing was spent. Get some $WWAT first, then try again.');
   }
 
-  // The server only accepts payment from a wallet that belongs to the host.
-  try {
-    await supabase.rpc('add_my_wallet' as never, { p_address: address, p_provider: 'other', p_label: null } as never);
-  } catch {
-    /* the server says so plainly if it is missing */
+  // The server only accepts payment from a wallet that has PROVED it holds its
+  // own key. Asking here, before a single transfer goes out, means a wallet
+  // that cannot prove itself costs the host nothing: they sign one sentence, or
+  // they stop, and either way their money is untouched.
+  const proof = await proveWallet(address);
+  if (!proof.ok) {
+    throw new Error(`${proof.error ?? 'That wallet could not be proved.'} Nothing was spent.`);
   }
 
   const provider = getWalletProvider();

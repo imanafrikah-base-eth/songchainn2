@@ -213,10 +213,16 @@ Deno.serve(async (req) => {
   // to everyone the moment it is mined. Without this, anybody could take a
   // stranger's purchase and count themselves as a backer with it.
   //
-  // Same caveat as the fee functions: add_my_wallet binds an address on nothing
-  // but a format check, so this is a narrowing rather than proof. The real fix
-  // is proof of key control, the way wallet-auth already does it with SIWE.
-  const { data: wallets } = await db.from("user_wallets").select("address").eq("user_id", user.id);
+  // PROVED, not merely registered. verified_at is set only by wallet-link,
+  // after that address signed a challenge naming this account. Registering an
+  // address proves nothing: add_my_wallet takes any well formed string, and a
+  // backer's purchase is public the moment it is mined, so without this a
+  // stranger could count themselves as a backer using somebody else's trade.
+  const { data: wallets } = await db
+    .from("user_wallets")
+    .select("address")
+    .eq("user_id", user.id)
+    .not("verified_at", "is", null);
   const mine = new Set<string>(
     ((wallets ?? []) as Array<{ address: string }>).map((w) => String(w.address).toLowerCase()),
   );

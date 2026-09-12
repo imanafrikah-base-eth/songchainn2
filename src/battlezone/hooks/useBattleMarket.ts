@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { supabase } from '@/battlezone/integrations/supabase/client';
 import { buyCoinWithEth } from '@/lib/zoraTrading';
+import { proveWallet } from '@/lib/proveWallet';
 
 /**
  * The trading ground for one battle.
@@ -98,6 +99,19 @@ export function useBackCorner() {
     async (params: BackCornerParams): Promise<BackResult> => {
       setPending(true);
       try {
+        // 0. Prove the wallet BEFORE any money moves.
+        //
+        //    The board only counts a purchase from a wallet that has proved it
+        //    holds its own key. Doing that after the buy would mean somebody
+        //    pays for a coin and only then discovers they cannot be counted,
+        //    which is the exact shape of the bug this whole path just had. One
+        //    signature, which moves nothing and costs no gas, comes first.
+        setStatus('Prove this wallet is yours');
+        const proof = await proveWallet(params.walletAddress);
+        if (!proof.ok) {
+          return { success: false, error: `${proof.error ?? 'That wallet could not be proved.'} Nothing was spent.` };
+        }
+
         setStatus('Confirm in your wallet');
 
         // 1. The purchase. Their wallet, their coin, straight to Zora.
@@ -124,21 +138,6 @@ export function useBackCorner() {
         //    itself rather than from what we typed, and is the only thing that
         //    can add anybody to the board.
         setStatus('Adding you to the board');
-
-        // The server only counts a purchase made from a wallet on this account,
-        // so a stranger's trade cannot be claimed off the public chain. Same
-        // step the host fee and voice fee take before they pay.
-        try {
-          await (supabase as never as {
-            rpc: (fn: string, args: Record<string, unknown>) => Promise<unknown>;
-          }).rpc('add_my_wallet', {
-            p_address: params.walletAddress,
-            p_provider: 'other',
-            p_label: null,
-          });
-        } catch {
-          /* the server says so plainly if the wallet is missing */
-        }
 
         const { data, error } = await supabase.functions.invoke('battle-trade-verify', {
           body: {
