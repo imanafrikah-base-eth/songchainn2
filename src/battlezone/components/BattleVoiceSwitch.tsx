@@ -12,6 +12,28 @@ import { enableVoice, payVoiceFee, quoteVoice, type VoiceQuote } from '@/battlez
  * If a payment went out but the switch did not flip, the transaction is kept
  * on screen so it can be checked again without paying twice.
  */
+/**
+ * What the host actually pays, said in that order: the tokens that will leave
+ * their wallet, then what that is worth.
+ *
+ * While $WWAT is cheap a token ceiling binds and the dollar figure is NOT what
+ * gets charged: at the September 2026 price the $3 fee is capped to 250,000
+ * $WWAT, about three cents. Printing "$3" was the interface overstating its own
+ * price by a hundred times, which is a strange way to talk somebody out of
+ * hosting.
+ */
+function priceWords(q: VoiceQuote): string {
+  if (!q.capped) {
+    return `$${q.usd} in $WWAT${q.amountDisplay ? `, about ${q.amountDisplay} $WWAT at today's price` : ''}`;
+  }
+  const tokens = q.amountDisplay ? `${q.amountDisplay} $WWAT` : `the $WWAT fee`;
+  const whole = q.amountRaw ? Number(q.amountRaw) / 1e18 : null;
+  const usd = whole !== null && q.priceUsd ? whole * q.priceUsd : null;
+  const money =
+    usd === null ? '' : usd < 1 ? `, about ${Math.max(1, Math.round(usd * 100))} cents` : `, about $${usd.toFixed(2)}`;
+  return `${tokens}${money}`;
+}
+
 export function BattleVoiceSwitch({ battleId, onEnabled }: { battleId: string; onEnabled: () => void }) {
   const [quote, setQuote] = useState<VoiceQuote | null>(null);
   const [busy, setBusy] = useState<'quote' | 'paying' | 'checking' | null>('quote');
@@ -70,7 +92,7 @@ export function BattleVoiceSwitch({ battleId, onEnabled }: { battleId: string; o
           <p className="text-xs text-muted-foreground">
             {quote.exempt
               ? 'Talk to the room from here, bring people up to speak, and take requests. Free for you.'
-              : `Talk to the room from here, bring people up to speak, and take requests. It costs $${quote.usd} in $WWAT${quote.amountDisplay ? `, about ${quote.amountDisplay} $WWAT at today's price` : ''}, paid from your wallet to the WaveWarz Africa treasury.`}
+              : `Talk to the room from here, bring people up to speak, and take requests. It costs ${priceWords(quote)}, paid from your wallet to the WaveWarz Africa treasury.`}
           </p>
           {paidTx ? (
             <p className="mt-2 text-xs text-foreground">
@@ -90,7 +112,9 @@ export function BattleVoiceSwitch({ battleId, onEnabled }: { battleId: string; o
                 ? 'Checking the payment'
                 : quote.exempt || paidTx
                   ? 'Turn on voice'
-                  : `Pay $${quote.usd} and turn on voice`}
+                  : quote.capped && quote.amountDisplay
+                    ? `Pay ${quote.amountDisplay} $WWAT and turn on voice`
+                    : `Pay $${quote.usd} and turn on voice`}
           </button>
           {!quote.exempt ? (
             <div className="mt-3">

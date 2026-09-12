@@ -38,6 +38,12 @@ export interface HostFeeQuote {
   reason?: string;
   usd: number;
   priceUsd?: number;
+  /**
+   * The token ceiling bound, so what is charged is less than the dollar price.
+   * True while $WWAT is cheap. The interface should say what is actually being
+   * paid, not the dollar figure it was capped down from.
+   */
+  capped?: boolean;
   token?: string;
   totalRaw?: string;
   legs?: FeeLeg[];

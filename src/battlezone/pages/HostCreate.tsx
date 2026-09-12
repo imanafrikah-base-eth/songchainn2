@@ -21,7 +21,7 @@ import { BattleArtistPicker } from "@/battlezone/components/BattleArtistPicker";
 import { usePublishedCatalog } from "@/hooks/usePublishedCatalog";
 import { durationsFromUrls } from "@/battlezone/lib/songDuration";
 import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
-import { HOST_FEE_ENABLED } from "@/battlezone/config";
+import { HOST_FEE_ENABLED, VOICE_FEE_MAX_TOKENS } from "@/battlezone/config";
 import { quoteHostFee, payHostFee, confirmHostFee } from "@/battlezone/lib/hostFee";
 
 /* A counter, not a clock: two mounts in the same millisecond would share a
@@ -949,7 +949,7 @@ const HostCreate = () => {
             )}
             <p className="text-xs text-muted-foreground">
               {stage === "main_stage"
-                ? "In-app voice: once the battle is up, turn it on from the room. It costs $3 in $WWAT. Without it, the X Space link above still carries the sound."
+                ? `In-app voice: once the battle is up, turn it on from the room. It costs $3 in $WWAT, and never more than ${VOICE_FEE_MAX_TOKENS.toLocaleString('en-US')} $WWAT, so while the coin is this cheap you pay the cap, which is a few cents. Without it, the X Space link above still carries the sound.`
                 : "The Open Mic takes no money, so it keeps the X Space link above for sound."}
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">

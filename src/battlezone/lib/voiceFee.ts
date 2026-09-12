@@ -21,6 +21,12 @@ export interface VoiceQuote {
   exempt: boolean;
   usd: number;
   priceUsd?: number;
+  /**
+   * The token ceiling bound, so what is charged is less than the dollar price.
+   * True while $WWAT is cheap. Say what is actually being paid, not the dollar
+   * figure it was capped down from.
+   */
+  capped?: boolean;
   amountRaw?: string;
   /** The amount in whole $WWAT, rounded for reading. */
   amountDisplay?: string;
