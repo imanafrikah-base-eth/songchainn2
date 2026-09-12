@@ -980,6 +980,17 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
         </div>
       </div>
 
+      {/* A record whose audio landed but whose cover never did used to sit here
+          saying "Upload started" for ever, with nothing to say what was wrong.
+          One artist stranded eleven that way and sent the same song three times
+          trying to get past it. Say what is missing and what fixes it. */}
+      {release.status === 'uploading' && !release.cover_art_url && (
+        <p className="mt-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+          Your audio is safely uploaded. This one still needs its cover art. Open Edit details, add
+          the artwork, and it goes to the judges by itself.
+        </p>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
