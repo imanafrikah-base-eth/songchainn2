@@ -281,14 +281,74 @@ Deno.serve(async (req) => {
   }
   const artists = names.map((n) => ({ name: n, wallet: byName.get(n)! }));
 
-  const price = await wwatAmountForUsd();
-  if (!price) {
-    return json(origin, { error: "Could not read the $WWAT price just now. Try again in a minute." }, 503);
+  // How long a quote is honoured: long enough for a wallet confirmation and a
+  // Base block or two, short enough that nobody sits on a stale price.
+  const QUOTE_TTL_MS = 20 * 60 * 1000;
+
+  // WHAT THIS HOST WAS QUOTED, NOT WHAT IT COSTS NOW.
+  //
+  // Confirm used to re-read the $WWAT price and check the transfers against a
+  // freshly computed amount, with PRICE_TOLERANCE_PCT standing in for movement
+  // in between. That punishes the wrong person: if the coin falls more than a
+  // fifth while the host is confirming in their wallet, an honest payment is
+  // called short and they are told to pay again. On a coin this thin that is an
+  // ordinary afternoon. So the quote is written down when it is given and the
+  // payment is judged against it while it is still fresh.
+  const { data: pinned } = action === "confirm"
+    ? await db
+        .from("battle_fee_quotes")
+        .select("total_raw, legs, price_usd, capped, expires_at")
+        .eq("battle_id", battleId)
+        .eq("kind", "host")
+        .eq("user_id", user.id)
+        .maybeSingle()
+    : { data: null };
+
+  const pinnedLegs = Array.isArray(pinned?.legs) ? (pinned!.legs as Leg[]) : [];
+  const pinnedFresh = Boolean(pinned)
+    && pinnedLegs.length > 0
+    && new Date(String(pinned!.expires_at)).getTime() > Date.now();
+
+  let price: { priceUsd: number; amountRaw: bigint; capped: boolean };
+  let legs: Leg[];
+
+  if (pinnedFresh) {
+    legs = pinnedLegs;
+    price = {
+      priceUsd: Number(pinned!.price_usd ?? 0),
+      amountRaw: BigInt(String(pinned!.total_raw)),
+      capped: Boolean(pinned!.capped),
+    };
+  } else {
+    const fresh = await wwatAmountForUsd();
+    if (!fresh) {
+      return json(origin, { error: "Could not read the $WWAT price just now. Try again in a minute." }, 503);
+    }
+    price = fresh;
+    legs = buildLegs(fresh.amountRaw, artists);
   }
-  const legs = buildLegs(price.amountRaw, artists);
 
   /* ---------------------------------------------------------------- quote */
   if (action === "quote") {
+    // Pin it. If this write fails the quote still stands, it is just judged
+    // against a fresh price later, which is exactly the old behaviour.
+    const { error: pinError } = await db.from("battle_fee_quotes").upsert(
+      {
+        battle_id: battleId,
+        kind: "host",
+        user_id: user.id,
+        token_address: WWAT,
+        total_raw: price.amountRaw.toString(),
+        legs,
+        price_usd: price.priceUsd,
+        capped: price.capped,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),
+      },
+      { onConflict: "battle_id,kind,user_id" },
+    );
+    if (pinError) console.error("battle-host-fee: could not pin the quote", pinError);
+
     return json(origin, {
       due: true,
       exempt: false,
@@ -368,7 +428,7 @@ Deno.serve(async (req) => {
     const paid = BigInt(transfer.data);
     const owed = BigInt(leg.amountRaw);
     if (paid * 100n < owed * PRICE_TOLERANCE_PCT) {
-      return json(origin, { error: `The payment for ${leg.label} is short at today's $WWAT price.` }, 400);
+      return json(origin, { error: `The payment for ${leg.label} is short of what you were quoted.` }, 400);
     }
 
     const from = ("0x" + transfer.topics[1].slice(26)).toLowerCase();

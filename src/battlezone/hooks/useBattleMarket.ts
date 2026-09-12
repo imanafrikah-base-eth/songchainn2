@@ -51,6 +51,25 @@ export function useBattleStanding(battleId: string | undefined) {
   });
 }
 
+/**
+ * The server's own sentence when it refuses, rather than a generic failure.
+ * supabase-js buries a non-2xx body in error.context.body, so without this the
+ * person is told "Edge Function returned a non-2xx status code", which tells
+ * them nothing about a purchase they just paid for.
+ */
+function readError(error: unknown, data: unknown): string {
+  const body = (error as { context?: { body?: string } } | null)?.context?.body;
+  try {
+    const parsed = typeof body === 'string'
+      ? (JSON.parse(body) as { error?: string })
+      : (data as { error?: string } | null);
+    if (parsed?.error) return parsed.error;
+  } catch {
+    /* fall through */
+  }
+  return 'The coin is in your wallet. We could not add you to the board just now, so try backing again in a moment and it will count you once.';
+}
+
 export interface BackCornerParams {
   battleId: string;
   side: 'a' | 'b';
@@ -92,40 +111,56 @@ export function useBackCorner() {
           return { success: false, error: trade.error ?? 'That purchase did not go through.' };
         }
 
-        // 2. Write down that it happened. The coin is already theirs at this
-        //    point, so nothing below can take it away from them.
+        // 2. Have the server read the purchase back off Base and write it down.
+        //
+        //    THE BROWSER CANNOT WRITE THIS ROW, AND SHOULD NOT BE ABLE TO.
+        //    battle_trades has no insert policy at all, so this used to be an
+        //    insert that always failed silently: the coin was bought, nothing
+        //    was recorded, and the room congratulated them anyway. Worse, when
+        //    it did work it took the browser's word for the amount and the
+        //    hash, and a row there is what makes somebody a backer, which the
+        //    verdict is meant to weigh. So battle-trade-verify checks the
+        //    transaction on Base, takes the ETH figure from the transaction
+        //    itself rather than from what we typed, and is the only thing that
+        //    can add anybody to the board.
         setStatus('Adding you to the board');
-        const weiSpent = (() => {
-          try {
-            const [whole, frac = ''] = params.ethAmount.split('.');
-            const padded = (frac + '0'.repeat(18)).slice(0, 18);
-            return (BigInt(whole || '0') * 10n ** 18n + BigInt(padded || '0')).toString();
-          } catch {
-            return '0';
-          }
-        })();
 
-        const { error } = await (supabase as any).from('battle_trades').insert({
-          battle_id: params.battleId,
-          user_id: params.userId,
-          wallet_address: params.walletAddress,
-          side: params.side,
-          song_id: params.songId,
-          coin_address: params.coinAddress,
-          eth_spent_wei: weiSpent,
-          tx_hash: trade.txHash,
+        // The server only counts a purchase made from a wallet on this account,
+        // so a stranger's trade cannot be claimed off the public chain. Same
+        // step the host fee and voice fee take before they pay.
+        try {
+          await (supabase as never as {
+            rpc: (fn: string, args: Record<string, unknown>) => Promise<unknown>;
+          }).rpc('add_my_wallet', {
+            p_address: params.walletAddress,
+            p_provider: 'other',
+            p_label: null,
+          });
+        } catch {
+          /* the server says so plainly if the wallet is missing */
+        }
+
+        const { data, error } = await supabase.functions.invoke('battle-trade-verify', {
+          body: {
+            battleId: params.battleId,
+            side: params.side,
+            songId: params.songId,
+            coinAddress: params.coinAddress,
+            txHash: trade.txHash,
+          },
         });
 
         void queryClient.invalidateQueries({ queryKey: ['battle-trade-standing', params.battleId] });
 
-        if (error) {
-          // Worth saying plainly rather than hiding: they own the coin, we just
-          // failed to count it. Telling them it failed outright would be a lie.
+        if (error || !(data as { ok?: boolean } | null)?.ok) {
+          // They own the coin either way, and nothing here can take it from
+          // them. But saying "you are on the board" when they are not is the
+          // lie this whole path used to tell, so it says which half worked.
           return {
             success: true,
             recordFailed: true,
             txHash: trade.txHash,
-            error: 'You own the coin. It may take a moment to show on the board.',
+            error: readError(error, data),
           };
         }
 

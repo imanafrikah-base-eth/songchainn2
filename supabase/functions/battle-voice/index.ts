@@ -157,6 +157,10 @@ Deno.serve(async (req) => {
   const action = body.action === "enable" ? "enable" : "quote";
   if (!UUID.test(battleId)) return json(origin, { error: "Bad request." }, 400);
 
+  // How long a quote is honoured: long enough for a wallet confirmation and a
+  // Base block or two, short enough that nobody sits on a stale price.
+  const QUOTE_TTL_MS = 20 * 60 * 1000;
+
   const db = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
   const { data: battle } = await db
     .from("battles")
@@ -186,6 +190,27 @@ Deno.serve(async (req) => {
     const price = await wwatPrice();
     if (!price) return json(origin, { error: "Could not read the $WWAT price just now. Try again in a minute." }, 503);
     const tokens = Number(price.amountRaw / 10n ** WWAT_DECIMALS) + 1;
+
+    // Pin what they were told, so enable judges the payment against this and
+    // not against the price at the moment they pressed the button. A failed
+    // pin is not fatal: it just falls back to the old fresh-price check.
+    const { error: pinError } = await db.from("battle_fee_quotes").upsert(
+      {
+        battle_id: battleId,
+        kind: "voice",
+        user_id: user.id,
+        token_address: WWAT,
+        total_raw: price.amountRaw.toString(),
+        legs: [],
+        price_usd: price.priceUsd,
+        capped: price.capped,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),
+      },
+      { onConflict: "battle_id,kind,user_id" },
+    );
+    if (pinError) console.error("battle-voice: could not pin the quote", pinError);
+
     return json(origin, {
       available: true,
       exempt: false,
@@ -270,10 +295,34 @@ Deno.serve(async (req) => {
     return json(origin, { error: "That payment is more than a day old, so it cannot turn voice on for a new battle." }, 400);
   }
 
-  const price = await wwatPrice();
-  if (!price) return json(origin, { error: "Could not read the $WWAT price to check the payment. Try again in a minute. Do not pay twice." }, 503);
-  if (paid * 100n < price.amountRaw * PRICE_TOLERANCE_PCT) {
-    return json(origin, { error: "That payment is short of the $3 voice fee at today's $WWAT price." }, 400);
+  // What they were quoted, while it is still fresh. Re-reading the price here
+  // and judging the payment against THAT is how an honest host gets told their
+  // payment is short: the coin only has to slip a fifth between paying and
+  // pressing the button. See pin_battle_fee_quotes_server_side.
+  const { data: pinned } = await db
+    .from("battle_fee_quotes")
+    .select("total_raw, price_usd, expires_at")
+    .eq("battle_id", battleId)
+    .eq("kind", "voice")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const pinnedFresh = Boolean(pinned) && new Date(String(pinned!.expires_at)).getTime() > Date.now();
+
+  let owedRaw: bigint;
+  let priceUsd: number | null;
+  if (pinnedFresh) {
+    owedRaw = BigInt(String(pinned!.total_raw));
+    priceUsd = pinned!.price_usd === null ? null : Number(pinned!.price_usd);
+  } else {
+    const price = await wwatPrice();
+    if (!price) return json(origin, { error: "Could not read the $WWAT price to check the payment. Try again in a minute. Do not pay twice." }, 503);
+    owedRaw = price.amountRaw;
+    priceUsd = price.priceUsd;
+  }
+
+  if (paid * 100n < owedRaw * PRICE_TOLERANCE_PCT) {
+    return json(origin, { error: "That payment is short of the voice fee you were quoted." }, 400);
   }
 
   const { error: feeError } = await db.from("battle_voice_fees").insert({
@@ -285,7 +334,7 @@ Deno.serve(async (req) => {
     amount_raw: paid.toString(),
     token_address: WWAT,
     quoted_usd: VOICE_FEE_USD,
-    price_usd: price.priceUsd,
+    price_usd: priceUsd,
   });
   if (feeError) {
     console.error("battle-voice: could not record the fee", feeError);

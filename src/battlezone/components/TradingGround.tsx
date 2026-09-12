@@ -90,7 +90,13 @@ export function TradingGround({
       });
       setExpanded(false);
     } else if (result.recordFailed) {
-      toast.success('The song is yours', { description: result.error });
+      // Half of this worked and half of it did not, so it does not get a tick.
+      // The coin is genuinely theirs, but they are not on the board, and this
+      // used to be a success toast that said "The song is yours" and left them
+      // believing they were counted.
+      toast.error('You own the coin, but the board did not count it', {
+        description: result.error,
+      });
       setExpanded(false);
     } else {
       toast.error('That did not go through', { description: result.error });
