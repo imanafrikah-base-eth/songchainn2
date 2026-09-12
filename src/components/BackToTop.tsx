@@ -83,7 +83,10 @@ export function BackToTop() {
       onClick={toTop}
       aria-label={`Back to the top. You are ${Math.round(progress * 100)}% down this page.`}
       className="fixed right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card/90 text-foreground shadow-lg backdrop-blur transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 lg:right-6"
-      style={{ bottom: 'calc(4.75rem + env(safe-area-inset-bottom, 0px))' }}
+      /* Clears the tab bar by 20px, and the mini player too. The player takes
+         the bar's place when a song is on and stands a little taller, which
+         left barely three pixels between them at the old 4.75rem. */
+      style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
     >
       <svg className="pointer-events-none absolute inset-0 h-12 w-12 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
         <circle

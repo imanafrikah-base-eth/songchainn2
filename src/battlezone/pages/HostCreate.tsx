@@ -616,8 +616,9 @@ const HostCreate = () => {
         return;
       }
 
-      await sendCoHostInvites(data.id, form.title);
-
+      // The fee settles BEFORE anybody is invited. A refused payment deletes
+      // the battle, and an invite sent first left a co-host holding a message
+      // that opened a battle which no longer existed.
       if (feeFirst) {
         if (!(await settleHostFee(data.id))) return;
         if (isLaunchNow) {
@@ -635,6 +636,8 @@ const HostCreate = () => {
           }
         }
       }
+
+      await sendCoHostInvites(data.id, form.title);
 
       if (isLaunchNow) {
         await upsertHostInRoom(data.id, hostName);

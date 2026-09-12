@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, FileText } from 'lucide-react';
 import { useSongDetails } from '@/lib/songDetails';
+import { artistPath } from '@/lib/slugRoutes';
+import { ArtistName } from '@/components/ArtistName';
 
 /**
  * Lyrics, credits and the record's facts, under the player, where the big
@@ -15,6 +17,9 @@ export function SongInfoSections({ songId }: { songId: string }) {
 
   const hasLyrics = Boolean(data.lyrics);
   const hasCredits = data.credits.length > 0;
+  /* Only the ones the artist chose to print. A feature they kept off the
+     display is still recorded on the record, it just does not appear here. */
+  const shownFeatures = data.featured.filter((f) => f.show);
   const facts: Array<[string, string]> = [];
   if (data.release_date) facts.push(['Released', new Date(data.release_date + 'T00:00:00Z').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })]);
   if (data.language) facts.push(['Language', data.language]);
@@ -24,7 +29,8 @@ export function SongInfoSections({ songId }: { songId: string }) {
   if (data.pro) facts.push(['Collecting society', data.pro]);
   if (data.explicit) facts.push(['Content', 'Explicit']);
 
-  const nothing = !hasLyrics && !hasCredits && !data.description && facts.length === 0;
+  const nothing =
+    !hasLyrics && !hasCredits && !data.description && facts.length === 0 && shownFeatures.length === 0;
 
   return (
     <section className="mt-10 grid gap-8 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -59,6 +65,23 @@ export function SongInfoSections({ songId }: { songId: string }) {
       </div>
 
       <div className="min-w-0 space-y-6">
+        {/* Who else is on it. A name here is a real artist on SONGCHAINN, so
+            it goes through ArtistName like every other name in the app and
+            leads to their page. A typed credit could do neither. */}
+        {shownFeatures.length > 0 && (
+          <div>
+            <h2 className="font-heading text-base font-semibold text-foreground">Featuring</h2>
+            <ul className="mt-2 divide-y divide-border">
+              {shownFeatures.map((f) => (
+                <li key={f.artistId} className="py-1.5 text-sm">
+                  <Link to={artistPath(f.artistId)} className="text-foreground transition-colors hover:text-primary">
+                    <ArtistName name={f.name} artistId={f.artistId} size={13} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {hasCredits && (
           <div>
             <h2 className="font-heading text-base font-semibold text-foreground">Credits</h2>

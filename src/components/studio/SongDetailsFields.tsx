@@ -1,6 +1,7 @@
 import { Plus, X } from 'lucide-react';
 import { isValidIsrc, type Credit, type Split, type SongDetails } from '@/lib/songDetails';
 import { ReleasePicker } from '@/components/studio/ReleasePicker';
+import { FeaturedArtists } from '@/components/studio/FeaturedArtists';
 
 const input =
   'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none disabled:opacity-60';
@@ -147,6 +148,13 @@ export function SongDetailsFields({
           </ul>
         )}
       </div>
+
+      <FeaturedArtists
+        value={value.featured}
+        onChange={(next) => set('featured', next)}
+        disabled={disabled}
+        selfArtistId={artistId}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">

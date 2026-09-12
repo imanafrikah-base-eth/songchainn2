@@ -37,7 +37,12 @@ export async function checkCover(file: File): Promise<CoverCheck> {
       warn: null,
     };
   }
-  const url = URL.createObjectURL(file);
+  // Measure what will be sent, not what came off the camera. This read `file`
+  // while the size check above read `sending`, so the two halves of the same
+  // verdict were judging different images. Harmless while shrinkCover caps at
+  // 1600 and never crops (so it cannot cross the 1400 or 600 thresholds, nor
+  // change the ratio), and wrong the moment either of those changes.
+  const url = URL.createObjectURL(sending);
   try {
     const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
       const img = new Image();

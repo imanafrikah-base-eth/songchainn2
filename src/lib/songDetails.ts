@@ -19,6 +19,24 @@ export interface Split {
   share: number;
 }
 
+/**
+ * Another artist on SONGCHAINN who is on this record.
+ *
+ * Not free text. A featured credit points at a real artist so the name links
+ * to their page and the credit reaches the person it belongs to. The uploader
+ * decides per person whether it appears on the song display; either way the
+ * credit is recorded, because "do not print it" and "it did not happen" are
+ * different things.
+ */
+export interface Featured {
+  /** Catalogue artist id, so the credit can link to their page. */
+  artistId: string;
+  /** How it should read, as it was when they were chosen. */
+  name: string;
+  /** Whether it shows on the song display. Recorded either way. */
+  show: boolean;
+}
+
 export type Distribution = 'app' | 'onchain';
 
 export interface SongDetails {
@@ -26,6 +44,8 @@ export interface SongDetails {
   description: string | null;
   credits: Credit[];
   splits: Split[];
+  /** Other artists on this record, each shown or not at the uploader's choice. */
+  featured: Featured[];
   isrc: string | null;
   iswc: string | null;
   language: string | null;
@@ -47,6 +67,7 @@ export const EMPTY_DETAILS: SongDetails = {
   description: null,
   credits: [],
   splits: [],
+  featured: [],
   isrc: null,
   iswc: null,
   language: null,
@@ -62,7 +83,7 @@ export const EMPTY_DETAILS: SongDetails = {
 };
 
 const COLUMNS =
-  'lyrics, description, credits, splits, isrc, iswc, language, explicit, release_date, release_at, publisher, pro, distribution, onchain_requested_at, release_id, track_number';
+  'lyrics, description, credits, splits, featured, isrc, iswc, language, explicit, release_date, release_at, publisher, pro, distribution, onchain_requested_at, release_id, track_number';
 
 /**
  * An ISRC is two letters of country, three of registrant, two of year and
@@ -107,11 +128,17 @@ function normalise(row: Record<string, unknown> | null): SongDetails {
   if (!row) return EMPTY_DETAILS;
   const credits = Array.isArray(row.credits) ? (row.credits as Credit[]) : [];
   const splits = Array.isArray(row.splits) ? (row.splits as Split[]) : [];
+  const featured = Array.isArray(row.featured) ? (row.featured as Featured[]) : [];
   return {
     lyrics: (row.lyrics as string | null) ?? null,
     description: (row.description as string | null) ?? null,
     credits: credits.filter((c) => c && typeof c.name === 'string'),
     splits: splits.filter((s) => s && typeof s.name === 'string'),
+    // An entry with no artist behind it is free text pretending to be a link,
+    // which is the thing this field exists to replace.
+    featured: featured
+      .filter((f) => f && typeof f.name === 'string' && f.artistId != null)
+      .map((f) => ({ artistId: String(f.artistId), name: f.name, show: f.show !== false })),
     isrc: (row.isrc as string | null) ?? null,
     iswc: (row.iswc as string | null) ?? null,
     language: (row.language as string | null) ?? null,
@@ -158,6 +185,10 @@ export function cleanDetails(d: SongDetails): SongDetails {
     splits: d.splits
       .map((s) => ({ name: s.name.trim(), role: s.role.trim(), share: Math.max(0, Math.min(100, Math.round(Number(s.share) || 0))) }))
       .filter((s) => s.name),
+    // One credit per artist, however many times they were picked.
+    featured: d.featured
+      .map((f) => ({ artistId: String(f.artistId).trim(), name: f.name.trim(), show: f.show !== false }))
+      .filter((f, i, all) => f.artistId && f.name && all.findIndex((o) => o.artistId === f.artistId) === i),
     isrc: normaliseIsrc(d.isrc),
     iswc: text(d.iswc)?.toUpperCase().replace(/\s+/g, '') ?? null,
     language: text(d.language),
@@ -182,6 +213,7 @@ export async function saveSongDetails(songId: string, details: SongDetails): Pro
       description: clean.description,
       credits: clean.credits,
       splits: clean.splits,
+      featured: clean.featured,
       isrc: clean.isrc,
       iswc: clean.iswc,
       language: clean.language,
