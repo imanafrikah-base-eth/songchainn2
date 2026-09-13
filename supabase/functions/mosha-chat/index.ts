@@ -67,7 +67,7 @@ HOW YOU TALK. Like the founder talks to his people: direct, warm, sure of the th
 
 WHO YOU ARE TALKING TO. You are given the person's name, how they asked to be referred to, and what they have done here. Use their name sometimes, not every line. Refer to them with the pronouns that match what they told us (a woman: she/her, a man: he/him, otherwise they/them); if they did not say, use "you" and "they". Never guess from a name. Notice what they hold and where they are, and let that shape the answer: a person with three song copies and a world key is not a stranger, and you should not talk to them like one.
 
-WHAT YOU REMEMBER. You may be given private notes you kept about this person from earlier chats. Use them: match how they like to be spoken to, pick up what they were doing, do not ask again what they already told you. Never recite the notes and never say you keep a file. If they ask, say you remember how they like to talk and what they are working on, that it is theirs, and that it goes with their account if they ever delete it.
+WHAT YOU REMEMBER. You may be given what you kept about this person from earlier chats: private notes, things they asked you to keep in mind, how they like it, facts about them, problems they hit that are still open, and problems that were solved before and how. Use all of it, and use it without being asked, so nobody ever has to explain the same thing to you twice and nobody ever hits the same wall twice. Match how they like to be spoken to, pick up what they were doing, do not ask again what they already told you, and honour what they asked you to keep in mind every single time. When a problem of theirs is still open, check it against the facts you were given this turn: if it is now fixed, tell them so in one line. When something they bring you matches a problem that was solved before, say you remember it, give them the fix that worked last time, and treat it as a thing that broke again: offer to send it to the team with [[action:report]], and if it has come back more than once, send it. Never recite the lists and never say you keep a file. If they ask what you remember, tell them plainly and briefly: how they like to talk, what they asked you to keep in mind, what they are working on, and the problems you are keeping an eye on for them. It is theirs, they can ask you to forget any of it, and it goes with their account if they ever delete it.
 
 WHAT YOU TALK ABOUT. SONGCHAINN, and only SONGCHAINN: the music here, the artists, how to use anything, how the money and the keys and the copies actually work, what a person can do next. If they ask about something else (homework, other apps, the weather, crypto in general), turn it back in one warm line and offer the nearest SONGCHAINN thing. If they ask what SONGCHAINN is, tell them like you are proud of it, because you are.
 
@@ -100,7 +100,8 @@ RULES YOU NEVER BREAK.
 12. You can hand a problem to the team yourself. End your reply with [[action:report]] on its own line and the app sends what they told you, with their account, to the founders' inbox before your words appear. Use it when they ask you to flag it, report it, tell the team or send it to the devs, or when something is broken and there is no way round it. Only in a reply that carries that tag may you say it went to the team, and then say it plainly: it is in the founders' inbox. In any other reply never say you flagged, reported, logged, escalated, sent logs or put anything on anyone's desk, because you did not.
 13. Never claim to have done a thing yourself. You cannot delete, rename, change, fix, push through, upload or keep watch on anything. What you can do is open a flow, take them to a page, or send a report. Say which one is happening and let it do the rest.
 14. Never go round in circles. You are told what your last replies opened. When somebody tells you a flow did not work, do not open that same one again and do not repeat the same advice: name what is actually in the way from the facts you were given, offer the other road, or send a report. Asking for the same thing again is different: when they ask for it, open it and say so. When somebody is angry and about to give up, one honest line about what went wrong beats three lines of sympathy.
-15. Nobody is ever told to crop, resize or shrink a picture themselves. The app does both: any photo can be picked, a photo that is not square opens a square window to drag it into place, and every picture is made small on the phone before it is sent.`;
+15. Nobody is ever told to crop, resize or shrink a picture themselves. The app does both: any photo can be picked, a photo that is not square opens a square window to drag it into place, and every picture is made small on the phone before it is sent.
+16. Your memory of a person is there to be used, every turn, without being asked. Before you answer, look at what they asked you to keep in mind, how they like it, and their open and solved problems. If what they bring you today matches a problem that was solved before, it has broken again: say you remember it, give them what fixed it last time, and offer [[action:report]] so the team knows it came back. If a problem is marked as having come back after a fix, or as hit several times, send the report rather than only offering. A problem you send with [[action:report]] is remembered as open and reported to the team, so next time ask them whether it is sorted.`;
 
 /* --------------------------------------------------------- the account --- */
 
@@ -109,7 +110,7 @@ A music app where the music streams free, the artist keeps everything, and the f
 
 LISTENING
 Everything streams free. Offline works: play a record and it stays playable without a line. Like a song to save it (Likes are public on your profile). Playlists, including collaborative ones. DJ $huffle picks for you. Search finds songs, artists and catalogs. Daily Mix on the landing page for people not signed in. The Room is live listening with everyone, with a live count of who is in; leaving the Room stops its song and brings back whatever played before. Home shows Hot Today (ranked, not by raw play count), New Releases (a new single stands on its own there), catalogs and what is live. The now-playing bar shows what is up next and has a close that stops the song. The feed (Community) has posts, song cards you can play inside the post, photos and videos from artists, likes, comments, tags. Direct messages: anyone can message anyone, send a song in a message and it arrives ready to play. When a newer build of the app is waiting, a banner says so and a small Update button stays in the top bar until it is taken. One tap is always enough: somebody who let three updates go by still lands on the newest build in one press, never once per update they missed. Long pages have a small button in the bottom corner that carries you back to the top, and its ring shows how far down the page you are. Invite a friend from your profile: the link carries your code, and you both start with points when they join. Artist Worlds and Your wallet are both in the top menu.
-Your chat with Mo$ha stays. Hide it and bring it back and the thread is still there: the last 48 hours in view, everything older one tap away under "Earlier chats" (a guest's chat stays on their phone for 48 hours). Mo$ha keeps a short private note on how each person likes to talk and what they are doing here, so it gets more personal each time; the note is theirs and goes with the account when the account is deleted.
+Your chat with Mo$ha stays. Hide it and bring it back and the thread is still there: the last 48 hours in view, everything older one tap away under "Earlier chats" (a guest's chat stays on their phone for 48 hours). Mo$ha keeps a short private memory of each person: how they like to talk, what they are doing here, anything they asked him to keep in mind, and the problems they ran into and how each one was fixed, so it gets more personal each time and nobody explains the same thing twice. That memory is theirs, they can ask Mo$ha to forget any of it, and it goes with the account when the account is deleted.
 
 ACCOUNTS AND SAFETY
 Sign up with email, Google, a Base wallet, or from inside Farcaster. A person who came in more than one way can end up with two logins under one name; the merge_accounts flow joins them, and it takes them saying the same thing from both logins before anything moves, then their records, worlds and pictures all come across and the spare lets go of the name. A Farcaster login that has been joined to somebody's real account signs them into that account from then on. Change your password from your profile without needing an email. Every picture somebody sets is framed by them first: a profile picture, and the wide photo across the top of an artist page, both open a frame to drag the photo into, and the version they framed is exactly what goes live, at any size and with no cropping app needed. Everyone must be an adult; we ask your date of birth once. Block anyone from their profile or from a chat: they cannot message you and neither of you sees the other's posts or comments; a Blocked people list in Profile settings lets you undo it. A post or a comment can be edited after the fact from its own menu: only the words change, the likes and replies stay, and it is marked as edited. Report any post. Delete your account yourself from Profile settings or at the /delete-account page; receipts, consent records and anything on Base stay, everything personal goes. Terms, privacy and guidelines are at /terms, /privacy, /guidelines. Mo$ha, $HIKULU, NAKULU and the Council of Elders are all AI, built by SONGCHAINN, never people.
@@ -265,13 +266,130 @@ type WorldFacts = {
   id: string;
   slug: string;
   status: string;
+  world_number: number | null;
+  owner_id: string | null;
+  artist_id: string | null;
+  story: string[] | null;
   hero_image: string | null;
   entrance_poster: string | null;
   room_art: Record<string, string> | null;
   city_art: Record<string, string> | null;
   zora_profile_url: string | null;
   zora_wallet_address: string | null;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  owner_last_entered_at: string | null;
 };
+
+const WORLD_COLUMNS =
+  "id, slug, status, world_number, owner_id, artist_id, story, hero_image, entrance_poster, room_art, city_art, zora_profile_url, zora_wallet_address, created_at, updated_at, published_at, owner_last_entered_at";
+
+type WorldCounts = { streets: number; hidden: number; filled: number; cities: number };
+
+/**
+ * Where one world stands, in words Mo$ha can act on. A published world is
+ * standing and open; a draft is being built, so it says what is laid out, what
+ * the doors still need (the same three things WorldBuilder.tsx checks before
+ * publishing) and the builder step that fits next.
+ */
+function worldStateLine(w: WorldFacts, uid: string, c: WorldCounts): string {
+  const visible = c.streets - c.hidden;
+  const hiddenNote = c.hidden ? `, ${c.hidden} hidden` : "";
+  const inside = w.owner_last_entered_at ? ` They were last inside it ${dayOf(w.owner_last_entered_at)}.` : "";
+  const otherLogin = w.owner_id && w.owner_id !== uid
+    ? " It stands under their artist name but was made from another login of theirs, so this login may not open it in the builder; if they cannot get in, merge_accounts brings it over."
+    : "";
+  if (w.status === "published") {
+    const num = w.world_number ? `World #${String(w.world_number).padStart(3, "0")}, ` : "";
+    return `World ${w.slug} (${num}world id ${w.id}) is PUBLISHED: standing and open to everyone at /w/${w.slug}${w.published_at ? `, open since ${dayOf(w.published_at)}` : ""}. It has ${plural(visible, "street", "streets")} on the map (${c.filled} with something on them${hiddenNote}) across ${plural(c.cities, "city", "cities")}.${inside} Talk about it as a standing world: what to add, change, dress or put on air next.${otherLogin}`;
+  }
+  if (w.status === "draft") {
+    const zoraOk = /^https?:\/\/([a-z0-9-]+\.)*zora\.co\//i.test(w.zora_profile_url ?? "") && /^0x[0-9a-fA-F]{40}$/.test(w.zora_wallet_address ?? "");
+    const storyOk = (w.story?.length ?? 0) > 0;
+    const missing: string[] = [];
+    if (c.filled < 3) missing.push(`something on ${plural(3 - c.filled, "more street", "more streets")} (${c.filled} of 3 so far, filled on the blocks step)`);
+    if (!storyOk) missing.push("a story on the gate (written on the publish step)");
+    if (!zoraOk) missing.push("their Zora account on the world, a zora.co link and the wallet it pays to (publish step)");
+    const step = c.streets === 0 ? "streets" : c.filled < 3 ? "blocks" : "publish";
+    const noArt = !w.hero_image && !w.entrance_poster && !Object.keys(w.room_art ?? {}).length
+      ? " No art is on it yet (the Art step); that is not needed to open, but it is what makes the gate."
+      : "";
+    return `World ${w.slug} (world id ${w.id}) is a DRAFT: they are building it and nobody can see it yet. Started ${dayOf(w.created_at)}, last worked on ${dayOf(w.updated_at)}.${inside} So far: ${plural(c.streets, "street", "streets")} laid out${hiddenNote}, ${c.filled} with something on them, ${plural(c.cities, "city", "cities")}. ${missing.length ? `Still needed before the doors can open: ${missing.join("; ")}.` : "Everything the doors need is in place: it is ready to publish."}${noArt} The step that fits next is ${step}: [[action:go:/world-builder?id=${w.id}&step=${step}]]. Apply this: they are mid-build, so offer to pick up where they left off, finish it or change it, here (edit_world) or on that step. Never talk to them as if they had no world.${otherLogin}`;
+  }
+  return `World ${w.slug} (world id ${w.id}) has the status "${w.status}".${otherLogin}`;
+}
+
+/**
+ * Every world this person has, found by the login that made it AND by their
+ * artist id (a world can stand under their artist name from another login),
+ * plus the worlds built into the app. Applied for listeners too: somebody can
+ * start a world before their account turns artist.
+ */
+async function worldLines(db: Db, uid: string, artistId: string | null): Promise<string[]> {
+  const out: string[] = [];
+  try {
+    const [byOwner, byArtist] = await Promise.all([
+      db.from("worlds").select(WORLD_COLUMNS).eq("owner_id", uid),
+      artistId ? db.from("worlds").select(WORLD_COLUMNS).eq("artist_id", artistId) : Promise.resolve({ data: [] as WorldFacts[] }),
+    ]);
+    const byId = new Map<string, WorldFacts>();
+    for (const w of [...((byOwner.data ?? []) as WorldFacts[]), ...((byArtist.data ?? []) as WorldFacts[])]) byId.set(w.id, w);
+    const list = [...byId.values()].sort((a, b) =>
+      a.status === b.status ? b.updated_at.localeCompare(a.updated_at) : a.status === "published" ? -1 : b.status === "published" ? 1 : 0,
+    );
+
+    // Worlds built into the app, not in the worlds table. IMan Afrikah's
+    // World #001 (src/worlds/registry.ts) is one: reading only by owner_id
+    // had Mo$ha telling him he had no world. Keep in step with registry.ts.
+    const builtIn = artistId ? BUILT_IN_WORLDS[artistId] : undefined;
+    const hasBuiltIn = !!builtIn && !list.some((w) => w.slug === builtIn);
+    if (hasBuiltIn) {
+      out.push(`They own ${builtIn}, World #001, built into the app, PUBLISHED and open at /world/${builtIn}. They ALREADY have a world: never offer to build one. One world per artist. Offer to change it (edit_world) instead.`);
+    }
+    if (!list.length) {
+      if (!hasBuiltIn && artistId) {
+        out.push("They have not started a world yet. Once in this conversation, when it fits, offer nicely to build it for them right here (build_world), and say you can replace or change anything on it afterwards (edit_world). Never nag.");
+      }
+      return out;
+    }
+
+    const ids = list.map((w) => w.id);
+    const [{ data: streets }, { data: cities }] = await Promise.all([
+      db.from("world_streets").select("id, world_id, hidden").in("world_id", ids),
+      db.from("world_cities").select("world_id").in("world_id", ids),
+    ]);
+    const streetRows = (streets ?? []) as Array<{ id: string; world_id: string; hidden: boolean | null }>;
+    const { data: blocks } = streetRows.length
+      ? await db.from("world_blocks").select("street_id").in("street_id", streetRows.map((s) => s.id)).limit(5000)
+      : { data: [] as Array<{ street_id: string }> };
+    const filledStreets = new Set(((blocks ?? []) as Array<{ street_id: string }>).map((b) => b.street_id));
+
+    const drafts = list.filter((w) => w.status === "draft").length;
+    const open = list.filter((w) => w.status === "published").length + (hasBuiltIn ? 1 : 0);
+    out.push(
+      `They ALREADY have a world (${open ? `${open} open` : "none open yet"}${drafts ? `, ${drafts} being built` : ""}). Never offer to build a second one: one world per artist. Offer to continue, finish or change the one they have (edit_world, or the builder step named below). A draft can be finished at /world-builder or by the edit_world flow.`,
+    );
+    for (const w of list) {
+      const own = streetRows.filter((s) => s.world_id === w.id);
+      out.push(
+        worldStateLine(w, uid, {
+          streets: own.length,
+          hidden: own.filter((s) => s.hidden).length,
+          filled: own.filter((s) => filledStreets.has(s.id)).length,
+          cities: ((cities ?? []) as Array<{ world_id: string }>).filter((x) => x.world_id === w.id).length,
+        }),
+      );
+      out.push(worldArtLine(w));
+    }
+    if (list.length + (hasBuiltIn ? 1 : 0) > 1) {
+      out.push("An account holds one world, and they have more than one from before that rule. If it comes up, the spare can be folded into the one they keep (every street moves across); never start another.");
+    }
+  } catch {
+    /* the rest of the answer stands */
+  }
+  return out;
+}
 
 /** How long a send may sit unfinished before it is stuck rather than busy. Same window as the Studio. */
 const STUCK_MS = 20 * 60 * 1000;
@@ -417,15 +535,16 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
       return { text: lines.join("\n"), uid: null };
     }
     uid = user.id;
-    const [{ data: profile }, { data: artist }, { count: holdings }, { count: citizen }, { data: points }, { count: likes }, { data: myWorlds }, { data: memory }] = await Promise.all([
+    const [{ data: profile }, { data: artist }, { count: holdings }, { count: citizen }, { data: points }, { count: likes }, { data: memory }] = await Promise.all([
       db.from("audience_profiles").select("display_name, username, gender, wallet_address, created_at").eq("user_id", uid).maybeSingle(),
       db.from("artist_accounts").select("artist_id, is_verified").eq("user_id", uid).maybeSingle(),
       db.from("song_holdings").select("song_id", { count: "exact", head: true }).eq("user_id", uid).gt("balance", 0),
       db.from("world_citizens").select("world_slug", { count: "exact", head: true }).eq("user_id", uid),
       db.from("user_points").select("*").eq("user_id", uid).maybeSingle(),
       db.from("liked_songs").select("id", { count: "exact", head: true }).eq("user_id", uid),
-      db.from("worlds").select("id, slug, status, hero_image, entrance_poster, room_art, city_art, zora_profile_url, zora_wallet_address").eq("owner_id", uid),
-      db.from("mosha_memory").select("notes").eq("user_id", uid).maybeSingle(),
+      // "*" so this reads the structured columns once that migration is on,
+      // and still reads notes alone before it.
+      db.from("mosha_memory").select("*").eq("user_id", uid).maybeSingle(),
     ]);
     const name = profile?.display_name || profile?.username || null;
     const gender = profile?.gender as string | null | undefined;
@@ -445,25 +564,15 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
     }
     if (artist) {
       lines.push(`They are an artist here (artist id ${artist.artist_id}${artist.is_verified ? ", verified" : ""}). Studio, uploads, the gallery, the world builder, the activity board and licensing requests all apply to them. The upload_song, build_world, edit_world and edit_gallery flows are for them.`);
-      const list = (myWorlds ?? []) as WorldFacts[];
-      // Worlds built into the app, not in the worlds table. IMan Afrikah's
-      // World #001 (src/worlds/registry.ts) is one: reading only by owner_id
-      // had Mo$ha telling him he had no world. Keep in step with registry.ts.
-      const builtIn = BUILT_IN_WORLDS[String(artist.artist_id)];
-      if (builtIn && !list.some((w) => w.slug === builtIn)) {
-        lines.push(`They own ${builtIn}, World #001, built into the app and open at /world/${builtIn}. They ALREADY have a world: never offer to build one. One world per artist. Offer to change it (edit_world) instead.`);
-      }
-      if (list.length) {
-        lines.push(`Their worlds: ${list.map((w) => `${w.slug} (${w.status}, world id ${w.id})`).join(", ")}. They ALREADY have a world, so never offer to build one: offer to change this one instead (edit_world), or say what is still empty on it. A draft can be finished at /world-builder or by the edit_world flow.`);
-        for (const w of list) lines.push(worldArtLine(w));
-      } else if (!builtIn) {
-        lines.push("They have not started a world yet. Once in this conversation, when it fits, offer nicely to build it for them right here (build_world), and say you can replace or change anything on it afterwards (edit_world). Never nag.");
-      }
+      // Every world they have, published or being built, by login and by artist id.
+      lines.push(...(await worldLines(db, uid, String(artist.artist_id))));
       // What actually happened to what they sent. Without this every "my
       // upload is not showing" got the same advice about file sizes.
       lines.push(...(await uploadLines(db, uid)));
     } else {
       lines.push("They are a listener, not an artist account yet. If they make music, the become_artist flow turns this account into an artist account in one tap; the Studio and the builder open after that.");
+      // A world can be started before the account turns artist.
+      lines.push(...(await worldLines(db, uid, null)));
     }
     // The wallets on this account, so wallet questions get a real answer
     // instead of a general one.
@@ -538,8 +647,7 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
     } catch {
       /* the rest of the answer stands */
     }
-    const notes = (memory as { notes?: string } | null)?.notes?.trim();
-    if (notes) lines.push(`Your private notes on this person from earlier chats (use them, never recite them):\n${notes}`);
+    lines.push(...memoryLines(readMemory(memory as Record<string, unknown> | null)));
   } catch {
     lines.push("Signed in, but their details could not be read this second; talk to them as a member.");
   }
@@ -548,10 +656,297 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
 
 /* ------------------------------------------------------------- memory --- */
 
-const NOTES_PROMPT = `You keep Mo$ha's private notes about one person on SONGCHAINN, so Mo$ha gets more personal with them each time they talk. You are given the old notes and the newest messages. Rewrite the notes as one short plain paragraph, under 700 characters, no headings, no lists. Keep only what helps next time: how they like to be spoken to (tone, length, slang or plain, which language or words they use), what they call themselves, whether they make music or listen, what they are working on or asked for, what they liked, what annoyed them, anything they asked Mo$ha to remember. Keep earlier facts that still hold; drop what the new messages contradict. Never store passwords, keys, wallet addresses, card numbers, health details, or anything about a different person. Never store Mo$ha's own words. Output the notes only, nothing else.`;
+const MEMORY_PROMPT = `You keep Mo$ha's private memory about one person on SONGCHAINN, so Mo$ha never makes them explain the same thing twice and never lets them hit the same wall twice. You are given their memory so far as JSON, the newest messages, and whether Mo$ha just sent their problem to the team. Reply with ONE JSON object and nothing else, no code fences, in exactly this shape:
+{"preferences": [], "remember": [], "facts": [], "drop": [], "open_problems": [], "solved_problems": [], "notes": ""}
+preferences: how they like to be spoken to (tone, length, slang or plain, which language), and what they like. The full updated list of short strings.
+remember: things they explicitly asked Mo$ha to remember or keep in mind, or told Mo$ha always or never to do. The full updated list.
+facts: short stable facts about them: whether they make music or listen, their artist name, city or country, what they are building, their goals. The full updated list.
+drop: exact items from the old memory that no longer hold, that the newest messages contradict, or that they asked Mo$ha to forget.
+open_problems: only problems, errors or complaints they raised in the NEWEST messages that are not fixed yet, whether new or hit again. Each is {"id": the old id if it is the same problem as one in the old memory (open or solved), else "", "text": one plain line saying what went wrong and where, "reported": true only if Mo$ha just sent this one to the team}.
+solved_problems: problems the newest messages show are now fixed or working (they said it works now, fixed, solved, sorted, or thanked Mo$ha after the help worked). Each is {"id": the old open id if there was one, else "", "text": what the problem was, "how_solved": one plain line saying what fixed it}.
+notes: one short plain paragraph under 600 characters on how to talk to them and what they are doing here, keeping what still holds.
+Every string under 200 characters. Never store passwords, codes, keys, seed phrases, wallet addresses, card or phone numbers, emails, health details, or anything about a different person. Never store Mo$ha's own words as their preference. If nothing changed, return the old values.`;
 
-/** The exchange is written down, and every few exchanges the notes are rewritten. Runs after the reply is sent. */
-async function remember(db: Db, uid: string, turns: Turn[], reply: string, action?: Action): Promise<void> {
+/* MEMORY-PURE-BEGIN: no Deno, no database. Mirrored by the node test in the session scratchpad (mosha-memory-merge-test.mjs). */
+
+type OpenProblem = { id: string; text: string; first_seen: string; last_seen: string; count: number; returned_after_fix?: boolean };
+type SolvedProblem = { id: string; text: string; how_solved: string; solved_at: string };
+type Memory = {
+  notes: string;
+  preferences: string[];
+  remember: string[];
+  facts: string[];
+  open_problems: OpenProblem[];
+  solved_problems: SolvedProblem[];
+};
+
+const MEMORY_CAPS = { preferences: 12, remember: 20, facts: 12, open_problems: 10, solved_problems: 20 } as const;
+const MEMORY_ITEM_MAX = 200;
+const MEMORY_NOTES_MAX = 1200;
+/** The same problem seen again within this window is the same occurrence, not a recurrence. */
+const RECUR_GAP_MS = 60 * 60 * 1000;
+
+/** A secret written out ("my password is ...") or a health detail: the whole item is dropped. */
+const SECRET_VALUE_RE = /\b(pass ?words?|passcodes?|pass ?phrases?|seed phrases?|recovery phrases?|secret phrases?|mnemonic|private keys?|secret keys?|api keys?|pin|otp|cvv|cvc|verification code|login code)\b\s*(?:is|was|=|:)\s*\S+/i;
+const HEALTH_RE = /\b(diagnos\w*|hiv|aids|cancer|diabet\w*|depress\w*|bipolar|schizo\w*|pregnan\w*|miscarriage|medication|prescription|chemo\w*|therapy|therapist|disease|illness|mental health|suicid\w*|self[- ]harm)\b/i;
+
+/** A message worth updating memory for right away rather than waiting for the cadence. */
+const MEMORY_SIGNAL_RE = /\b(remember|keep in mind|forget|note (?:this|that)|i prefer|i'?d rather|i like|i love|i hate|i want you to|call me|don'?t|do not|never|always|stop|problem|issue|error|bug|broke|broken|not working|isn'?t working|doesn'?t work|does not work|won'?t|can'?t|cannot|couldn'?t|fail(?:ed|ing|s)?|stuck|wrong|missing|not showing|disappeared|crash(?:ed|es)?|works now|working now|it works|fixed|solved|sorted|resolved|thanks?|thank you|thx|appreciate)\b/i;
+
+function hasMemorySignal(text: string): boolean {
+  return MEMORY_SIGNAL_RE.test(text);
+}
+
+/** Wallets, cards, phones, emails and long tokens swapped out; secrets and health details refused (null). */
+function scrubMemoryText(input: unknown, max = MEMORY_ITEM_MAX): string | null {
+  if (typeof input !== "string") return null;
+  let s = input.replace(/\s+/g, " ").trim();
+  if (!s) return null;
+  if (SECRET_VALUE_RE.test(s) || HEALTH_RE.test(s)) return null;
+  s = s
+    .replace(/\b0x[a-fA-F0-9]{20,}\b/g, "[wallet]")
+    .replace(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.eth\b/gi, "[wallet]")
+    .replace(/\bbc1[a-z0-9]{25,60}\b/gi, "[wallet]")
+    .replace(/\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g, "[wallet]")
+    .replace(/[^\s@]+@[^\s@]+\.[a-z]{2,}/gi, "[email]")
+    .replace(/\b(?:\d[ -]?){12,18}\d\b/g, "[number]")
+    .replace(/\+?\d[\d\s().-]{7,}\d/g, (m) => (m.replace(/\D/g, "").length >= 9 ? "[number]" : m))
+    .replace(/\b[A-Za-z0-9_-]{40,}\b/g, "[removed]");
+  if (s.replace(/\[(wallet|email|number|removed)\]/g, "").replace(/[^a-z0-9]/gi, "").length < 3) return null;
+  return s.slice(0, max);
+}
+
+function normMemoryText(s: string): string {
+  return s.toLowerCase().replace(/\(reported to the team\)/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Case-insensitive, punctuation-blind; a longer line containing a shorter one counts as the same. */
+function sameMemoryText(a: string, b: string): boolean {
+  const x = normMemoryText(a);
+  const y = normMemoryText(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  return Math.min(x.length, y.length) >= 12 && (x.includes(y) || y.includes(x));
+}
+
+function problemId(text: string): string {
+  let h = 5381;
+  for (const ch of normMemoryText(text)) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0;
+  return `p${h.toString(36)}`;
+}
+
+function cleanMemoryList(x: unknown): string[] {
+  if (!Array.isArray(x)) return [];
+  return x
+    .map((v) => (typeof v === "string" ? v : v && typeof v === "object" ? (v as { text?: unknown }).text : null))
+    .map((v) => scrubMemoryText(v))
+    .filter((v): v is string => !!v);
+}
+
+function dedupeMemoryList(list: string[], cap: number): string[] {
+  const out: string[] = [];
+  for (const s of list) if (!out.some((o) => sameMemoryText(o, s))) out.push(s);
+  return out.slice(0, cap);
+}
+
+/** Whatever the row holds (or null, or a row from before the structured columns), as a clean Memory. */
+function readMemory(row: Record<string, unknown> | null): Memory {
+  const r = row ?? {};
+  const iso = (v: unknown, fallback: string) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : fallback);
+  const epoch = new Date(0).toISOString();
+  const open = (Array.isArray(r.open_problems) ? r.open_problems : [])
+    .map((p: Record<string, unknown>) => {
+      const text = scrubMemoryText(p?.text);
+      if (!text) return null;
+      const first = iso(p.first_seen, epoch);
+      return {
+        id: typeof p.id === "string" && p.id ? p.id : problemId(text),
+        text,
+        first_seen: first,
+        last_seen: iso(p.last_seen, first),
+        count: typeof p.count === "number" && p.count > 0 ? Math.floor(p.count) : 1,
+        ...(p.returned_after_fix === true ? { returned_after_fix: true } : {}),
+      } as OpenProblem;
+    })
+    .filter((p): p is OpenProblem => !!p);
+  const solved = (Array.isArray(r.solved_problems) ? r.solved_problems : [])
+    .map((p: Record<string, unknown>) => {
+      const text = scrubMemoryText(p?.text);
+      if (!text) return null;
+      return {
+        id: typeof p.id === "string" && p.id ? p.id : problemId(text),
+        text,
+        how_solved: scrubMemoryText(p.how_solved) ?? "",
+        solved_at: iso(p.solved_at, epoch),
+      } as SolvedProblem;
+    })
+    .filter((p): p is SolvedProblem => !!p);
+  return {
+    notes: typeof r.notes === "string" ? r.notes : "",
+    preferences: dedupeMemoryList(cleanMemoryList(r.preferences), MEMORY_CAPS.preferences),
+    remember: dedupeMemoryList(cleanMemoryList(r.remember), MEMORY_CAPS.remember),
+    facts: dedupeMemoryList(cleanMemoryList(r.facts), MEMORY_CAPS.facts),
+    open_problems: open.slice(0, MEMORY_CAPS.open_problems),
+    solved_problems: solved.slice(0, MEMORY_CAPS.solved_problems),
+  };
+}
+
+/** The model's reply as an object, or null when it is not one (then the old memory stands). */
+function parseMemoryJson(raw: unknown): Record<string, unknown> | null {
+  if (typeof raw !== "string") return null;
+  const text = raw.replace(/```(?:json)?/gi, "");
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    const v = JSON.parse(text.slice(start, end + 1));
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Old memory + what the model proposed = new memory, decided here in code:
+ * lists deduped and capped (newest first), dropped items removed, a problem
+ * marked solved moved out of open with how it was solved, a problem seen
+ * again bumped (count and last_seen), a solved problem seen again reopened
+ * as having come back after its fix, and a report Mo$ha sent recorded as an
+ * open problem "reported to the team". A null proposal keeps the old memory
+ * (only the report, if any, is added).
+ */
+function mergeMemory(old: Memory, proposal: Record<string, unknown> | null, opts: { now: string; reportedText?: string | null }): Memory {
+  const now = opts.now;
+  const nowMs = Date.parse(now);
+  let open = old.open_problems.map((p) => ({ ...p }));
+  let solved = old.solved_problems.map((p) => ({ ...p }));
+  let preferences = old.preferences;
+  let remember = old.remember;
+  let facts = old.facts;
+  let notes = old.notes;
+
+  const markReported = (p: OpenProblem) => {
+    if (!/\(reported to the team\)/i.test(p.text)) p.text = `${p.text.slice(0, MEMORY_ITEM_MAX - 24)} (reported to the team)`;
+  };
+
+  /** The same problem hit (again): bump it, reopen it if it was solved, or add it. */
+  const seeOpen = (text: string, id: string | null, reported: boolean, justSolved: SolvedProblem[]) => {
+    if (justSolved.some((s) => (id && s.id === id) || sameMemoryText(s.text, text))) return;
+    const i = open.findIndex((p) => (id && p.id === id) || sameMemoryText(p.text, text));
+    if (i >= 0) {
+      const p = open[i];
+      if (nowMs - Date.parse(p.last_seen) > RECUR_GAP_MS) p.count += 1;
+      p.last_seen = now;
+      if (reported) markReported(p);
+      open.splice(i, 1);
+      open.unshift(p);
+      return;
+    }
+    const before = solved.find((s) => (id && s.id === id) || sameMemoryText(s.text, text));
+    const fresh: OpenProblem = before
+      ? { id: before.id, text, first_seen: now, last_seen: now, count: 2, returned_after_fix: true }
+      : { id: problemId(text), text, first_seen: now, last_seen: now, count: 1 };
+    if (reported) markReported(fresh);
+    open.unshift(fresh);
+  };
+
+  if (proposal) {
+    const drop = cleanMemoryList(proposal.drop);
+    const keep = (s: string) => !drop.some((d) => sameMemoryText(d, s));
+    preferences = dedupeMemoryList([...cleanMemoryList(proposal.preferences), ...old.preferences].filter(keep), MEMORY_CAPS.preferences);
+    remember = dedupeMemoryList([...cleanMemoryList(proposal.remember), ...old.remember].filter(keep), MEMORY_CAPS.remember);
+    facts = dedupeMemoryList([...cleanMemoryList(proposal.facts), ...old.facts].filter(keep), MEMORY_CAPS.facts);
+    open = open.filter((p) => keep(p.text));
+    solved = solved.filter((p) => keep(p.text));
+
+    const justSolved: SolvedProblem[] = [];
+    for (const raw of Array.isArray(proposal.solved_problems) ? proposal.solved_problems : []) {
+      const item = (raw ?? {}) as Record<string, unknown>;
+      const text = scrubMemoryText(item.text);
+      if (!text) continue;
+      const id = typeof item.id === "string" && item.id ? item.id : null;
+      const how = scrubMemoryText(item.how_solved) ?? "";
+      const i = open.findIndex((p) => (id && p.id === id) || sameMemoryText(p.text, text));
+      const was = i >= 0 ? open.splice(i, 1)[0] : null;
+      const entry: SolvedProblem = {
+        id: was?.id ?? id ?? problemId(text),
+        text: (was?.text ?? text).replace(/\s*\(reported to the team\)/i, ""),
+        how_solved: how,
+        solved_at: now,
+      };
+      solved = solved.filter((s) => s.id !== entry.id && !sameMemoryText(s.text, entry.text));
+      solved.unshift(entry);
+      justSolved.push(entry);
+    }
+
+    let reportPlaced = false;
+    for (const raw of Array.isArray(proposal.open_problems) ? proposal.open_problems : []) {
+      const item = (typeof raw === "string" ? { text: raw } : raw ?? {}) as Record<string, unknown>;
+      const text = scrubMemoryText(item.text);
+      if (!text) continue;
+      const reported = !!opts.reportedText && item.reported === true;
+      if (reported) reportPlaced = true;
+      seeOpen(text, typeof item.id === "string" && item.id ? item.id : null, reported, justSolved);
+    }
+    if (opts.reportedText && !reportPlaced) {
+      const t = scrubMemoryText(opts.reportedText);
+      if (t) seeOpen(t, null, true, []);
+    }
+
+    const freshNotes = scrubMemoryText(proposal.notes, MEMORY_NOTES_MAX);
+    if (freshNotes) notes = freshNotes;
+  } else if (opts.reportedText) {
+    const t = scrubMemoryText(opts.reportedText);
+    if (t) seeOpen(t, null, true, []);
+  }
+
+  open.sort((a, b) => b.last_seen.localeCompare(a.last_seen));
+  solved.sort((a, b) => b.solved_at.localeCompare(a.solved_at));
+  return {
+    notes: notes.slice(0, MEMORY_NOTES_MAX),
+    preferences,
+    remember,
+    facts,
+    open_problems: open.slice(0, MEMORY_CAPS.open_problems),
+    solved_problems: solved.slice(0, MEMORY_CAPS.solved_problems),
+  };
+}
+
+/** The memory as lines of the live context. */
+function memoryLines(m: Memory): string[] {
+  const day = (iso: string) => iso.slice(0, 10);
+  const out: string[] = [];
+  if (m.remember.length) out.push(`Things they asked you to keep in mind (honour every one, every time): ${m.remember.join("; ")}.`);
+  if (m.preferences.length) out.push(`How they like it: ${m.preferences.join("; ")}.`);
+  if (m.facts.length) out.push(`What you know about them: ${m.facts.join("; ")}.`);
+  if (m.open_problems.length) {
+    out.push(
+      `Problems they have hit that are still open (check the facts you were given; if it is now fixed, tell them): ${m.open_problems
+        .map((p) => `"${p.text}" (first ${day(p.first_seen)}, last ${day(p.last_seen)}${p.count > 1 ? `, hit ${p.count} times` : ""}${p.returned_after_fix ? ", CAME BACK after it had been fixed, so treat it as broken again and send a report" : ""})`)
+        .join("; ")}.`,
+    );
+  }
+  if (m.solved_problems.length) {
+    out.push(
+      `Problems that were solved before (if the same thing shows up again, say you remember it and apply the fix that worked, and say it is being passed on if it keeps coming back): ${m.solved_problems
+        .map((p) => `"${p.text}", fixed by: ${p.how_solved || "not recorded"} (${day(p.solved_at)})`)
+        .join("; ")}.`,
+    );
+  }
+  const notes = m.notes.trim();
+  if (notes) out.push(`Your private notes on this person from earlier chats (use them, never recite them):\n${notes}`);
+  return out;
+}
+
+/* MEMORY-PURE-END */
+
+/**
+ * The exchange is written down. Memory is updated at once when the person's
+ * message carries a signal (a problem, a fix, a preference, "remember") or a
+ * report went to the team, and otherwise every few exchanges. Runs after the
+ * reply is sent.
+ */
+async function remember(db: Db, uid: string, turns: Turn[], reply: string, action: Action | undefined, reported: boolean): Promise<void> {
   const last = turns[turns.length - 1];
   if (!last || last.role !== "user") return;
   try {
@@ -564,33 +959,38 @@ async function remember(db: Db, uid: string, turns: Turn[], reply: string, actio
   }
 
   try {
-    const { data: row } = await db.from("mosha_memory").select("notes, turns_since").eq("user_id", uid).maybeSingle();
-    const notes = (row?.notes as string | undefined) ?? "";
-    const since = ((row?.turns_since as number | undefined) ?? 0) + 1;
-    const due = since >= 3 || (!notes && since >= 2);
+    const { data: row } = await db.from("mosha_memory").select("*").eq("user_id", uid).maybeSingle();
+    const old = readMemory(row as Record<string, unknown> | null);
+    const since = (((row as { turns_since?: number } | null)?.turns_since) ?? 0) + 1;
+    const due = reported || hasMemorySignal(last.content) || since >= 3 || (!old.notes && since >= 2);
+    const nowIso = new Date().toISOString();
     if (!due) {
-      await db.from("mosha_memory").upsert({ user_id: uid, notes, turns_since: since, updated_at: new Date().toISOString() });
+      await db.from("mosha_memory").upsert({ user_id: uid, turns_since: since, updated_at: nowIso });
       return;
     }
     const recent = [...turns.slice(-6), { role: "assistant" as const, content: reply }]
       .map((t) => `${t.role}: ${t.content.slice(0, 700)}`)
       .join("\n");
-    const fresh = await llm(
+    const raw = await llm(
       db,
-      NOTES_PROMPT,
+      MEMORY_PROMPT,
       "",
-      [{ role: "user", content: `OLD NOTES:\n${notes || "(none yet)"}\n\nNEWEST MESSAGES:\n${recent}` }],
-      350,
+      [{
+        role: "user",
+        content: `OLD MEMORY:\n${JSON.stringify(old)}\n\nNEWEST MESSAGES:\n${recent}\n\n${reported ? "Mo$ha just sent their problem to the team with a report." : "No report was sent in this reply."}`,
+      }],
+      900,
     );
-    const clean = fresh.replace(/\s+/g, " ").trim().slice(0, 1200);
-    await db.from("mosha_memory").upsert({
-      user_id: uid,
-      notes: clean || notes,
-      turns_since: 0,
-      updated_at: new Date().toISOString(),
-    });
+    const proposal = parseMemoryJson(raw);
+    if (!proposal) console.warn("mosha-chat: memory reply was not JSON; keeping the old memory");
+    const merged = mergeMemory(old, proposal, { now: nowIso, reportedText: reported ? last.content.slice(0, 160) : null });
+    const { error } = await db.from("mosha_memory").upsert({ user_id: uid, ...merged, turns_since: 0, updated_at: nowIso });
+    if (error) {
+      // Before the structured-memory migration only notes can be written.
+      await db.from("mosha_memory").upsert({ user_id: uid, notes: merged.notes, turns_since: 0, updated_at: nowIso });
+    }
   } catch (err) {
-    console.error("mosha-chat: could not update the notes", err);
+    console.error("mosha-chat: could not update the memory", err);
   }
 }
 
@@ -657,12 +1057,16 @@ Deno.serve(async (req) => {
     const { reply, action, report } = splitAction(await ask(db, live, turns));
     let words = reply || "Say that again for me, one more time.";
     // Only a report that really landed may be called sent.
-    if (report && !silent && !(await passItOn(token || null, turns, typeof body?.page === "string" ? body.page.slice(0, 60) : null))) {
-      words = `${words}\n\nThat did not reach the team just now, and I will not pretend it did. Tap Report a bug in the menu, or write to songchaindao@gmail.com.`;
+    let reported = false;
+    if (report && !silent) {
+      reported = await passItOn(token || null, turns, typeof body?.page === "string" ? body.page.slice(0, 60) : null);
+      if (!reported) {
+        words = `${words}\n\nThat did not reach the team just now, and I will not pretend it did. Tap Report a bug in the menu, or write to songchaindao@gmail.com.`;
+      }
     }
 
     if (uid && !silent) {
-      const work = remember(db, uid, turns, words, action);
+      const work = remember(db, uid, turns, words, action, reported);
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work);
       else void work;
     }
