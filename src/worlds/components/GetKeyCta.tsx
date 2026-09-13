@@ -31,6 +31,14 @@ export function GetKeyCta({
   const tokenLive = rings?.tokenLive ?? false;
   const native = isNativeApp();
   const coin = getArtistCoin(world.artistId);
+  // A world with no token name of its own (a builder world with no coin yet)
+  // must never print a blank: "The key is being cut.  goes live soon" read as
+  // broken under GESD1's world. Its own coin's name when there is one, else
+  // plain words about the artist's key.
+  const keyName = world.tokenSymbol?.trim() || (coin?.zoraHandle ? `$${coin.zoraHandle.toUpperCase()}` : `${world.artistName}'s key`);
+  // A world keyed on listening points (the builder's points gate) has no coin
+  // to buy: its label is "points", and the doors open on the ledger.
+  const pointsKey = !coin && world.tokenSymbol?.trim().toLowerCase() === 'points';
   const canBuy = tokenLive && !!coin && !native;
   const [open, setOpen] = useState(false);
 
@@ -39,7 +47,7 @@ export function GetKeyCta({
       open={open}
       onOpenChange={setOpen}
       coinAddress={coin.coinAddress}
-      symbol={world.tokenSymbol}
+      symbol={keyName}
       artistName={world.artistName}
       thresholds={rings?.thresholds ?? null}
       worldSlug={world.slug}
@@ -56,7 +64,7 @@ export function GetKeyCta({
             onClick={() => setOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-4 py-2 text-xs font-bold text-black transition hover:bg-amber-300"
           >
-            <KeyRound className="h-3.5 w-3.5" /> Get {world.tokenSymbol}
+            <KeyRound className="h-3.5 w-3.5" /> Get {keyName}
           </button>
           {modal}
         </>
@@ -65,9 +73,11 @@ export function GetKeyCta({
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-300">
         <KeyRound className="h-3.5 w-3.5" />
-        {tokenLive
-          ? `${world.tokenSymbol} in your wallet is the key.`
-          : `The key is being cut. ${world.tokenSymbol} goes live soon.`}
+        {pointsKey
+          ? 'Listening points open these doors.'
+          : tokenLive
+            ? `${keyName} in your wallet is the key.`
+            : `The key is being cut. ${keyName} goes live soon.`}
       </span>
     );
   }
@@ -89,13 +99,15 @@ export function GetKeyCta({
             onClick={() => setOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-bold text-black transition hover:bg-amber-300"
           >
-            <KeyRound className="h-4 w-4" /> Get {world.tokenSymbol}
+            <KeyRound className="h-4 w-4" /> Get {keyName}
           </button>
         ) : (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-5 py-2 text-sm font-semibold text-amber-300">
-            {tokenLive
-              ? `${world.tokenSymbol} held in your own wallet opens the doors.`
-              : `The key is being cut. ${world.tokenSymbol} goes live soon on Base.`}
+            {pointsKey
+              ? `Listening points open these doors: ${(rings?.thresholds?.FAN ?? 1000).toLocaleString()} for the fan rooms, ${(rings?.thresholds?.INSIDER ?? 10000).toLocaleString()} for the insider rooms. Nothing to buy.`
+              : tokenLive
+                ? `${keyName} held in your own wallet opens the doors.`
+                : `The key is being cut. ${keyName} goes live soon on Base.`}
           </span>
         )}
         {world.farcasterUrl && (
