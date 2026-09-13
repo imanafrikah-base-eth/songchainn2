@@ -638,6 +638,21 @@ export function Navigation() {
                 })}
 
                 <div className="pt-2 mt-2 border-t border-border/50 space-y-2">
+                  {/* Every open world, one tap from the menu on a phone. It was
+                      only in the desktop More list and the Home slideshow. */}
+                  <motion.button
+                    onClick={() => handleNavClick('/worlds')}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left transition-all border",
+                      location.pathname === '/worlds'
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "glass text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent"
+                    )}
+                  >
+                    <Globe2 className="w-5 h-5" />
+                    <span>Artist Worlds</span>
+                  </motion.button>
+
                   <motion.button
                     onClick={() => {
                       setShowInvite(true);

@@ -8,7 +8,10 @@ import type { WorldConfig } from '@/worlds/types';
 import { usePublishedWorlds, worldPath } from '@/hooks/usePublishedWorlds';
 import { WorldDoorway } from './WorldDoorway';
 
-const SLIDE_MS = 14000;
+/** How long each world's advert stands before the next one slides in. */
+const SLIDE_MS = 7000;
+/** A tap or a swipe over the advert pauses it this long, then it carries on by itself. */
+const TOUCH_PAUSE_MS = 9000;
 const CODE_SLUGS = new Set(WORLDS.map((w) => w.slug));
 
 /** What a world chose to show in its advert: its gate by default. */
@@ -42,47 +45,100 @@ export function WorldsSlideshow({
 }) {
   const { data: worlds = [] } = usePublishedWorlds();
   const [index, setIndex] = useState(0);
-  const [held, setHeld] = useState(false);
-  const timer = useRef<number | null>(null);
+  // A mouse resting on the advert holds it. A finger never does for long: on a
+  // phone a scroll over the advert fires touchcancel, not touchend, so a
+  // "held while touched" flag stayed on and the slideshow stopped for good on
+  // whichever world was showing. A touch now pauses it briefly instead.
+  const [hovered, setHovered] = useState(false);
+  const [pausedUntil, setPausedUntil] = useState(0);
+  const [pageVisible, setPageVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
+  // Bumped on every manual move, so the next slide gets its full time.
+  const [cycle, setCycle] = useState(0);
+  const resumeTimer = useRef<number | null>(null);
   const count = worlds.length;
+
+  const reducedMotion = (() => {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+  })();
+  const running = count > 1 && !hovered && pausedUntil === 0 && pageVisible && !reducedMotion;
 
   useEffect(() => {
     if (index >= count && count > 0) setIndex(0);
   }, [count, index]);
 
   useEffect(() => {
-    if (count < 2 || held) return;
-    let reduced = false;
-    try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { /* fine */ }
-    if (reduced) return;
-    timer.current = window.setInterval(() => setIndex((i) => (i + 1) % count), SLIDE_MS);
-    return () => { if (timer.current !== null) window.clearInterval(timer.current); };
-  }, [count, held]);
+    const onVisibility = () => setPageVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  // One slide at a time: a timeout per slide rather than an interval, so a
+  // manual move or a pause always gives the next world its full time.
+  useEffect(() => {
+    if (!running) return;
+    const t = window.setTimeout(() => setIndex((i) => (i + 1) % count), SLIDE_MS);
+    return () => window.clearTimeout(t);
+  }, [running, count, index, cycle]);
+
+  useEffect(() => {
+    if (!pausedUntil) return;
+    if (resumeTimer.current !== null) window.clearTimeout(resumeTimer.current);
+    resumeTimer.current = window.setTimeout(() => setPausedUntil(0), Math.max(0, pausedUntil - Date.now()));
+    return () => { if (resumeTimer.current !== null) window.clearTimeout(resumeTimer.current); };
+  }, [pausedUntil]);
 
   if (!count) return null;
   const current = Math.min(index, count - 1);
   const world = worlds[current];
   const ctaForWorld = typeof cta === 'function' ? cta(world) : cta;
+  const pauseForTouch = () => setPausedUntil(Date.now() + TOUCH_PAUSE_MS);
+  const goTo = (next: number) => {
+    setIndex(((next % count) + count) % count);
+    setCycle((c) => c + 1);
+  };
 
   return (
     <div
       className={`relative ${className}`}
-      onPointerEnter={() => setHeld(true)}
-      onPointerLeave={() => setHeld(false)}
-      onTouchStart={() => setHeld(true)}
-      onTouchEnd={() => setHeld(false)}
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHovered(true); }}
+      onPointerLeave={(e) => { if (e.pointerType === 'mouse') setHovered(false); }}
+      onTouchStart={pauseForTouch}
     >
-      {CODE_SLUGS.has(world.slug) ? (
-        <WorldDoorway key={world.slug} cta={ctaForWorld} />
-      ) : (
-        <WorldAd key={world.slug} world={world} cta={ctaForWorld} />
+      {count > 1 && (
+        <div className="mb-2 flex gap-1" aria-hidden="true">
+          {worlds.map((w, i) => (
+            <div key={w.slug} className="h-0.5 flex-1 overflow-hidden rounded-full bg-muted-foreground/25">
+              <div
+                key={i === current ? `${current}-${cycle}-${running}` : 'idle'}
+                className="h-full rounded-full bg-primary"
+                style={
+                  i < current
+                    ? { width: '100%' }
+                    : i === current
+                      ? running
+                        ? { width: '100%', animation: `worlds-slide-progress ${SLIDE_MS}ms linear` }
+                        : { width: '100%', opacity: 0.6 }
+                      : { width: 0 }
+                }
+              />
+            </div>
+          ))}
+          <style>{'@keyframes worlds-slide-progress { from { width: 0 } to { width: 100% } }'}</style>
+        </div>
       )}
+      <div key={world.slug} className="animate-in fade-in duration-500">
+        {CODE_SLUGS.has(world.slug) ? (
+          <WorldDoorway cta={ctaForWorld} />
+        ) : (
+          <WorldAd world={world} cta={ctaForWorld} />
+        )}
+      </div>
 
       {count > 1 && (
         <div className="mt-2 flex items-center justify-between gap-2">
           <button
             type="button"
-            onClick={() => setIndex((i) => (i - 1 + count) % count)}
+            onClick={() => goTo(current - 1)}
             aria-label="Previous world"
             className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground"
           >
@@ -96,14 +152,14 @@ export function WorldsSlideshow({
                 role="tab"
                 aria-selected={i === current}
                 aria-label={formatWorldNumber(w)}
-                onClick={() => setIndex(i)}
+                onClick={() => goTo(i)}
                 className={`h-1.5 rounded-full transition-all ${i === current ? 'w-6 bg-primary' : 'w-1.5 bg-muted-foreground/40'}`}
               />
             ))}
           </div>
           <button
             type="button"
-            onClick={() => setIndex((i) => (i + 1) % count)}
+            onClick={() => goTo(current + 1)}
             aria-label="Next world"
             className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground"
           >
