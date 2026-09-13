@@ -9,6 +9,9 @@ import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+import type { Song } from '@/data/musicData';
+import { roomOrderForDay } from '@/lib/roomOrder';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -62,30 +65,6 @@ const MOSHA_USER_ID = 'mosha-bot';
 const MOSHA_NAME = 'Mo$ha';
 const MOSHA_ROOM_GREETING_PREFIX = 'songchainn:mosha-room-greeted:v1:';
 const MOSHA_MODE_KEY = 'songchainn:mosha-room-mode:v1';
-
-/** A tiny deterministic generator, so one seed always gives one order. */
-function seededRandom(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** The same shuffled order for everybody, changing once a day. */
-function shuffledForToday<T>(items: readonly T[]): T[] {
-  const day = Math.floor(Date.now() / 86_400_000);
-  const rand = seededRandom(day * 2654435761);
-  const out = items.slice();
-  for (let i = out.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rand() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
 
 const KNOWN_ARTIST_NAMES = new Set(
   ARTISTS.map(a => a.name.trim().toLowerCase()).filter(Boolean)
@@ -304,8 +283,25 @@ export default function Room() {
   const { enterRoomMode, exitRoomMode, setVolume, volume, play, hideRoom } = usePlayerActions();
   const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
 
-  // On shuffle, and on the same shuffle as everyone else in here.
-  const playlist = useMemo(() => shuffledForToday(SONGS), []);
+  // Every record on SONGCHAINN, the founding catalogue and every published
+  // upload, on the same shuffle as everyone else in here. It waits for the
+  // uploads to load: entering with the founding list and then again with the
+  // full one would restart the song and put this listener on a different order.
+  const { songs: publishedSongs, isLoading: isCatalogLoading } = usePublishedCatalog();
+  const roomSongs = useMemo(() => {
+    if (isCatalogLoading) return [] as Song[];
+    const byId = new Map<string, Song>();
+    for (const song of [...SONGS, ...publishedSongs]) {
+      if (song.audioUrl && !byId.has(song.id)) byId.set(song.id, song);
+    }
+    return [...byId.values()];
+  }, [isCatalogLoading, publishedSongs]);
+  // The catalogue refetches in the background (tab focus, stale time). A new
+  // array with the same records must not rebuild the order, because entering
+  // the Room again restarts the song, so the order follows the set of ids only.
+  const roomSignature = useMemo(() => roomSongs.map((s) => s.id).sort().join('|'), [roomSongs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const playlist = useMemo(() => roomOrderForDay(roomSongs), [roomSignature]);
 
   const [roomName, setRoomName] = useState<string>('');
   const [messages, setMessages] = useState<RoomMessage[]>([]);

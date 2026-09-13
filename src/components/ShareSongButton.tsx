@@ -7,6 +7,7 @@ import { SendSongSheet } from '@/components/social/SendSongSheet';
 import { shareToFeed } from '@/lib/shareToFeed';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { thumb } from '@/lib/img';
 import { fcComposeCast, fcOpenUrl, isInMiniApp } from '@/lib/farcasterActions';
 
 interface ShareSongButtonProps {
@@ -272,8 +273,9 @@ export function ShareSongButton({
               <div className="mx-4 mb-5 p-3 bg-white/5 rounded-2xl flex items-center gap-3 border border-white/5">
                 {coverImage ? (
                   <img
-                    src={coverImage}
+                    src={thumb(coverImage, 56)}
                     alt=""
+                    decoding="async"
                     className="w-14 h-14 rounded-xl object-cover flex-shrink-0 shadow-lg"
                   />
                 ) : (

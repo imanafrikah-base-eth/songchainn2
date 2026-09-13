@@ -8,6 +8,7 @@ import { useEngagement, PLAY_THRESHOLD_SECONDS } from '@/context/EngagementConte
 import { Slider } from '@/components/ui/slider';
 import { FullScreenPlayer } from './FullScreenPlayer';
 import { SpinningSongArt } from './SpinningSongArt';
+import { thumb } from '@/lib/img';
 import { ShareSongButton } from './ShareSongButton';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -154,8 +155,11 @@ export const AudioPlayer = memo(function AudioPlayer() {
         title: currentSong.title,
         artist: currentSong.artist,
         album: currentSong.volume || '$ongChainn',
+        // Android fetches this for the lock screen and notification on every
+        // song change. It was the full-size cover; a 384 px copy is plenty.
+        // No `type`: the resized copy is WebP, not JPEG.
         artwork: currentSong.coverImage
-          ? [{ src: currentSong.coverImage, sizes: '512x512', type: 'image/jpeg' }]
+          ? [{ src: thumb(currentSong.coverImage, 192) ?? currentSong.coverImage, sizes: '384x384' }]
           : [],
       });
 
