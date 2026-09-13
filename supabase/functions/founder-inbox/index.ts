@@ -10,7 +10,10 @@
 // Request:  POST { kind: 'suggestion' | 'bug' | 'feature', text, subject?, page?,
 //                  screen_size?, world_id?, world_slug?, build_step? }
 //           with the caller's JWT when signed in.
-// Response: { success: true, stored: boolean, emailed: boolean }
+// Response: { success: true, stored: boolean, emailed: boolean, dmed: boolean }
+//
+// Every note also reaches IMan Afrikah's DMs from Mo$ha: stored notes through
+// the table triggers, unstored ones through rpc mosha_dm_founder below.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -119,11 +122,58 @@ Deno.serve(async (req) => {
       console.error("founder-inbox: could not store the note", err);
     }
 
+    /* ------------------------------------------- IMan's DM, from Mo$ha --- */
+    // A stored note already reaches IMan Afrikah's DMs through the AFTER INSERT
+    // trigger on its table (migration 20260913000300), so only a note that no
+    // table kept (a guest's suggestion or world request, or a failed insert) is
+    // sent from here. That way nothing lands in the DM twice.
+    let dmed = !!stored;
+    if (!stored) {
+      try {
+        let name = "a guest";
+        if (uid) {
+          const { data: prof } = await db
+            .from("audience_profiles")
+            .select("display_name, profile_name, username")
+            .eq("user_id", uid)
+            .maybeSingle();
+          name = prof?.display_name?.trim() || prof?.profile_name?.trim() || prof?.username?.trim() || email || "someone without a name yet";
+        }
+        const heading =
+          kind === "bug"
+            ? /mo\$ha/i.test(subject) ? `Report from ${name} via Mo$ha` : `Bug report from ${name}`
+            : kind === "suggestion"
+              ? `Feature suggestion from ${name}`
+              : `World builder request from ${name} via Mo$ha`;
+        const lines = [
+          heading,
+          subject && !/^(suggestion|feature suggestion|sent through mo\$ha)$/i.test(subject) ? `Title: ${subject}` : "",
+          "",
+          text.slice(0, 1500),
+          "",
+          page ? `Page: ${page}` : "",
+          body?.screen_size ? `Screen: ${String(body.screen_size).slice(0, 40)}` : "",
+          kind === "bug" ? `Device: ${(req.headers.get("user-agent") ?? "unknown").slice(0, 160)}` : "",
+          body?.world_slug ? `World: /world/${String(body.world_slug).slice(0, 120)}` : "",
+          body?.build_step ? `Step: ${String(body.build_step).slice(0, 60)}` : "",
+          storeError ? "(It could not be saved to its table, so this message is the only copy in the app.)" : "",
+        ].filter((l, i, all) => l !== "" || (i > 0 && all[i - 1] !== ""));
+        const { error: dmErr } = await db.rpc("mosha_dm_founder", {
+          p_body: lines.join("\n").trim(),
+          p_meta: { report_kind: kind, guest: !uid },
+        });
+        if (dmErr) throw dmErr;
+        dmed = true;
+      } catch (err) {
+        console.error("founder-inbox: could not DM the founder", err);
+      }
+    }
+
     /* ------------------------------------------------- the inbox --- */
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) {
       console.error("founder-inbox: RESEND_API_KEY not configured; note saved without the email");
-      return json({ success: true, stored: !!stored, emailed: false, storeError });
+      return json({ success: true, stored: !!stored, emailed: false, dmed, storeError });
     }
 
     // Send from a verified Resend domain when one exists; the sandbox sender
@@ -189,7 +239,7 @@ Deno.serve(async (req) => {
       await db.from("suggestion_forms").update({ email_sent: true }).eq("id", stored);
     }
 
-    return json({ success: true, stored: !!stored, emailed, storeError });
+    return json({ success: true, stored: !!stored, emailed, dmed, storeError });
   } catch (err) {
     console.error("founder-inbox error:", err);
     return json({ error: "That did not go through. Try again in a moment." }, 500);
