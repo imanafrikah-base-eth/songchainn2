@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Music } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Catalog } from '@/data/musicData';
+import { thumb } from '@/lib/img';
 
 interface CatalogCardProps {
   catalog: Catalog;
@@ -26,10 +27,13 @@ export function CatalogCard({ catalog, isNew, className }: CatalogCardProps) {
         <div className="relative aspect-square overflow-hidden">
           {catalog.coverImage ? (
             <img
-              src={catalog.coverImage}
+              src={thumb(catalog.coverImage, 240)}
               alt={catalog.title}
+              width={240}
+              height={240}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-secondary">

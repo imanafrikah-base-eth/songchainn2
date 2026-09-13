@@ -143,6 +143,12 @@ export interface WorldConfig {
   roomArt?: Record<string, string>;
   /** Skyline art, keyed by city slug. Real artist imagery only. */
   cityArt?: Record<string, string>;
+  /**
+   * A built world only: how many blocks stand on each street, keyed by street
+   * slug. Lets the map leave empty streets and cities out for visitors.
+   * Absent on code-defined worlds, whose rooms are hand-built and never empty.
+   */
+  streetBlockCounts?: Record<string, number>;
 
   // ---------------------------------------------------------------- motion
   // Every art slot above is a still, and the still is what ships: these

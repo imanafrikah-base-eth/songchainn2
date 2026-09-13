@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Music, Users, Upload, Edit, Trash2, Plus, FileMusic, BadgeCheck, Wallet, Lightbulb } from 'lucide-react';
+import { Music, Users, Upload, ExternalLink, Plus, FileMusic, BadgeCheck, Wallet, Lightbulb } from 'lucide-react';
+import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useAuth } from '@/context/AuthContext';
 import { ARTISTS, SONGS, Artist, Song } from '@/data/musicData';
 import { Button } from '@/components/ui/button';
@@ -205,12 +206,14 @@ export default function Admin() {
                         <td className="px-4 py-3 text-muted-foreground text-sm">{artist.location}</td>
                         <td className="px-4 py-3 text-muted-foreground">{artist.songs.length}</td>
                         <td className="px-4 py-3 text-right">
+                          {/* The artist's own page is where their profile is
+                              edited. Deleting an artist from here was never
+                              real, and the catalogue is live, so it is gone. */}
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="ghost" onClick={() => toast({ title: 'Edit Artist', description: 'Artist editing coming soon.' })}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => toast({ title: 'Delete Artist', description: 'Artist deletion coming soon.', variant: 'destructive' })}>
-                              <Trash2 className="w-4 h-4" />
+                            <Button asChild size="sm" variant="ghost" aria-label={`Open ${artist.name}'s page`}>
+                              <Link to={artistPath(artist.id, artist.name)}>
+                                <ExternalLink className="w-4 h-4" />
+                              </Link>
                             </Button>
                           </div>
                         </td>
@@ -254,12 +257,14 @@ export default function Admin() {
                         <td className="px-4 py-3 text-muted-foreground">{song.plays.toLocaleString()}</td>
                         <td className="px-4 py-3 text-muted-foreground">{song.likes.toLocaleString()}</td>
                         <td className="px-4 py-3 text-right">
+                          {/* Every song listed here is the published catalogue,
+                              which is never deleted from this table. The song's
+                              page is the real place to see and manage it. */}
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="ghost" onClick={() => toast({ title: 'Edit Song', description: 'Song editing coming soon.' })}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => toast({ title: 'Delete Song', description: 'Song deletion coming soon.', variant: 'destructive' })}>
-                              <Trash2 className="w-4 h-4" />
+                            <Button asChild size="sm" variant="ghost" aria-label={`Open ${song.title}`}>
+                              <Link to={songPath({ id: song.id, title: song.title, artistId: song.artistId, artist: song.artist })}>
+                                <ExternalLink className="w-4 h-4" />
+                              </Link>
                             </Button>
                           </div>
                         </td>

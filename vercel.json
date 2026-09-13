@@ -2,6 +2,19 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "images": {
+    "sizes": [96, 192, 384, 640, 828, 1080],
+    "qualities": [70],
+    "formats": ["image/webp"],
+    "minimumCacheTTL": 2678400,
+    "localPatterns": [
+      { "pathname": "^/(world-assets|lovable-uploads|images|img)/.*$" }
+    ],
+    "remotePatterns": [
+      { "protocol": "https", "hostname": "^pub-[a-z0-9]{32}\\.r2\\.dev$" },
+      { "protocol": "https", "hostname": "^wsjhbfmzbonxmxaaassu\\.supabase\\.co$", "pathname": "^/storage/v1/object/public/.*$" }
+    ]
+  },
   "rewrites": [
     {
       "source": "/",

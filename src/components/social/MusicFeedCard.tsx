@@ -1,4 +1,8 @@
-import { useState, type SyntheticEvent } from 'react';
+import { useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
+import { Send } from 'lucide-react';
+import type { PostComment } from '@/types/social';
+import { useCompliance } from '@/hooks/useCompliance';
+import { COMMENT_MAX_LENGTH } from '@/components/social/CommentSheet';
 import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -38,8 +42,123 @@ function formatPulseTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+/**
+ * The conversation under a feed card: the newest comments, and a one line
+ * composer that opens where you tapped.
+ *
+ * Replying used to mean finding the comment icon in the rail, waiting for a
+ * sheet, and typing into a box at the far bottom of the screen. One comment in
+ * 184 posts says how often anybody bothered.
+ */
+function FeedCommentStrip({
+  count,
+  previews,
+  onOpenAll,
+  onSend,
+}: {
+  count: number;
+  previews: PostComment[];
+  onOpenAll: () => void;
+  onSend?: (content: string) => Promise<boolean>;
+}) {
+  const { isMuted, isSuspended } = useCompliance();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const canComment = !!onSend && !isMuted && !isSuspended;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const content = text.trim();
+    if (!content || !onSend || sending) return;
+    setSending(true);
+    setText('');
+    const ok = await onSend(content);
+    setSending(false);
+    if (!ok) {
+      setText(content);
+      inputRef.current?.focus();
+    } else {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="mb-2 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+      {previews.length > 0 && (
+        <button
+          type="button"
+          onClick={onOpenAll}
+          className="block w-full min-h-11 rounded-lg text-left"
+          aria-label={`Open all ${count} comments`}
+        >
+          {previews.map((c) => (
+            <span key={c.id} className="block truncate text-xs text-white/85">
+              <span className="font-semibold text-white">
+                {c.profile?.display_name || c.profile?.profile_name || 'Someone'}
+              </span>{' '}
+              {c.content}
+            </span>
+          ))}
+          {count > previews.length && (
+            <span className="mt-0.5 block text-xs text-white/60">
+              View all {count} comments
+            </span>
+          )}
+        </button>
+      )}
+
+      {canComment && (open ? (
+        <form onSubmit={(e) => void submit(e)} className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            autoFocus
+            value={text}
+            maxLength={COMMENT_MAX_LENGTH}
+            onChange={(e) => setText(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setOpen(false);
+            }}
+            onBlur={() => {
+              if (!text.trim()) setOpen(false);
+            }}
+            placeholder="Add a comment"
+            aria-label="Add a comment"
+            className="h-11 min-w-0 flex-1 rounded-full border border-white/20 bg-black/60 px-4 text-sm text-white placeholder:text-white/50 outline-none focus:border-white/50"
+          />
+          <button
+            type="submit"
+            disabled={!text.trim() || sending}
+            aria-label="Send comment"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex h-11 max-w-full items-center gap-2 rounded-full bg-white/10 px-4 text-sm text-white/80 backdrop-blur-sm hover:bg-white/15"
+        >
+          <MessageCircle className="h-4 w-4 shrink-0" />
+          <span className="truncate">
+            {count > 0 ? 'Add a comment' : 'Be the first to comment'}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 interface MusicFeedCardProps {
   post: SocialPostWithProfile;
+  /** The newest one or two comments, shown under the caption. */
+  previewComments?: PostComment[];
+  /** Post a comment from the card itself. Resolves false when it did not send. */
+  onQuickComment?: (postId: string, content: string) => Promise<boolean>;
   onLike: (postId: string) => void;
   onFollow: (userId: string) => void;
   isFollowing: boolean;
@@ -52,7 +171,7 @@ interface MusicFeedCardProps {
   onUntagSelf?: (postId: string) => Promise<boolean> | void;
 }
 
-export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, onDelete, onEdit, onUntagSelf }: MusicFeedCardProps) {
+export function MusicFeedCard({ post, previewComments, onQuickComment, onLike, onFollow, isFollowing, onComment, onDelete, onEdit, onUntagSelf }: MusicFeedCardProps) {
   const { user } = useAuth();
   const { currentSong, isPlaying, playSong, pause, play } = usePlayer();
   const navigate = useNavigate();
@@ -358,14 +477,25 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
           )}
         </div>
 
-        <button className="flex flex-col items-center gap-1" onClick={(e) => { e.stopPropagation(); onLike(post.id); }}>
-          <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${post.is_liked ? 'bg-red-500/30' : 'bg-white/10 backdrop-blur-sm'}`}>
+        <button
+          className="flex flex-col items-center gap-1"
+          aria-label={post.is_liked ? `Unlike, ${post.likes_count || 0} likes` : `Like, ${post.likes_count || 0} likes`}
+          aria-pressed={post.is_liked}
+          onClick={(e) => { e.stopPropagation(); onLike(post.id); }}
+        >
+          <motion.div
+            key={post.is_liked ? 'liked' : 'unliked'}
+            initial={post.is_liked ? { scale: 0.7 } : false}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${post.is_liked ? 'bg-red-500/30' : 'bg-white/10 backdrop-blur-sm'}`}
+          >
             <Heart className={`w-6 h-6 ${post.is_liked ? 'text-red-400 fill-red-400' : 'text-white'}`} />
-          </div>
-          <span className="text-[11px] text-white/90 font-medium">{post.likes_count || 0}</span>
+          </motion.div>
+          <span className="text-[11px] text-white/90 font-medium tabular-nums">{post.likes_count || 0}</span>
         </button>
 
-        <button className="flex flex-col items-center gap-1" onClick={(e) => { e.stopPropagation(); onComment(); }}>
+        <button className="flex flex-col items-center gap-1" aria-label={`Comments, ${post.comments_count || 0}`} onClick={(e) => { e.stopPropagation(); onComment(); }}>
           <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
             <MessageCircle className="w-6 h-6 text-white" />
           </div>
@@ -599,9 +729,18 @@ export function MusicFeedCard({ post, onLike, onFollow, isFollowing, onComment, 
           </div>
         )}
 
-        <p className="text-white/60 text-xs mt-2">
+        <p className="text-white/60 text-xs mt-2 mb-2">
           {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
         </p>
+
+        {!post.id.startsWith('pending-') && (
+          <FeedCommentStrip
+            count={post.comments_count || 0}
+            previews={previewComments ?? []}
+            onOpenAll={onComment}
+            onSend={onQuickComment ? (content) => onQuickComment(post.id, content) : undefined}
+          />
+        )}
       </div>
 
       {reporting && (

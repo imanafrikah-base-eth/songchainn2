@@ -68,6 +68,28 @@ import {
   WallRoom,
 } from '@/worlds/components/rooms/SimpleRooms';
 
+/**
+ * Whether a street has anything on it for a visitor to walk into. Only a
+ * built world carries block counts; a code-defined world's rooms are
+ * hand-built, so they always count as standing.
+ */
+function streetHasContent(world: WorldConfig, slug: string): boolean {
+  const counts = world.streetBlockCounts;
+  if (!counts) return true;
+  return (counts[slug] ?? 0) > 0 || Boolean(world.roomArt?.[slug]) || Boolean(world.roomVideo?.[slug]);
+}
+
+/**
+ * Whether a city has anything inside it. A picture on the plot alone is not
+ * somewhere to go: with no street standing in it the visitor walks into an
+ * empty lot, which is what five "Building site" plates were telling them.
+ */
+function cityHasContent(world: WorldConfig, city: WorldCityDef): boolean {
+  if (!world.streetBlockCounts) return true;
+  if (cityInventory(world, city).count > 0) return true;
+  return cityRooms(world, city).some((r) => streetHasContent(world, r.slug));
+}
+
 function WalletChip({
   world,
   wallet,
@@ -178,6 +200,15 @@ function WorldInner({
   const room = !city && segment ? world.rooms.find((r) => r.slug === segment) : undefined;
 
   if (segment && !city && !room) return <Navigate to={`/world/${world.slug}`} replace />;
+
+  // Anyone who is not the owner looking at their own world as its owner.
+  const visitorView = !(isOwner && !asVisitor);
+  const visibleCities = [...world.cities]
+    .sort((a, b) => a.order - b.order)
+    .filter((c) => !visitorView || c.stage === 'soon' || cityHasContent(world, c));
+  const visibleSquare = townSquareRooms(world).filter(
+    (r) => !visitorView || r.stage === 'soon' || streetHasContent(world, r.slug),
+  );
 
   const connected = Boolean(wallet);
   const brand = `Artist Worlds by songchainn · ${formatWorldNumber(world)}`;
@@ -309,37 +340,50 @@ function WorldInner({
               )}
             </header>
 
-            {/* The skyline: the cities of this world */}
-            <SectionLabel
-              title="The cities"
-              note="Every city is a kind of content. The music plays in all of them."
-            />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[...world.cities]
-                .sort((a, b) => a.order - b.order)
-                .map((c, i) => (
-                  <CityBlock
-                    key={c.slug}
-                    world={world}
-                    city={c}
-                    index={i}
-                    soon={c.stage === 'soon' && !(isOwner && !asVisitor)}
-                  />
-                ))}
-            </div>
+            {/* The skyline: the cities of this world. A visitor only sees the
+                cities and streets with something standing in them; the owner
+                in their own view still sees every building site. */}
+            {visibleCities.length > 0 && (
+              <>
+                <SectionLabel
+                  title="The cities"
+                  note="Every city is a kind of content. The music plays in all of them."
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {visibleCities.map((c, i) => (
+                    <CityBlock
+                      key={c.slug}
+                      world={world}
+                      city={c}
+                      index={i}
+                      soon={c.stage === 'soon' && visitorView}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* The town square: the landmarks that belong to no single city */}
-            <div className="mt-12">
-              <SectionLabel
-                title="The town square"
-                note="The centre of the world. Where you arrive, and where everyone gathers."
-              />
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {townSquareRooms(world).map((r, i) => (
-                  <WorldDoor key={r.slug} world={world} room={r} rings={rings} connected={connected} index={i} />
-                ))}
+            {visibleSquare.length > 0 && (
+              <div className={visibleCities.length > 0 ? 'mt-12' : undefined}>
+                <SectionLabel
+                  title="The town square"
+                  note="The centre of the world. Where you arrive, and where everyone gathers."
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {visibleSquare.map((r, i) => (
+                    <WorldDoor key={r.slug} world={world} room={r} rings={rings} connected={connected} index={i} />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {visibleCities.length === 0 && visibleSquare.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-8 text-center">
+                <p className="text-sm text-white/70">{world.artistName} is still building this world.</p>
+                <p className="mt-1 text-xs text-white/40">Check back soon.</p>
+              </div>
+            )}
 
             {/* The station: live voice from the artist, and the episodes kept from it. */}
             <div className="mt-12">
@@ -511,7 +555,11 @@ function CityView({
 }) {
   const hue = DOOR_HUES[city.hue] ?? DOOR_HUES.amber;
   const { count, unit } = cityInventory(world, city);
-  const buildings = cityRooms(world, city);
+  // The owner arranging their city sees every street; everyone else only the
+  // ones with something standing on them.
+  const buildings = cityRooms(world, city).filter(
+    (r) => ownerView || r.stage === 'soon' || streetHasContent(world, r.slug),
+  );
   const art = world.cityArt?.[city.slug];
   const loop = world.cityVideo?.[city.slug];
 

@@ -9,6 +9,7 @@ import { ArrowRight, DoorOpen, Glasses, Volume2, VolumeX } from 'lucide-react';
 import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
 import { Button } from '@/components/ui/button';
 import { isNativeApp } from '@/lib/native';
+import { thumb } from '@/lib/img';
 
 /**
  * The doors, on a page that is not the world.
@@ -88,10 +89,22 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-/** Somebody who has asked their browser to go easy on their data plan. */
+/**
+ * Somebody whose data should not be spent before they ask: Save-Data, a 2g or
+ * 3g line, or a phone. On any of those, nothing is fetched ahead of a tap. The
+ * clip still plays when they push the doors; they just wait for it then.
+ */
 function prefersLessData(): boolean {
-  const nav = typeof navigator !== 'undefined' ? (navigator as Navigator & { connection?: { saveData?: boolean } }) : undefined;
-  return Boolean(nav?.connection?.saveData);
+  if (typeof navigator === 'undefined') return true;
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  if (conn?.saveData) return true;
+  if (conn?.effectiveType && /^(slow-2g|2g|3g)$/.test(conn.effectiveType)) return true;
+  try {
+    if (window.matchMedia('(pointer: coarse) and (max-width: 767px)').matches) return true;
+  } catch {
+    /* no matchMedia: judge on the connection alone */
+  }
+  return false;
 }
 
 /**
@@ -372,17 +385,18 @@ export function WorldDoorway({
         className="relative aspect-[4/5] w-full sm:aspect-[16/10] lg:aspect-[21/9]"
       >
         <img
-          src={still}
+          src={thumb(still, 640)}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
           loading="lazy"
+          decoding="async"
         />
         <video
           ref={playerA}
           className={playerClass(0)}
           muted
           playsInline
-          preload="metadata"
+          preload="none"
           disablePictureInPicture
           aria-hidden="true"
           onEnded={onClipEnded}
@@ -392,7 +406,7 @@ export function WorldDoorway({
           className={playerClass(1)}
           muted
           playsInline
-          preload="metadata"
+          preload="none"
           disablePictureInPicture
           aria-hidden="true"
           onEnded={onClipEnded}

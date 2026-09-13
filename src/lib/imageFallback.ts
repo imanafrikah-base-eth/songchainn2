@@ -15,7 +15,10 @@
  * never gets seen.
  */
 
+import { originalOf } from './img';
+
 const HANDLED = 'data-img-fallback';
+const RETRIED = 'data-img-original-retry';
 
 /**
  * Neutral placeholder tile, inline so it can never itself fail to load.
@@ -42,6 +45,19 @@ function onImageError(event: Event) {
   if (!el || el.tagName !== 'IMG') return;
 
   const img = el as HTMLImageElement;
+
+  // A resized copy that failed (optimizer quota, a host it does not know, a
+  // dev server with no /_vercel/image) gets one try at the original file
+  // before it is called broken. Components that hide a tile on a real failure
+  // check for data-img-fallback, which is not set on this retry.
+  const original = originalOf(img.getAttribute('src') || '');
+  if (original && !img.hasAttribute(RETRIED)) {
+    img.setAttribute(RETRIED, '');
+    img.removeAttribute('srcset');
+    img.removeAttribute('sizes');
+    img.src = original;
+    return;
+  }
 
   // Never loop: one swap per element, and never re-enter on the placeholder.
   if (img.hasAttribute(HANDLED)) return;

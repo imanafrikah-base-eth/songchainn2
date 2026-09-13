@@ -4,6 +4,7 @@ import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { thumb } from '@/lib/img';
 
 /**
  * The first thing on Home.
@@ -51,9 +52,11 @@ export const HomeHero = memo(function HomeHero({ feature, onPlay, faces = [] }: 
         {/* Backdrop: the record's own artwork, out of focus. */}
         {art ? (
           <img
-            src={art}
+            /* Blurred to nothing, so a small copy looks identical and costs a fraction. */
+            src={thumb(art, 96)}
             alt=""
             aria-hidden
+            decoding="async"
             className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover blur-2xl opacity-45"
           />
         ) : (
@@ -70,8 +73,10 @@ export const HomeHero = memo(function HomeHero({ feature, onPlay, faces = [] }: 
           >
             {art ? (
               <img
-                src={art}
+                src={thumb(art, 208)}
                 alt=""
+                width={208}
+                height={208}
                 className="h-44 w-44 rounded-xl object-cover shadow-float sm:h-52 sm:w-52"
                 /* eager: this is the largest paint on the page, never lazy it */
                 loading="eager"
@@ -125,10 +130,13 @@ export const HomeHero = memo(function HomeHero({ feature, onPlay, faces = [] }: 
                 <Link to={artistPath(f.id)} className="group block focus-ring rounded-full">
                   {f.image ? (
                     <img
-                      src={f.image}
+                      src={thumb(f.image, 72)}
                       alt=""
+                      width={72}
+                      height={72}
                       className="h-16 w-16 rounded-full object-cover transition-transform group-hover:scale-105 sm:h-[4.5rem] sm:w-[4.5rem]"
                       loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div className="h-16 w-16 rounded-full bg-secondary sm:h-[4.5rem] sm:w-[4.5rem]" />

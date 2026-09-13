@@ -41,6 +41,7 @@ import { useArtistCoinHolding, HOLDER_PERK_USD } from '@/hooks/useArtistCoinHold
 import { GetKeyModal } from '@/worlds/components/GetKeyModal';
 import { WORLDS } from '@/worlds/registry';
 import { isNativeApp } from '@/lib/native';
+import { reallyBroken, thumb } from '@/lib/img';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -798,10 +799,11 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
             />
             {displayCoverPhoto && (
               <img
-                src={displayCoverPhoto}
+                src={thumb(displayCoverPhoto, 828)}
                 alt="Cover"
+                decoding="async"
                 className="w-full h-full object-cover"
-                onError={handleImageError}
+                onError={(e) => { if (reallyBroken(e)) handleImageError(e); }}
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
@@ -828,16 +830,22 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
               {displayProfileImage && !profileImageFailed ? (
                 <div className="relative w-full h-full">
                   <img
-                    src={displayProfileImage}
+                    src={thumb(displayProfileImage, 96)}
                     alt=""
+                    width={96}
+                    height={96}
+                    decoding="async"
                     className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110"
-                    onError={handleImageError}
+                    onError={(e) => { if (reallyBroken(e)) handleImageError(e); }}
                   />
-                  <img 
-                    src={displayProfileImage} 
+                  <img
+                    src={thumb(displayProfileImage, 192)}
                     alt={displayName || artist.name}
+                    width={192}
+                    height={192}
+                    decoding="async"
                     className="relative w-full h-full object-contain"
-                    onError={() => setProfileImageFailed(true)}
+                    onError={(e) => { if (reallyBroken(e)) setProfileImageFailed(true); }}
                   />
                 </div>
               ) : (
@@ -911,7 +919,9 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
                       <span className={`mr-1.5 inline-block h-2 w-2 rounded-full align-middle ${isArtistOnline ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} aria-hidden="true" />
                       {artistPresenceLabel}
                     </p>
-                  ) : holding.coin ? (
+                  ) : holding.coin && user ? (
+                    /* A holder perk means nothing to somebody not signed in:
+                       there is no wallet to link and nothing to hold yet. */
                     <p className="text-xs text-muted-foreground mt-2">
                       Hold ${HOLDER_PERK_USD.toFixed(2)} of {artist.name}'s coin to see when {artist.name} is online.{' '}
                       {!holding.wallet ? (

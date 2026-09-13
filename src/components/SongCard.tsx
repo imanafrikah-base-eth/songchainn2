@@ -23,6 +23,7 @@ import { useArtworkColor } from '@/hooks/useArtworkColor';
 import { Button } from '@/components/ui/button';
 import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { toast } from '@/hooks/use-toast';
+import { reallyBroken, thumb } from '@/lib/img';
 
 interface SongCardProps {
   song: Song;
@@ -217,11 +218,14 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               <>
                 {song.coverImage && !coverImageFailed ? (
                   <img
-                    src={song.coverImage}
+                    src={thumb(song.coverImage, 56)}
                     alt={song.title}
+                    width={56}
+                    height={56}
                     className="w-full h-full object-contain"
                     loading="lazy"
-                    onError={() => setCoverImageFailed(true)}
+                    decoding="async"
+                    onError={(e) => { if (reallyBroken(e)) setCoverImageFailed(true); }}
                   />
                 ) : (
                   <div className="w-full h-full gradient-primary opacity-60" />
@@ -401,9 +405,10 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               </div>
             ) : song.coverImage ? (
               <img
-                src={song.coverImage}
+                src={thumb(song.coverImage, 414)}
                 alt={song.title}
                 loading="lazy"
+                decoding="async"
                 className="w-full h-full object-contain"
               />
             ) : (
@@ -533,12 +538,15 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
         ) : (
           <>
             {song.coverImage && !coverImageFailed ? (
-              <img 
-                src={song.coverImage} 
-                alt={song.title} 
+              <img
+                src={thumb(song.coverImage, 192)}
+                alt={song.title}
+                width={192}
+                height={192}
                 className="w-full h-full object-contain"
                 loading="lazy"
-                onError={() => setCoverImageFailed(true)}
+                decoding="async"
+                onError={(e) => { if (reallyBroken(e)) setCoverImageFailed(true); }}
               />
             ) : (
               <div className="absolute inset-0 gradient-primary opacity-40" />

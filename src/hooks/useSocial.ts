@@ -816,9 +816,12 @@ export function useSocial() {
         void fetchPostsRef.current(feedTypeRef.current);
       })
       // Targeted count updates — avoid full 5-query refetch on every like/comment
+      // Your own like or comment was already counted optimistically. Counting
+      // its realtime echo as well showed one tap as two.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, (payload) => {
         const postId = String((payload.new as any)?.post_id || (payload.old as any)?.post_id || '');
         if (!postId) return;
+        if (payload.eventType === 'INSERT' && (payload.new as any)?.user_id === uid) return;
         const delta = payload.eventType === 'INSERT' ? 1 : -1;
         setPosts(prev => prev.map(p =>
           p.id === postId ? { ...p, likes_count: Math.max(0, p.likes_count + delta) } : p
@@ -827,6 +830,7 @@ export function useSocial() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, (payload) => {
         const postId = String((payload.new as any)?.post_id || (payload.old as any)?.post_id || '');
         if (!postId) return;
+        if (payload.eventType === 'INSERT' && (payload.new as any)?.user_id === uid) return;
         const delta = payload.eventType === 'INSERT' ? 1 : -1;
         setPosts(prev => prev.map(p =>
           p.id === postId ? { ...p, comments_count: Math.max(0, p.comments_count + delta) } : p

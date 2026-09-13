@@ -237,6 +237,167 @@ function NotificationItem({
   );
 }
 
+/*
+ * Grouping.
+ *
+ * 99% of notifications were never opened, because the tray was a wall of the
+ * same row: one "is now live" per battle, one line per Mo$ha message. Runs of
+ * the same kind of notification on the same day collapse into one row here.
+ * Nothing is lost: the row stands for every id in it, a tap reads them all and
+ * dismiss removes them all. The badge still counts every unseen row and still
+ * clears on opening the tray (seen_at), exactly as before.
+ */
+interface NotificationGroup {
+  key: string;
+  items: Notification[];
+}
+
+/** Payments and claims are about one specific thing each, so they never merge. */
+function groupKeyFor(n: Notification): string {
+  if (extractBattleRoute(n.message)) return 'battle_live';
+  if (isPayment(n.type) || n.type === 'artist_claim') return `solo:${n.id}`;
+  const cta = typeof n.metadata?.cta_path === 'string' ? n.metadata.cta_path : '';
+  return `${n.type}|${cta}`;
+}
+
+function groupNotifications(list: Notification[]): NotificationGroup[] {
+  const groups: NotificationGroup[] = [];
+  for (const n of list) {
+    const key = groupKeyFor(n);
+    const last = groups[groups.length - 1];
+    if (
+      last
+      && last.key === key
+      && new Date(last.items[0].created_at).toDateString() === new Date(n.created_at).toDateString()
+    ) {
+      last.items.push(n);
+    } else {
+      groups.push({ key, items: [n] });
+    }
+  }
+  return groups;
+}
+
+function NotificationGroupItem({
+  group,
+  onReadMany,
+  onDeleteMany,
+  onNavigate,
+}: {
+  group: NotificationGroup;
+  onReadMany: (ids: string[]) => void;
+  onDeleteMany: (ids: string[]) => void;
+  onNavigate: (notification: Notification) => void;
+}) {
+  const lead = group.items[0];
+  const count = group.items.length;
+  const ids = group.items.map((n) => n.id);
+  const anyUnread = group.items.some((n) => !n.is_read);
+  const isBattle = group.key === 'battle_live';
+  const Icon = isBattle ? Flame : iconFor(lead.type);
+
+  // Distinct senders, newest first.
+  const senders: { name: string; userId: string | null }[] = [];
+  for (const n of group.items) {
+    const name = senderName(n.from_profile);
+    if (name && !senders.some((s) => s.name === name)) senders.push({ name, userId: n.from_user_id });
+  }
+  const cta = typeof lead.metadata?.cta_path === 'string' ? lead.metadata.cta_path : '';
+  const leadText = defaultMessage(lead) || readableMessage(lead.message) || '';
+  const more = count - 1;
+
+  let who: { name: string; userId: string | null } | null = null;
+  let suffix = '';
+  let text: string;
+  if (isBattle) {
+    text = `${readableMessage(lead.message) || 'A battle is live'}, and ${more} more ${more === 1 ? 'battle' : 'battles'} went live`;
+  } else if (senders.length === 1 && cta.startsWith('/inbox')) {
+    text = `${count} new messages from ${senders[0].name}`;
+  } else if (senders.length >= 2) {
+    who = senders[0];
+    const others = senders.length - 1;
+    suffix = ` and ${others} ${others === 1 ? 'other' : 'others'}`;
+    text = defaultMessage(lead) || readableMessage(lead.message) || '';
+  } else if (senders.length === 1) {
+    who = senders[0];
+    text = `${leadText}, and ${more} more like this`;
+  } else {
+    text = `${leadText}${leadText ? ', and' : ''} ${more} more like this`.trim();
+  }
+
+  const avatar = lead.from_profile as { profile_picture_url?: string | null; avatar_url?: string | null } | undefined;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className={cn(
+        'flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer group',
+        anyUnread ? 'bg-primary/10 hover:bg-primary/15' : 'bg-transparent hover:bg-muted/50',
+      )}
+      onClick={() => {
+        if (anyUnread) onReadMany(ids.filter((id) => group.items.find((n) => n.id === id && !n.is_read)));
+        onNavigate(lead);
+      }}
+    >
+      <div className="relative flex-shrink-0">
+        {lead.from_profile && !isBattle ? (
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={avatar?.profile_picture_url || avatar?.avatar_url || undefined} />
+            <AvatarFallback className="bg-primary/20 text-primary">
+              {senders[0]?.name?.[0]?.toUpperCase() || '?'}
+            </AvatarFallback>
+          </Avatar>
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+            <Icon className="w-5 h-5 text-primary" />
+          </div>
+        )}
+        <span className="absolute -bottom-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-background border border-border text-[10px] font-semibold text-foreground flex items-center justify-center tabular-nums">
+          {count}
+        </span>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm">
+            {!who && lead.title && !isBattle && (
+              <span className="font-semibold text-foreground block">{lead.title}</span>
+            )}
+            {who && (
+              <span className="font-semibold text-foreground">
+                <ArtistName name={who.name} userId={who.userId} size={13} />
+                {suffix}
+              </span>
+            )}
+            {who ? ' ' : ''}
+            <span className="text-muted-foreground">{text}</span>
+          </p>
+          <button
+            type="button"
+            aria-label={`Dismiss ${count} notifications`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteMany(ids);
+            }}
+            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/20 rounded transition-all min-h-11 min-w-11 inline-flex items-center justify-center"
+          >
+            <X className="w-3 h-3 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <Icon className="w-3 h-3 text-primary" />
+          <span className="text-xs text-muted-foreground">
+            {formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })}
+          </span>
+          {anyUnread && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export function NotificationDropdown() {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'social' | 'playlists'>('all');
@@ -247,9 +408,11 @@ export function NotificationDropdown() {
     unseenCount,
     isLoading,
     markAsRead,
+    markManyAsRead,
     markAllAsRead,
     markAllSeen,
-    deleteNotification
+    deleteNotification,
+    deleteMany,
   } = useNotifications();
 
   // Opening the tray clears the badge number. Items stay highlighted until
@@ -267,6 +430,8 @@ export function NotificationDropdown() {
         }
         return notification.type !== 'playlist';
       });
+
+  const groups = groupNotifications(filteredNotifications);
 
   const handleNotificationNavigate = (notification: Notification) => {
     setOpen(false);
@@ -377,14 +542,24 @@ export function NotificationDropdown() {
           ) : (
             <div className="p-2">
               <AnimatePresence>
-                {filteredNotifications.map(notification => (
-                  <NotificationItem
-                    key={notification.id}
-                    notification={notification}
-                    onRead={markAsRead}
-                    onDelete={deleteNotification}
-                    onNavigate={handleNotificationNavigate}
-                  />
+                {groups.map((group) => (
+                  group.items.length === 1 ? (
+                    <NotificationItem
+                      key={group.items[0].id}
+                      notification={group.items[0]}
+                      onRead={markAsRead}
+                      onDelete={deleteNotification}
+                      onNavigate={handleNotificationNavigate}
+                    />
+                  ) : (
+                    <NotificationGroupItem
+                      key={`${group.key}:${group.items[0].id}`}
+                      group={group}
+                      onReadMany={(ids) => void markManyAsRead(ids)}
+                      onDeleteMany={(ids) => void deleteMany(ids)}
+                      onNavigate={handleNotificationNavigate}
+                    />
+                  )
                 ))}
               </AnimatePresence>
             </div>

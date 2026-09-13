@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { thumb } from '@/lib/img';
 
 // Cache extracted colors (and failures, as null) so the same cover art is
 // never re-sampled on repeat plays/re-renders.
@@ -71,7 +72,11 @@ function extractDominantColor(imageUrl: string): Promise<string | null> {
       }
     };
     img.onerror = () => resolve(null);
-    img.src = imageUrl;
+    // Sampled at 16 px, so a small copy gives the same colour. The full cover
+    // was a second multi-megabyte download per card, and from R2 (no CORS
+    // headers) it tainted the canvas and returned nothing anyway. The resized
+    // copy comes from our own origin, so it can actually be read.
+    img.src = thumb(imageUrl, 48) ?? imageUrl;
   });
 }
 

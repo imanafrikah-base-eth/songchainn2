@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { ARTISTS, SONGS } from '@/data/musicData';
 import { songPath } from '@/lib/slugRoutes';
+import { thumb } from '@/lib/img';
+import { WorldArt } from '@/worlds/components/WorldArt';
 
 /**
  * Real pictures where there used to be only words.
@@ -73,6 +75,8 @@ export function ArtMosaic({
   const covers = useCoverSongs(count, seed);
   if (!covers.length) return null;
   const tile = size === 'sm' ? 'h-12 w-12' : size === 'lg' ? 'h-24 w-24 sm:h-28 sm:w-28' : 'h-16 w-16 sm:h-20 sm:w-20';
+  // Largest CSS size the tile reaches, so a 48 px cover is not a 2 MB download.
+  const tilePx = size === 'sm' ? 48 : size === 'lg' ? 112 : 80;
   const row = [...covers, ...covers];
   return (
     <div className={`select-none overflow-hidden ${className}`}>
@@ -95,8 +99,10 @@ export function ArtMosaic({
             className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             <img
-              src={song.coverImage}
+              src={thumb(song.coverImage, tilePx)}
               alt=""
+              width={tilePx}
+              height={tilePx}
               loading="lazy"
               decoding="async"
               draggable={false}
@@ -119,8 +125,10 @@ export function ArtistFaces({ count = 8, className = '', size = 'md' }: { count?
       {faces.map((a, i) => (
         <img
           key={a.id}
-          src={a.profileImage}
+          src={thumb(a.profileImage, 48)}
           alt=""
+          width={48}
+          height={48}
           loading="lazy"
           decoding="async"
           className={`${dim} rounded-full border-2 border-background object-cover ${i ? '-ml-3' : ''}`}
@@ -152,10 +160,10 @@ export function PictureCard({
 }) {
   const inner = (
     <>
-      <img src={image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105" />
-      {video && (
-        <video src={video} poster={image} muted loop playsInline autoPlay preload="none" className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
-      )}
+      {/* The still at card size, and the loop only once the card is on screen
+          and the connection and motion settings allow it. A bare autoPlay
+          <video> ignored preload="none" and fetched every film up front. */}
+      <WorldArt poster={image} video={video} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
       <div className="relative flex h-full flex-col justify-end p-4">
         <p className="font-heading text-lg font-bold leading-tight text-white drop-shadow">{title}</p>

@@ -6,6 +6,8 @@ import { WorldsSlideshow } from './WorldsSlideshow';
 import { useWorldsStanding, FOUNDING_PLACES } from '@/hooks/useWorldsStanding';
 import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
 import { useHasWorld } from '@/worlds/builder/useHasWorld';
+import { WorldArt } from '@/worlds/components/WorldArt';
+import { thumb } from '@/lib/img';
 
 /**
  * Phase Three, advertised.
@@ -120,8 +122,11 @@ export function WorldsPhase3({
       <ul className="mt-5 grid gap-3 sm:grid-cols-3">
         {WHAT_IS_REAL.map(({ icon: Icon, title, line, image, video }) => (
           <li key={title} className="group relative min-h-[10rem] overflow-hidden rounded-xl border border-border bg-black">
-            <img src={image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105" />
-            <video src={video} poster={image} muted loop playsInline autoPlay preload="none" className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
+            {/* The loop waits until the card is on screen, and never comes at
+                all on Save-Data, a 2g or 3g line, or reduced motion. autoPlay
+                on a bare <video> overrode preload="none" and fetched all
+                three films with the page. */}
+            <WorldArt poster={image} video={video} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
             <div className="relative flex h-full flex-col justify-end p-4">
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
@@ -136,7 +141,7 @@ export function WorldsPhase3({
 
       {/* 3. THE OFFER */}
       <div className="relative mt-4 overflow-hidden rounded-2xl border border-primary/30 bg-card/60">
-        <img src={`${W}/square-hero.jpg`} alt="" loading="lazy" decoding="async" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25" />
+        <img src={thumb(`${W}/square-hero.jpg`, 640)} alt="" loading="lazy" decoding="async" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/95 via-background/80 to-background/40" />
         <div className="relative grid gap-4 p-5 sm:grid-cols-[1.2fr_auto] sm:items-center sm:p-6">
           <div>

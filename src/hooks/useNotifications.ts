@@ -215,6 +215,44 @@ export function useNotifications() {
     }
   }, [user]);
 
+  /** A grouped row in the tray stands for several notifications; one tap reads them all. */
+  const markManyAsRead = useCallback(async (ids: string[]) => {
+    if (!user || ids.length === 0) return;
+    const idSet = new Set(ids);
+    const unreadHere = notifications.filter(n => idSet.has(n.id) && !n.is_read).length;
+    if (unreadHere === 0) return;
+
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .in('id', ids)
+      .eq('user_id', user.id);
+
+    if (!error) {
+      setNotifications(prev => prev.map(n => (idSet.has(n.id) ? { ...n, is_read: true } : n)));
+      setUnreadCount(prev => Math.max(0, prev - unreadHere));
+    }
+  }, [user, notifications]);
+
+  /** Dismiss every notification a grouped row stands for. */
+  const deleteMany = useCallback(async (ids: string[]) => {
+    if (!user || ids.length === 0) return;
+    const idSet = new Set(ids);
+    const targets = notifications.filter(n => idSet.has(n.id));
+
+    await supabase
+      .from('notifications')
+      .delete()
+      .in('id', ids)
+      .eq('user_id', user.id);
+
+    setNotifications(prev => prev.filter(n => !idSet.has(n.id)));
+    const unread = targets.filter(n => !n.is_read).length;
+    const unseen = targets.filter(n => !n.seen_at).length;
+    if (unread) setUnreadCount(prev => Math.max(0, prev - unread));
+    if (unseen) setUnseenCount(prev => Math.max(0, prev - unseen));
+  }, [user, notifications]);
+
   const markAllAsRead = useCallback(async () => {
     if (!user) return;
 
@@ -351,10 +389,12 @@ export function useNotifications() {
     unseenCount,
     isLoading,
     markAsRead,
+    markManyAsRead,
     markAllAsRead,
     markAllSeen,
     createNotification,
     deleteNotification,
+    deleteMany,
     refetch: fetchNotifications,
   };
 }

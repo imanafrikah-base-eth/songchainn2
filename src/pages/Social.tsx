@@ -27,6 +27,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { supabase } from '@/integrations/supabase/client';
 import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { SONGS } from '@/data/musicData';
+import { useCommentPreviews } from '@/hooks/useCommentPreviews';
 
 export default function Social() {
   const { user, audienceProfile } = useAuth();
@@ -182,6 +183,10 @@ export default function Social() {
     ? [sharedPost, ...filteredPosts.filter((p) => p.id !== sharedPost.id)]
     : filteredPosts;
 
+  const { previews, addPreview, removePreview, replacePreviews } = useCommentPreviews(
+    postsToRender.map((p) => p.id),
+  );
+
   const backToFeed = useCallback(() => {
     navigate('/social', { replace: true });
   }, [navigate]);
@@ -195,9 +200,42 @@ export default function Social() {
     const postId = commentSheet.postId;
     if (!postId) return false;
     const ok = await deleteComment(postId, commentId);
-    if (ok) setCurrentComments((prev) => prev.filter((c) => c.id !== commentId));
+    if (ok) {
+      setCurrentComments((prev) => prev.filter((c) => c.id !== commentId));
+      removePreview(postId, commentId);
+    }
     return ok;
-  }, [commentSheet.postId, deleteComment]);
+  }, [commentSheet.postId, deleteComment, removePreview]);
+
+  /**
+   * A comment typed straight into a feed card. It shows under the caption at
+   * once and is taken back down, with the text returned to the box, if the
+   * insert fails.
+   */
+  const handleQuickComment = useCallback(async (postId: string, content: string) => {
+    if (!user) return false;
+    const pending: PostComment = {
+      id: `pending-${Date.now()}`,
+      user_id: user.id,
+      post_id: postId,
+      content,
+      created_at: new Date().toISOString(),
+      profile: audienceProfile ?? undefined,
+      likes_count: 0,
+      is_liked: false,
+    };
+    addPreview(pending);
+    try {
+      await addComment(postId, content);
+      const comments = await getPostComments(postId);
+      replacePreviews(postId, comments);
+      return true;
+    } catch {
+      removePreview(postId, pending.id);
+      toast({ title: 'Your comment did not send', variant: 'destructive' });
+      return false;
+    }
+  }, [user, audienceProfile, addPreview, addComment, getPostComments, replacePreviews, removePreview]);
   postsToRenderRef.current = postsToRender;
   const effectiveIsLoading = isLoading || isLoadingSharedPost;
 
@@ -334,6 +372,7 @@ export default function Social() {
       await addComment(postId, content);
       const comments = await getPostComments(postId);
       setCurrentComments(comments);
+      replacePreviews(postId, comments);
     } catch {
       setCurrentComments((prev) => prev.filter((c) => c.id !== tempId));
       toast({ title: 'Your comment did not send', variant: 'destructive' });
@@ -416,6 +455,8 @@ export default function Social() {
             >
               <MusicFeedCard
                 post={post}
+                previewComments={previews[post.id]}
+                onQuickComment={handleQuickComment}
                 onLike={toggleLikePost}
                 onFollow={followUser}
                 isFollowing={isFollowing(post.user_id)}

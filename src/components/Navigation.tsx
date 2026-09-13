@@ -80,6 +80,21 @@ export function Navigation() {
     Boolean(playerState?.isRoomMode) && Boolean(playerState?.isRoomHidden) && location.pathname !== '/room';
 
   useEffect(() => {
+    // Saving a song for offline play only exists for a signed-in listener in
+    // the installed app, with the service worker switched on, and only after
+    // the song has played once. Everyone else was told it worked when it
+    // could not, so the note waits for the one person it is true for.
+    if (!user) return;
+    if (!(import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true')) return;
+    let installed = false;
+    try {
+      installed =
+        window.matchMedia?.('(display-mode: standalone)').matches ||
+        (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+    } catch {
+      installed = false;
+    }
+    if (!installed) return;
     try {
       const key = 'offline-save-announcement-v1';
       const hasSeen = localStorage.getItem(key);
@@ -92,7 +107,7 @@ export function Navigation() {
         console.error('Failed to read offline save announcement state', error);
       }
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -442,7 +457,7 @@ export function Navigation() {
         <div className="border-b border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm">
           <div className="container mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
             <span className="text-xs sm:text-sm text-emerald-100">
-              You can now save songs and play them even without internet.
+              Songs you save on this device play without internet. Play one once, then save it.
             </span>
             <button
               type="button"

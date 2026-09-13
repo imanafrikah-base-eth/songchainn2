@@ -6,6 +6,7 @@ import { MapPin, Music, Users } from 'lucide-react';
 import { Artist, SONGS } from '@/data/musicData';
 import { Link } from 'react-router-dom';
 import { useArtistFollowerCounts, useArtistStreamTotals, usePulseCounts } from '@/hooks/usePopularity';
+import { thumb } from '@/lib/img';
 
 interface ArtistCardProps {
   artist: Artist;
@@ -50,16 +51,23 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
             {artist.profileImage ? (
               <div className="relative w-24 h-24 rounded-full ring-2 ring-primary/30 shadow-glow transition-transform duration-300 group-hover:scale-105 overflow-hidden">
                 <img
-                  src={artist.profileImage}
+                  src={thumb(artist.profileImage, 96)}
                   alt=""
                   aria-hidden="true"
+                  width={96}
+                  height={96}
+                  loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
                 />
                 <img
-                  src={artist.profileImage}
+                  src={thumb(artist.profileImage, 96)}
                   alt={artist.name}
+                  width={96}
+                  height={96}
                   className="relative w-full h-full object-contain"
                   loading="lazy"
+                  decoding="async"
                 />
               </div>
             ) : (

@@ -14,6 +14,7 @@ import { SearchModal } from '@/components/SearchModal';
 import { CountryCodeSelector } from '@/components/CountryCodeSelector';
 import { COUNTRY_CODES, CountryCode } from '@/data/countryCodes';
 import { cn } from '@/lib/utils';
+import { thumb } from '@/lib/img';
 import { useFarcasterContext } from '@/context/FarcasterContext';
 import sdk from '@farcaster/miniapp-sdk';
 import { fcOpenUrl } from '@/lib/farcasterActions';
@@ -936,7 +937,7 @@ export default function Auth() {
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-md overflow-hidden bg-background/60 flex items-center justify-center shrink-0">
                       {song.coverImage ? (
-                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" loading="eager" width="40" height="40" />
+                        <img src={thumb(song.coverImage, 40)} alt={song.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" />
                       ) : (
                         <img src={logo} alt={song.title} className="w-6 h-6 object-contain opacity-80" />
                       )}
@@ -990,7 +991,7 @@ export default function Auth() {
                   >
                     <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                       {song.coverImage ? (
-                        <img src={song.coverImage} alt={song.title} className="w-full h-full object-cover" loading="eager" />
+                        <img src={thumb(song.coverImage, 192)} alt={song.title} className="w-full h-full object-cover" loading={index < 4 ? 'eager' : 'lazy'} decoding="async" width={192} height={192} />
                       ) : (
                         <img src={logo} alt={song.title} className="w-16 h-16 object-contain opacity-80" />
                       )}
@@ -1161,7 +1162,7 @@ export default function Auth() {
                   >
                     <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                       {catalog.coverImage ? (
-                        <img src={catalog.coverImage} alt={catalog.title} className="w-full h-full object-cover" />
+                        <img src={thumb(catalog.coverImage, 192)} alt={catalog.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={192} height={192} />
                       ) : (
                         <img src={logo} alt={catalog.title} className="w-16 h-16 object-contain opacity-80" />
                       )}
@@ -1204,7 +1205,7 @@ export default function Auth() {
                       >
                         <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                           {release.coverImage ? (
-                            <img src={release.coverImage} alt={release.title} className="w-full h-full object-cover" />
+                            <img src={thumb(release.coverImage, 192)} alt={release.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={192} height={192} />
                           ) : (
                             <img src={logo} alt={release.title} className="w-16 h-16 object-contain opacity-80" />
                           )}
@@ -1232,7 +1233,7 @@ export default function Auth() {
                       >
                         <div className="relative aspect-square rounded-lg overflow-hidden mb-2 bg-background/60 flex items-center justify-center">
                           {release.song.coverImage ? (
-                            <img src={release.song.coverImage} alt={release.song.title} className="w-full h-full object-cover" />
+                            <img src={thumb(release.song.coverImage, 192)} alt={release.song.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={192} height={192} />
                           ) : (
                             <img src={logo} alt={release.song.title} className="w-16 h-16 object-contain opacity-80" />
                           )}
@@ -1271,16 +1272,23 @@ export default function Auth() {
                       {artist.profileImage ? (
                         <>
                           <img
-                            src={artist.profileImage}
+                            src={thumb(artist.profileImage, 96)}
                             alt=""
                             aria-hidden="true"
+                            width={96}
+                            height={96}
+                            loading="lazy"
+                            decoding="async"
                             className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
                           />
                           <img
-                            src={artist.profileImage}
+                            src={thumb(artist.profileImage, 96)}
                             alt={artist.name}
+                            width={96}
+                            height={96}
                             className="relative w-full h-full object-contain"
                             loading="lazy"
+                            decoding="async"
                           />
                         </>
                       ) : (

@@ -231,15 +231,38 @@ export async function fetchWorldBySlug(slug: string | undefined): Promise<WorldC
       .eq('world_id', (world as unknown as WorldRow).id),
     supabase
       .from('world_streets')
-      .select('slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden, stage')
+      .select('id, slug, name, ring, access, tagline, teaser, hue, sort_order, key_kind, key_song_id, key_threshold, key_nft_id, hidden, stage')
       .eq('world_id', (world as unknown as WorldRow).id),
   ]);
 
-  return rowsToWorldConfig(
+  const streetRows = (streets ?? []) as unknown as Array<StreetRow & { id: string }>;
+  const config = rowsToWorldConfig(
     world as unknown as WorldRow,
     (cities ?? []) as unknown as CityRow[],
-    (streets ?? []) as unknown as StreetRow[],
+    streetRows,
   );
+
+  // What stands on each street, so visitors are not walked past empty
+  // building sites. A failed read leaves the map as it was rather than
+  // hiding a street that may well have blocks on it.
+  const streetIds = streetRows.map((s) => s.id).filter(Boolean);
+  if (streetIds.length > 0) {
+    const { data: blocks, error: blocksError } = await supabase
+      .from('world_blocks')
+      .select('street_id')
+      .in('street_id', streetIds);
+    if (!blocksError) {
+      const slugById = new Map(streetRows.map((s) => [s.id, s.slug]));
+      const counts: Record<string, number> = {};
+      for (const s of streetRows) counts[s.slug] = 0;
+      for (const b of (blocks ?? []) as Array<{ street_id: string }>) {
+        const slug = slugById.get(b.street_id);
+        if (slug) counts[slug] += 1;
+      }
+      config.streetBlockCounts = counts;
+    }
+  }
+  return config;
 }
 
 /**

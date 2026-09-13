@@ -13,6 +13,17 @@ import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import { AmbientBackground } from "@/components/AmbientBackground";
 
+const UpcomingEmpty = () => (
+  <div className="rounded-xl border border-dashed border-border bg-card px-6 py-8 text-center">
+    <p className="font-semibold text-foreground">Nothing on the calendar yet</p>
+    <p className="mt-1 text-sm text-muted-foreground">
+      <AppLink to="/host/create" className="font-semibold text-primary hover:underline">Host a battle</AppLink>
+      {" "}or{" "}
+      <AppLink to="/battles/results" className="font-semibold text-primary hover:underline">watch how past battles went</AppLink>.
+    </p>
+  </div>
+);
+
 const Index = () => {
   const { isEmbedded } = useEmbedMode();
   const { data: liveBattles = [] } = useBattles("live");
@@ -84,11 +95,19 @@ const Index = () => {
         </section>
 
         <section>
-          <SectionHeader title="📅 Upcoming" subtitle="Battles coming soon" linkTo="/battles/upcoming" linkLabel="All Upcoming" />
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {upcomingBattles.map((b) => <BattleCard key={b.id} battle={b} />)}
-          </div>
-          {upcomingBattles.length === 0 && <p className="text-center text-muted-foreground py-6">No upcoming battles scheduled.</p>}
+          {/* A heading promising battles "coming soon" over a line saying none
+              are scheduled read as broken. With nothing on the calendar there
+              is one empty state, and it says what a person can do about it. */}
+          {upcomingBattles.length > 0 ? (
+            <>
+              <SectionHeader title="📅 Upcoming" subtitle="Battles on the calendar" linkTo="/battles/upcoming" linkLabel="All Upcoming" />
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {upcomingBattles.map((b) => <BattleCard key={b.id} battle={b} />)}
+              </div>
+            </>
+          ) : (
+            <UpcomingEmpty />
+          )}
         </section>
 
         <section>

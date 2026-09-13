@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { reallyBroken, thumb } from '@/lib/img';
 import { Link } from 'react-router-dom';
 import { X, Play, ChevronLeft, ChevronRight, Coins, ImageIcon, Clapperboard, Images, MoreHorizontal, Pencil, Eye, EyeOff, RefreshCw, Trash2, Loader2, Download, Lock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -68,14 +69,52 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
   const [openAt, setOpenAt] = useState<number | null>(null);
   /** Which sections the visitor has asked to see in full. */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  /**
+   * Pieces whose file did not load. They drop out of the grid, the counts and
+   * the viewer for this visit, and nothing is deleted: the row stays, so a
+   * file that comes back shows again on the next load. The artist still sees
+   * theirs, so they can replace or delete it.
+   */
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  const markBroken = useCallback((id: string) => {
+    setBroken((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
+
+  /**
+   * Nothing in the grid is fetched until the gallery is close to the screen.
+   * It sits below the songs, and most visitors to an artist's page came for
+   * the music; the count line above the grid still says what is here.
+   */
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    if (near) return;
+    const node = rootRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setNear(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '300px' },
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, [near, isLoading, items.length]);
 
   // Sections in a fixed order, and one flat list in that same order so the
   // viewer walks through the gallery the way the page shows it.
   const { sections, ordered } = useMemo(() => {
-    const sections = SECTIONS.map((s) => ({ ...s, items: items.filter((i) => i.kind === s.key) })).filter((s) => s.items.length > 0);
+    const usable = canManage ? items : items.filter((i) => !broken.has(i.id));
+    const sections = SECTIONS.map((s) => ({ ...s, items: usable.filter((i) => i.kind === s.key) })).filter((s) => s.items.length > 0);
     const ordered = sections.flatMap((s) => s.items);
     return { sections, ordered };
-  }, [items]);
+  }, [items, broken, canManage]);
 
   if (isLoading) {
     return (
@@ -105,7 +144,7 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
 
   let offset = 0;
   return (
-    <>
+    <div ref={rootRef}>
       {/* What is in here, said in one line before any of it has to load. */}
       <p className="mb-3 text-xs text-muted-foreground">
         {sections
@@ -140,9 +179,13 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
                 )}
               </div>
               <div className={`grid gap-2 ${section.grid}`}>
-                {shown.map((item, i) => (
-                  <Tile key={item.id} item={item} frame={section.frame} manage={canManage} onOpen={() => setOpenAt(start + i)} />
-                ))}
+                {shown.map((item, i) =>
+                  near ? (
+                    <Tile key={item.id} item={item} frame={section.frame} manage={canManage} onOpen={() => setOpenAt(start + i)} onBroken={markBroken} />
+                  ) : (
+                    <div key={item.id} className={`rounded-xl border border-border bg-muted ${section.frame}`} />
+                  ),
+                )}
               </div>
               {hidden > 0 && !isOpen && (
                 <button
@@ -161,11 +204,14 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
       {openAt !== null && ordered[openAt] && (
         <Lightbox items={ordered} index={openAt} onIndex={setOpenAt} onClose={() => setOpenAt(null)} />
       )}
-    </>
+    </div>
   );
 }
 
-function Tile({ item, frame, manage, onOpen }: { item: ArtistMediaItem; frame: string; manage: boolean; onOpen: () => void }) {
+function Tile({ item, frame, manage, onOpen, onBroken }: { item: ArtistMediaItem; frame: string; manage: boolean; onOpen: () => void; onBroken: (id: string) => void }) {
+  const onImgError = (e: SyntheticEvent<HTMLImageElement>) => {
+    if (reallyBroken(e)) onBroken(item.id);
+  };
   return (
     <div className={`group relative overflow-hidden rounded-xl border border-border bg-muted ${frame}`}>
       <button
@@ -176,10 +222,13 @@ function Tile({ item, frame, manage, onOpen }: { item: ArtistMediaItem; frame: s
       >
         {item.kind === 'video' ? (
           <>
+            {/* A clip is never downloaded to show its tile: the poster at tile
+                size, or a plain dark frame, and the film only when tapped.
+                preload="metadata" was pulling megabytes per clip on phones. */}
             {item.poster_url ? (
-              <img src={item.poster_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <img src={thumb(item.poster_url, 200)} alt="" width={200} height={113} className="h-full w-full object-cover" loading="lazy" decoding="async" onError={onImgError} />
             ) : (
-              <video src={item.public_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+              <span className="block h-full w-full bg-gradient-to-br from-muted to-background" aria-hidden="true" />
             )}
             <span className="absolute inset-0 flex items-center justify-center">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm">
@@ -189,13 +238,17 @@ function Tile({ item, frame, manage, onOpen }: { item: ArtistMediaItem; frame: s
           </>
         ) : (
           <img
-            src={item.public_url}
+            /* Fetched at tile size: these were full size photographs, up to
+               4 MB each, drawn into a third of a phone's width. The viewer
+               still opens the original. */
+            src={thumb(item.public_url, 140)}
             alt=""
+            width={140}
+            height={140}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             loading="lazy"
-            /* These are full size photographs shown as thumbnails. Decoding
-               them off the main thread keeps a gridful from stalling a scroll. */
             decoding="async"
+            onError={onImgError}
           />
         )}
 

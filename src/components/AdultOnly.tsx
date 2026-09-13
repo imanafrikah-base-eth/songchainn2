@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarClock, Lock } from 'lucide-react';
 import { useCompliance } from '@/hooks/useCompliance';
+import { AgeGate } from '@/components/AgeGate';
 import { ADULT_AGE, MIN_AGE } from '@/legal/policies';
 
 /**
@@ -60,19 +61,18 @@ export function AdultOnly({
   if (allowed) return <>{children}</>;
   if (silent) return null;
 
+  /* Asked right here, at the door that needs it. This used to link to
+     /profile, which has no date of birth field, so the one thing that would
+     open the door led nowhere. Sign-up no longer asks for it up front, so this
+     is now where most people answer it. */
   if (needsBirthday) {
     return (
-      <div className="flex gap-3 rounded-xl border border-border bg-card/60 p-4">
-        <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-        <div className="text-sm">
-          <p className="font-medium text-foreground">{WHAT_IT_IS[reason]} needs your date of birth.</p>
-          <p className="mt-1 text-muted-foreground">
-            We have not asked you yet. Add it to your profile and this opens straight away.
-          </p>
-          <Link to="/profile" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
-            Add my date of birth
-          </Link>
-        </div>
+      <div className="space-y-2">
+        <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <CalendarClock className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          {WHAT_IT_IS[reason]} needs your date of birth.
+        </p>
+        <AgeGate />
       </div>
     );
   }

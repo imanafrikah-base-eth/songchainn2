@@ -10,6 +10,7 @@ import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
+import { thumb } from '@/lib/img';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -146,15 +147,20 @@ export default function Artists() {
                       {artist.profileImage ? (
                         <div className="relative w-full h-full">
                           <img
-                            src={artist.profileImage}
+                            src={thumb(artist.profileImage, 96)}
                             alt=""
+                            loading="lazy"
+                            decoding="async"
                             className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110"
                           />
                           <img
-                            src={artist.profileImage}
+                            src={thumb(artist.profileImage, 192)}
                             alt={artist.name}
+                            width={192}
+                            height={192}
                             className="relative w-full h-full object-contain"
                             loading="lazy"
+                            decoding="async"
                           />
                         </div>
                       ) : (

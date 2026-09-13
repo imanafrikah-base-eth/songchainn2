@@ -45,6 +45,20 @@ function resolveLiveCount(row: RoomLiveCountRow | null | undefined) {
 
 async function readLiveCount(roomId: string): Promise<number> {
   try {
+    // A guest cannot read room_live_users or room_profiles (no anon SELECT),
+    // so asking for them from a signed-out page only ever 401s in the
+    // console. room_live_counts is the aggregate anon IS granted, and it
+    // names nobody, so a guest reads that and nothing else.
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      const { data: guestCount, error: guestError } = await (supabase as any)
+        .from('room_live_counts')
+        .select('listener_count')
+        .eq('room_id', roomId)
+        .maybeSingle();
+      return guestError || !guestCount ? 0 : resolveLiveCount(guestCount as RoomLiveCountRow);
+    }
+
     // Prefer room_live_users (a view over room_profiles filtered to users
     // seen in the last 90s). An empty result IS the answer, zero people
     // live, so never fall through to stale sources on success.

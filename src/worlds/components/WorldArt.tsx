@@ -22,23 +22,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { fitStyle, type ArtFit } from '@/lib/artFit';
+import { decorativeVideoAllowed, thumb } from '@/lib/img';
 
-type Connection = { saveData?: boolean; effectiveType?: string };
-
-/** True when this visitor should not be sent a video at all. */
+/**
+ * True when this visitor should not be sent a video at all: reduced motion,
+ * Save-Data, or a 2g or 3g connection. A 3g phone was being handed 2 MB
+ * loops for a list of doors.
+ */
 function motionIsUnwelcome(): boolean {
-  if (typeof window === 'undefined') return true;
-  try {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
-  } catch {
-    // matchMedia missing is not a reason to force motion on anyone.
-    return true;
-  }
-  const nav = navigator as Navigator & { connection?: Connection };
-  const conn = nav.connection;
-  if (conn?.saveData) return true;
-  if (conn?.effectiveType && /^(slow-)?2g$/.test(conn.effectiveType)) return true;
-  return false;
+  return !decorativeVideoAllowed();
 }
 
 export function WorldArt({
@@ -48,11 +40,19 @@ export function WorldArt({
   /** Set on both layers, so the still and the loop are framed identically. */
   objectPosition,
   /**
-   * Off-screen slots stay still. A room banner is on screen the moment the
-   * page paints, so it can skip the observer and start immediately.
+   * The still loads straight away instead of lazily, for a slot that is on
+   * screen the moment the page paints. The loop still waits until the slot
+   * is actually visible: a slideshow below the fold used to start a 2 MB
+   * film before anybody scrolled to it.
    */
   eager = false,
   fit,
+  /**
+   * How wide the slot is on screen, in CSS pixels, so the still is fetched at
+   * that size rather than at the artist's full upload. Defaults to a phone's
+   * full width.
+   */
+  posterWidth = 414,
 }: {
   poster?: string;
   video?: string;
@@ -61,19 +61,21 @@ export function WorldArt({
   eager?: boolean;
   /** Where the artist put the focus and how far in they zoomed. */
   fit?: ArtFit;
+  posterWidth?: number;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   // Resolved once, on the client, because the answer depends on the device.
   const [wantsMotion, setWantsMotion] = useState(false);
-  const [visible, setVisible] = useState(eager);
+  const [visible, setVisible] = useState(false);
+  const still = thumb(poster, posterWidth);
 
   useEffect(() => {
     setWantsMotion(!motionIsUnwelcome());
   }, []);
 
   useEffect(() => {
-    if (eager || !wantsMotion || !video) return;
+    if (!wantsMotion || !video) return;
     const node = holder.current;
     if (!node || typeof IntersectionObserver === 'undefined') {
       setVisible(true);
@@ -86,7 +88,7 @@ export function WorldArt({
     );
     io.observe(node);
     return () => io.disconnect();
-  }, [eager, wantsMotion, video]);
+  }, [wantsMotion, video]);
 
   const showVideo = Boolean(video) && wantsMotion && visible;
 
@@ -114,11 +116,11 @@ export function WorldArt({
       {/* Both layers are taken out of flow and stacked in the same box. Left
           in normal flow they sit one under the other, which is a still with a
           film playing underneath it rather than a slot that moves. */}
-      {poster && (
+      {still && (
         <img
-          src={poster}
+          src={still}
           alt=""
-          loading="lazy"
+          loading={eager ? 'eager' : 'lazy'}
           decoding="async"
           className={`absolute inset-0 ${className}`}
           style={fit ? fitStyle(fit) : objectPosition ? { objectPosition } : undefined}
@@ -128,7 +130,7 @@ export function WorldArt({
         <video
           ref={videoRef}
           src={video}
-          poster={poster}
+          poster={still}
           muted
           loop
           playsInline

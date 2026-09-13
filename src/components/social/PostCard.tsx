@@ -25,6 +25,9 @@ import { useUserPresence } from '@/hooks/useUserPresence';
 import { ReportDialog } from '@/components/ReportDialog';
 import { OfficialBadge } from '@/components/OfficialBadge';
 import { InlineEdit, EditedMark } from '@/components/social/InlineEdit';
+import { toast } from '@/hooks/use-toast';
+import { useCompliance } from '@/hooks/useCompliance';
+import { Send } from 'lucide-react';
 
 interface PostCardProps {
   post: SocialPostWithProfile;
@@ -53,7 +56,9 @@ export function PostCard({
   onAddComment,
   onUntagSelf
 }: PostCardProps) {
-  const { user } = useAuth();
+  const { user, audienceProfile } = useAuth();
+  const { isMuted, isSuspended } = useCompliance();
+  const [composerOpen, setComposerOpen] = useState(false);
   const { playSong } = usePlayer();
   const navigate = useNavigate();
   const { sharePost, shareSong, copied, getShareUrl, getSongShareUrl, copyToClipboard, shareToX } = useShare();
@@ -130,12 +135,35 @@ export function PostCard({
     setShowComments(!showComments);
   };
 
+  /**
+   * The comment appears the moment it is sent, with the thread opened under it.
+   * It used to wait for the insert and a full refetch while the box sat empty,
+   * which reads as the comment having vanished.
+   */
   const handleAddComment = async () => {
-    if (!newComment.trim()) return;
-    await onAddComment(post.id, newComment);
+    const text = newComment.trim();
+    if (!text || !user) return;
+    const pending: PostComment = {
+      id: `pending-${Date.now()}`,
+      post_id: post.id,
+      user_id: user.id,
+      content: text,
+      created_at: new Date().toISOString(),
+      profile: audienceProfile ?? undefined,
+    };
     setNewComment('');
-    const fetchedComments = await onGetComments(post.id);
-    setComments(fetchedComments);
+    setComments((prev) => [...prev, pending]);
+    setShowComments(true);
+    try {
+      await onAddComment(post.id, text);
+      const fetchedComments = await onGetComments(post.id);
+      setComments(fetchedComments);
+      setComposerOpen(false);
+    } catch {
+      setComments((prev) => prev.filter((c) => c.id !== pending.id));
+      setNewComment(text);
+      toast({ title: 'Your comment did not send', variant: 'destructive' });
+    }
   };
 
   const handlePlaySong = () => {
@@ -303,20 +331,23 @@ export function PostCard({
         <Button
           variant="ghost"
           size="sm"
-          className={`gap-1 ${post.is_liked ? 'text-red-500' : ''}`}
+          className={`gap-1 min-h-11 min-w-11 ${post.is_liked ? 'text-red-500' : ''}`}
+          aria-pressed={post.is_liked}
+          aria-label={post.is_liked ? 'Unlike' : 'Like'}
           onClick={() => onLike(post.id)}
         >
           <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-current' : ''}`} />
-          {post.likes_count > 0 && post.likes_count}
+          <span className="tabular-nums">{post.likes_count || 0}</span>
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          className="gap-1"
+          className="gap-1 min-h-11 min-w-11"
+          aria-label={showComments ? 'Hide comments' : 'Show comments'}
           onClick={handleToggleComments}
         >
           <MessageCircle className="w-4 h-4" />
-          {post.comments_count > 0 && post.comments_count}
+          <span className="tabular-nums">{post.comments_count || 0}</span>
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -405,21 +436,57 @@ export function PostCard({
                   </div>
                   );
                 })}
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Write a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                    className="flex-1 h-9 text-sm"
-                  />
-                  <Button size="sm" onClick={handleAddComment}>Post</Button>
-                </div>
               </>
             )}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {!showComments && post.comments_count > 0 && (
+        <button
+          type="button"
+          onClick={() => void handleToggleComments()}
+          className="min-h-11 text-sm text-muted-foreground hover:text-foreground"
+        >
+          View all {post.comments_count} comments
+        </button>
+      )}
+
+      {/* Always one tap away, not behind the comment icon. */}
+      {user && !isMuted && !isSuspended && (composerOpen ? (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleAddComment();
+          }}
+        >
+          <Input
+            autoFocus
+            placeholder="Add a comment"
+            aria-label="Add a comment"
+            value={newComment}
+            maxLength={500}
+            onChange={(e) => setNewComment(e.target.value.slice(0, 500))}
+            onBlur={() => {
+              if (!newComment.trim()) setComposerOpen(false);
+            }}
+            className="flex-1 h-11 text-sm rounded-full"
+          />
+          <Button type="submit" size="icon" className="h-11 w-11 rounded-full" disabled={!newComment.trim()} aria-label="Send comment">
+            <Send className="w-4 h-4" />
+          </Button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setComposerOpen(true)}
+          className="flex h-11 w-full items-center gap-2 rounded-full border border-border/60 bg-background/40 px-4 text-left text-sm text-muted-foreground hover:bg-background/70"
+        >
+          <MessageCircle className="w-4 h-4 shrink-0" />
+          Add a comment
+        </button>
+      ))}
     </motion.div>
   );
 }

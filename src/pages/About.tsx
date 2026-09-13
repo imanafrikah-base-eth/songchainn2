@@ -7,6 +7,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { Button } from '@/components/ui/button';
 import { ArtMosaic, ArtistFaces, PictureCard } from '@/components/ArtMosaic';
+import { WorldArt } from '@/worlds/components/WorldArt';
 import { ZabalGamezSection } from '@/components/ZabalGamezSection';
 import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
@@ -132,8 +133,8 @@ const About = () => {
               </a>
             </div>
             <div className="relative min-h-[14rem] overflow-hidden rounded-2xl bg-black">
-              <img src={`${W}/entrance-doors.jpg`} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-              <video src={`${W}/entrance.mp4`} poster={`${W}/entrance-doors.jpg`} muted loop playsInline autoPlay preload="none" className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
+              {/* Still first; the loop only once this is on screen, on a good line, with motion welcome. */}
+              <WorldArt poster={`${W}/entrance-doors.jpg`} video={`${W}/entrance.mp4`} className="h-full w-full object-cover" />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">World #001</p>
                 <p className="font-heading text-lg font-bold text-white">The doors are real. Push them.</p>
