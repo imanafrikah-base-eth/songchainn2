@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useArtistOwnership } from '@/hooks/useArtistOwnership';
 import { ArtMosaic, ArtistFaces, PictureCard } from '@/components/ArtMosaic';
+import { useHasWorld } from '@/worlds/builder/useHasWorld';
 
 /**
  * What is actually here, shown rather than listed.
@@ -16,6 +17,8 @@ const W = '/world-assets';
 
 export function WhatsLive() {
   const { isArtist, isLoading } = useArtistOwnership();
+  // One world per artist: an artist who has theirs is sent into it, not told to build one.
+  const { hasWorld, worldPath: myWorldPath } = useHasWorld();
   if (isLoading) return null;
 
   return (
@@ -39,7 +42,11 @@ export function WhatsLive() {
         {isArtist ? (
           <>
             <PictureCard image={`${W}/room-studio.jpg`} title="Release today, free" line="Send a finished record. The judges listen, it is live the same minute." to="/studio" cta="Open the Studio" />
-            <PictureCard image={`${W}/square-hero.jpg`} video={`${W}/square-hero.mp4`} title="Build your own world" line="Streets, rooms, a key. Six screens, no code, or ask Mo$ha to build it." to="/world-builder" cta="Start building" />
+            {hasWorld && myWorldPath ? (
+              <PictureCard image={`${W}/square-hero.jpg`} video={`${W}/square-hero.mp4`} title="Your world is standing" line="Walk in to see what visitors find, or ask Mo$ha to change anything on it." to={myWorldPath} cta="Walk into your world" />
+            ) : (
+              <PictureCard image={`${W}/square-hero.jpg`} video={`${W}/square-hero.mp4`} title="Build your own world" line="Streets, rooms, a key. Six screens, no code, or ask Mo$ha to build it." to="/world-builder" cta="Start building" />
+            )}
             <PictureCard image={`${W}/room-request.jpg`} title="Paid to your own wallet" line="Coin a record and the earnings land with you. We never hold the money." to="/studio" cta="See the activity board" />
             <PictureCard image={`${W}/room-council.jpg`} title="See who really listens" line="Points come from real listening, so you see the fans who show up." to="/leaderboard" cta="The leaderboard" />
           </>

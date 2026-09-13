@@ -19,6 +19,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { useAuth } from '@/context/AuthContext';
 import { useBecomeArtist } from '@/hooks/useBecomeArtist';
 import { WORLD_BUILDER_ENABLED } from '@/lib/features';
+import { useHasWorld } from '@/worlds/builder/useHasWorld';
 import { supabase } from '@/integrations/supabase/client';
 import {
   useArtistReleases, useBatchUpload, useReleaseActions, isScheduled, AUDITION_STALE_MS,
@@ -139,6 +140,9 @@ const Studio = () => {
 
   // What upload-url will let through today, so a ten-track album is told
   // here rather than refused on track seven.
+  // One world per artist: the world card says "your world", never "build one", once they have it.
+  const { hasWorld, worldPath: myWorldPath } = useHasWorld();
+
   // No daily track limit (founder, 13 Sep 2026): an artist sends as many
   // records as they like, whenever they like, so nothing here counts "today".
   const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
@@ -293,7 +297,24 @@ const Studio = () => {
 
         {/* ------------------------------------------------------- world --- */}
 
-        {WORLD_BUILDER_ENABLED && isArtist && (
+        {WORLD_BUILDER_ENABLED && isArtist && hasWorld && myWorldPath && (
+          <Link
+            to={myWorldPath}
+            className="mb-8 flex items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/50"
+          >
+            <Globe2 className="mt-0.5 h-6 w-6 shrink-0 text-primary" />
+            <div>
+              <h2 className="font-heading text-lg font-bold text-foreground">Your world</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                It is standing. Walk it to see what visitors find, or ask Mo$ha to change the
+                streets, what is on them, or who gets through each door.
+              </p>
+              <span className="mt-2 inline-block text-sm font-semibold text-primary">Walk into your world</span>
+            </div>
+          </Link>
+        )}
+
+        {WORLD_BUILDER_ENABLED && isArtist && !hasWorld && (
           <Link
             to="/world-builder"
             className="mb-8 flex items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/50"

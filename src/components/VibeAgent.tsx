@@ -396,9 +396,20 @@ export function VibeAgent() {
       ? pendingGreeting
       : null;
 
+  /**
+   * Mo$ha opens himself for a greeting at most ONCE per visit, and never again
+   * after the person has closed him. Closing is an answer. Before this, a
+   * backlog of greetings (eleven songs going live) reopened him every time he
+   * was shut, and any re-render (a scroll that refetched the greeting) could
+   * bring him back: "I closed it and it pops up when I scroll".
+   */
+  const greetingAutoOpened = useRef(false);
+  const closedByPerson = useRef(false);
   useEffect(() => {
     if (!greetingHere) return;
     if (chatOpen || step) return;
+    if (greetingAutoOpened.current || closedByPerson.current) return;
+    greetingAutoOpened.current = true;
     setChatOpen(true);
   }, [greetingHere, chatOpen, step]);
 
@@ -726,6 +737,7 @@ export function VibeAgent() {
                 // hand on another page must not use up a first-record welcome
                 // that is still waiting for the artist's own page.
                 if (greetingHere) dismissGreeting(greetingHere.id);
+                closedByPerson.current = true;
                 setChatOpen(false);
               }}
               extraChips={[

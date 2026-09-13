@@ -5,6 +5,7 @@ import { DoorwayCtaGuest, DoorwayCtaMember } from './WorldDoorway';
 import { WorldsSlideshow } from './WorldsSlideshow';
 import { useWorldsStanding, FOUNDING_PLACES } from '@/hooks/useWorldsStanding';
 import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
+import { useHasWorld } from '@/worlds/builder/useHasWorld';
 
 /**
  * Phase Three, advertised.
@@ -70,6 +71,9 @@ export function WorldsPhase3({
   const { data: standing } = useWorldsStanding();
   const placesLeft = standing?.placesLeft;
   const isGuest = variant === 'guest';
+  // One world per artist. A member who already has one is sent into it, not offered another.
+  const { hasWorld, worldPath: myWorldPath } = useHasWorld();
+  const ownsWorld = !isGuest && hasWorld && Boolean(myWorldPath);
 
   return (
     <section className={`relative ${className}`}>
@@ -139,7 +143,7 @@ export function WorldsPhase3({
               The founding {FOUNDING_PLACES}
             </p>
             <h3 className="mt-2.5 font-heading text-xl font-bold leading-tight text-foreground sm:text-2xl">
-              Build your own world, free.
+              {ownsWorld ? 'Your world is standing.' : 'Build your own world, free.'}
             </h3>
             <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
               The first {FOUNDING_PLACES} artists get a full world free. Ask Mo$ha and it builds it with you.
@@ -173,8 +177,8 @@ export function WorldsPhase3({
             ) : (
               <>
                 <Button asChild className="h-11 rounded-full px-6 text-sm font-semibold">
-                  <Link to="/world-builder">
-                    Start building
+                  <Link to={ownsWorld && myWorldPath ? myWorldPath : '/world-builder'}>
+                    {ownsWorld ? 'Walk into your world' : 'Start building'}
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Link>
                 </Button>

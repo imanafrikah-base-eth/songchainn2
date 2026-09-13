@@ -51,11 +51,17 @@ export function useMoshaGreeting() {
   });
 
   const markShown = useMutation({
-    mutationFn: async (id: string) => {
+    // EVERY waiting greeting, not just the one on screen. Marking only the
+    // shown row meant an artist who put up eleven songs had eleven greetings
+    // queued, and each time they closed Mo$ha the next one opened him again:
+    // "I closed it and it keeps popping up". One close clears the lot.
+    mutationFn: async (_id: string) => {
+      if (!user?.id) return;
       await supabase
         .from('mosha_greetings' as never)
         .update({ shown_at: new Date().toISOString() } as never)
-        .eq('id', id);
+        .eq('user_id', user.id)
+        .is('shown_at', null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mosha-greeting', user?.id ?? null] });

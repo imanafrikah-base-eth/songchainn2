@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { MoshaFlow, FLOW_LABEL, type MoshaFlowName } from '@/components/mosha/MoshaFlows';
 import { useDuplicateAccounts } from '@/hooks/useAccountLinks';
 import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
+import { getWorldByArtistId } from '@/worlds/registry';
 
 const STARTERS = [
   'What is this place?',
@@ -105,7 +106,7 @@ export function MoshaChat({
   /** The questions offered under a greeting, in place of the usual starters. */
   suggestions?: string[] | null;
 }) {
-  const { isArtist, user } = useAuth();
+  const { isArtist, user, artistId } = useAuth();
   const navigate = useNavigate();
   // Sorting out logins is only offered to somebody who actually has more than one.
   const { data: twins = [] } = useDuplicateAccounts();
@@ -113,6 +114,13 @@ export function MoshaChat({
   // their own account back to them is the whole difference between a guide
   // and a pop-up.
   const { data: myWorlds = [] } = useMyWorlds();
+  /**
+   * A world is theirs if the builder table says so OR it is one of the worlds
+   * built into the app for their artist id. IMan Afrikah's World #001 lives in
+   * src/worlds/registry.ts, not the worlds table, so reading only the table
+   * had Mo$ha offering to build him a world he already has.
+   */
+  const hasWorld = myWorlds.length > 0 || Boolean(getWorldByArtistId(artistId ?? undefined));
   const [turns, setTurns] = useState<ChatTurn[]>(initial ?? []);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -257,10 +265,10 @@ export function MoshaChat({
         {/* Only to an artist who has not built one. Offering to build a world
             to somebody who already has one is the app telling them it never
             looked, and that is the fastest way to lose their trust. */}
-        {isArtist && myWorlds.length === 0 && turns.length === 0 && !greeting && (
+        {isArtist && !hasWorld && turns.length === 0 && !greeting && (
           <Bubble role="assistant">Want me to build your world for you? Say the word and it is done in a few taps. I can replace or change anything on it after, whenever you like.</Bubble>
         )}
-        {isArtist && myWorlds.length > 0 && turns.length === 0 && (
+        {isArtist && hasWorld && turns.length === 0 && (
           <Bubble role="assistant">
             Your world is standing. Say the word and I will change anything on it: the streets, what
             is on them, who gets through each door, the advert on Home.
@@ -360,7 +368,7 @@ export function MoshaChat({
       {/* The things Mo$ha can do, always one tap away, not only before the first word. */}
       {user && (
         <div className="flex gap-1.5 overflow-x-auto border-t border-border px-3 py-1.5 scrollbar-hide">
-          {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).filter((c) => c.flow !== 'merge_accounts' || twins.length > 0).map((c) => (
+          {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).filter((c) => c.flow !== 'merge_accounts' || twins.length > 0).filter((c) => (hasWorld ? c.flow !== 'build_world' : c.flow !== 'edit_world')).map((c) => (
             <button key={c.flow} type="button" disabled={busy} onClick={() => openFlow(c.flow)} className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50 min-h-10">
               {FLOW_LABEL[c.flow]}
             </button>

@@ -8,6 +8,7 @@ import { formatWorldNumber } from '@/worlds/registry';
 import { usePublishedWorlds, worldPath } from '@/hooks/usePublishedWorlds';
 import { useAuth } from '@/context/AuthContext';
 import { WORLD_BUILDER_ENABLED } from '@/lib/features';
+import { useHasWorld } from '@/worlds/builder/useHasWorld';
 
 /**
  * Artist Worlds: every world that is open, in the order they were numbered.
@@ -16,6 +17,8 @@ import { WORLD_BUILDER_ENABLED } from '@/lib/features';
 const Worlds = () => {
   const { data: worlds = [], isLoading } = usePublishedWorlds();
   const { isArtist } = useAuth();
+  // One world per artist: somebody who has one is shown theirs, never "build one".
+  const { hasWorld, worldPath: myWorldPath } = useHasWorld();
 
   return (
     <div className="min-h-screen bg-background pb-28">
@@ -66,7 +69,28 @@ const Worlds = () => {
           </ul>
         )}
 
-        {WORLD_BUILDER_ENABLED && (
+        {WORLD_BUILDER_ENABLED && isArtist && hasWorld && myWorldPath && (
+          <div className="mt-10 flex flex-col gap-3 rounded-2xl border border-primary/30 bg-card/60 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
+                <Globe2 className="h-3 w-3" /> Your world
+              </p>
+              <h2 className="mt-1 font-heading text-xl font-bold text-foreground">Your world is standing</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                One world per artist. Walk in, or ask Mo$ha to change anything on it.
+              </p>
+            </div>
+            <Link
+              to={myWorldPath}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+            >
+              Walk into your world
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        )}
+
+        {WORLD_BUILDER_ENABLED && !(isArtist && hasWorld) && (
           <div className="mt-10 flex flex-col gap-3 rounded-2xl border border-primary/30 bg-card/60 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">

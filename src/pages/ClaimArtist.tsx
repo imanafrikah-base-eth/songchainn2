@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { useAuth } from '@/context/AuthContext';
 import { useBecomeArtist } from '@/hooks/useBecomeArtist';
+import { useHasWorld } from '@/worlds/builder/useHasWorld';
 import { supabase } from '@/integrations/supabase/client';
 import { ARTISTS } from '@/data/musicData';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
@@ -28,6 +29,8 @@ type Claim = { id: string; artist_id: string; status: 'pending' | 'approved' | '
 
 export default function ClaimArtist() {
   const { user, isArtist, artistId, refreshArtistStatus } = useAuth();
+  // One world per artist: offer theirs, never a second one.
+  const { hasWorld, worldPath: myWorldPath } = useHasWorld();
   const { becomeArtist, pending: becoming } = useBecomeArtist();
   const queryClient = useQueryClient();
   const { artists: published } = usePublishedCatalog();
@@ -114,7 +117,11 @@ export default function ClaimArtist() {
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button asChild><Link to="/studio">Open the Studio</Link></Button>
-              <Button asChild variant="outline"><Link to="/world-builder">Build your world</Link></Button>
+              {hasWorld && myWorldPath ? (
+                <Button asChild variant="outline"><Link to={myWorldPath}>Your world</Link></Button>
+              ) : (
+                <Button asChild variant="outline"><Link to="/world-builder">Build your world</Link></Button>
+              )}
               <Button asChild variant="outline"><Link to="/launch">The launcher</Link></Button>
             </div>
           </div>

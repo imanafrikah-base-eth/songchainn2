@@ -252,6 +252,15 @@ function splitAction(reply: string): { reply: string; action?: Action; report?: 
 
 /* --------------------------------------------------------- live context --- */
 
+/**
+ * Worlds built into the app (src/worlds/registry.ts), keyed by artist id. They
+ * are not rows in the worlds table, so an owner_id lookup never finds them.
+ * Keep in step with WORLDS in registry.ts.
+ */
+const BUILT_IN_WORLDS: Record<string, string> = {
+  "3": "iman-afrikah",
+};
+
 type WorldFacts = {
   id: string;
   slug: string;
@@ -437,10 +446,17 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
     if (artist) {
       lines.push(`They are an artist here (artist id ${artist.artist_id}${artist.is_verified ? ", verified" : ""}). Studio, uploads, the gallery, the world builder, the activity board and licensing requests all apply to them. The upload_song, build_world, edit_world and edit_gallery flows are for them.`);
       const list = (myWorlds ?? []) as WorldFacts[];
+      // Worlds built into the app, not in the worlds table. IMan Afrikah's
+      // World #001 (src/worlds/registry.ts) is one: reading only by owner_id
+      // had Mo$ha telling him he had no world. Keep in step with registry.ts.
+      const builtIn = BUILT_IN_WORLDS[String(artist.artist_id)];
+      if (builtIn && !list.some((w) => w.slug === builtIn)) {
+        lines.push(`They own ${builtIn}, World #001, built into the app and open at /world/${builtIn}. They ALREADY have a world: never offer to build one. One world per artist. Offer to change it (edit_world) instead.`);
+      }
       if (list.length) {
         lines.push(`Their worlds: ${list.map((w) => `${w.slug} (${w.status}, world id ${w.id})`).join(", ")}. They ALREADY have a world, so never offer to build one: offer to change this one instead (edit_world), or say what is still empty on it. A draft can be finished at /world-builder or by the edit_world flow.`);
         for (const w of list) lines.push(worldArtLine(w));
-      } else {
+      } else if (!builtIn) {
         lines.push("They have not started a world yet. Once in this conversation, when it fits, offer nicely to build it for them right here (build_world), and say you can replace or change anything on it afterwards (edit_world). Never nag.");
       }
       // What actually happened to what they sent. Without this every "my
