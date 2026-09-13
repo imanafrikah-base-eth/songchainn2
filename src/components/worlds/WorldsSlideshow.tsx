@@ -1,15 +1,22 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { WorldArt } from '@/worlds/components/WorldArt';
 import { WORLDS, formatWorldNumber } from '@/worlds/registry';
 import type { WorldConfig } from '@/worlds/types';
 import { usePublishedWorlds, worldPath } from '@/hooks/usePublishedWorlds';
 import { WorldDoorway } from './WorldDoorway';
 
-/** How long each world's advert stands before the next one slides in. */
+/** How long a built world's advert plays before the next world slides in. */
 const SLIDE_MS = 7000;
+/**
+ * World #001's slide lasts as long as its doors take to open and hold (they
+ * report when they are done). This is only the ceiling, for doors that stall.
+ */
+const DOOR_MAX_MS = 12000;
+/** Roughly how long the doors take, for the progress bar. */
+const DOOR_EXPECTED_MS = 5500;
 /** A tap or a swipe over the advert pauses it this long, then it carries on by itself. */
 const TOUCH_PAUSE_MS = 9000;
 const CODE_SLUGS = new Set(WORLDS.map((w) => w.slug));
@@ -24,12 +31,15 @@ function adFor(world: WorldConfig): { poster?: string; video?: string; fitKey: s
 }
 
 /**
- * Every open world's advert, one at a time, sliding on its own.
+ * Every open world's advert, one after another, on its own.
  *
- * World #001 shows exactly what it always showed here: IMan's filmed brass
- * doors, opening. Every other world shows what its artist chose for this
- * slot in the builder (the gate loop, the hero loop, or a clip made for it).
- * With one world open there is nothing to slide and the doorway stands alone.
+ * Founder, 13 Sep 2026: an auto slideshow of every live world, nobody pressing
+ * next, each world showing its own preview animation before the next one comes.
+ * World #001's slide opens IMan's filmed brass doors by itself, holds a beat on
+ * the other side and then hands over; every other world plays the loop its
+ * artist chose for this slot (gate, hero, or a clip made for it) for a few
+ * seconds. It only runs while the section is on screen, so the doors never
+ * open to nobody. The dots still jump straight to a world.
  */
 export function WorldsSlideshow({
   cta,
@@ -45,22 +55,23 @@ export function WorldsSlideshow({
 }) {
   const { data: worlds = [] } = usePublishedWorlds();
   const [index, setIndex] = useState(0);
-  // A mouse resting on the advert holds it. A finger never does for long: on a
-  // phone a scroll over the advert fires touchcancel, not touchend, so a
-  // "held while touched" flag stayed on and the slideshow stopped for good on
-  // whichever world was showing. A touch now pauses it briefly instead.
+  // A mouse resting on the advert holds it. A finger only pauses it briefly: on
+  // a phone a scroll over the advert fires touchcancel, not touchend, so a
+  // "held while touched" flag stayed on and the slideshow stopped for good.
   const [hovered, setHovered] = useState(false);
   const [pausedUntil, setPausedUntil] = useState(0);
   const [pageVisible, setPageVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
-  // Bumped on every manual move, so the next slide gets its full time.
+  const [inView, setInView] = useState(false);
+  // Bumped on every move, so the next slide gets its full time and replays.
   const [cycle, setCycle] = useState(0);
   const resumeTimer = useRef<number | null>(null);
+  const host = useRef<HTMLDivElement | null>(null);
   const count = worlds.length;
 
   const reducedMotion = (() => {
     try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
   })();
-  const running = count > 1 && !hovered && pausedUntil === 0 && pageVisible && !reducedMotion;
+  const running = count > 1 && inView && !hovered && pausedUntil === 0 && pageVisible && !reducedMotion;
 
   useEffect(() => {
     if (index >= count && count > 0) setIndex(0);
@@ -72,13 +83,34 @@ export function WorldsSlideshow({
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  // One slide at a time: a timeout per slide rather than an interval, so a
-  // manual move or a pause always gives the next world its full time.
+  useEffect(() => {
+    const node = host.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return;
+    }
+    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { threshold: 0.35 });
+    io.observe(node);
+    return () => io.disconnect();
+  }, [count]);
+
+  const current = count ? Math.min(index, count - 1) : 0;
+  const world = worlds[current];
+  const isDoors = world ? CODE_SLUGS.has(world.slug) : false;
+
+  const next = useCallback(() => {
+    if (count < 2) return;
+    setIndex((i) => (i + 1) % count);
+    setCycle((c) => c + 1);
+  }, [count]);
+
+  // One slide at a time. A built world moves on after its advert has played;
+  // the doors move on when they say they are done, and this is their ceiling.
   useEffect(() => {
     if (!running) return;
-    const t = window.setTimeout(() => setIndex((i) => (i + 1) % count), SLIDE_MS);
+    const t = window.setTimeout(next, isDoors ? DOOR_MAX_MS : SLIDE_MS);
     return () => window.clearTimeout(t);
-  }, [running, count, index, cycle]);
+  }, [running, index, cycle, isDoors, next]);
 
   useEffect(() => {
     if (!pausedUntil) return;
@@ -87,18 +119,22 @@ export function WorldsSlideshow({
     return () => { if (resumeTimer.current !== null) window.clearTimeout(resumeTimer.current); };
   }, [pausedUntil]);
 
-  if (!count) return null;
-  const current = Math.min(index, count - 1);
-  const world = worlds[current];
+  const onDoorsFinished = useCallback(() => {
+    if (running) next();
+  }, [running, next]);
+
+  if (!count || !world) return null;
   const ctaForWorld = typeof cta === 'function' ? cta(world) : cta;
   const pauseForTouch = () => setPausedUntil(Date.now() + TOUCH_PAUSE_MS);
-  const goTo = (next: number) => {
-    setIndex(((next % count) + count) % count);
+  const goTo = (to: number) => {
+    setIndex(((to % count) + count) % count);
     setCycle((c) => c + 1);
   };
+  const slideMs = isDoors ? DOOR_EXPECTED_MS : SLIDE_MS;
 
   return (
     <div
+      ref={host}
       className={`relative ${className}`}
       onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHovered(true); }}
       onPointerLeave={(e) => { if (e.pointerType === 'mouse') setHovered(false); }}
@@ -116,7 +152,7 @@ export function WorldsSlideshow({
                     ? { width: '100%' }
                     : i === current
                       ? running
-                        ? { width: '100%', animation: `worlds-slide-progress ${SLIDE_MS}ms linear` }
+                        ? { width: '100%', animation: `worlds-slide-progress ${slideMs}ms linear` }
                         : { width: '100%', opacity: 0.6 }
                       : { width: 0 }
                 }
@@ -126,49 +162,36 @@ export function WorldsSlideshow({
           <style>{'@keyframes worlds-slide-progress { from { width: 0 } to { width: 100% } }'}</style>
         </div>
       )}
-      <div key={world.slug} className="animate-in fade-in duration-500">
-        {CODE_SLUGS.has(world.slug) ? (
-          <WorldDoorway cta={ctaForWorld} />
+
+      {/* Keyed by the move, not only the world, so a world that comes round
+          again plays its animation again: the doors open every time. */}
+      <div key={`${world.slug}-${cycle}`} className="animate-in fade-in duration-500">
+        {isDoors ? (
+          <WorldDoorway cta={ctaForWorld} autoPlay={count > 1 && inView && !reducedMotion} onFinished={onDoorsFinished} />
         ) : (
           <WorldAd world={world} cta={ctaForWorld} />
         )}
       </div>
 
       {count > 1 && (
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => goTo(current - 1)}
-            aria-label="Previous world"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <div className="flex items-center gap-1.5" role="tablist" aria-label="Worlds">
-            {worlds.map((w, i) => (
-              <button
-                key={w.slug}
-                type="button"
-                role="tab"
-                aria-selected={i === current}
-                aria-label={formatWorldNumber(w)}
-                onClick={() => goTo(i)}
-                className={`h-1.5 rounded-full transition-all ${i === current ? 'w-6 bg-primary' : 'w-1.5 bg-muted-foreground/40'}`}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => goTo(current + 1)}
-            aria-label="Next world"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+        <div className="mt-3 flex items-center justify-center gap-1.5" role="tablist" aria-label="Worlds">
+          {worlds.map((w, i) => (
+            <button
+              key={w.slug}
+              type="button"
+              role="tab"
+              aria-selected={i === current}
+              aria-label={formatWorldNumber(w)}
+              onClick={() => goTo(i)}
+              className="flex h-11 min-w-8 items-center justify-center"
+            >
+              <span className={`block h-1.5 rounded-full transition-all ${i === current ? 'w-6 bg-primary' : 'w-1.5 bg-muted-foreground/40'}`} />
+            </button>
+          ))}
         </div>
       )}
 
-      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+      <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
         <span>{count === 1 ? 'One world open.' : `${count} worlds open.`}</span>
         <Link to="/worlds" className="inline-flex items-center gap-1 font-semibold text-primary">
           Every world

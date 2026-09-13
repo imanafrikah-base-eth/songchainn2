@@ -19,7 +19,7 @@ import { AmbientBackground } from '@/components/AmbientBackground';
 import { fcOpenUrl } from '@/lib/farcasterActions';
 import { MoshaChat } from '@/components/mosha/MoshaChat';
 import { useMoshaGreeting, type MoshaGreeting } from '@/hooks/useMoshaGreeting';
-import { MoshaIntroPopup, useMoshaIntroTrigger, useOverlayOpen } from '@/components/MoshaIntroPopup';
+import { MoshaIntroPopup, useOverlayOpen } from '@/components/MoshaIntroPopup';
 
 type AgentMode = 'unset' | 'music' | 'chill' | 'turnup' | 'focus' | 'feelings' | 'explore';
 type MoodChoice = 'loving' | 'cool' | 'not_my_vibe';
@@ -398,19 +398,12 @@ export function VibeAgent() {
     if (chatOpen) setGreetingNote(false);
   }, [chatOpen]);
 
-  /* The first hello, once per device, after a real scroll. The feed moves his
-     tab to another corner, so the note stays off it. */
+  /* The feed moves his tab to another corner, so the news note stays off it.
+     The "Meet Mo$ha" hello is not here: founder, 13 Sep 2026, it is only for
+     new visitors on the signed-out landing page (Auth.tsx), never for people
+     who are already signed in. */
   const onFeed = /^\/(social|post)(\/|$)/.test(location.pathname);
   const showGreetingNote = Boolean(greetingNote && greetingHere && !chatOpen && !step && !overlayOpen && !onFeed);
-  const moshaIntro = useMoshaIntroTrigger(
-    noMoshaHere || inABattle || onFeed || chatOpen || Boolean(step) || showGreetingNote,
-  );
-  const acceptIntro = moshaIntro.accept;
-  useEffect(() => {
-    // Opening him by hand is meeting him; the hello has nothing left to say.
-    // accept (not just "mark seen") also hands back the floor if it was up.
-    if (chatOpen) acceptIntro();
-  }, [chatOpen, acceptIntro]);
 
   useEffect(() => {
     const handleOpen = (event: Event) => {
@@ -769,16 +762,6 @@ export function VibeAgent() {
             closedByPerson.current = true;
             setGreetingNote(false);
           }}
-        />
-        <MoshaIntroPopup
-          show={moshaIntro.show}
-          title="Meet Mo$ha"
-          line="Your $ongChainn guide. Ask anything."
-          onOpen={() => {
-            moshaIntro.accept();
-            setChatOpen(true);
-          }}
-          onDismiss={moshaIntro.dismiss}
         />
       </>
     );

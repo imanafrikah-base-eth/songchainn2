@@ -161,13 +161,28 @@ function fetchClip(src: string): Promise<string> {
   return hit;
 }
 
+/** In the Home slideshow: how long the open doors hold before the next world. */
+const AUTO_HOLD_MS = 1800;
+/** The same hold when no clip could play, so the still is read, not flashed. */
+const AUTO_HOLD_STILL_MS = 3500;
+
 export function WorldDoorway({
   /** Rendered under the tour once the visitor is inside. This is the ask. */
   cta,
   className = '',
+  /**
+   * The Home worlds slideshow plays the doors by itself: they open with no tap,
+   * hold a moment on the other side, and then onFinished moves the slideshow to
+   * the next world. No room tour and no "Open the doors" button in this mode;
+   * everywhere else the doors still wait for the visitor's own push.
+   */
+  autoPlay = false,
+  onFinished,
 }: {
   cta: React.ReactNode;
   className?: string;
+  autoPlay?: boolean;
+  onFinished?: () => void;
 }) {
   const world = IMAN_AFRIKAH_WORLD;
   const reduceMotion = useMemo(prefersReducedMotion, []);
@@ -333,13 +348,33 @@ export function WorldDoorway({
     };
   }, [phase, room, tour, reduceMotion, motionOk, play]);
 
+  /* Slideshow mode: push the doors the moment this slide is showing. */
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoPlay || autoStarted.current || phase !== 'closed') return;
+    autoStarted.current = true;
+    open();
+  }, [autoPlay, phase, open]);
+
+  /* Slideshow mode: once through the doors, hold a beat, then hand over. */
+  const finishedRef = useRef(onFinished);
+  useEffect(() => { finishedRef.current = onFinished; }, [onFinished]);
+  useEffect(() => {
+    if (!autoPlay || phase !== 'inside') return;
+    const t = window.setTimeout(
+      () => finishedRef.current?.(),
+      motionOk && !reduceMotion ? AUTO_HOLD_MS : AUTO_HOLD_STILL_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [autoPlay, phase, motionOk, reduceMotion]);
+
   /* Walking from room to room. After the last room the doors shut again and
      the walk is over: a preview that stays open on a loop reads as if the
      visitor is already inside, and they are not. The shut doors, with the ask
      still under them, say the true thing: you have seen it, the way in is
      below. A montage that never ends is wallpaper besides. */
   useEffect(() => {
-    if (phase !== 'inside' || reduceMotion) return;
+    if (phase !== 'inside' || reduceMotion || autoPlay) return;
     const last = room >= tour.length - 1;
     const t = window.setTimeout(() => {
       if (last) {
@@ -351,7 +386,7 @@ export function WorldDoorway({
       }
     }, last ? LAST_ROOM_MS : ROOM_MS);
     return () => window.clearTimeout(t);
-  }, [phase, room, tour.length, reduceMotion]);
+  }, [phase, room, tour.length, reduceMotion, autoPlay]);
 
   /* Shut doors play nothing. */
   useEffect(() => {
@@ -466,17 +501,19 @@ export function WorldDoorway({
                 ? 'That was a look through them. To walk in for real, the way is just below.'
                 : world.positioning}
             </p>
-            <Button
-              onClick={open}
-              size="lg"
-              variant={toured ? 'outline' : 'default'}
-              className={`mt-4 h-12 rounded-full px-7 text-sm font-semibold ${
-                toured ? 'border-white/40 bg-black/40 text-white hover:bg-black/60 hover:text-white' : ''
-              }`}
-            >
-              <DoorOpen className="mr-2 h-4 w-4" />
-              {toured ? 'Look again' : 'Open the doors'}
-            </Button>
+            {!autoPlay && (
+              <Button
+                onClick={open}
+                size="lg"
+                variant={toured ? 'outline' : 'default'}
+                className={`mt-4 h-12 rounded-full px-7 text-sm font-semibold ${
+                  toured ? 'border-white/40 bg-black/40 text-white hover:bg-black/60 hover:text-white' : ''
+                }`}
+              >
+                <DoorOpen className="mr-2 h-4 w-4" />
+                {toured ? 'Look again' : 'Open the doors'}
+              </Button>
+            )}
           </div>
         )}
 
@@ -517,7 +554,7 @@ export function WorldDoorway({
 
       {/* The ask, under the picture rather than over it, so it is never
           competing with his art for the same pixels. */}
-      {(phase === 'inside' || toured) && (
+      {(phase === 'inside' || toured || autoPlay) && (
         <div className="border-t border-border bg-card animate-in fade-in slide-in-from-top-2 duration-500">
           <div className="p-4 sm:p-5">{cta}</div>
         </div>
