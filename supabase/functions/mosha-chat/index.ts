@@ -536,7 +536,7 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
     }
     uid = user.id;
     const [{ data: profile }, { data: artist }, { count: holdings }, { count: citizen }, { data: points }, { count: likes }, { data: memory }] = await Promise.all([
-      db.from("audience_profiles").select("display_name, username, gender, wallet_address, created_at").eq("user_id", uid).maybeSingle(),
+      db.from("audience_profiles").select("display_name, username, gender, wallet_address, created_at, zora_handle").eq("user_id", uid).maybeSingle(),
       db.from("artist_accounts").select("artist_id, is_verified").eq("user_id", uid).maybeSingle(),
       db.from("song_holdings").select("song_id", { count: "exact", head: true }).eq("user_id", uid).gt("balance", 0),
       db.from("world_citizens").select("world_slug", { count: "exact", head: true }).eq("user_id", uid),
@@ -562,8 +562,33 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
       const tier = p.tier ?? p.tier_name;
       if (total != null) lines.push(`Points: ${total}${tier ? `, tier ${tier}` : ""}.`);
     }
+    // Their Zora, as the app already holds it. N3M3SIS (13 Sep 2026) told Mo$ha
+    // the team had connected her Zora link and wallet and he said it was blank,
+    // because he only read wallets linked to her login and the fields typed into
+    // her world. Her Zora handle, creator coin and payout wallet were all on
+    // file the whole time, on her profile and her artist record.
+    let zoraPayout: string | null = null;
     if (artist) {
       lines.push(`They are an artist here (artist id ${artist.artist_id}${artist.is_verified ? ", verified" : ""}). Studio, uploads, the gallery, the world builder, the activity board and licensing requests all apply to them. The upload_song, build_world, edit_world and edit_gallery flows are for them.`);
+      try {
+        const artistName = (profile?.display_name ?? "").trim();
+        const [{ data: coin }, { data: payWallets }] = await Promise.all([
+          db.from("artist_coins").select("zora_handle, coin_address, payout_address, wallet").eq("artist_id", String(artist.artist_id)).maybeSingle(),
+          db.from("artist_wallets").select("artist_id, wallet_address").in("artist_id", [String(artist.artist_id), artistName ? `name:${artistName}` : "name:"]),
+        ]);
+        const c = coin as { zora_handle?: string | null; coin_address?: string | null; payout_address?: string | null; wallet?: string | null } | null;
+        const handle = (c?.zora_handle || (profile as { zora_handle?: string | null } | null)?.zora_handle || "").replace(/^@/, "").trim();
+        const isAddr = (a: unknown): a is string => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a);
+        const payout = [c?.payout_address, c?.wallet, ...((payWallets ?? []) as Array<{ wallet_address: string | null }>).map((w) => w.wallet_address)].find(isAddr) ?? null;
+        zoraPayout = payout;
+        if (handle || isAddr(c?.coin_address) || payout) {
+          lines.push(
+            `Their Zora IS CONNECTED on SONGCHAINN, on their profile and artist record: ${handle ? `Zora account @${handle} (zora.co/@${handle})` : "a Zora account"}${isAddr(c?.coin_address) ? `, creator coin ending ${c!.coin_address!.slice(-4)} (the key to their world and what fans hold)` : ""}${payout ? `, payouts go to their Zora wallet ending ${payout.slice(-4)}` : ""}. Never tell them their Zora or payout wallet is missing or blank. If they ask, confirm it is connected and read the handle and the last four of the wallet. A Zora account is not a wallet to connect in the app; a wallet linked to their login is a separate thing, only needed to buy keys or copies themselves.`,
+          );
+        }
+      } catch {
+        /* the rest of the answer stands */
+      }
       // Every world they have, published or being built, by login and by artist id.
       lines.push(...(await worldLines(db, uid, String(artist.artist_id))));
       // What actually happened to what they sent. Without this every "my
@@ -588,7 +613,11 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
           `Wallets on this account: ${list.length} (${list.map((w) => w.provider).join(", ")}). The one that pays is ${paying ? `${paying.provider} ending ${paying.address.slice(-4)}` : "not chosen yet"}. They switch which one pays on /wallet, which also shows their balance, the records they own and their coins. Never read a whole address out; the last four is enough.`,
         );
       } else {
-        lines.push("No wallet on this account yet. They do not need one to listen, post or release; only to own a record or hold a world key. The connect_wallet flow opens the one already on their device.");
+        lines.push(
+          zoraPayout
+            ? `No wallet is linked to this login, and that is fine: their earnings already go to their Zora wallet ending ${zoraPayout.slice(-4)}, which is on their artist record. A wallet linked to their login is only needed for them to buy keys or copies themselves; the connect_wallet flow does that if they want it. Never say their payout wallet is missing.`
+            : "No wallet on this account yet. They do not need one to listen, post or release; only to own a record or hold a world key. The connect_wallet flow opens the one already on their device.",
+        );
       }
     } catch {
       /* the rest of the answer stands */
