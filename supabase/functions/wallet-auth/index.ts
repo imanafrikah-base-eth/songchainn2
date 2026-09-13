@@ -173,8 +173,21 @@ Deno.serve(async (req) => {
       user_metadata: { wallet_address: address.toLowerCase(), provider: 'wallet' },
     });
 
-    // Ignore "already registered" — existing user is fine, we'll still issue an OTP below.
-    if (createErr && !/already registered|already exists/i.test(createErr.message)) {
+    // An existing user is fine, we still issue an OTP below.
+    //
+    // RETURNING WALLET USERS WERE LOCKED OUT (12 Sep 2026). This used to match
+    // only /already registered|already exists/, but Supabase now says "A user
+    // with this email address has already BEEN registered", which neither
+    // pattern matches. So every wallet that had signed in before got a 500 and
+    // "Authentication failed", while a brand new wallet still worked, which is
+    // why nobody noticed. Match the stable error CODE first and the wording only
+    // as a fallback, so a rewording can never lock people out again.
+    const code = (createErr as { code?: string } | null)?.code;
+    const alreadyThere =
+      code === 'email_exists' ||
+      code === 'user_already_exists' ||
+      /already (been )?registered|already exists/i.test(createErr?.message ?? '');
+    if (createErr && !alreadyThere) {
       throw createErr;
     }
 

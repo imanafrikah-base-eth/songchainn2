@@ -21,7 +21,7 @@ import { useBecomeArtist } from '@/hooks/useBecomeArtist';
 import { WORLD_BUILDER_ENABLED } from '@/lib/features';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  useArtistReleases, useBatchUpload, useReleaseActions, isScheduled, AUDITION_STALE_MS, UPLOADS_PER_DAY,
+  useArtistReleases, useBatchUpload, useReleaseActions, isScheduled, AUDITION_STALE_MS,
   TIER_LABEL, type ArtistRelease, type ReleaseTier, type QueuedTrack, type BatchMeta,
 } from '@/hooks/useArtistStudio';
 import { useQueryClient } from '@tanstack/react-query';
@@ -139,17 +139,9 @@ const Studio = () => {
 
   // What upload-url will let through today, so a ten-track album is told
   // here rather than refused on track seven.
-  // What the door actually let through today. A row stuck at 'uploading' never
-  // became a record: it is a reservation whose cover never landed. Counting
-  // those against the cap charged the artist for the app's own failure, and
-  // made every retry likelier to be refused than the try before it.
-  const sentToday = useMemo(() => {
-    const since = Date.now() - 24 * 60 * 60 * 1000;
-    return releases.filter((r) => new Date(r.created_at).getTime() > since && r.status !== 'uploading').length;
-  }, [releases]);
-  const leftToday = Math.max(0, UPLOADS_PER_DAY - sentToday);
+  // No daily track limit (founder, 13 Sep 2026): an artist sends as many
+  // records as they like, whenever they like, so nothing here counts "today".
   const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
-  const overCap = queued.length > leftToday;
 
   const detailProblem = detailProblems({ ...details, track_number: null })[0] ?? null;
   const onRelease = !!details.release_id;
@@ -182,13 +174,16 @@ const Studio = () => {
     return !!title && tracks.some((o) => o.key !== t.key && o.title.trim().toLowerCase() === title);
   };
 
+  // Every record files under a genre. No default: the artist picks one.
+  const genreMissing = !(GENRES as string[]).includes(genre);
+
   const canSubmit =
     queued.length > 0 && queued.every((t) => !trackProblem(t)) && !!cover && !coverCheck.block && !detailProblem
-    && artistName.trim().length > 0 && !busy && !cannotUpload && !overCap;
+    && !genreMissing && artistName.trim().length > 0 && !busy && !cannotUpload;
 
   const meta = (): BatchMeta => ({
     artistName: artistName.trim(),
-    genre: genre.trim() || undefined,
+    genre: genreMissing ? undefined : genre,
     cover,
     details,
   });
@@ -364,7 +359,7 @@ const Studio = () => {
                     onRemove={() => remove(t.key)}
                     onRetry={() => void start(meta(), t.key).catch((err) => toast.error((err as Error)?.message || 'That did not go through. Try again.'))}
                     onAskAgain={() => void askAgain(t.key)}
-                    retryReady={!trackProblem(t) && !!cover && !coverCheck.block && !detailProblem && artistName.trim().length > 0 && !cannotUpload && leftToday > 0}
+                    retryReady={!trackProblem(t) && !!cover && !coverCheck.block && !detailProblem && !genreMissing && artistName.trim().length > 0 && !cannotUpload}
                   />
                 ))}
               </ul>
@@ -372,11 +367,6 @@ const Studio = () => {
             {tracks.length > 1 && !busy && (
               <p className="mt-2 text-xs text-muted-foreground">
                 They go up one after the other and each one is judged the moment it lands. Titles come from the file names; fix any that look wrong before you send.
-              </p>
-            )}
-            {overCap && (
-              <p className="mt-2 text-xs text-destructive">
-                That is {queued.length} to send and you have {leftToday} left today. The door lets {UPLOADS_PER_DAY} through a day; take some out or send the rest tomorrow.
               </p>
             )}
 
@@ -439,21 +429,30 @@ const Studio = () => {
               </label>
 
               <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Genre <span className="normal-case font-normal">(optional)</span></span>
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Genre</span>
                 <select
                   value={genre}
                   onChange={(e) => setGenre(e.target.value)}
                   disabled={busy}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                  required
+                  aria-required="true"
+                  aria-invalid={tracks.length > 0 && genreMissing}
+                  className={`w-full rounded-xl border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none ${tracks.length > 0 && genreMissing ? 'border-amber-500/60' : 'border-border'}`}
                 >
-                  <option value="">Pick the closest one</option>
+                  <option value="" disabled>Pick the closest one</option>
                   {GENRES.map((g) => (
                     <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  This is where the record files in Discover. Pick the nearest fit; you can change it later.
-                </span>
+                {tracks.length > 0 && genreMissing ? (
+                  <span className="mt-1 block text-xs text-amber-500">
+                    Pick a genre. A record cannot go out without one.
+                  </span>
+                ) : (
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    This is where the record files in Discover. Pick the nearest fit; you can change it later.
+                  </span>
+                )}
               </label>
 
               <div className="sm:col-span-2">
@@ -492,6 +491,9 @@ const Studio = () => {
 
             {detailProblem && (
               <p className="mt-4 text-xs text-destructive">{detailProblem}</p>
+            )}
+            {tracks.length > 0 && genreMissing && !busy && (
+              <p className="mt-4 text-xs text-destructive">Pick a genre above before you send.</p>
             )}
 
             {busy && tracks.length > 1 && (

@@ -65,9 +65,10 @@ export function FeaturedArtists({
     setQuery('');
   };
 
-  const remove = (artistId: string) => onChange(value.filter((f) => f.artistId !== artistId));
-  const toggleShow = (artistId: string) =>
-    onChange(value.map((f) => (f.artistId === artistId ? { ...f, show: !f.show } : f)));
+  // By position: a credit for someone not on SONGCHAINN has no id to find it by.
+  const remove = (index: number) => onChange(value.filter((_, i) => i !== index));
+  const toggleShow = (index: number) =>
+    onChange(value.map((f, i) => (i === index ? { ...f, show: !f.show } : f)));
 
   return (
     <div>
@@ -94,16 +95,19 @@ export function FeaturedArtists({
 
       {value.length > 0 && (
         <ul className="space-y-2">
-          {value.map((f) => (
+          {value.map((f, index) => (
             <li
-              key={f.artistId}
+              key={f.artistId ?? `name-${f.name}`}
               className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2"
             >
-              <span className="min-w-0 flex-1 truncate text-sm text-foreground">{f.name}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                {f.name}
+                {f.collab && <span className="ml-1.5 text-xs text-muted-foreground">Collaboration</span>}
+              </span>
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => toggleShow(f.artistId)}
+                onClick={() => toggleShow(index)}
                 aria-label={f.show ? `Hide ${f.name} on the song display` : `Show ${f.name} on the song display`}
                 className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium ${
                   f.show ? 'text-primary' : 'text-muted-foreground'
@@ -116,7 +120,7 @@ export function FeaturedArtists({
                 type="button"
                 disabled={disabled}
                 aria-label={`Remove ${f.name}`}
-                onClick={() => remove(f.artistId)}
+                onClick={() => remove(index)}
                 className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <X className="h-4 w-4" />

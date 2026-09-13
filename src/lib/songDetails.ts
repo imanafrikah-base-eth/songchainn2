@@ -29,12 +29,22 @@ export interface Split {
  * different things.
  */
 export interface Featured {
-  /** Catalogue artist id, so the credit can link to their page. */
-  artistId: string;
+  /**
+   * Catalogue artist id, so the credit can link to their page. Absent only
+   * for a featured artist who is not on SONGCHAINN; that credit prints
+   * without a link.
+   */
+  artistId?: string;
   /** How it should read, as it was when they were chosen. */
   name: string;
   /** Whether it shows on the song display. Recorded either way. */
   show: boolean;
+  /**
+   * A true collaboration ("A x B") rather than a feature. The record is
+   * credited "A & B" and sits in both catalogues, so it is not printed as
+   * "ft B" under the title.
+   */
+  collab?: boolean;
 }
 
 export type Distribution = 'app' | 'onchain';
@@ -134,11 +144,16 @@ function normalise(row: Record<string, unknown> | null): SongDetails {
     description: (row.description as string | null) ?? null,
     credits: credits.filter((c) => c && typeof c.name === 'string'),
     splits: splits.filter((s) => s && typeof s.name === 'string'),
-    // An entry with no artist behind it is free text pretending to be a link,
-    // which is the thing this field exists to replace.
+    // An entry with an artist id links to their page. One without is a named
+    // artist who is not on SONGCHAINN yet, and prints as plain text.
     featured: featured
-      .filter((f) => f && typeof f.name === 'string' && f.artistId != null)
-      .map((f) => ({ artistId: String(f.artistId), name: f.name, show: f.show !== false })),
+      .filter((f) => f && typeof f.name === 'string' && f.name.trim().length > 0)
+      .map((f) => ({
+        ...(f.artistId != null && String(f.artistId).trim() ? { artistId: String(f.artistId).trim() } : {}),
+        name: f.name,
+        show: f.show !== false,
+        ...(f.collab === true ? { collab: true } : {}),
+      })),
     isrc: (row.isrc as string | null) ?? null,
     iswc: (row.iswc as string | null) ?? null,
     language: (row.language as string | null) ?? null,
@@ -186,9 +201,19 @@ export function cleanDetails(d: SongDetails): SongDetails {
       .map((s) => ({ name: s.name.trim(), role: s.role.trim(), share: Math.max(0, Math.min(100, Math.round(Number(s.share) || 0))) }))
       .filter((s) => s.name),
     // One credit per artist, however many times they were picked.
+    // The collab flag and name-only credits survive a save from the Studio.
     featured: d.featured
-      .map((f) => ({ artistId: String(f.artistId).trim(), name: f.name.trim(), show: f.show !== false }))
-      .filter((f, i, all) => f.artistId && f.name && all.findIndex((o) => o.artistId === f.artistId) === i),
+      .map((f) => ({
+        ...(f.artistId != null && String(f.artistId).trim() ? { artistId: String(f.artistId).trim() } : {}),
+        name: f.name.trim(),
+        show: f.show !== false,
+        ...(f.collab === true ? { collab: true } : {}),
+      }))
+      .filter((f, i, all) =>
+        f.name &&
+        all.findIndex((o) =>
+          f.artistId ? o.artistId === f.artistId : !o.artistId && o.name.toLowerCase() === f.name.toLowerCase(),
+        ) === i),
     isrc: normaliseIsrc(d.isrc),
     iswc: text(d.iswc)?.toUpperCase().replace(/\s+/g, '') ?? null,
     language: text(d.language),

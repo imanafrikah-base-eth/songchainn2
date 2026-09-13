@@ -41,6 +41,7 @@ export interface BattleRow {
   stage: string | null;
   music_ends_at: string | null;
   closes_at: string | null;
+  launched_at?: string | null;
   voice_enabled?: boolean | null;
   created_at: string;
   updated_at: string;
@@ -98,6 +99,8 @@ export interface Battle {
   musicEndsAt?: string;
   /** When the poll and the trading ground both close. */
   closesAt?: string;
+  /** When the host pressed go live, when the row has it. The music clock anchors here. */
+  launchedAt?: string;
   /** In-app voice is on for this battle. Only the server turns it on. */
   voiceEnabled: boolean;
   createdAt: string;
@@ -152,6 +155,7 @@ function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Bat
     stage: row.stage === "open_mic" ? "open_mic" : "main_stage",
     musicEndsAt: row.music_ends_at || undefined,
     closesAt: row.closes_at || undefined,
+    launchedAt: row.launched_at || undefined,
     voiceEnabled: row.voice_enabled === true,
     createdAt: row.created_at,
   };

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Users, Hand, Mic, MicOff, Crown, Shield, UserCheck, UserX, Volume2, VolumeX } from 'lucide-react';
 import { useBattleRoles } from '@/battlezone/hooks/useBattleRoles';
 import { useToast } from '@/battlezone/hooks/use-toast';
+import { useParticipantAvatars } from '@/battlezone/hooks/useParticipantAvatars';
+import ParticipantPhoto from '@/battlezone/components/ParticipantPhoto';
 
 interface SpeakerManagementProps {
   battleId: string;
@@ -26,6 +28,11 @@ export const SpeakerManagement: React.FC<SpeakerManagementProps> = ({
 
   const [speakerRequests, setSpeakerRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  /* Same cached query LiveRoom uses, so no extra request for the room. */
+  const avatars = useParticipantAvatars([
+    ...participants.map((p) => p.user_id),
+    ...speakerRequests.map((r) => String(r.user_id ?? '')),
+  ]);
 
   // Fetch speaker requests
   const fetchSpeakerRequests = async () => {
@@ -111,8 +118,8 @@ export const SpeakerManagement: React.FC<SpeakerManagementProps> = ({
     };
 
     return (
-      <div className={`relative rounded-full bg-muted flex items-center justify-center font-bold ${sizes[size]}`}>
-        {(participant.display_name || '?').charAt(0).toUpperCase()}
+      <div className="relative shrink-0">
+        <ParticipantPhoto url={avatars.get(participant.user_id)} name={participant.display_name} className={sizes[size]} />
         {participant.role === 'host' && <Crown className="absolute -top-1 -right-1 h-3 w-3 text-neon-gold" />}
         {participant.role === 'co-host' && <Shield className="absolute -top-1 -right-1 h-3 w-3 text-neon-cyan" />}
       </div>

@@ -62,46 +62,46 @@ const AVIMY = `${R2D}/IMAN%20AFARIKAH%20-%20VAPACHALO%20CATALOG/IMAN%20AFRIKAH%2
 
 interface SongMeta { t: string; a: string; img: string }
 const SONG_META: Record<string, SongMeta> = {
-  // 7ROO7H BASED Vol1
-  "1": { t: "Eve's Daughter", a: "7ROO7H BASED", img: A7V1 },
-  "8": { t: "OUNCE", a: "7ROO7H BASED", img: A7V1 },
-  "10": { t: "ME", a: "7ROO7H BASED", img: A7V1 },
-  "11": { t: "GOD'S SIN", a: "7ROO7H BASED", img: A7V1 },
-  "12": { t: "ALREADY LOST", a: "7ROO7H BASED", img: A7V1 },
-  "13": { t: "7", a: "7ROO7H BASED", img: A7V1 },
-  "49": { t: "Eve's Daughter (Alt Mix)", a: "7ROO7H BASED", img: A7V1 },
-  // 7ROO7H BASED Vol2
-  "57": { t: "DISCORD", a: "7ROO7H BASED", img: A7V2 },
-  "58": { t: "DRUNK", a: "7ROO7H BASED", img: A7V2 },
-  "59": { t: "I TRY", a: "7ROO7H BASED", img: A7V2 },
-  "60": { t: "INCOMPATIBLE", a: "7ROO7H BASED", img: A7V2 },
-  "61": { t: "NEVER AGAIN", a: "7ROO7H BASED", img: A7V2 },
-  "62": { t: "ONCHAIN", a: "7ROO7H BASED", img: A7V2 },
-  "63": { t: "SUPER BASED", a: "7ROO7H BASED", img: A7V2 },
-  // 7ROO7H BASED Vol3
-  "107": { t: "AGAIN", a: "7ROO7H BASED", img: A7V3 },
-  "108": { t: "MATCH MADE IN HEAVEN", a: "7ROO7H BASED", img: A7V3 },
-  "109": { t: "IF I COULD", a: "7ROO7H BASED", img: A7V3 },
-  "110": { t: "SHNAKKE", a: "7ROO7H BASED", img: A7V3 },
-  "111": { t: "TWEAKING", a: "7ROO7H BASED", img: A7V3 },
-  "112": { t: "AHEAD OF TIME", a: "7ROO7H BASED", img: A7V3 },
-  "113": { t: "MY OWN", a: "7ROO7H BASED", img: A7V3 },
-  // 7ROO7H BASED Vol4
-  "114": { t: "THE RISING HOPE", a: "7ROO7H BASED", img: A7V4 },
-  "115": { t: "NO PLAYSTATION", a: "7ROO7H BASED", img: A7V4 },
-  "116": { t: "INFORMA", a: "7ROO7H BASED", img: A7V4 },
-  "117": { t: "FADA", a: "7ROO7H BASED", img: A7V4 },
-  "118": { t: "MORE LIFE", a: "7ROO7H BASED", img: A7V4 },
-  "119": { t: "SELF ADVICE", a: "7ROO7H BASED", img: A7V4 },
-  "204": { t: "INSIDE LIBALA RMS", a: "7ROO7H BASED", img: A7V4 },
-  // 7ROO7H BASED Vol5
-  "120": { t: "THE GARDEN", a: "7ROO7H BASED", img: A7V4 },
-  "121": { t: "THE LIGHT HOUSE", a: "7ROO7H BASED", img: A7V4 },
-  "122": { t: "THE SUMO WRESLER", a: "7ROO7H BASED", img: A7V4 },
-  "123": { t: "THE WIRECABLE", a: "7ROO7H BASED", img: A7V4 },
-  "124": { t: "THE GOLDEN STOPWATCH", a: "7ROO7H BASED", img: A7V4 },
-  "125": { t: "THE FLOWER", a: "7ROO7H BASED", img: A7V4 },
-  "126": { t: "THE DIAMOND PATH", a: "7ROO7H BASED", img: A7V4 },
+  // 7ROO7H Vol1
+  "1": { t: "Eve's Daughter", a: "7ROO7H", img: A7V1 },
+  "8": { t: "OUNCE", a: "7ROO7H", img: A7V1 },
+  "10": { t: "ME", a: "7ROO7H", img: A7V1 },
+  "11": { t: "GOD'S SIN", a: "7ROO7H", img: A7V1 },
+  "12": { t: "ALREADY LOST", a: "7ROO7H", img: A7V1 },
+  "13": { t: "7", a: "7ROO7H", img: A7V1 },
+  "49": { t: "Eve's Daughter (Alt Mix)", a: "7ROO7H", img: A7V1 },
+  // 7ROO7H Vol2
+  "57": { t: "DISCORD", a: "7ROO7H", img: A7V2 },
+  "58": { t: "DRUNK", a: "7ROO7H", img: A7V2 },
+  "59": { t: "I TRY", a: "7ROO7H", img: A7V2 },
+  "60": { t: "INCOMPATIBLE", a: "7ROO7H", img: A7V2 },
+  "61": { t: "NEVER AGAIN", a: "7ROO7H", img: A7V2 },
+  "62": { t: "ONCHAIN", a: "7ROO7H", img: A7V2 },
+  "63": { t: "SUPER BASED", a: "7ROO7H", img: A7V2 },
+  // 7ROO7H Vol3
+  "107": { t: "AGAIN", a: "7ROO7H", img: A7V3 },
+  "108": { t: "MATCH MADE IN HEAVEN", a: "7ROO7H", img: A7V3 },
+  "109": { t: "IF I COULD", a: "7ROO7H", img: A7V3 },
+  "110": { t: "SHNAKKE", a: "7ROO7H", img: A7V3 },
+  "111": { t: "TWEAKING", a: "7ROO7H", img: A7V3 },
+  "112": { t: "AHEAD OF TIME", a: "7ROO7H", img: A7V3 },
+  "113": { t: "MY OWN", a: "7ROO7H", img: A7V3 },
+  // 7ROO7H Vol4
+  "114": { t: "THE RISING HOPE", a: "7ROO7H", img: A7V4 },
+  "115": { t: "NO PLAYSTATION", a: "7ROO7H", img: A7V4 },
+  "116": { t: "INFORMA", a: "7ROO7H", img: A7V4 },
+  "117": { t: "FADA", a: "7ROO7H", img: A7V4 },
+  "118": { t: "MORE LIFE", a: "7ROO7H", img: A7V4 },
+  "119": { t: "SELF ADVICE", a: "7ROO7H", img: A7V4 },
+  "204": { t: "INSIDE LIBALA RMS", a: "7ROO7H", img: A7V4 },
+  // 7ROO7H Vol5
+  "120": { t: "THE GARDEN", a: "7ROO7H", img: A7V4 },
+  "121": { t: "THE LIGHT HOUSE", a: "7ROO7H", img: A7V4 },
+  "122": { t: "THE SUMO WRESLER", a: "7ROO7H", img: A7V4 },
+  "123": { t: "THE WIRECABLE", a: "7ROO7H", img: A7V4 },
+  "124": { t: "THE GOLDEN STOPWATCH", a: "7ROO7H", img: A7V4 },
+  "125": { t: "THE FLOWER", a: "7ROO7H", img: A7V4 },
+  "126": { t: "THE DIAMOND PATH", a: "7ROO7H", img: A7V4 },
   // DenaJah
   "2": { t: "Dance", a: "DenaJah", img: ADJ },
   "9": { t: "Alone", a: "DenaJah", img: ADJ },
@@ -367,7 +367,10 @@ async function db() {
 
 export default async function handler(req: any, res: any) {
   // Reached by name (/n3m3sis/block-is-hot) or by id (/song/212, /share/212).
-  const artistSlug = slugOf(String(req.query?.artist || ""));
+  // An artist who was renamed keeps their old address working.
+  const RENAMED: Record<string, string> = { "7roo7h-based": "7roo7h" };
+  const rawArtistSlug = slugOf(String(req.query?.artist || ""));
+  const artistSlug = RENAMED[rawArtistSlug] || rawArtistSlug;
   const songSlug = String(req.query?.song || "").trim().toLowerCase();
   let id = String(req.query?.id || "").trim();
 

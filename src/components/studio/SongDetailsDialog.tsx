@@ -165,7 +165,8 @@ export function SongDetailsDialog({
               <label className="block">
                 <span className={label}>Genre</span>
                 <select value={genreDraft} disabled={saving} onChange={(e) => setGenreDraft(e.target.value)} className={input}>
-                  <option value="">Not set</option>
+                  {/* A record that already has a genre keeps one; an older record with none still opens and saves. */}
+                  <option value="" disabled={Boolean(genre)}>Not set</option>
                   {[...new Set([genreDraft, ...GENRES].filter(Boolean))].map((g) => (
                     <option key={g} value={g}>{g}</option>
                   ))}

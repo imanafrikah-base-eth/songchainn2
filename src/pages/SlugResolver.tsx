@@ -2,7 +2,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
-import { artistIdForSlug, artistPath, getSongBySlug, registerArtistNames, toSlug } from '@/lib/slugRoutes';
+import { artistIdForSlug, artistPath, getSongBySlug, registerArtistNames, renamedArtistSlug, toSlug } from '@/lib/slugRoutes';
 import ArtistDetail from './ArtistDetail';
 import SongDetail from './SongDetail';
 
@@ -24,11 +24,13 @@ export default function SlugResolver() {
   // through the app, so look the name up after this call, not before.
   const { songs, isLoading } = usePublishedCatalog();
   const artistId = artistIdForSlug(slug);
+  // An artist who changed their name keeps their old address as a way in.
+  const renamedTo = renamedArtistSlug(slug);
 
   // An artist account with nothing published yet is still somebody's page.
   const account = useQuery({
     queryKey: ['artist-by-name', slug],
-    enabled: !songSlug && !artistId && !isLoading && Boolean(slug),
+    enabled: !renamedTo && !songSlug && !artistId && !isLoading && Boolean(slug),
     staleTime: 60_000,
     queryFn: async (): Promise<string | null> => {
       const { data: accounts } = await supabase.from('artist_accounts' as never).select('artist_id, user_id');
@@ -43,6 +45,10 @@ export default function SlugResolver() {
       return found.artist_id;
     },
   });
+
+  if (renamedTo) {
+    return <Navigate to={songSlug ? `/${renamedTo}/${songSlug}` : `/${renamedTo}`} replace />;
+  }
 
   if (songSlug) {
     const known = getSongBySlug(slug, songSlug);

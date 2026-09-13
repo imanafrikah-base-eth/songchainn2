@@ -3,6 +3,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import AppLink from "@/battlezone/components/AppLink";
 import { useBattle } from "@/battlezone/hooks/useBattles";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
+import { installBattleAudioGestureUnlock } from "@/battlezone/lib/audioUnlock";
+
+/* "Enter the room" is a tap, so it unlocks sound. The automatic redirect is
+   not a gesture; if the browser refuses, the room shows its tap overlay. */
+installBattleAudioGestureUnlock();
 
 /**
  * The door for a shared battle link, where the battle's status is genuinely

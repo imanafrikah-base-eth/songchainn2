@@ -244,7 +244,39 @@ export default function SongDetail({ songIdOverride }: { songIdOverride?: string
                 )}
               </div>
               
-              <Link 
+              {song.collabArtistIds?.length ? (
+                /* A collaboration is credited "A & B", and each name leads to
+                   its own page. Links cannot nest, so this is not one big link. */
+                <div className="inline-flex flex-wrap items-center gap-3 mb-6">
+                  <Link to={artistPath(artist.id)} className="w-10 h-10 rounded-full bg-secondary overflow-hidden" aria-label={artist.name}>
+                    {artist.profileImage ? (
+                      <img src={artist.profileImage} alt={artist.name} className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="w-full h-full gradient-primary opacity-40 flex items-center justify-center">
+                        <span className="text-sm font-bold">{artist.name.charAt(0)}</span>
+                      </div>
+                    )}
+                  </Link>
+                  <span className="text-lg text-foreground">
+                    {song.artist.split(' & ').map((part, i, parts) => {
+                      const partId = i === 0 ? artist.id : song.collabArtistIds?.[i - 1];
+                      return (
+                        <span key={`${part}-${i}`}>
+                          {partId ? (
+                            <Link to={artistPath(partId, part)} className="hover:text-primary transition-colors">
+                              <ArtistName name={part} artistId={partId} size={14} />
+                            </Link>
+                          ) : (
+                            part
+                          )}
+                          {i < parts.length - 1 && <span className="text-muted-foreground"> &amp; </span>}
+                        </span>
+                      );
+                    })}
+                  </span>
+                </div>
+              ) : (
+              <Link
                 to={artistPath(artist.id)}
                 className="inline-flex items-center gap-3 mb-6 group"
               >
@@ -261,6 +293,7 @@ export default function SongDetail({ songIdOverride }: { songIdOverride?: string
                   <ArtistName name={artist.name} artistId={artist.id} size={14} />
                 </span>
               </Link>
+              )}
 
               {coinAddress && earnedPlacement(song) && (
                 <div className="mb-6">

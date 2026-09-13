@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Mic, Hand, Send, Play, Pause, SkipForward,
-  Square, UserPlus, Volume2, ExternalLink, Crown, Smile, Music, X, Radio, Heart,
+  Square, UserPlus, Volume2, ExternalLink, Crown, Smile, Music, Heart,
   Feather, Music2, Flame, Hourglass, type LucideIcon,
 } from "lucide-react";
 import { VOICE_ENABLED } from "@/battlezone/config";
@@ -23,8 +23,14 @@ import { getLiveKitToken } from "@/battlezone/lib/livekit";
 import MicControls from "@/battlezone/components/MicControls";
 import SpeakerManagement from "@/battlezone/components/SpeakerManagement";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
-import { useHostAudio } from "@/battlezone/hooks/useHostAudio";
-import { SONGS } from "@/data/musicData";
+import {
+  getBattleAudioContext, installBattleAudioGestureUnlock, primeBattleAudio, useBattleAudioBlocked,
+} from "@/battlezone/lib/audioUnlock";
+import { useParticipantAvatars } from "@/battlezone/hooks/useParticipantAvatars";
+import ParticipantPhoto from "@/battlezone/components/ParticipantPhoto";
+
+/* Any tap in the battlezone counts as the gesture that lets the room play. */
+installBattleAudioGestureUnlock();
 import {
   JUDGE_BY_USER_ID, judgesMentioned, pingJudgeChat, requestHikuluVerdict,
   type JudgeKey,
@@ -74,8 +80,8 @@ const LiveRoom = () => {
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const { data: battle, isLoading, refetch: refetchBattle } = useBattle(roomId);
-  // Voice is on per battle: the host turns it on from this room, and until they
-  // do the battle keeps its X Space link, the poll and the chat.
+  // Voice is on per battle: the host turns it on from this room. The battle
+  // music plays for everyone either way; voices only when voice is on.
   const voiceOn = VOICE_ENABLED && battle?.voiceEnabled === true;
   const { data: liveBattles = [] } = useBattles("live");
 
@@ -87,11 +93,10 @@ const LiveRoom = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isVerySmallMobile, setIsVerySmallMobile] = useState(false);
   const [audioConnected, setAudioConnected] = useState(false);
-  /* connecting until the first connect, then connected / reconnecting / offline. */
-  const [voiceStatus, setVoiceStatus] = useState<"connecting" | "connected" | "reconnecting" | "offline">("connecting");
-  /* False when the browser blocked autoplay (mobile Safari especially). */
+  /* False when the browser blocked the voices (mobile Safari especially). */
   const [canPlayAudio, setCanPlayAudio] = useState(true);
-  const [showSongPicker, setShowSongPicker] = useState(false);
+  /* True when the browser blocked the battle music. */
+  const musicBlocked = useBattleAudioBlocked();
   const [clockClosed, setClockClosed] = useState(false);
   const liveKitRoomRef = useRef<Room | null>(null);
   /* The current room as state too, so children and effects see a room created
@@ -109,8 +114,6 @@ const LiveRoom = () => {
   const roundSongB = battle?.songsB?.[round - 1] ?? battle?.songsB?.[0];
   const { data: songCoins } = useSongCoinAddresses([roundSongA?.id, roundSongB?.id]);
 
-  const hostAudio = useHostAudio();
-  
   // Use new role management system
   const {
     participants,
@@ -119,6 +122,8 @@ const LiveRoom = () => {
     getParticipantsByRole,
     approveSpeakerRequest,
   } = useBattleRoles(roomId || '');
+  /* Profile pictures for everyone in the room, one cached query. */
+  const avatars = useParticipantAvatars(participants.map((p) => p.user_id));
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -398,34 +403,15 @@ const LiveRoom = () => {
     }
   };
 
-  /* The host's broadcast track carries the MUSIC only. The host's voice goes
-     out once, as the ordinary LiveKit microphone track that MicControls owns;
-     mixing the mic in here as well made listeners hear the host twice.
-     Re-runs when the room connects or a new room replaces it after a
-     reconnect, so the song goes back on air instead of silently staying off. */
-  const { audioState: hostAudioState, publishToRoom: hostPublish, unpublishFromRoom: hostUnpublish } = hostAudio;
-  useEffect(() => {
-    if (!voiceOn) return;
-    const room = liveRoom;
-    if (!room || !audioConnected || myRole !== 'host') return;
-    if (hostAudioState === 'idle' || hostAudioState === 'error') {
-      hostUnpublish(room);
-      return;
-    }
-    hostPublish(room).catch((error) => {
-      console.error("[LiveKit] host broadcast publish failed", error);
-      toast({
-        title: "Music is not reaching the room",
-        description: "The broadcast could not start. Stop the music and play it again.",
-      });
-    });
-  }, [hostAudioState, myRole, hostPublish, hostUnpublish, voiceOn, liveRoom, audioConnected, toast]);
+  /* In a battle the only sounds are the battle music (BattleStage, on the
+     clock, for everyone) and the voices of the host, co-hosts and approved
+     speakers (their LiveKit mic tracks). There is no host radio here; stations
+     belong to Artist Worlds. */
 
   const host = getParticipantsByRole('host')[0];
   const coHosts = getParticipantsByRole('co-host');
   const speakers = getParticipantsByRole('speaker');
   const audience = getParticipantsByRole('audience');
-  const iAmHostOrCoHost = hasPermission('canApproveSpeakers');
   const canPublishAudio = hasPermission('canPublishAudio');
 
   useEffect(() => {
@@ -490,13 +476,11 @@ const LiveRoom = () => {
     };
 
     const connectLiveKit = async () => {
-      setVoiceStatus("connecting");
       try {
         const { token, wsUrl } = await getLiveKitToken(roomId, user.id, participantName);
         if (cancelled) return;
 
         if (!wsUrl || !token) {
-          setVoiceStatus("offline");
           toast({
             title: "Voice connection unavailable",
             description: "Live audio is not configured for this deployment. Contact support.",
@@ -504,10 +488,15 @@ const LiveRoom = () => {
           return;
         }
 
+        /* Voices play through the shared AudioContext that the tap into the
+           room already unlocked, so nobody is asked to switch sound on.
+           LiveKit does not close a context it was handed. */
+        const sharedContext = getBattleAudioContext();
         room = new Room({
           adaptiveStream: true,
           dynacast: true,
           stopLocalTrackOnUnpublish: true,
+          webAudioMix: sharedContext ? { audioContext: sharedContext } : false,
         });
         const current = room;
         liveKitRoomRef.current = current;
@@ -517,23 +506,19 @@ const LiveRoom = () => {
           .on(RoomEvent.Connected, () => {
             if (cancelled) return;
             setAudioConnected(true);
-            setVoiceStatus("connected");
             setCanPlayAudio(current.canPlaybackAudio);
           })
           .on(RoomEvent.Reconnecting, () => {
             if (cancelled) return;
             setAudioConnected(false);
-            setVoiceStatus("reconnecting");
           })
           .on(RoomEvent.Reconnected, () => {
             if (cancelled) return;
             setAudioConnected(true);
-            setVoiceStatus("connected");
           })
           .on(RoomEvent.Disconnected, () => {
             if (cancelled) return;
             setAudioConnected(false);
-            setVoiceStatus("offline");
             detachAll();
           })
           .on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
@@ -555,12 +540,14 @@ const LiveRoom = () => {
 
         await current.connect(wsUrl, token, { autoSubscribe: true });
         if (cancelled) return;
+        // Harmless without a gesture; with the entry tap's unlock it just works.
+        if (!current.canPlaybackAudio) await current.startAudio().catch(() => undefined);
+        if (cancelled) return;
         setCanPlayAudio(current.canPlaybackAudio);
       } catch (error) {
         console.error("[LiveKit] connect failed", error);
         if (cancelled) return;
         setAudioConnected(false);
-        setVoiceStatus("offline");
         toast({
           title: "Could not join the room's voice",
           description: "Check your connection and reload the room. Voting and chat still work.",
@@ -635,15 +622,19 @@ const LiveRoom = () => {
      never reordered as they talk; the caption says who is talking instead. */
   const stage = [...(host ? [host] : []), ...coHosts, ...speakers];
 
-  const startRoomAudio = () => {
+  /* Only reached when a browser refused both the entry tap and autoplay, e.g. a
+     shared link opened straight into the room. Any tap unlocks everything. */
+  const battleLiveNow = battle?.status === "live" && !battleEnded;
+  const voicesBlocked = voiceOn && audioConnected && !canPlayAudio;
+  const needsTap = battleLiveNow && (musicBlocked || voicesBlocked);
+  const unlockRoomAudio = () => {
+    primeBattleAudio();
     const room = liveKitRoomRef.current;
     if (!room) return;
     room
       .startAudio()
       .then(() => setCanPlayAudio(room.canPlaybackAudio))
-      .catch(() => {
-        toast({ title: "Sound is still blocked", description: "Tap again, or check that this tab is not muted." });
-      });
+      .catch(() => undefined);
   };
 
   const formatTime = (date: Date) => {
@@ -660,6 +651,22 @@ const LiveRoom = () => {
 
   return (
     <div className={`${isEmbedded ? "h-full min-h-full" : "min-h-screen"} bg-background flex flex-col`}>
+      {/* Not a choice: everyone in the room hears the battle. This only appears
+          when the browser refused to play without a tap, and any tap clears it. */}
+      {needsTap && (
+        <button
+          type="button"
+          onClick={unlockRoomAudio}
+          className="fixed inset-0 z-50 flex h-full w-full items-center justify-center bg-background/90 px-6 text-center"
+        >
+          <span className="flex flex-col items-center gap-3">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/40 bg-primary/10">
+              <Volume2 className="h-7 w-7 text-primary" />
+            </span>
+            <span className="text-lg font-bold text-foreground">Tap anywhere to hear the battle</span>
+          </span>
+        </button>
+      )}
       <EmbedTopBar title="Live Room" />
       {/* Header */}
       <div className={`border-b border-border bg-card/60 backdrop-blur-xl ${isVerySmallMobile ? "px-2.5 py-2" : "px-4 py-3"}`}>
@@ -682,35 +689,6 @@ const LiveRoom = () => {
             <div className={`rounded-lg border border-border bg-card text-foreground ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
               {myRole === "host" ? "Host" : myRole === "co-host" ? "Co-Host" : myRole === "speaker" ? "Speaker" : "Audience"}
             </div>
-            {voiceOn ? (
-              audioConnected && !canPlayAudio ? (
-                <button
-                  onClick={startRoomAudio}
-                  className={`rounded-lg border border-primary/40 bg-primary/10 font-semibold text-primary hover:bg-primary/20 min-h-11 ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}
-                >
-                  Tap to hear
-                </button>
-              ) : (
-                <div className={`rounded-lg border ${audioConnected ? "border-primary/40 text-primary" : "border-border text-muted-foreground"} bg-card ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
-                  {audioConnected
-                    ? "Audio On"
-                    : voiceStatus === "reconnecting"
-                      ? "Audio Reconnecting"
-                      : voiceStatus === "offline"
-                        ? "Audio Off"
-                        : "Audio Connecting"}
-                </div>
-              )
-            ) : battle.xSpaceUrl ? (
-              <a
-                href={battle.xSpaceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`rounded-lg bg-primary font-semibold text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1.5 ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}
-              >
-                <Radio className="h-3.5 w-3.5" /> Listen on X
-              </a>
-            ) : null}
           </div>
         </div>
         <div className={`mx-auto max-w-7xl flex flex-wrap items-center ${isVerySmallMobile ? "mt-2 gap-1.5" : "mt-3 gap-2"}`}>
@@ -738,14 +716,6 @@ const LiveRoom = () => {
               <h3 className="text-sm font-bold text-muted-foreground mb-2 flex items-center gap-2">
                 <Mic className="h-4 w-4" /> Speaking Now
               </h3>
-              {audioConnected && !canPlayAudio && (
-                <button
-                  onClick={startRoomAudio}
-                  className="mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20"
-                >
-                  <Volume2 className="h-4 w-4" /> Tap to hear the room
-                </button>
-              )}
               {stage.length > 0 && <NowTalkingCaption store={speakingStore} stage={stage} />}
               {/* One scrollable line on phones; wraps and centres from sm up. */}
               <div className={`-mx-1 flex flex-nowrap items-start overflow-x-auto px-1 pb-1 pt-1.5 sm:flex-wrap sm:justify-center sm:overflow-visible ${isVerySmallMobile ? "gap-3" : "gap-4 sm:gap-6"}`}>
@@ -757,6 +727,7 @@ const LiveRoom = () => {
                     name={p.display_name}
                     role={p.role}
                     muted={p.is_muted}
+                    avatarUrl={avatars.get(p.user_id)}
                     size={i === 0 && p.role === "host" ? "lg" : "md"}
                   />
                 ))}
@@ -768,36 +739,16 @@ const LiveRoom = () => {
             </div>
           )}
 
-          {/* Live audio on X Spaces */}
-          {!voiceOn && battle.xSpaceUrl && (
-            <div className={`rounded-2xl border border-primary/30 bg-primary/5 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-5"} backdrop-blur flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
-              <div className="flex items-start gap-3">
-                <Radio className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-bold text-foreground">Live audio is on X Spaces</p>
-                  <p className="text-xs text-muted-foreground">Join the Space to hear the battle. Vote and chat right here while you listen.</p>
-                </div>
-              </div>
-              <a
-                href={battle.xSpaceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shrink-0"
-              >
-                Listen on X <ExternalLink className="h-4 w-4" />
-              </a>
-            </div>
-          )}
-
-          {/* The songs play here, in the room, while the battle is live. */}
+          {/* The battle's songs play here for everyone, on the battle clock. */}
           <BattleStage
-            battleId={roomId || ""}
-            round={round}
             songsA={battle.songsA}
             songsB={battle.songsB}
             artistAName={battle.artistA.name}
             artistBName={battle.artistB.name}
-            isHost={iAmHostOrCoHost}
+            musicEndsAt={battle.musicEndsAt ?? null}
+            launchedAt={battle.launchedAt ?? null}
+            live={battleLiveNow}
+            ended={battleEnded}
             compact={isVerySmallMobile}
           />
 
@@ -1009,89 +960,6 @@ const LiveRoom = () => {
                 </button>
               </div>
 
-              {/* Host Music Broadcast */}
-              {voiceOn && (
-              <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                    <Music className="h-4 w-4" /> Broadcast Music
-                  </h3>
-                  {hostAudio.isSongPlaying && (
-                    <span className="text-xs font-semibold text-primary animate-pulse">● LIVE</span>
-                  )}
-                </div>
-
-                {hostAudio.error && (
-                  <p className="text-xs text-live">{hostAudio.error}</p>
-                )}
-
-                <p className="text-xs text-muted-foreground">Your voice goes out through Mute and Unmute in Audio Controls.</p>
-
-                <div className="flex flex-wrap gap-2">
-                  {/* Song toggle */}
-                  {!hostAudio.isSongPlaying ? (
-                    <button
-                      onClick={() => setShowSongPicker(true)}
-                      className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center gap-2"
-                    >
-                      <Music className="h-4 w-4" /> Play Song to Room
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => hostAudio.stopSong()}
-                      className="rounded-xl bg-live/10 border border-live/30 px-4 py-2 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center gap-2"
-                    >
-                      <Square className="h-3 w-3" /> Stop Music
-                    </button>
-                  )}
-                </div>
-
-                {/* Volume slider for song */}
-                {hostAudio.isSongPlaying && (
-                  <div className="flex items-center gap-3">
-                    <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <input
-                      type="range" min={0} max={1} step={0.05}
-                      value={hostAudio.songVolume}
-                      onChange={(e) => hostAudio.setSongVolume(parseFloat(e.target.value))}
-                      className="flex-1 accent-primary"
-                    />
-                    <span className="text-xs text-muted-foreground w-8">{Math.round(hostAudio.songVolume * 100)}%</span>
-                  </div>
-                )}
-
-                {/* Song picker overlay */}
-                {showSongPicker && (
-                  <div className="rounded-xl border border-border bg-background p-3 space-y-2 max-h-64 overflow-y-auto">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-muted-foreground">Choose a song to broadcast</span>
-                      <button onClick={() => setShowSongPicker(false)} className="text-muted-foreground hover:text-foreground">
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    {SONGS.slice(0, 15).map((song) => (
-                      <button
-                        key={song.id}
-                        onClick={async () => {
-                          setShowSongPicker(false);
-                          // Publishing is done by the effect above once the
-                          // broadcast state changes, so it is never done twice.
-                          void liveKitRoomRef.current?.startAudio().catch(() => undefined);
-                          await hostAudio.playSong(song.audioUrl);
-                        }}
-                        className="w-full text-left rounded-lg px-3 py-2 hover:bg-primary/10 transition-colors flex items-center gap-3"
-                      >
-                        <Music className="h-4 w-4 text-primary shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              )}
             </div>
           )}
 
@@ -1134,6 +1002,7 @@ const LiveRoom = () => {
                       name={p.display_name}
                       role={p.role}
                       muted={p.is_muted}
+                      avatarUrl={avatars.get(p.user_id)}
                       size="sm"
                       showLabel={false}
                     />
@@ -1164,9 +1033,7 @@ const LiveRoom = () => {
                       .map((p) => (
                         <div key={p.user_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border">
                           <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
-                              {(p.display_name || "?").charAt(0).toUpperCase()}
-                            </div>
+                            <ParticipantPhoto url={avatars.get(p.user_id)} name={p.display_name} className="h-8 w-8 text-xs" />
                             <p className="text-sm font-medium text-foreground truncate">{p.display_name || "Anonymous"}</p>
                           </div>
                           <button

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
@@ -12,6 +12,9 @@ const GSI_SRC = 'https://accounts.google.com/gsi/client';
 
 /** How long the auth server gets to answer a probe before we call the link down. */
 const REACH_TIMEOUT_MS = 8000;
+
+/** How long Google's own button gets to appear before the redirect button takes its place. */
+const GSI_RENDER_TIMEOUT_MS = 4000;
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 
@@ -49,6 +52,14 @@ function inAppBrowser(): boolean {
   return /FBAN|FBAV|FB_IAB|Instagram|Line\/|MicroMessenger|Twitter|TikTok|BytedanceWebview|Snapchat|; wv\)|WebView/i.test(ua);
 }
 
+function prefersDark(): boolean {
+  if (typeof document === 'undefined') return false;
+  const root = document.documentElement;
+  if (root.classList.contains('dark') || root.dataset.theme === 'dark') return true;
+  if (root.classList.contains('light') || root.dataset.theme === 'light') return false;
+  return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
+}
+
 declare global {
   interface Window {
     google?: any;
@@ -84,7 +95,7 @@ async function sha256Hex(input: string): Promise<string> {
     .join('');
 }
 
-/** Google's four-colour G, drawn here so the button needs nothing from Google to look right. */
+/** Google's four-colour G, drawn here so the fallback button needs nothing from Google to look right. */
 function GoogleMark({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 18 18" className={className} aria-hidden="true">
@@ -103,20 +114,25 @@ interface GoogleSignInProps {
 }
 
 /**
- * "Continue with Google", the way that always works, plus One Tap when it can.
+ * "Continue with Google", signed in on OUR page wherever Google allows it.
  *
- * The button is ours and it goes through Supabase's ordinary Google sign-in:
- * a hop to accounts.google.com and back to the page. That path depends on
- * nothing loading on our page, works on every browser that can reach
- * Google, and the auth logs show it completing. It used to sit behind
- * Google's own scripted button, which could arrive late, draw nothing when
- * the origin was not on Google's list, or silently do nothing in a webview;
- * each of those looked like a broken button.
+ * WHY THIS CHANGED (12 Sep 2026). The button used to go through Supabase's
+ * redirect: a hop to accounts.google.com and back. Google names whoever
+ * receives that hop, so the account chooser said "to continue to
+ * wsjhbfmzbonxmxaaassu.supabase.co", which reads like a stranger's site.
  *
- * One Tap is the extra: Google's script is loaded in the background and,
- * where the browser and the person's Google session allow it, the prompt
- * appears and signs them in with an ID token (nonce-checked by Supabase).
- * If it never appears, nothing is missing; the button is right there.
+ * Now the first choice is Google's own button, drawn by Google's script on
+ * this page. Choosing an account opens Google's sign-in window over
+ * songchainn.xyz and hands back an ID token, which Supabase checks against a
+ * nonce (signInWithIdToken). Google then names this site, or the app name set
+ * on the OAuth consent screen once it is verified.
+ *
+ * The redirect is kept, never removed. The old reason for moving off Google's
+ * scripted button still holds: it can arrive late, draw nothing when this
+ * origin is missing from the client's Authorised JavaScript origins, or do
+ * nothing in a webview. So if Google's button has not drawn within a few
+ * seconds, or the script is blocked, our own button appears and uses the
+ * redirect, which always works. Nobody is ever left without a way in.
  *
  * Inside another app's built-in browser Google refuses to sign anyone in,
  * so there the button is replaced by a line that says to open a real
@@ -125,6 +141,9 @@ interface GoogleSignInProps {
 export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
   const [verifying, setVerifying] = useState(false);
   const [webview] = useState(inAppBrowser);
+  /** 'loading' until Google's button draws; 'google' once it has; 'fallback' if it never does. */
+  const [mode, setMode] = useState<'loading' | 'google' | 'fallback'>('loading');
+  const buttonHost = useRef<HTMLDivElement | null>(null);
 
   const redirectSignIn = useCallback(async () => {
     setVerifying(true);
@@ -166,16 +185,23 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // One Tap, in the background, never in the way.
+  // Google's own button (and One Tap beside it), with the redirect as the net.
   useEffect(() => {
-    if (!oneTap || webview || !isSupabaseConfigured || !GOOGLE_CLIENT_ID) return;
+    if (webview || !isSupabaseConfigured || !GOOGLE_CLIENT_ID) return;
     let cancelled = false;
+    let observer: MutationObserver | null = null;
+    const giveUp = window.setTimeout(() => {
+      if (!cancelled) setMode((m) => (m === 'google' ? m : 'fallback'));
+    }, GSI_RENDER_TIMEOUT_MS);
+
     (async () => {
       try {
         await loadGsi();
         if (cancelled || !window.google?.accounts?.id) return;
         const rawNonce = crypto.randomUUID().replace(/-/g, '');
         const hashedNonce = await sha256Hex(rawNonce);
+        if (cancelled) return;
+
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: async (response: { credential?: string }) => {
@@ -198,16 +224,49 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
           },
           nonce: hashedNonce,
           use_fedcm_for_prompt: true,
+          use_fedcm_for_button: true,
           itp_support: true,
           cancel_on_tap_outside: false,
+          context: 'signin',
+          ux_mode: 'popup',
         });
-        window.google.accounts.id.prompt();
+
+        const host = buttonHost.current;
+        if (host) {
+          // Google draws into an iframe; its arrival is the proof the button works
+          // on this origin. Watch for it rather than trusting renderButton to throw.
+          observer = new MutationObserver(() => {
+            if (host.querySelector('iframe')) {
+              window.clearTimeout(giveUp);
+              if (!cancelled) setMode('google');
+              observer?.disconnect();
+            }
+          });
+          observer.observe(host, { childList: true, subtree: true });
+          const width = Math.max(200, Math.min(400, Math.floor(host.getBoundingClientRect().width || 320)));
+          window.google.accounts.id.renderButton(host, {
+            type: 'standard',
+            theme: prefersDark() ? 'filled_black' : 'outline',
+            size: 'large',
+            text: 'continue_with',
+            shape: 'pill',
+            logo_alignment: 'center',
+            width,
+          });
+        }
+
+        if (oneTap) window.google.accounts.id.prompt();
       } catch {
-        /* Script blocked or refused: the button is right there. */
+        /* Script blocked or refused: the redirect button takes over. */
+        window.clearTimeout(giveUp);
+        if (!cancelled) setMode('fallback');
       }
     })();
+
     return () => {
       cancelled = true;
+      window.clearTimeout(giveUp);
+      observer?.disconnect();
       try {
         window.google?.accounts?.id?.cancel();
       } catch {
@@ -229,15 +288,31 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
 
   return (
     <div className="relative mb-3">
-      <button
-        type="button"
-        onClick={redirectSignIn}
-        disabled={verifying}
-        className="flex h-11 w-full items-center justify-center gap-2.5 rounded-full border border-border bg-background text-sm font-medium text-foreground transition hover:bg-accent disabled:opacity-60"
-      >
-        <GoogleMark className="h-4 w-4" />
-        Continue with Google
-      </button>
+      {/* Google's own button draws in here. Kept mounted (not display:none, which
+          would give it no width to draw at) and simply collapsed if it never comes. */}
+      <div
+        ref={buttonHost}
+        className={mode === 'fallback' ? 'h-0 overflow-hidden' : 'flex min-h-11 w-full justify-center'}
+        aria-hidden={mode === 'fallback' ? true : undefined}
+      />
+
+      {mode === 'loading' && (
+        <div className="pointer-events-none absolute inset-0 flex h-11 items-center justify-center rounded-full border border-border bg-background">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {mode === 'fallback' && (
+        <button
+          type="button"
+          onClick={redirectSignIn}
+          disabled={verifying}
+          className="flex h-11 w-full items-center justify-center gap-2.5 rounded-full border border-border bg-background text-sm font-medium text-foreground transition hover:bg-accent disabled:opacity-60"
+        >
+          <GoogleMark className="h-4 w-4" />
+          Continue with Google
+        </button>
+      )}
 
       {verifying && (
         <div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70">

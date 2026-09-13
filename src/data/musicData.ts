@@ -22,6 +22,7 @@ export type Genre =
   | 'Alternative'
   | 'Pop-Dancehall'
   | 'Hiphop/Soul'
+  | 'Hip Hop'
   | 'Afro-Fusion'
   | 'Trap/Dancehall Fusion';
 
@@ -38,6 +39,7 @@ export const GENRES: Genre[] = [
   'Alternative',
   'Pop-Dancehall',
   'Hiphop/Soul',
+  'Hip Hop',
   'Afro-Fusion',
   'Trap/Dancehall Fusion',
 ];
@@ -81,6 +83,24 @@ export interface Song {
   /** Position on the release, 1-based. Unset means "in the order it arrived". */
   trackNumber?: number;
   explicit?: boolean;
+  /**
+   * The other artists on a true collaboration ("A x B"), by artist id. The
+   * row belongs to the lead artist (artistId) and is credited "A & B"; these
+   * ids put the same single song in each collaborator's catalogue too, without
+   * a second copy anywhere else.
+   */
+  collabArtistIds?: string[];
+}
+
+/**
+ * Whether a song sits in this artist's catalogue: their own records, plus any
+ * collaboration they are on. Use it for artist-scoped lists only (the artist
+ * page, their counts, their play-all). Global lists use the song array as is,
+ * so a collaboration appears there once.
+ */
+export function songInArtistCatalog(song: Pick<Song, 'artistId' | 'collabArtistIds'>, artistId: string | null | undefined): boolean {
+  if (!artistId) return false;
+  return song.artistId === artistId || Boolean(song.collabArtistIds?.includes(artistId));
 }
 
 export interface Catalog {
@@ -205,7 +225,7 @@ const artistCover3 =
   'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/Sammie%20Song%20ART.png';
 
 const ARTWORK_BY_ARTIST: Record<string, string> = {
-  '7ROO7H BASED': artist7roo7hBased,
+  '7ROO7H': artist7roo7hBased,
   DenaJah: artistDenajah,
   Denajah: artistDenajah,
   DENAJAH: artistDenajah,
@@ -294,10 +314,10 @@ const SONGS_RAW: Song[] = [
   {
     id: '1',
     title: "Eve's Daughter",
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: "https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/7ROO7H%20BASED%20-%20EVE'S%20DAUGHTER.wav",
-    coverImage: ARTWORK_BY_ARTIST['7ROO7H BASED'],
+    coverImage: ARTWORK_BY_ARTIST['7ROO7H'],
     plays: 0,
     likes: 342,
     townSquare: 'Livingstone Town Square',
@@ -306,10 +326,10 @@ const SONGS_RAW: Song[] = [
   {
     id: '8',
     title: 'OUNCE',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/7ROO7H%20BASED%20-%20OUNCE.wav',
-    coverImage: ARTWORK_BY_ARTIST['7ROO7H BASED'],
+    coverImage: ARTWORK_BY_ARTIST['7ROO7H'],
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -318,10 +338,10 @@ const SONGS_RAW: Song[] = [
   {
     id: '10',
     title: 'ME',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/7ROO7H%20BASED%20-%20ME.wav',
-    coverImage: ARTWORK_BY_ARTIST['7ROO7H BASED'],
+    coverImage: ARTWORK_BY_ARTIST['7ROO7H'],
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -330,10 +350,10 @@ const SONGS_RAW: Song[] = [
   {
     id: '11',
     title: "GOD'S SIN",
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: "https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/7ROO7H%20BASED%20-%20GOD'S%20SIN.wav",
-    coverImage: ARTWORK_BY_ARTIST['7ROO7H BASED'],
+    coverImage: ARTWORK_BY_ARTIST['7ROO7H'],
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -342,10 +362,10 @@ const SONGS_RAW: Song[] = [
   {
     id: '12',
     title: 'ALREADY LOST',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/7ROO7H%20BASED%20-%20ALREADY%20LOST..wav',
-    coverImage: ARTWORK_BY_ARTIST['7ROO7H BASED'],
+    coverImage: ARTWORK_BY_ARTIST['7ROO7H'],
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -354,10 +374,10 @@ const SONGS_RAW: Song[] = [
   {
     id: '13',
     title: '7',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/7ROO7H%20BASED%20-%207.wav',
-    coverImage: ARTWORK_BY_ARTIST['7ROO7H BASED'],
+    coverImage: ARTWORK_BY_ARTIST['7ROO7H'],
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -366,10 +386,10 @@ const SONGS_RAW: Song[] = [
   {
     id: '49',
     title: "Eve's Daughter (Alt Mix)",
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: "https://pub-dabb7edd1f1a4dbf82bbc290554e465b.r2.dev/7ROO7H%20BASED%20-%20EVE'S%20DAUGHTER.wav",
-    coverImage: ARTWORK_BY_ARTIST['7ROO7H BASED'],
+    coverImage: ARTWORK_BY_ARTIST['7ROO7H'],
     plays: 0,
     likes: 0,
     townSquare: 'Livingstone Town Square',
@@ -1575,7 +1595,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '57',
     title: 'DISCORD',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/7ROO7H%20BASED%20-%20DISCORD.wav',
     coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20ARTWORK.png',
@@ -1589,7 +1609,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '58',
     title: 'DRUNK',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/7ROO7H%20BASED%20-%20DRUNK.wav',
     coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20ARTWORK.png',
@@ -1603,7 +1623,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '59',
     title: 'I TRY',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/7ROO7H%20BASED%20-%20I%20TRY.wav',
     coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20ARTWORK.png',
@@ -1617,7 +1637,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '60',
     title: 'INCOMPATIBLE',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/7ROO7H%20BASED%20-%20INCOMPATIBLE.wav',
     coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20ARTWORK.png',
@@ -1631,7 +1651,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '61',
     title: 'NEVER AGAIN',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/7ROO7H%20BASED%20-%20NEVER%20AGAIN.wav',
     coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20ARTWORK.png',
@@ -1645,7 +1665,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '62',
     title: 'ONCHAIN',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/7ROO7H%20BASED%20-%20ONCHAIN.wav',
     coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20ARTWORK.png',
@@ -1659,7 +1679,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '63',
     title: 'SUPER BASED',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-d78e53cc880a4b7680111f1860db61a5.r2.dev/7ROO7H%20BASED%20-%20SUPER%20BASED.wav',
     coverImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20ARTWORK.png',
@@ -1673,7 +1693,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '107',
     title: 'AGAIN',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/1%20AGAIN.mp3',
     coverImage: artist7roo7hBasedVol3,
@@ -1687,7 +1707,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '108',
     title: 'MATCH MADE IN HEAVEN',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/2.7%20-%20MATCH%20MADE%20IN%20HEAVEN.mp3',
     coverImage: artist7roo7hBasedVol3,
@@ -1701,7 +1721,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '109',
     title: 'IF I COULD',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/3%20IF%20I%20COULD.mp3',
     coverImage: artist7roo7hBasedVol3,
@@ -1715,7 +1735,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '110',
     title: 'SHNAKKE',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/4%20SHNAKKE.mp3',
     coverImage: artist7roo7hBasedVol3,
@@ -1729,7 +1749,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '111',
     title: 'TWEAKING',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/5%20TWEAKING.mp3',
     coverImage: artist7roo7hBasedVol3,
@@ -1743,7 +1763,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '112',
     title: 'AHEAD OF TIME',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/6.7%20-%20AHEAD%20OF%20TIME.mp3',
     coverImage: artist7roo7hBasedVol3,
@@ -1757,7 +1777,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '113',
     title: 'MY OWN',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/7%20MY%20OWN.mp3',
     coverImage: artist7roo7hBasedVol3,
@@ -1771,7 +1791,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '114',
     title: 'THE RISING HOPE',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/1.7%20THE%20RISING%20HOPE.mp3',
     coverImage: artist7roo7hBasedVol4,
@@ -1785,7 +1805,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '115',
     title: 'NO PLAYSTATION',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/2.7%20-%20NO%20PLAYSTATION.mp3',
     coverImage: artist7roo7hBasedVol4,
@@ -1799,7 +1819,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '116',
     title: 'INFORMA',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/3.7%20-%20INFORMA.mp3',
     coverImage: artist7roo7hBasedVol4,
@@ -1813,7 +1833,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '117',
     title: 'FADA',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/4.7%20-%20FADA.mp3',
     coverImage: artist7roo7hBasedVol4,
@@ -1827,7 +1847,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '118',
     title: 'MORE LIFE',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/5.7%20-%20MORE%20LIFE.mp3',
     coverImage: artist7roo7hBasedVol4,
@@ -1841,7 +1861,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '119',
     title: 'SELF ADVICE',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/6.7%20-%20SELF%20ADVICE.mp3',
     coverImage: artist7roo7hBasedVol4,
@@ -1855,7 +1875,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '204',
     title: 'INSIDE LIBALA RMS',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/7.7%20-%20INSIDE%20LIBALA%20RMS.mp3',
     coverImage: artist7roo7hBasedVol4,
@@ -1869,7 +1889,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '120',
     title: 'THE GARDEN',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/1.7%20-%20THE%20GARDEN.mp3',
     coverImage: artist7roo7hBasedProfileImage,
@@ -1883,7 +1903,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '121',
     title: 'THE LIGHT HOUSE',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/2.7%20-%20THE%20LIGHT%20HOUSE.mp3',
     coverImage: artist7roo7hBasedProfileImage,
@@ -1897,7 +1917,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '122',
     title: 'THE SUMO WRESLER',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/3.7%20-%20THE%20SUMO%20WRESLER.mp3',
     coverImage: artist7roo7hBasedProfileImage,
@@ -1911,7 +1931,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '123',
     title: 'THE WIRECABLE',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/4.7%20-%20THE%20WIRECABLE.mp3',
     coverImage: artist7roo7hBasedProfileImage,
@@ -1925,7 +1945,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '124',
     title: 'THE GOLDEN STOPWATCH',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/5.7%20-%20THE%20GOLDEN%20STOPWATCH.mp3',
     coverImage: artist7roo7hBasedProfileImage,
@@ -1939,7 +1959,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '125',
     title: 'THE FLOWER',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/6.7%20-%20THE%20FLOWER.mp3',
     coverImage: artist7roo7hBasedProfileImage,
@@ -1953,7 +1973,7 @@ const SONGS_RAW: Song[] = [
   {
     id: '126',
     title: 'THE DIAMOND PATH',
-    artist: '7ROO7H BASED',
+    artist: '7ROO7H',
     artistId: '1',
     audioUrl: 'https://pub-233ff4384c1741e395ef88d52dbe291d.r2.dev/7.7%20-%20THE%20DIAMOND%20PATH.mp3',
     coverImage: artist7roo7hBasedProfileImage,
@@ -3588,8 +3608,8 @@ export const CATALOGS: Catalog[] = buildCatalogs(SONGS);
 export const ARTISTS: Artist[] = [
   {
     id: '1',
-    name: '7ROO7H BASED',
-    bio: 'A visionary artist from Zambia blending traditional African rhythms with contemporary electronic sounds. 7ROO7H BASED creates music that speaks to the soul and moves the body.',
+    name: '7ROO7H',
+    bio: 'A visionary artist from Zambia blending traditional African rhythms with contemporary electronic sounds. 7ROO7H creates music that speaks to the soul and moves the body.',
     location: 'Zambia',
     townSquare: 'Livingstone Town Square',
     profileImage: 'https://pub-221dc60ecc5143e3b28d9d2bfa2cbee0.r2.dev/7ROO7H%20%20Based/7ROO7H%20Based%20(1).png',

@@ -4,7 +4,7 @@ import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { Users, Music, TrendingUp, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ARTISTS, SONGS } from '@/data/musicData';
+import { ARTISTS, SONGS, songInArtistCatalog } from '@/data/musicData';
 import { useSongPopularity, useArtistFollowerCounts, useArtistStreamTotals } from '@/hooks/usePopularity';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { Navigation } from '@/components/Navigation';
@@ -43,7 +43,7 @@ export default function Artists() {
   // Calculate stats for each artist
   const artistsWithStats = useMemo(() => {
     return allArtists.map(artist => {
-      const songs = allSongs.filter(s => s.artistId === artist.id);
+      const songs = allSongs.filter(s => songInArtistCatalog(s, artist.id));
       let totalPlays = 0;
       
       songs.forEach(song => {

@@ -3,6 +3,10 @@ import type { Battle } from "@/battlezone/hooks/useBattles";
 import LiveBadge from "./LiveBadge";
 import AppLink from "./AppLink";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
+import { installBattleAudioGestureUnlock } from "@/battlezone/lib/audioUnlock";
+
+/* The tap on a live battle card is the gesture that lets the room play sound. */
+installBattleAudioGestureUnlock();
 
 const ArtistAvatar = ({ name, image, side }: { name: string; image: string; side: "A" | "B" }) => (
   image ? (

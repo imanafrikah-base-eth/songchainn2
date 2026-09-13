@@ -19,6 +19,10 @@ import { BattleCountdown } from "@/battlezone/components/BattleCountdown";
 import { STAGES, buildClock } from "@/battlezone/lib/battleStages";
 import { ARTISTS, SONGS } from "@/data/musicData";
 import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
+import { installBattleAudioGestureUnlock } from "@/battlezone/lib/audioUnlock";
+
+/* Enter room and Go live are taps; they unlock the room's sound on the way in. */
+installBattleAudioGestureUnlock();
 
 const BattleDetail = () => {
   const { isEmbedded, embedTo } = useEmbedMode();

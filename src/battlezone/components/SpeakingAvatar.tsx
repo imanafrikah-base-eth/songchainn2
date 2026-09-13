@@ -2,6 +2,7 @@ import { memo } from "react";
 import { MicOff } from "lucide-react";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { BattleRole } from "@/battlezone/hooks/useBattleRoles";
+import ParticipantPhoto from "@/battlezone/components/ParticipantPhoto";
 import {
   useActiveSpeakerIds,
   useSpeaking,
@@ -42,6 +43,8 @@ interface SpeakingAvatarProps {
   size?: Size;
   /** Name, bars and role badge under the avatar. Off for list rows that print their own. */
   showLabel?: boolean;
+  /** Profile picture; the initial shows when there is none or it fails. */
+  avatarUrl?: string | null;
 }
 
 function useLit(store: SpeakingStore, userId: string, dbMuted: boolean, role: BattleRole) {
@@ -79,6 +82,7 @@ function SpeakingAvatarImpl({
   muted: dbMuted,
   size = "md",
   showLabel = true,
+  avatarUrl,
 }: SpeakingAvatarProps) {
   const reduced = usePrefersReducedMotion();
   const { lit, level, muted } = useLit(store, userId, dbMuted, role);
@@ -102,11 +106,7 @@ function SpeakingAvatarImpl({
         className={`pointer-events-none absolute ${s.ring} rounded-full border-2 border-primary transition-opacity duration-75 motion-reduce:transition-none`}
         style={{ opacity: lit ? 1 : 0 }}
       />
-      <div
-        className={`relative flex h-full w-full items-center justify-center rounded-full bg-muted font-bold text-foreground ${s.text}`}
-      >
-        {displayName.charAt(0).toUpperCase()}
-      </div>
+      <ParticipantPhoto url={avatarUrl} name={displayName} className={`h-full w-full ${s.text}`} />
       {muted && (
         <span
           className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full border border-border bg-background p-0.5"

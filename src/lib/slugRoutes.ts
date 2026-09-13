@@ -29,6 +29,18 @@ const RESERVED: Set<string> = new Set([
   'world-builder', 'worlds',
 ]);
 
+// Addresses an artist used to have, old slug to current slug, so a link
+// shared before a rename still lands. Never claimable by anyone else.
+const RENAMED_ARTIST_SLUGS: Record<string, string> = {
+  '7roo7h-based': '7roo7h',
+};
+
+/** The current address for an artist slug that has since been renamed. */
+export function renamedArtistSlug(slug: string): string | undefined {
+  const s = slug.toLowerCase();
+  return Object.prototype.hasOwnProperty.call(RENAMED_ARTIST_SLUGS, s) ? RENAMED_ARTIST_SLUGS[s] : undefined;
+}
+
 // The founding catalog, known at build time.
 const artistBySlug = new Map<string, Artist>();
 const slugByArtistId = new Map<string, string>();
@@ -57,7 +69,7 @@ const dynamicIdBySlug = new Map<string, string>();
 const dynamicSlugById = new Map<string, string>();
 
 function usable(slug: string): boolean {
-  return Boolean(slug) && !RESERVED.has(slug) && !artistBySlug.has(slug);
+  return Boolean(slug) && !RESERVED.has(slug) && !artistBySlug.has(slug) && !renamedArtistSlug(slug);
 }
 
 /** Make these artists addressable by name. Safe to call often. */

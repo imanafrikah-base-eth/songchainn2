@@ -16,8 +16,12 @@ import RoomEntry from "./pages/RoomEntry";
 import HostCreate from "./pages/HostCreate";
 import HostControl from "./pages/HostControl";
 import NotFound from "./pages/NotFound";
+import { installBattleAudioGestureUnlock } from "@/battlezone/lib/audioUnlock";
 
 const queryClient = new QueryClient();
+
+/* Any tap in the battlezone unlocks the battle room's sound ahead of entering it. */
+installBattleAudioGestureUnlock();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

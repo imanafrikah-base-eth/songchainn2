@@ -13,7 +13,7 @@ const R2C = "https://pub-16e4913e843a417aa5b0c907a4f79ba4.r2.dev";
 // has not put up a picture of their own.
 interface ArtistMeta { name: string; img: string }
 const ARTIST_META: Record<string, ArtistMeta> = {
-  "1": { name: "7ROO7H BASED", img: `${R2B}/7ROO7H%20%20Based/7ROO7H%20Based%20(1).png` },
+  "1": { name: "7ROO7H", img: `${R2B}/7ROO7H%20%20Based/7ROO7H%20Based%20(1).png` },
   "2": { name: "DenaJah", img: `${R2B}/DenaJah/file_0000000064dc71f5be6445bc8e4cda04.png` },
   "3": { name: "IMan Afrikah", img: `${R2B}/file_0000000077c8722f8f65c9d1abd8bca1-2.png` },
   "4": { name: "NDA", img: `${R2B}/NDA/NDA%20(1).png` },
@@ -46,7 +46,10 @@ async function db() {
 export default async function handler(req: any, res: any) {
   // Reached by name (/n3m3sis, any artist, founding or joined through the
   // app) or by id (/artist/11, /share/artist/11).
-  const slugParam = slugOf(String(req.query?.slug || ""));
+  // An artist who was renamed keeps their old address working.
+  const RENAMED: Record<string, string> = { "7roo7h-based": "7roo7h" };
+  const rawSlug = slugOf(String(req.query?.slug || ""));
+  const slugParam = RENAMED[rawSlug] || rawSlug;
   let id =
     String(req.query?.id || "").trim() ||
     Object.keys(ARTIST_META).find((k) => slugOf(ARTIST_META[k].name) === slugParam) ||

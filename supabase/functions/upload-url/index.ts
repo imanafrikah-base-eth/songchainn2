@@ -46,7 +46,6 @@ function json(origin: string | null, body: unknown, status = 200) {
 // so the generous cap costs us almost nothing and keeps lossless the norm.
 const MAX_BYTES = 100 * 1024 * 1024;
 const MIN_BYTES = 128 * 1024;         // below this it is not a song
-const UPLOADS_PER_DAY = 10;
 const PRESIGN_TTL = 900;              // 15 minutes to finish the PUT
 
 // WAV and MP3 only, deliberately. The audition can only decode what the
@@ -564,20 +563,12 @@ Deno.serve(async (req) => {
 
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-  // Abuse cap. Generous enough that a real artist never meets it.
-  const { data: recent, error: countErr } = await db.rpc("artist_upload_count", {
-    p_user: user.id,
-    p_since: "24 hours",
-  });
-  if (countErr) {
-    console.error("upload-url quota check failed:", countErr);
-    return json(origin, { error: "Could not start the upload. Try again." }, 500);
-  }
-  if ((recent ?? 0) >= UPLOADS_PER_DAY) {
-    return json(origin, {
-      error: `That is ${UPLOADS_PER_DAY} tracks today. Come back tomorrow, the door stays open.`,
-    }, 429);
-  }
+  // NO DAILY TRACK LIMIT (founder, 13 Sep 2026). There used to be a cap of a
+  // handful of tracks per artist per 24 hours here, and it turned real artists
+  // away mid-release: a ten-track volume could not go up in one sitting. An
+  // artist account is granted, not self-declared, so the abuse it guarded
+  // against is already gated upstream. Artists upload as many songs as they
+  // want, whenever they want. Size limits above still apply per file.
 
   // Which artist do these releases belong to?
   //

@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { saveSongDetails, type SongDetails } from '@/lib/songDetails';
 import { landCover as landCoverFile, NO_COVER } from '@/lib/coverArt';
 import { sendFile } from '@/lib/storageUpload';
+import { GENRES } from '@/data/musicData';
 
 /**
  * The artist side of SONGCHAINN: upload a track, have it auditioned, and see
@@ -227,9 +228,6 @@ export interface BatchMeta {
   /** Credits, splits, paperwork, release and distribution, shared by every track. */
   details?: SongDetails;
 }
-
-/** The daily cap in upload-url. Keep in step with UPLOADS_PER_DAY there. */
-export const UPLOADS_PER_DAY = 10;
 
 /** The fields that belong to one record, never to a batch of them. */
 const PER_TRACK_ONLY: Array<keyof SongDetails> = ['lyrics', 'description', 'isrc', 'iswc'];
@@ -518,6 +516,11 @@ export function useBatchUpload() {
         && (t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId)),
       );
       if (!todo.length) return;
+      // A record always files under a genre. The form enforces it; this
+      // stops any other caller sending one without.
+      if (!meta.genre || !(GENRES as string[]).includes(meta.genre)) {
+        throw new Error('Pick a genre before you send. Every record files under one.');
+      }
       setRunning(true);
       const auditions: Promise<void>[] = [];
       try {

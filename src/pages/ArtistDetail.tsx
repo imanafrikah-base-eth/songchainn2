@@ -3,7 +3,7 @@ import { artistPath } from '@/lib/slugRoutes';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { motion } from 'framer-motion';
 import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound, Mic2, MessageSquare } from 'lucide-react';
-import { ARTISTS, SONGS, getRelatedArtists, type Artist } from '@/data/musicData';
+import { ARTISTS, SONGS, getRelatedArtists, songInArtistCatalog, type Artist } from '@/data/musicData';
 import { getWorldByArtistId } from '@/worlds/registry';
 import { ArtistCoinPanel } from '@/components/ArtistCoinPanel';
 import { WORLDS_ENABLED } from '@/lib/features';
@@ -90,7 +90,8 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
   
   const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
   const catalogArtist = ARTISTS.find(a => a.id === id) ?? publishedArtists.find(a => a.id === id);
-  const artistSongs = [...SONGS, ...publishedSongs].filter(s => s.artistId === id);
+  // Their own records plus any collaboration they are on ("A & B" sits with both).
+  const artistSongs = [...SONGS, ...publishedSongs].filter(s => songInArtistCatalog(s, id));
   const isFollowingArtist = id ? isArtistLiked(id) : false;
 
   const { data: artistAccount, isLoading: isArtistAccountLoading } = useQuery({

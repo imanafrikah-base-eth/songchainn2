@@ -67,7 +67,8 @@ function SongRow({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [genre, setGenre] = useState<Genre>('Afro');
+  // No default genre: whoever publishes picks one.
+  const [genre, setGenre] = useState<Genre | ''>('');
   const [artistChoice, setArtistChoice] = useState<string>('__new__');
   const [isPublishing, setIsPublishing] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -105,6 +106,10 @@ function SongRow({
   };
 
   const handlePublish = async () => {
+    if (!genre) {
+      toast({ title: 'Pick a genre first', description: 'A record cannot go out without one.', variant: 'destructive' });
+      return;
+    }
     setIsPublishing(true);
     try {
       const ext = song.audio_path.includes('.') ? song.audio_path.split('.').pop() : 'mp3';
@@ -228,6 +233,7 @@ function SongRow({
                 onChange={(e) => setGenre(e.target.value as Genre)}
                 className="w-full text-sm rounded-md border border-border bg-background px-2 py-1.5"
               >
+                <option value="" disabled>Pick a genre</option>
                 {GENRES.map((g) => (
                   <option key={g} value={g}>{g}</option>
                 ))}

@@ -19,7 +19,9 @@ export function SongInfoSections({ songId }: { songId: string }) {
   const hasCredits = data.credits.length > 0;
   /* Only the ones the artist chose to print. A feature they kept off the
      display is still recorded on the record, it just does not appear here. */
-  const shownFeatures = data.featured.filter((f) => f.show);
+  /* A collaborator is already in the credited name ("A & B"), so they are
+     not printed a second time as a feature. */
+  const shownFeatures = data.featured.filter((f) => f.show && !f.collab);
   const facts: Array<[string, string]> = [];
   if (data.release_date) facts.push(['Released', new Date(data.release_date + 'T00:00:00Z').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })]);
   if (data.language) facts.push(['Language', data.language]);
@@ -73,10 +75,14 @@ export function SongInfoSections({ songId }: { songId: string }) {
             <h2 className="font-heading text-base font-semibold text-foreground">Featuring</h2>
             <ul className="mt-2 divide-y divide-border">
               {shownFeatures.map((f) => (
-                <li key={f.artistId} className="py-1.5 text-sm">
-                  <Link to={artistPath(f.artistId)} className="text-foreground transition-colors hover:text-primary">
-                    <ArtistName name={f.name} artistId={f.artistId} size={13} />
-                  </Link>
+                <li key={f.artistId ?? `name-${f.name}`} className="py-1.5 text-sm">
+                  {f.artistId ? (
+                    <Link to={artistPath(f.artistId, f.name)} className="text-foreground transition-colors hover:text-primary">
+                      <ArtistName name={f.name} artistId={f.artistId} size={13} />
+                    </Link>
+                  ) : (
+                    <span className="text-foreground">{f.name}</span>
+                  )}
                 </li>
               ))}
             </ul>

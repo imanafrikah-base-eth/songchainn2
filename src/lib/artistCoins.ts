@@ -70,7 +70,7 @@ export const ARTIST_COINS: ArtistCoin[] = [
   },
   {
     artistId: '1',
-    name: '7ROO7H BASED',
+    name: '7ROO7H',
     zoraHandle: '7roo7h',
     coinAddress: '0x846ddf7f47b3c65e73b24db75fb4211f5f1df3b5',
     wallet: '0x736c327b72adf696ed4ec5d584dbb262aaffe639',

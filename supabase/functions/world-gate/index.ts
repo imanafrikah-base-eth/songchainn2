@@ -111,6 +111,8 @@ const WORLD_TOKENS: Record<string, WorldTokenConfig> = {
 const ARTIST_CREATOR_COINS: Record<string, string> = {
   "nda": "0xd95f5343ddd180e560dcdf165c39d2e904da3d8f",
   "santana": "0xedbad33620e105d499cbe97a00c0deee252064b6",
+  "7roo7h": "0x846ddf7f47b3c65e73b24db75fb4211f5f1df3b5",
+  // His address before the rename to 7ROO7H; kept so a world made under it stays gated.
   "7roo7h-based": "0x846ddf7f47b3c65e73b24db75fb4211f5f1df3b5",
   "denajah": "0x0f2a0e134a19f53d266b976fd2fae370ac832d13",
   "sanchy": "0xc8b3b18f1c51bdcab4b7e971e093780bd074e9fd",

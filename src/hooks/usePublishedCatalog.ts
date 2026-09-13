@@ -23,6 +23,43 @@ interface PublishedSongRow {
   track_number: number | null;
   explicit: boolean | null;
   release_date: string | null;
+  // jsonb list of other artists on the record. An entry with collab: true is
+  // a true collaboration ("A x B"): the row is A's, credited "A & B", and it
+  // also belongs in B's catalogue.
+  featured: unknown;
+}
+
+interface CollabArtist {
+  artistId: string;
+  name: string;
+}
+
+/** The collaborators on a row, read defensively: only entries with a real artist id and the collab flag. */
+function collabsOf(row: PublishedSongRow): CollabArtist[] {
+  if (!Array.isArray(row.featured)) return [];
+  const out: CollabArtist[] = [];
+  for (const f of row.featured as Array<Record<string, unknown> | null>) {
+    if (!f || f.collab !== true || f.artistId == null) continue;
+    const artistId = String(f.artistId).trim();
+    if (!artistId || artistId === row.artist_id || out.some((c) => c.artistId === artistId)) continue;
+    out.push({ artistId, name: typeof f.name === 'string' ? f.name.trim() : '' });
+  }
+  return out;
+}
+
+/**
+ * The lead artist's own name on a row. A collaboration is credited "A & B",
+ * and an artist whose first row is a collaboration must still be addressed
+ * as "A", never as "A & B".
+ */
+function leadNameOf(row: PublishedSongRow): string {
+  let name = (row.artist_name ?? '').trim();
+  for (const c of collabsOf(row)) {
+    if (!c.name) continue;
+    const suffix = ` & ${c.name}`;
+    if (name.toLowerCase().endsWith(suffix.toLowerCase())) name = name.slice(0, -suffix.length).trim();
+  }
+  return name;
 }
 
 interface ReleaseRow {
@@ -69,7 +106,7 @@ export function usePublishedCatalog() {
       const today = new Date().toISOString().slice(0, 10);
       const { data, error } = await supabase
         .from('songs')
-        .select('id, title, artist_name, audio_url, cover_art_url, artist_image_url, genre, town_square, artist_id, created_at, audition, duration_seconds, release_id, track_number, explicit, release_date')
+        .select('id, title, artist_name, audio_url, cover_art_url, artist_image_url, genre, town_square, artist_id, created_at, audition, duration_seconds, release_id, track_number, explicit, release_date, featured')
         .eq('is_published', true)
         .not('artist_id', 'is', null)
         .or(`release_date.is.null,release_date.lte.${today}`);
@@ -106,6 +143,7 @@ export function usePublishedCatalog() {
       .filter((row) => row.title && row.artist_name && row.audio_url && row.artist_id)
       .map((row) => {
         const release = row.release_id ? byId.get(row.release_id) : undefined;
+        const collabs = collabsOf(row);
         return {
           id: row.id,
           title: row.title!,
@@ -125,6 +163,9 @@ export function usePublishedCatalog() {
           releaseId: release?.id,
           releaseKind: release?.kind,
           trackNumber: row.track_number ?? undefined,
+          // One row, one song everywhere. These ids only widen artist-scoped
+          // lists (see songInArtistCatalog), so a collaboration is never doubled.
+          collabArtistIds: collabs.length ? collabs.map((c) => c.artistId) : undefined,
         };
       });
   }, [rows, releaseRows]);
@@ -132,22 +173,31 @@ export function usePublishedCatalog() {
   const artists = useMemo<Artist[]>(() => {
     const existingArtistIds = new Set(ARTISTS.map((a) => a.id));
     const artistsById = new Map<string, Artist>();
-    rows.forEach((row) => {
+    // A row that is not a collaboration carries the plainest form of the name,
+    // so it is read first.
+    const ordered = [...rows].sort((a, b) => Number(collabsOf(a).length > 0) - Number(collabsOf(b).length > 0));
+    ordered.forEach((row) => {
       if (!row.artist_id || existingArtistIds.has(row.artist_id) || artistsById.has(row.artist_id)) return;
+      const name = leadNameOf(row) || 'Unknown Artist';
       artistsById.set(row.artist_id, {
         id: row.artist_id,
-        name: row.artist_name || 'Unknown Artist',
-        bio: `${row.artist_name} joined $ongChainn through the artist submission program.`,
+        name,
+        bio: `${name} joined $ongChainn through the artist submission program.`,
         location: row.town_square ?? 'Unknown',
         townSquare: row.town_square ?? 'Livingstone Town Square',
         profileImage: row.artist_image_url ?? undefined,
-        songs: rows.filter((r) => r.artist_id === row.artist_id).map((r) => r.id),
+        songs: rows
+          .filter((r) => r.artist_id === row.artist_id || collabsOf(r).some((c) => c.artistId === row.artist_id))
+          .map((r) => r.id),
         addedAt: row.created_at ?? undefined,
       });
     });
     const list = Array.from(artistsById.values());
     // Artists who joined through the app get their name as their address.
     registerArtistNames(list);
+    // Collaborators are addressable by name too, so "A & B" can link to B.
+    // Registered after the artists' own rows, so a real artist keeps their slug.
+    registerArtistNames(rows.flatMap((r) => collabsOf(r).map((c) => ({ id: c.artistId, name: c.name }))));
     return list;
   }, [rows]);
 

@@ -123,6 +123,7 @@ export default function Discover() {
       Alternative: 0,
       'Pop-Dancehall': 0,
       'Hiphop/Soul': 0,
+      'Hip Hop': 0,
       'Trap/Dancehall Fusion': 0,
     };
 
@@ -244,6 +245,7 @@ export default function Discover() {
       Alternative: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
       'Pop-Dancehall': 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
       'Hiphop/Soul': 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+      'Hip Hop': 'bg-stone-500/20 text-stone-300 border-stone-500/30',
       'Trap/Dancehall Fusion': 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
     };
     return colors[genre] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';

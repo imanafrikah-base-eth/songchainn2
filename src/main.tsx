@@ -15,6 +15,7 @@ import { installStorageShim } from "./lib/storageShim";
 import { capturePendingReferralCode } from "./hooks/useReferrals";
 import { installLoadErrorRecovery } from "./lib/chunkRecovery";
 import { installMediaProtection, restoreReturnPath } from "./lib/deviceGuards";
+import { installAppWideBattleAudioUnlock } from "./battlezone/lib/audioUnlock";
 
 // FIRST, ahead of every other line in this file.
 //
@@ -36,6 +37,11 @@ capturePendingReferralCode();
 // reads the address; and the ordinary doors to saving an artist's media, shut.
 restoreReturnPath();
 installMediaProtection();
+
+// In a battle room everybody listens. The tap that carries someone into a room
+// from anywhere in the app counts as the browser's required gesture, so the
+// battle music and voices start without asking. See src/battlezone/lib/audioUnlock.ts.
+installAppWideBattleAudioUnlock();
 
 
 declare global {

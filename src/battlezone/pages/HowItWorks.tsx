@@ -1,4 +1,4 @@
-import { Users, Mic, Trophy, Crown, Shield, Hand, MessageSquare, Radio } from "lucide-react";
+import { Users, Mic, Trophy, Crown, Shield, Hand, MessageSquare, Music } from "lucide-react";
 import Navbar from "@/battlezone/components/Navbar";
 import Footer from "@/battlezone/components/Footer";
 import CountryChips from "@/battlezone/components/CountryChips";
@@ -15,7 +15,7 @@ const steps = VOICE_ENABLED
     ]
   : [
       { icon: Users, title: "Join a Battle Room", desc: "Browse live battles and enter a room as an audience member. It's free and instant." },
-      { icon: MessageSquare, title: "Vote and Chat Live", desc: "Cast your vote for your favourite artist and join the conversation in the live chat. Live audio plays on the host's X Space, tap Listen on X in the room." },
+      { icon: MessageSquare, title: "Vote and Chat Live", desc: "Cast your vote for your favourite artist and join the conversation in the live chat. The battle music plays in the room for everyone." },
       { icon: Trophy, title: "See Results and Follow Artists", desc: "Watch the results unfold and follow winning artists on $ongChainn." },
     ];
 
@@ -27,10 +27,10 @@ const roles = VOICE_ENABLED
       { icon: MessageSquare, title: "Audience", desc: "Listeners who vote, react, and can request to speak.", color: "text-muted-foreground" },
     ]
   : [
-      { icon: Crown, title: "Host", desc: "Creates the battle room, manages rounds, runs the X Space for live audio, and declares results.", color: "text-neon-gold" },
+      { icon: Crown, title: "Host", desc: "Creates the battle room, manages rounds, and declares results.", color: "text-neon-gold" },
       { icon: Shield, title: "Co-Host", desc: "Assists the host by keeping the chat in order and hyping the battle.", color: "text-neon-cyan" },
-      { icon: Radio, title: "X Space", desc: "The host goes live on an X Space for battle commentary. Tap Listen on X in the room to hear it.", color: "text-primary" },
-      { icon: MessageSquare, title: "Audience", desc: "Fans who vote, react, and chat live while listening on the X Space.", color: "text-muted-foreground" },
+      { icon: Music, title: "Battle Music", desc: "The battle's songs play in the room for everyone, in order, on the battle clock.", color: "text-primary" },
+      { icon: MessageSquare, title: "Audience", desc: "Fans who vote, react, and chat live while the battle plays.", color: "text-muted-foreground" },
     ];
 
 const HowItWorks = () => {
