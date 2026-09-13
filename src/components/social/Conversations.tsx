@@ -43,6 +43,14 @@ export function Conversations() {
     : null;
   const hasThread = isMosha || !!open;
 
+  /* Opening Mo$ha pulls in anything said in the chat window since, and clears his badge. */
+  const { reload: reloadMosha, markRead: markMoshaRead } = mosha;
+  useEffect(() => {
+    if (!isMosha) return;
+    void reloadMosha();
+    void markMoshaRead();
+  }, [isMosha, reloadMosha, markMoshaRead]);
+
   /* Leaving a conversation refreshes the list, so its unread count clears. */
   const prevSelected = useRef<string | null>(selectedId);
   useEffect(() => {
@@ -95,6 +103,7 @@ export function Conversations() {
       onSelect={select}
       myId={user?.id ?? null}
       moshaLast={mosha.last}
+      moshaUnread={isMosha ? 0 : mosha.unread}
       fill={isDesktop}
     />
   );

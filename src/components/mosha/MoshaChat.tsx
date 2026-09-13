@@ -3,7 +3,22 @@ import { Link, useNavigate } from 'react-router-dom';
 import { rememberEditWhere } from '@/lib/moshaWatch';
 import { Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
 import { askMoshaFull, MOSHA_INTRO, type MoshaAction, type MoshaTurn } from '@/lib/mosha';
-import { getCache, loadEarlier, loadGuest, loadRecent, saveGuest, setCache, type StoredTurn } from '@/lib/moshaHistory';
+import {
+  getCache,
+  loadEarlier,
+  loadGuest,
+  loadRecent,
+  markMoshaRead,
+  mergeTurns,
+  RECENT_HOURS,
+  saveGuest,
+  setCache,
+  toModelTurns,
+  type MoshaSource,
+  type StoredTurn,
+} from '@/lib/moshaHistory';
+import { useQueryClient } from '@tanstack/react-query';
+import { INBOX_UNREAD_KEY } from '@/hooks/useInboxUnread';
 import { useAuth } from '@/context/AuthContext';
 import { MoshaFlow, FLOW_LABEL, type MoshaFlowName } from '@/components/mosha/MoshaFlows';
 import { useDuplicateAccounts } from '@/hooks/useAccountLinks';
@@ -45,6 +60,8 @@ const ARTIST_ACCOUNT_ASK = /\b(artist account|artist profile|claim|switch\s+(?:t
 interface ChatTurn extends MoshaTurn {
   id?: string;
   at?: string;
+  /** A notice (a welcome, a counter) is shown in the thread but never sent to the model. */
+  source?: MoshaSource;
   action?: { label: string; to: string };
   /** A flow Mo$ha opened under this reply. */
   flow?: MoshaFlowName;
@@ -60,6 +77,7 @@ function toChat(t: StoredTurn): ChatTurn {
     at: t.at,
     role: t.role,
     content: t.content,
+    source: t.source,
     action: t.action?.type === 'go' ? { label: 'Take me there', to: t.action.path } : undefined,
   };
 }
@@ -70,6 +88,7 @@ function toStored(t: ChatTurn): StoredTurn {
     at: t.at ?? new Date().toISOString(),
     role: t.role,
     content: t.content,
+    source: t.source,
     action: t.action ? { type: 'go', path: t.action.to } : undefined,
   };
 }
@@ -149,9 +168,14 @@ export function MoshaChat({
   const seeded = Boolean(initial);
   const userId = user?.id ?? null;
   const historyKey = userId ?? 'guest';
+  const queryClient = useQueryClient();
+  const turnsRef = useRef<ChatTurn[]>(turns);
+  turnsRef.current = turns;
 
   // The thread comes back when Mo$ha is shown again: from the page cache
-  // first, then the server (or the phone, for a guest).
+  // first, then the server (or the phone, for a guest). The server is asked
+  // even when the cache has it, because the same conversation also goes on in
+  // the Inbox, and notices arrive there too.
   useEffect(() => {
     if (seeded) return;
     const cached = getCache(historyKey);
@@ -159,27 +183,35 @@ export function MoshaChat({
       setTurns(cached.turns.map(toChat));
       setHasArchive(cached.hasArchive);
       setRestored(true);
-      return;
     }
     if (!userId) {
-      const g = loadGuest();
-      setTurns(g.map(toChat));
-      setCache(historyKey, g, false);
-      setRestored(true);
+      if (!cached) {
+        const g = loadGuest();
+        setTurns(g.map(toChat));
+        setCache(historyKey, g, false);
+        setRestored(true);
+      }
       return;
     }
     let alive = true;
     void loadRecent(userId).then(({ turns: t, hasArchive: more }) => {
       if (!alive) return;
-      setTurns(t.map(toChat));
-      setHasArchive(more);
-      setCache(historyKey, t, more);
+      const onPage = getCache(historyKey)?.turns ?? turnsRef.current.filter((x) => !x.local).map(toStored);
+      const since = Date.now() - RECENT_HOURS * 3_600_000;
+      // Archive pages already pulled up stay, and so does their "Earlier chats" state.
+      const pulledOlder = onPage.some((x) => x.id && Date.parse(x.at) < since);
+      const merged = mergeTurns(t, onPage);
+      const archive = pulledOlder ? Boolean(getCache(historyKey)?.hasArchive) : more;
+      setTurns(merged.map(toChat));
+      setHasArchive(archive);
+      setCache(historyKey, merged, archive);
       setRestored(true);
+      void markMoshaRead().then(() => queryClient.invalidateQueries({ queryKey: [INBOX_UNREAD_KEY] }));
     });
     return () => {
       alive = false;
     };
-  }, [seeded, historyKey, userId]);
+  }, [seeded, historyKey, userId, queryClient]);
 
   // Whatever is on screen is what comes back next time.
   useEffect(() => {
@@ -220,7 +252,7 @@ export function MoshaChat({
       setTurns(next);
       setDraft('');
       setBusy(true);
-      const { reply, action: moshaAction } = await askMoshaFull(next.map(({ role, content }) => ({ role, content })), 'bubble');
+      const { reply, action: moshaAction } = await askMoshaFull(toModelTurns(next), 'bubble');
       const flow = moshaAction?.type === 'flow' ? moshaAction.flow : undefined;
       const go = moshaAction?.type === 'go' ? moshaAction : undefined;
       const choose = moshaAction?.type === 'choose' ? moshaAction : undefined;
@@ -248,6 +280,8 @@ export function MoshaChat({
     askedRef.current = ask;
     void send(ask).then(() => onAsked?.());
   }, [ask, busy, send, onAsked]);
+  /* Only notices so far (a welcome, a counter): the starters still belong under them. */
+  const talked = turns.some((t) => t.source !== 'notice');
   const openFlow = useCallback((flow: MoshaFlowName) => {
     setTurns((prev) => [...prev, { role: 'assistant', content: FLOW_LABEL[flow] + '. Right here.', flow, local: true, at: new Date().toISOString() }]);
   }, []);
@@ -365,7 +399,7 @@ export function MoshaChat({
             </span>
           </Bubble>
         )}
-        {turns.length === 0 && !busy && (
+        {!talked && !busy && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {(suggestions?.length ? suggestions : isArtist ? ARTIST_STARTERS : LISTENER_STARTERS).map((s) => (
               <button key={s} type="button" onClick={() => send(s)} className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted min-h-10">

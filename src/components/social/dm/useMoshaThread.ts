@@ -1,13 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { askMosha } from '@/lib/mosha';
+import { useQueryClient } from '@tanstack/react-query';
+import { askMoshaFull } from '@/lib/mosha';
+import {
+  appendCache,
+  byTime,
+  getCache,
+  loadLatest,
+  loadMoshaUnread,
+  markMoshaRead,
+  mergeTurns,
+  toModelTurns,
+  type StoredTurn,
+} from '@/lib/moshaHistory';
+import { INBOX_UNREAD_KEY } from '@/hooks/useInboxUnread';
 
 /**
- * The line to Mo$ha, lifted out of the Inbox page unchanged so it can sit in the
- * conversation list as a pinned row and render in the shared thread view.
+ * The line to Mo$ha in the Inbox. It is the SAME conversation as the Mo$ha
+ * chat window: one history per person in mosha_messages, written by the
+ * mosha-chat function (so a reply here comes from the same brain, with the
+ * same memory), plus notices sent through send_mosha_message. A line said in
+ * either place shows in both.
  *
- * Same tables and RPCs as before: ensure_dm_thread, direct_messages,
- * send_mosha_message. The welcome message is persisted on the first ever visit.
+ * The welcome is shown when there is nothing yet, and never written down, so
+ * it cannot crowd the chat window's own first line.
  */
 
 export type MoshaMessage = {
@@ -38,138 +53,100 @@ export function parseMessageWithCtas(text: string): { content: string; ctas: Mos
   return { content: contentLines.join('\n').trim(), ctas };
 }
 
-const byTime = (a: MoshaMessage, b: MoshaMessage) =>
-  new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+/** A page Mo$ha pointed at becomes a button under the reply. */
+function toMessage(t: StoredTurn, i: number): MoshaMessage {
+  const path = t.action?.type === 'go' || t.action?.type === 'choose' ? t.action.path : null;
+  const cta = path ? `\nCTA::${t.action?.type === 'choose' ? 'Open the World Builder' : 'Take me there'}::${path}` : '';
+  return {
+    id: t.id ?? `local-${t.at}-${i}`,
+    sender: t.role === 'user' ? 'user' : 'mosha',
+    text: `${t.content}${cta}`,
+    created_at: t.at,
+  };
+}
 
 export function useMoshaThread(userId: string | null) {
-  const [messages, setMessages] = useState<MoshaMessage[]>([]);
+  const queryClient = useQueryClient();
+  const [turns, setTurns] = useState<StoredTurn[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [awaitingReply, setAwaitingReply] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(null);
-  const messagesRef = useRef<MoshaMessage[]>([]);
-  messagesRef.current = messages;
+  const [unread, setUnread] = useState(0);
+  const turnsRef = useRef<StoredTurn[]>([]);
+  turnsRef.current = turns;
+  const busyRef = useRef(false);
+  const userRef = useRef(userId);
+  userRef.current = userId;
+  const seedAt = useRef(new Date().toISOString());
+
+  const reload = useCallback(async () => {
+    const who = userId;
+    if (!who) {
+      setTurns([]);
+      setUnread(0);
+      setIsLoading(false);
+      return;
+    }
+    const [{ turns: server }, count] = await Promise.all([loadLatest(who), loadMoshaUnread(who)]);
+    if (userRef.current !== who) return;
+    setUnread(count);
+    // Never replace the thread under a question still waiting for its answer.
+    if (busyRef.current) return;
+    const local = turnsRef.current.length ? turnsRef.current : getCache(who)?.turns ?? [];
+    setTurns(mergeTurns(server, local));
+    setIsLoading(false);
+  }, [userId]);
 
   useEffect(() => {
-    let active = true;
-    const seed = (): MoshaMessage[] => [
-      { id: 'seed-mosha', sender: 'mosha', text: MOSHA_SEED_TEXT, created_at: new Date().toISOString() },
-    ];
-    const load = async () => {
-      if (!userId) {
-        setMessages([]);
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      const { data: newThreadId, error: threadError } = await (supabase as any)
-        .rpc('ensure_dm_thread', { _user_id: userId });
-      if (!active) return;
-      if (threadError || !newThreadId) {
-        setMessages(seed());
-        setIsLoading(false);
-        return;
-      }
-      setThreadId(newThreadId);
+    turnsRef.current = [];
+    setTurns([]);
+    setIsLoading(true);
+    void reload();
+  }, [reload]);
 
-      const { data, error } = await (supabase as any)
-        .from('direct_messages')
-        .select('id,sender_type,message_text,created_at')
-        .eq('thread_id', newThreadId)
-        .order('created_at', { ascending: true })
-        .limit(120);
-      if (!active) return;
-
-      if (error) {
-        setMessages(seed());
-        setIsLoading(false);
-        return;
-      }
-
-      if (!Array.isArray(data) || data.length === 0) {
-        // First-ever visit to this thread -- persist the welcome message for real.
-        const { data: seedId } = await (supabase as any)
-          .rpc('send_mosha_message', { _user_id: userId, _message_text: MOSHA_SEED_TEXT });
-        if (!active) return;
-        setMessages([{ ...seed()[0], id: seedId || 'seed-mosha' }]);
-        setIsLoading(false);
-        return;
-      }
-
-      setMessages(
-        data.map((row: any) => ({
-          id: row.id,
-          sender: row.sender_type,
-          text: row.message_text,
-          created_at: row.created_at,
-        })),
-      );
-      setIsLoading(false);
-    };
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [userId]);
+  const markRead = useCallback(async () => {
+    if (!userId) return;
+    setUnread(0);
+    await markMoshaRead();
+    void queryClient.invalidateQueries({ queryKey: [INBOX_UNREAD_KEY] });
+  }, [userId, queryClient]);
 
   const send = useCallback(
     async (raw: string) => {
       const text = raw.trim();
-      // One question at a time, as before: nothing new goes out until Mo$ha has answered.
-      if (!text || isSending || awaitingReply) return;
+      // One question at a time: nothing new goes out until Mo$ha has answered.
+      if (!text || busyRef.current) return;
+      busyRef.current = true;
       setIsSending(true);
-      const optimisticId = `${Date.now()}-user`;
-      const userMessage: MoshaMessage = {
-        id: optimisticId,
-        sender: 'user',
-        text,
-        created_at: new Date().toISOString(),
-      };
-      const before = [...messagesRef.current].sort(byTime);
-      setMessages((prev) => [...prev, userMessage]);
-
-      if (threadId && userId) {
-        const { data, error } = await (supabase as any)
-          .from('direct_messages')
-          .insert({ thread_id: threadId, sender_type: 'user', sender_user_id: userId, message_text: text })
-          .select('id,created_at')
-          .single();
-        if (!error && data) {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === optimisticId ? { ...m, id: data.id, created_at: data.created_at } : m)),
-          );
-        }
-      }
+      const mine: StoredTurn = { role: 'user', content: text, at: new Date().toISOString(), source: 'inbox' };
+      const next = [...turnsRef.current, mine];
+      setTurns(next);
+      if (userId) appendCache(userId, [mine]);
       setIsSending(false);
       setAwaitingReply(true);
-
-      // Mo$ha answers everything, from the real account of the app and what it
-      // knows about this person. The thread's last turns go with the question.
-      const turns = [...before, userMessage]
-        .filter((m) => m.id !== 'seed-mosha')
-        .slice(-12)
-        .map((m) => ({ role: m.sender === 'user' ? ('user' as const) : ('assistant' as const), content: m.text }));
       try {
-        const replyText = await askMosha(turns, 'inbox');
-        let replyId: string | null = null;
-        if (userId) {
-          const { data, error } = await (supabase as any)
-            .rpc('send_mosha_message', { _user_id: userId, _message_text: replyText });
-          if (!error) replyId = data as string;
-        }
-        setMessages((prev) => [
-          ...prev,
-          { id: replyId || `${Date.now()}-mosha`, sender: 'mosha', text: replyText, created_at: new Date().toISOString() },
-        ]);
+        // mosha-chat writes the question and the answer into the one history.
+        const { reply, action } = await askMoshaFull(toModelTurns(next), 'inbox');
+        const answer: StoredTurn = { role: 'assistant', content: reply, at: new Date().toISOString(), action, source: 'inbox' };
+        setTurns((prev) => [...prev, answer]);
+        if (userId) appendCache(userId, [answer]);
       } finally {
+        busyRef.current = false;
         setAwaitingReply(false);
       }
     },
-    [isSending, awaitingReply, threadId, userId],
+    [userId],
   );
 
-  const sorted = useMemo(() => [...messages].sort(byTime), [messages]);
-  const last = sorted[sorted.length - 1] ?? null;
+  const messages = useMemo<MoshaMessage[]>(() => {
+    if (isLoading) return [];
+    if (turns.length === 0) {
+      return [{ id: 'seed-mosha', sender: 'mosha', text: MOSHA_SEED_TEXT, created_at: seedAt.current }];
+    }
+    return [...turns].sort(byTime).map(toMessage);
+  }, [turns, isLoading]);
 
-  return { messages: sorted, last, isLoading, isSending, awaitingReply, send };
+  const last = turns.length ? toMessage([...turns].sort(byTime)[turns.length - 1], turns.length - 1) : null;
+
+  return { messages, last, isLoading, isSending, awaitingReply, send, unread, markRead, reload };
 }

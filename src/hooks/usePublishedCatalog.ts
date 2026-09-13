@@ -88,7 +88,9 @@ function toTier(audition: unknown): QualityTier | undefined {
 // store and the song card both read that rule from one place.
 
 function toGenre(value: string | null): Genre {
-  return (GENRES as string[]).includes(value ?? '') ? (value as Genre) : 'Afro';
+  // An unknown or missing genre falls back to a neutral one. It used to fall
+  // back to 'Afro', which labelled every untagged song from anywhere as Afro.
+  return (GENRES as string[]).includes(value ?? '') ? (value as Genre) : 'Alternative';
 }
 
 /**
@@ -154,7 +156,7 @@ export function usePublishedCatalog() {
           duration: row.duration_seconds ?? undefined,
           plays: 0,
           likes: 0,
-          townSquare: row.town_square ?? 'Livingstone Town Square',
+          townSquare: row.town_square ?? '',
           genre: toGenre(row.genre),
           addedAt: row.created_at ?? undefined,
           qualityTier: toTier(row.audition),
@@ -182,9 +184,11 @@ export function usePublishedCatalog() {
       artistsById.set(row.artist_id, {
         id: row.artist_id,
         name,
-        bio: `${name} joined $ongChainn through the artist submission program.`,
-        location: row.town_square ?? 'Unknown',
-        townSquare: row.town_square ?? 'Livingstone Town Square',
+        bio: `${name} releases music on $ongChainn.`,
+        // The artist's own location when they gave one, otherwise nothing.
+        // No region is assumed for anyone.
+        location: row.town_square?.trim() ?? '',
+        townSquare: row.town_square ?? '',
         profileImage: row.artist_image_url ?? undefined,
         songs: rows
           .filter((r) => r.artist_id === row.artist_id || collabsOf(r).some((c) => c.artistId === row.artist_id))

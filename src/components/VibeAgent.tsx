@@ -18,7 +18,8 @@ import moshaAvatar from '@/assets/Mo$ha chat pop up.webp';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { fcOpenUrl } from '@/lib/farcasterActions';
 import { MoshaChat } from '@/components/mosha/MoshaChat';
-import { useMoshaGreeting } from '@/hooks/useMoshaGreeting';
+import { useMoshaGreeting, type MoshaGreeting } from '@/hooks/useMoshaGreeting';
+import { MoshaIntroPopup, useMoshaIntroTrigger, useOverlayOpen } from '@/components/MoshaIntroPopup';
 
 type AgentMode = 'unset' | 'music' | 'chill' | 'turnup' | 'focus' | 'feelings' | 'explore';
 type MoodChoice = 'loving' | 'cool' | 'not_my_vibe';
@@ -149,35 +150,11 @@ function pickNextSong(params: {
   return scored[0]?.song || null;
 }
 
-/** True while a drawer, sheet or dialog owns the screen. */
-function useOverlayOpen(): boolean {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    // Only the body's own attributes, and only the three that matter. An
-    // earlier version watched every node in the document, which fired on
-    // each animation frame of a playing app and pegged the main thread hard
-    // enough to leave the page blank. A drawer or a dialog always leaves a
-    // mark on the body, so the body is the only thing worth watching.
-    const read = () => {
-      const body = document.body;
-      setOpen(
-        body.hasAttribute('data-scroll-locked')
-        || body.style.pointerEvents === 'none'
-        || body.dataset.menuOpen === 'true'
-        // Any hand-built panel that raised its hand through useOverlayFlag.
-        || body.hasAttribute('data-overlay-open'),
-      );
-    };
-    read();
-    const mo = new MutationObserver(read);
-    mo.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['style', 'data-scroll-locked', 'data-menu-open', 'data-overlay-open'],
-    });
-    return () => mo.disconnect();
-  }, []);
-  return open;
+/** The one line the small note says when Mo$ha is holding the artist's news. */
+function greetingLine(kind: MoshaGreeting['kind']): string {
+  if (kind === 'verified') return 'Your account is verified. Tap to read.';
+  if (kind === 'first_song_live') return 'Your first record is live. Tap to read.';
+  return 'Your song is live. Tap to read.';
 }
 
 export function VibeAgent() {
@@ -403,15 +380,37 @@ export function VibeAgent() {
    * was shut, and any re-render (a scroll that refetched the greeting) could
    * bring him back: "I closed it and it pops up when I scroll".
    */
+  /* He no longer opens the full chat for it either: on a phone that panel
+     covers most of the screen. A small note beside his tab says there is news,
+     and a tap on it opens the chat holding the greeting. Still at most once per
+     visit, and never again after the person closed him or the note. */
   const greetingAutoOpened = useRef(false);
   const closedByPerson = useRef(false);
+  const [greetingNote, setGreetingNote] = useState(false);
   useEffect(() => {
     if (!greetingHere) return;
     if (chatOpen || step) return;
     if (greetingAutoOpened.current || closedByPerson.current) return;
     greetingAutoOpened.current = true;
-    setChatOpen(true);
+    setGreetingNote(true);
   }, [greetingHere, chatOpen, step]);
+  useEffect(() => {
+    if (chatOpen) setGreetingNote(false);
+  }, [chatOpen]);
+
+  /* The first hello, once per device, after a real scroll. The feed moves his
+     tab to another corner, so the note stays off it. */
+  const onFeed = /^\/(social|post)(\/|$)/.test(location.pathname);
+  const showGreetingNote = Boolean(greetingNote && greetingHere && !chatOpen && !step && !overlayOpen && !onFeed);
+  const moshaIntro = useMoshaIntroTrigger(
+    noMoshaHere || inABattle || onFeed || chatOpen || Boolean(step) || showGreetingNote,
+  );
+  const acceptIntro = moshaIntro.accept;
+  useEffect(() => {
+    // Opening him by hand is meeting him; the hello has nothing left to say.
+    // accept (not just "mark seen") also hands back the floor if it was up.
+    if (chatOpen) acceptIntro();
+  }, [chatOpen, acceptIntro]);
 
   useEffect(() => {
     const handleOpen = (event: Event) => {
@@ -570,9 +569,9 @@ export function VibeAgent() {
         .slice(0, 3);
       const energyLabel =
         mode === 'turnup'
-          ? 'Afro Drill'
+          ? 'Drill'
           : mode === 'chill'
-            ? 'Afro Chill'
+            ? 'Chill'
             : mode === 'focus'
               ? 'Deep Focus'
               : mode === 'feelings'
@@ -754,32 +753,67 @@ export function VibeAgent() {
         </div>
       );
     }
+    const notes = (
+      <>
+        <MoshaIntroPopup
+          show={showGreetingNote}
+          title="Mo$ha has news for you"
+          line={greetingHere ? greetingLine(greetingHere.kind) : ''}
+          onOpen={() => {
+            setGreetingNote(false);
+            setChatOpen(true);
+          }}
+          onDismiss={() => {
+            // Closing the note is an answer, same as closing the chat.
+            if (greetingHere) dismissGreeting(greetingHere.id);
+            closedByPerson.current = true;
+            setGreetingNote(false);
+          }}
+        />
+        <MoshaIntroPopup
+          show={moshaIntro.show}
+          title="Meet Mo$ha"
+          line="Your $ongChainn guide. Ask anything."
+          onOpen={() => {
+            moshaIntro.accept();
+            setChatOpen(true);
+          }}
+          onDismiss={moshaIntro.dismiss}
+        />
+      </>
+    );
     if (mode === 'unset') {
       return (
+        <>
+          <div className="agent-dock agent-tab fixed z-[58]">
+            <button
+              type="button"
+              onClick={() => setChatOpen(true)}
+              aria-label="Open Mo$ha"
+              className="agent-tab-button border border-primary/50 bg-primary text-primary-foreground font-semibold shadow-xl shadow-primary/30 hover:bg-primary/90 active:scale-[0.98] transition-colors flex items-center gap-1"
+            >
+              <Sparkles className="w-3 h-3" />
+              Mo$ha
+            </button>
+          </div>
+          {notes}
+        </>
+      );
+    }
+    return (
+      <>
         <div className="agent-dock agent-tab fixed z-[58]">
           <button
             type="button"
             onClick={() => setChatOpen(true)}
-            aria-label="Open Mo$ha"
-            className="agent-tab-button border border-primary/50 bg-primary text-primary-foreground font-semibold shadow-xl shadow-primary/30 hover:bg-primary/90 active:scale-[0.98] transition-colors flex items-center gap-1"
+            aria-label={`Open Mo$ha, ${modeLabel(mode)}`}
+            className="agent-tab-button border border-primary/50 bg-primary text-primary-foreground font-semibold shadow-xl shadow-primary/30 hover:bg-primary/90 active:scale-[0.98] transition-colors"
           >
-            <Sparkles className="w-3 h-3" />
             Mo$ha
           </button>
         </div>
-      );
-    }
-    return (
-      <div className="agent-dock agent-tab fixed z-[58]">
-        <button
-          type="button"
-          onClick={() => setChatOpen(true)}
-          aria-label={`Open Mo$ha, ${modeLabel(mode)}`}
-          className="agent-tab-button border border-primary/50 bg-primary text-primary-foreground font-semibold shadow-xl shadow-primary/30 hover:bg-primary/90 active:scale-[0.98] transition-colors"
-        >
-          Mo$ha
-        </button>
-      </div>
+        {notes}
+      </>
     );
   }
 
@@ -820,7 +854,7 @@ export function VibeAgent() {
           {step === 'welcome' && (
             <div className="space-y-3">
               <div className="flex items-start gap-2">
-                <p className="text-sm text-foreground">Hey {displayName}, want to vibe-chat, explore WaveWarz Africa, or just play music?</p>
+                <p className="text-sm text-foreground">Hey {displayName}, want to play some music, vibe-chat, or catch a battle on WaveWarz Africa?</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Button type="button" className="h-10 text-xs" onClick={() => setStep('mode-picker')}>
@@ -1014,7 +1048,7 @@ export function VibeAgent() {
             <div className="space-y-3">
               <div className="flex items-start gap-2">
                 <p className="text-sm text-foreground">
-                {discoveryArtistName} is rising in Zambia. Early listeners are catching this wave.
+                {discoveryArtistName} is rising on $ongChainn. Early listeners are catching this wave.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2">

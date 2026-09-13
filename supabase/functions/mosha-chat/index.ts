@@ -106,7 +106,7 @@ RULES YOU NEVER BREAK.
 /* --------------------------------------------------------- the account --- */
 
 const KNOWLEDGE = `WHAT SONGCHAINN IS
-A music app where the music streams free, the artist keeps everything, and the fans who care can get closer than a stream: hold a record, walk into an artist's world, back a side in a battle, book time with the artist. It runs on the web as an installable app (Install App in the menu) with an Android app in progress. Nobody needs a wallet to listen or to release. Positioning: release here first, then everywhere. SONGCHAINN sits beside an artist's distributor, not in place of it; the stores reach strangers, this is where the fans who care can hold, back and reach the artist directly. It is built for every artist in the world; the first roster is Zambian. The /about page tells the whole story for a listener, an artist and a label in one place.
+A music app where the music streams free, the artist keeps everything, and the fans who care can get closer than a stream: hold a record, walk into an artist's world, back a side in a battle, book time with the artist. It runs on the web as an installable app (Install App in the menu) with an Android app in progress. Nobody needs a wallet to listen or to release. Positioning: release here first, then everywhere. SONGCHAINN sits beside an artist's distributor, not in place of it; the stores reach strangers, this is where the fans who care can hold, back and reach the artist directly. SONGCHAINN is for every artist and every listener in the world, in any country, and anyone from anywhere is welcome to listen and to release; the founding roster happened to be from Zambia, and WaveWarz Africa is one regional battle series inside a global app. If somebody asks whether it is only for Africans, the answer is a warm and clear no: it is for everyone, wherever they are. The /about page tells the whole story for a listener, an artist and a label in one place.
 
 LISTENING
 Everything streams free. Offline: save a song for offline from its card or the full screen player and it plays without internet; a song that was only played, not saved, needs a connection. Like a song to save it (Likes are public on your profile). Playlists, including collaborative ones. DJ $huffle picks for you. Search finds songs, artists and catalogs. Daily Mix on the landing page for people not signed in. The Room is live listening with everyone, with a live count of who is in; leaving the Room stops its song and brings back whatever played before. Home shows Hot Today (ranked, not by raw play count), New Releases (a new single stands on its own there), catalogs and what is live. The now-playing bar shows what is up next and has a close that stops the song. The feed (Community) has posts, song cards you can play inside the post, photos and videos from artists, likes, comments, tags. Messages: the inbox holds your chats with people, and a song sent in a message arrives ready to play. Listeners can message each other freely. To message a musician a fan must hold $0.50 of that musician's coin; a musician who has not yet added a payout wallet and a coin does not receive messages from fans until they do. Reports made anywhere in the app, and to Mo$ha, reach the founder's inbox. When a newer build of the app is waiting, a banner says so and a small Update button stays in the top bar until it is taken. One tap is always enough: somebody who let three updates go by still lands on the newest build in one press, never once per update they missed. Long pages have a small button in the bottom corner that carries you back to the top, and its ring shows how far down the page you are. Invite a friend from your profile: the link carries your code, and you both start with points when they join. Artist Worlds and Your wallet are both in the top menu.
@@ -665,6 +665,8 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
         .select("action, created_at")
         .eq("user_id", uid)
         .eq("role", "assistant")
+        // Notices (a welcome, a counter) share the history but opened nothing.
+        .neq("source", "notice")
         .order("created_at", { ascending: false })
         .limit(4);
       const opened = ((last ?? []) as Array<{ action: { type?: string; flow?: string; path?: string } | null }>).map((r) =>
@@ -975,13 +977,16 @@ function memoryLines(m: Memory): string[] {
  * report went to the team, and otherwise every few exchanges. Runs after the
  * reply is sent.
  */
-async function remember(db: Db, uid: string, turns: Turn[], reply: string, action: Action | undefined, reported: boolean): Promise<void> {
+async function remember(db: Db, uid: string, turns: Turn[], reply: string, action: Action | undefined, reported: boolean, surface: string): Promise<void> {
   const last = turns[turns.length - 1];
   if (!last || last.role !== "user") return;
+  // One history per person since 13 Sep 2026: the chat window and the Inbox
+  // both write here, and source says which one it was said in.
+  const source = surface === "inbox" ? "inbox" : "chat";
   try {
     await db.from("mosha_messages").insert([
-      { user_id: uid, role: "user", content: last.content.slice(0, 4000) },
-      { user_id: uid, role: "assistant", content: reply.slice(0, 4000), action: action ?? null },
+      { user_id: uid, role: "user", content: last.content.slice(0, 4000), source },
+      { user_id: uid, role: "assistant", content: reply.slice(0, 4000), action: action ?? null, source },
     ]);
   } catch (err) {
     console.error("mosha-chat: could not write the exchange down", err);
@@ -1095,7 +1100,7 @@ Deno.serve(async (req) => {
     }
 
     if (uid && !silent) {
-      const work = remember(db, uid, turns, words, action, reported);
+      const work = remember(db, uid, turns, words, action, reported, extra.surface);
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work);
       else void work;
     }

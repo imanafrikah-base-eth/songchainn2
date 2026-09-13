@@ -107,7 +107,7 @@ export default function Licensing() {
                   {USES.map((u) => <option key={u} value={u}>{u}</option>)}
                 </select>
               </label>
-              <label className="block"><span className={label}>Territory</span><input value={form.territory} onChange={(e) => set('territory', e.target.value)} className={input} maxLength={120} placeholder="Worldwide, Zambia, online only..." /></label>
+              <label className="block"><span className={label}>Territory</span><input value={form.territory} onChange={(e) => set('territory', e.target.value)} className={input} maxLength={120} placeholder="Worldwide, one country, online only..." /></label>
               <label className="block"><span className={label}>Budget</span><input value={form.budget} onChange={(e) => set('budget', e.target.value)} className={input} maxLength={60} placeholder="A figure or a range, in any currency" /></label>
             </div>
             <label className="block">

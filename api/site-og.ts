@@ -12,7 +12,7 @@ const SITE = "https://www.songchainn.xyz";
 const NAME = "$ongChainn";
 const TAGLINE = "Free music streaming where artists keep everything and fans can own the songs they love.";
 const DESCRIPTION =
-  "$ongChainn is a free music streaming app where every song streams free, artists release directly to fans and keep everything, and the fans who care can own a record, walk into an artist's world, book time with the artist, or back a side in a live music battle. Built for independent artists worldwide, starting with Zambian and African music.";
+  "$ongChainn is a free music streaming app where every song streams free, artists release directly to fans and keep everything, and the fans who care can own a record, walk into an artist's world, book time with the artist, or back a side in a live music battle. Built for artists and listeners everywhere in the world.";
 
 const FAQ: Array<{ q: string; a: string }> = [
   {
@@ -45,7 +45,11 @@ const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: "Which artists are on $ongChainn?",
-    a: "Independent artists from anywhere in the world. The first roster is Zambian, including IMan Afrikah, whose world is open now. Any artist can join and release today.",
+    a: "Independent artists from anywhere in the world, from the United States to Nigeria to Zambia. It started with a founding roster in Zambia, including IMan Afrikah, whose world is open now. Any artist in any country can join and release today.",
+  },
+  {
+    q: "Is $ongChainn only for African artists?",
+    a: "No. $ongChainn is for every artist and every listener in the world. WaveWarz Africa is one regional battle series inside the app; the app itself is global.",
   },
   {
     q: "Do I need crypto or a wallet to use $ongChainn?",
@@ -113,7 +117,7 @@ export default function handler(req: any, res: any) {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(DESCRIPTION)}" />
-<meta name="keywords" content="free music streaming app, own the songs you love, artists keep 100 percent, release music directly to fans, independent artist platform, music app for artists, African music streaming, Zambian music, IMan Afrikah, artist worlds, VR music experience, live music battles, WaveWarz Africa, music on Base, song copies, get paid direct as an artist, music without a middleman" />
+<meta name="keywords" content="free music streaming app, own the songs you love, artists keep 100 percent, release music directly to fans, independent artist platform, music app for artists, music from around the world, independent music worldwide, IMan Afrikah, artist worlds, VR music experience, live music battles, WaveWarz Africa, music on Base, song copies, get paid direct as an artist, music without a middleman" />
 <link rel="canonical" href="${canonical}" />
 <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
 <meta property="og:type" content="website" />

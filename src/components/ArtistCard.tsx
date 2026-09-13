@@ -85,10 +85,12 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
             <ArtistName name={artist.name} artistId={artist.id} size={16} />
           </h3>
 
-          <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground mb-3">
-            <MapPin className="w-3.5 h-3.5" />
-            <span>{artist.location}</span>
-          </div>
+          {artist.location && (
+            <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground mb-3">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>{artist.location}</span>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
@@ -105,9 +107,11 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
             )}
           </div>
 
-          <div className="mt-3 px-3 py-1.5 rounded-xl bg-primary/10 border border-border text-primary text-xs text-center truncate font-medium">
-            {artist.location}
-          </div>
+          {artist.location && (
+            <div className="mt-3 px-3 py-1.5 rounded-xl bg-primary/10 border border-border text-primary text-xs text-center truncate font-medium">
+              {artist.location}
+            </div>
+          )}
         </div>
       </motion.div>
     </Link>

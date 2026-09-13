@@ -30,6 +30,7 @@ import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { useArtworkColor, hslToRgbTriplet } from '@/hooks/useArtworkColor';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { useOverlayFlag } from '@/lib/overlayFlag';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -48,6 +49,8 @@ export const FullScreenPlayer = memo(function FullScreenPlayer({ isOpen, onClose
   const { currentTime, duration } = usePlayerTime();
   const { togglePlay, seekTo, setVolume, playNext, playPrevious, pause, volume, repeatMode, setRepeatMode, shuffleMode, toggleShuffle, jumpToIndex, removeFromQueue, reorderQueue } = usePlayerActions();
   const prefersReducedMotion = usePrefersReducedMotion();
+  // The full player owns the whole screen; floating notes (Mo$ha's hello) wait.
+  useOverlayFlag(isOpen);
 
   const { toggleLike, isLiked, sendPulse } = useEngagement();
   const { cacheSong, isSongCached, cachingInProgress, isOnline, isInstalled } = useOfflineAudio();

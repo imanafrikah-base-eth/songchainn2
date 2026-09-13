@@ -21,11 +21,18 @@ export function useInboxUnread(): number {
     staleTime: 30_000,
     refetchInterval: 60_000,
     queryFn: async () => {
-      const { data: rows, error } = await supabase.rpc('list_my_conversations' as never);
-      if (error) return 0;
-      return ((rows ?? []) as unknown as Conversation[])
-        .filter((c) => !c.is_archived)
-        .reduce((sum, c) => sum + (c.unread || 0), 0);
+      const uid = user?.id ?? '';
+      // People, plus notices from Mo$ha nobody has opened yet.
+      const [{ data: rows, error }, { data: thread }] = await Promise.all([
+        supabase.rpc('list_my_conversations' as never),
+        supabase.from('dm_threads').select('unread_count').eq('user_id', uid).maybeSingle(),
+      ]);
+      const people = error
+        ? 0
+        : ((rows ?? []) as unknown as Conversation[])
+            .filter((c) => !c.is_archived)
+            .reduce((sum, c) => sum + (c.unread || 0), 0);
+      return people + Number(thread?.unread_count ?? 0);
     },
   });
   return data;

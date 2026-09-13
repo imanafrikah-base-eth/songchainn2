@@ -63,7 +63,7 @@ export default async function handler(req, res) {
 
   const { data: song, error: songErr } = await db
     .from('songs')
-    .select('id, title, artist_name, owner_id, status, audio_url, storage_key, audition, created_at, cover_art_url')
+    .select('id, title, artist_name, owner_id, status, audio_url, storage_key, audition, created_at, cover_art_url, genre')
     .eq('id', songId)
     .single();
 
@@ -73,6 +73,10 @@ export default async function handler(req, res) {
   // Nothing goes live without its artwork. The database refuses it too; this
   // says so in words before the judges spend a minute on the file.
   if (!song.cover_art_url) return send(res, 422, { error: 'Add the cover art first. Nothing goes live without it.', code: 'NO_COVER' });
+  // songs_require_genre refuses the publish too, but only after the judges
+  // have spent a minute on the file, and the route then said "could not save
+  // it" with the row left at 'auditioning'. Say what is missing up front.
+  if (!String(song.genre || '').trim()) return send(res, 422, { error: 'Pick a genre first. Every record files under one.', code: 'NO_GENRE' });
 
   // "Still listening" is only true for twenty minutes. Past that the tab
   // closed on it or the function died, and the artist can ask again rather

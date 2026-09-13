@@ -115,8 +115,12 @@ export interface DraftGate {
   council_size: number;
 }
 
+// A new world opens by loyalty points until its artist chooses a key. The old
+// default was 'songchainn' (the shared $ONGCHAINN key), which world-gate never
+// supported, so every builder world's inner doors could not open, and saving
+// the builder quietly put GESD1's world back on it after it was set to points.
 export const DEFAULT_GATE: DraftGate = {
-  kind: 'songchainn',
+  kind: 'points',
   token_address: null,
   token_decimals: 18,
   fan_threshold: 1000,

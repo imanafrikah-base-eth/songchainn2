@@ -34,6 +34,7 @@ export function ConversationList({
   onSelect,
   myId,
   moshaLast,
+  moshaUnread = 0,
   fill,
 }: {
   conversations: Conversation[];
@@ -42,6 +43,8 @@ export function ConversationList({
   onSelect: (id: string) => void;
   myId: string | null;
   moshaLast: MoshaMessage | null;
+  /** Notices from Mo$ha not yet seen. */
+  moshaUnread?: number;
   /** Fill a fixed-height pane and scroll inside it (desktop). */
   fill?: boolean;
 }) {
@@ -102,20 +105,32 @@ export function ConversationList({
                 type="button"
                 onClick={() => onSelect(MOSHA_CONVERSATION_ID)}
                 aria-current={selectedId === MOSHA_CONVERSATION_ID ? 'true' : undefined}
+                aria-label={moshaUnread > 0 ? `Mo$ha, ${moshaUnread} unread` : undefined}
                 className={cn(ROW, selectedId === MOSHA_CONVERSATION_ID ? 'bg-muted' : 'hover:bg-muted/60')}
               >
                 <DmAvatar src={moshaAvatar} name="Mo$ha" size={48} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-[15px] font-semibold text-foreground">Mo$ha</span>
+                      <span className={cn('truncate text-[15px] text-foreground', moshaUnread > 0 ? 'font-bold' : 'font-semibold')}>Mo$ha</span>
                       <Pin size={12} className="shrink-0 rotate-45 text-muted-foreground" aria-label="Pinned" />
                     </span>
                     {moshaLast && (
-                      <span className="shrink-0 text-xs text-muted-foreground">{listTime(moshaLast.created_at)}</span>
+                      <span className={cn('shrink-0 text-xs', moshaUnread > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+                        {listTime(moshaLast.created_at)}
+                      </span>
                     )}
                   </span>
-                  <span className="block truncate text-sm text-muted-foreground">{moshaPreview}</span>
+                  <span className="flex items-center gap-2">
+                    <span className={cn('min-w-0 flex-1 truncate text-sm', moshaUnread > 0 ? 'font-medium text-foreground' : 'text-muted-foreground')}>
+                      {moshaPreview}
+                    </span>
+                    {moshaUnread > 0 && (
+                      <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
+                        {moshaUnread > 9 ? '9+' : moshaUnread}
+                      </span>
+                    )}
+                  </span>
                 </span>
               </button>
             </li>

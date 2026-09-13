@@ -838,7 +838,6 @@ export default function WorldBuilder() {
 
             <div className="space-y-2">
               {[
-                { v: 'songchainn', t: '$ONGCHAINN', d: 'One key, many doors. Anyone holding it already walks into every world using it, so your world opens with people in it.' },
                 { v: 'points', t: 'Loyalty points', d: 'No wallet involved at all. Gate on the tier someone has earned by listening.' },
                 { v: 'pass', t: 'A pass', d: 'Bought with a card or given away. Simplest key there is.' },
                 { v: 'token', t: 'My own token', d: 'An ERC-20 on Base that you launched. songchainn takes a share of your creator fee stream, never your supply.' },

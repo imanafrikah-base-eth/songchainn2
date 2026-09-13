@@ -148,7 +148,8 @@ function SongRow({
       }
 
       const artistId = linkedArtist ? linkedArtist.id : `app-${slugify(app.artist_name)}`;
-      const townSquare = linkedArtist?.townSquare ?? 'Livingstone Town Square';
+      // The artist's own place, never an assumed one.
+      const townSquare = linkedArtist?.townSquare || app.location || null;
 
       const { error: insertErr } = await supabase.from('songs').insert({
         id: newSongId,

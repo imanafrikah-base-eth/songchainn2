@@ -237,9 +237,11 @@ export default function Artists() {
                       </div>
                       
                       {/* Location Badge */}
-                      <div className="px-3 py-2 rounded-xl bg-primary/10 border border-border text-primary text-xs text-center font-medium truncate">
-                        {artist.location}
-                      </div>
+                      {artist.location && (
+                        <div className="px-3 py-2 rounded-xl bg-primary/10 border border-border text-primary text-xs text-center font-medium truncate">
+                          {artist.location}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 </Link>

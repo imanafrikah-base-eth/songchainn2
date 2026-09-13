@@ -1143,7 +1143,7 @@ export default function Profile() {
                   id="profile-interests"
                   value={interests}
                   onChange={(e) => setInterests(e.target.value)}
-                  placeholder="Afrobeats, Hip-hop, Alté..."
+                  placeholder="Hip-hop, Afrobeats, Indie, Latin..."
                   maxLength={120}
                 />
                 {fieldErrors.interests && <p className="text-xs text-destructive">{fieldErrors.interests}</p>}

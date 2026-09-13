@@ -169,6 +169,17 @@ const Studio = () => {
   const ownArtwork = releaseType !== 'single';
   const validGenre = (g: string | null | undefined) => !!g && (GENRES as string[]).includes(g);
 
+  /**
+   * The records a queued title may not repeat. A file lands the moment it is
+   * picked, which reserves a songs row under the same title; the next refetch
+   * of this list used to hand that row back as "You already have a record
+   * called this", so Send was blocked by the track's own upload. N3M3SIS sat
+   * on that twice with APE SHITT (13 Sep 2026). A row still at 'uploading' is
+   * not a record yet, and the rows this queue reserved are the same tracks.
+   */
+  const reservedHere = new Set(tracks.map((t) => t.songId).filter(Boolean) as string[]);
+  const existingRecords = releases.filter((r) => r.status !== 'uploading' && !reservedHere.has(r.id));
+
   /** What stops this one row from being sent, in the artist's words. */
   const trackProblem = (t: QueuedTrack): string | null => {
     if (t.file.size > MAX_MB * 1024 * 1024) return `That file is ${(t.file.size / (1024 * 1024)).toFixed(1)} MB. The limit is ${MAX_MB} MB.`;
@@ -182,7 +193,7 @@ const Studio = () => {
       if (tracks.some((o) => o.key !== t.key && o.title.trim().toLowerCase() === title.toLowerCase())) {
         return `Two tracks here are both called this. Name the other one as its own version, like "${title} (Remix)".`;
       }
-      if (releases.some((r) => (r.title ?? '').trim().toLowerCase() === title.toLowerCase())) {
+      if (existingRecords.some((r) => (r.title ?? '').trim().toLowerCase() === title.toLowerCase())) {
         return `You already have a record called this. Send it again only as another version, and say so in the title, like "${title} (Remix)".`;
       }
     }
@@ -195,7 +206,7 @@ const Studio = () => {
     if (tracks.some((o) => o.key !== t.key && o.title.trim().toLowerCase() === title)) {
       return 'Another track here shares this name, and this one is marked as its own version.';
     }
-    const same = releases.find((r) => (r.title ?? '').trim().toLowerCase() === title);
+    const same = existingRecords.find((r) => (r.title ?? '').trim().toLowerCase() === title);
     return same ? `You already have a record called this (${STATUS_LABEL[same.status] ?? same.status}). This goes up beside it as its own version.` : null;
   };
 
@@ -1053,7 +1064,10 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
         coverUrl={release.cover_art_url}
         open={editing}
         onOpenChange={setEditing}
-        onSaved={stuck && !release.cover_art_url ? () => void askAgain() : undefined}
+        // A record still at 'uploading' has its audio in and was only waiting
+        // on the artist. Saving the details sends it to the judges at any age;
+        // this used to wait twenty minutes, so a cover added straight away did nothing.
+        onSaved={release.status === 'uploading' ? () => void askAgain() : undefined}
       />
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -1110,10 +1124,11 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
           saying "Upload started" for ever, with nothing to say what was wrong.
           One artist stranded eleven that way and sent the same song three times
           trying to get past it. Say what is missing and what fixes it. */}
-      {release.status === 'uploading' && !release.cover_art_url && (
+      {release.status === 'uploading' && (!release.cover_art_url || !release.genre) && (
         <p className="mt-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
-          Your audio is safely uploaded. This one still needs its cover art. Open Edit details, add
-          the artwork, and it goes to the judges by itself.
+          Your audio is safely uploaded. This one still needs its
+          {!release.cover_art_url && !release.genre ? ' cover art and a genre' : !release.cover_art_url ? ' cover art' : ' genre'}.
+          Open Edit details, add {!release.cover_art_url && !release.genre ? 'them' : 'it'}, save, and it goes to the judges by itself.
         </p>
       )}
 

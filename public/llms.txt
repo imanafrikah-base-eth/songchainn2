@@ -1,6 +1,6 @@
 # $ongChainn
 
-> Free music streaming where artists keep everything and fans can own the songs they love. Built for independent artists worldwide; the first roster is Zambian.
+> Free music streaming where artists keep everything and fans can own the songs they love. Built for artists and listeners everywhere in the world; it is not a regional app. The founding roster was from Zambia, and artists from the United States, Nigeria and elsewhere release here too.
 
 $ongChainn (also written SONGCHAINN) is a music app at https://www.songchainn.xyz. Every song streams free. Artists release directly to fans and keep everything. Fans who want more than a stream can own a copy of a record, walk into an artist's world, book time with the artist, or back a side in a live music battle. No wallet is needed to listen or to release.
 

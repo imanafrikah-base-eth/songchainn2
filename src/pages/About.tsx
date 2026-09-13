@@ -67,6 +67,9 @@ const About = () => {
           <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
             Artists release here first and keep everything. Fans stream for free, and the ones who care can hold a record, walk into an artist's world, or back a side in a battle.
           </p>
+          <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground">
+            For artists and listeners from everywhere. Any artist in any country can release here today.
+          </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <Button asChild className="h-11 rounded-full px-6"><Link to={user ? '/discover' : '/?auth=signup'}>{user ? 'Start listening' : 'Join free'} <ArrowRight className="ml-1.5 h-4 w-4" /></Link></Button>
             <Button asChild variant="outline" className="h-11 rounded-full px-6"><Link to="/worlds">Walk into a world</Link></Button>
@@ -163,7 +166,7 @@ const About = () => {
 
         <section className="mt-12 rounded-3xl bg-primary px-5 py-8 text-center text-primary-foreground sm:px-8">
           <h2 className="font-heading text-2xl font-bold sm:text-3xl">Release here first, then everywhere.</h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm opacity-90">Built for every artist in the world. The first roster is Zambian. The doors are open.</p>
+          <p className="mx-auto mt-2 max-w-xl text-sm opacity-90">Built for every artist and every listener, wherever you are. It started with a handful of artists in Zambia, and the doors are open to the whole world.</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button asChild variant="secondary" className="h-11 rounded-full px-6"><Link to={user ? '/studio' : '/?auth=signup'}>{user ? 'Open the Studio' : 'Sign up free'}</Link></Button>
             <Button asChild variant="ghost" className="h-11 rounded-full px-6 text-primary-foreground hover:bg-white/10"><Link to="/worlds">See the worlds</Link></Button>

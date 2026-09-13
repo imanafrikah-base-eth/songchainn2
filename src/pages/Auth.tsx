@@ -40,15 +40,30 @@ import { HomeHero, type HeroFeature } from '@/components/HomeHero';
 import { useSettledHero } from '@/hooks/useSettledHero';
 import { pickHeroSong } from '@/lib/heroPick';
 import { GenreExplorer } from '@/components/GenreExplorer';
-import { claimInterruption, releaseInterruption } from '@/lib/interruptions';
+import { MoshaIntroPopup, useMoshaIntroTrigger } from '@/components/MoshaIntroPopup';
 import { AUTH_PROVIDERS, WORLDS_ENABLED } from '@/lib/features';
 
 type ConnectionState = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success';
 type AuthMode = 'signin' | 'signup';
 type AuthView = 'landing' | 'main' | 'email' | 'phone' | 'verify-otp' | 'connect-wallet';
 
-// Default to Zambia
-const DEFAULT_COUNTRY = COUNTRY_CODES.find(c => c.code === 'ZM') || COUNTRY_CODES[0];
+// The phone country starts from the visitor's own browser region, never an
+// assumed one. With no region to read, it falls back to the United States
+// only because +1 is the most widely shared dialling code; the picker is one tap.
+function detectDefaultCountry(): CountryCode {
+  try {
+    const langs = typeof navigator !== 'undefined' ? [...(navigator.languages ?? []), navigator.language] : [];
+    for (const lang of langs) {
+      const region = lang?.split(/[-_]/)[1]?.toUpperCase();
+      const hit = region ? COUNTRY_CODES.find((c) => c.code === region) : undefined;
+      if (hit) return hit;
+    }
+  } catch {
+    // no navigator, fall through
+  }
+  return COUNTRY_CODES.find((c) => c.code === 'US') || COUNTRY_CODES[0];
+}
+const DEFAULT_COUNTRY = detectDefaultCountry();
 const DAILY_MIX_ID = 'songchainn-daily-mix-preview';
 const DAILY_MIX_URL = 'https://pub-6e7e2bb48a994314926f27fb90fa198f.r2.dev/SongChainn%20Playlist%201.mp3';
 const GUEST_LOCKED_SONGS_KEY = 'songchainn_guest_locked_songs';
@@ -160,8 +175,8 @@ export default function Auth() {
     duration: 0,
     plays: 0,
     likes: 0,
-    townSquare: 'Livingstone Town Square',
-    genre: 'Afro',
+    townSquare: '',
+    genre: 'Alternative',
   }), []);
 
   const popularityBySongId = useMemo(() => {
@@ -187,6 +202,17 @@ export default function Auth() {
   // Every artist on the platform, not a top slice. There are eleven; showing
   // all of them is the point, and the row scrolls.
   const previewArtists = useMemo(() => rankedArtists, [rankedArtists]);
+
+  // Where the artists on here are from, as they said it themselves. Shown only
+  // when there is more than one place, so the row never reads as one region.
+  const artistPlaces = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const a of previewArtists) {
+      const place = (a.location ?? '').trim();
+      if (place && !seen.has(place.toLowerCase())) seen.set(place.toLowerCase(), place);
+    }
+    return Array.from(seen.values());
+  }, [previewArtists]);
 
   const previewSongs = useMemo(() => {
     return [...SONGS].sort(
@@ -755,34 +781,19 @@ export default function Auth() {
     };
   }, [clearMoshaTourTimers]);
 
-  // Mo$ha used to open by itself three seconds after a stranger landed here,
-  // on top of the music, before they had scrolled once. A first-time visitor
-  // should meet the records first. He now waits for them to actually engage:
-  // they played something, or they scrolled past the hero. Even then the
-  // app-wide interruption budget has the final say, and the "Call Mo$ha"
-  // button is on screen the whole time for anyone who wants him sooner.
+  // Mo$ha never opens his chat by himself here. It used to open over most of a
+  // phone screen once the visitor scrolled. Now, once per device, a small note
+  // ("Meet Mo$ha") appears above the Call Mo$ha button after they have scrolled,
+  // and only a tap on it opens the chat. See MoshaIntroPopup.
+  const moshaIntro = useMoshaIntroTrigger(
+    isMoshaOpen || authView !== 'landing' || connectionState === 'success' || showMixFinishedPrompt || isSearchOpen,
+  );
+  const acceptMoshaIntro = moshaIntro.accept;
   useEffect(() => {
-    let done = false;
-    const offer = () => {
-      if (done) return;
-      if (!claimInterruption('mosha-landing', { priority: 'promo' })) return;
-      done = true;
-      setIsMoshaOpen(true);
-      window.removeEventListener('scroll', onScroll);
-    };
-    const onScroll = () => {
-      if (window.scrollY > window.innerHeight * 0.6) offer();
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    // Backstop for someone who reads without scrolling. Well past the quiet
-    // window, so it never lands on arrival.
-    const t = window.setTimeout(offer, 45000);
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener('scroll', onScroll);
-      releaseInterruption('mosha-landing');
-    };
-  }, []);
+    // Opening him by hand is meeting him; the note has nothing left to say.
+    // accept (not just "mark seen") also hands back the floor if it was up.
+    if (isMoshaOpen) acceptMoshaIntro();
+  }, [isMoshaOpen, acceptMoshaIntro]);
 
   useEffect(() => {
     const handleOpen = () => setIsMoshaOpen(true);
@@ -948,6 +959,9 @@ export default function Auth() {
                 Start the Daily Mix or the record below right now. No account and no wallet needed to listen. Make a
                 free account when you want to keep going.
               </p>
+              <p className="mt-1.5 text-sm text-foreground/80 max-w-xl">
+                Artists and listeners from everywhere. Wherever you are, you are welcome here.
+              </p>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
@@ -1022,6 +1036,11 @@ export default function Auth() {
                 <h2 className="text-xl font-heading text-foreground">Trending Artists</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
+              <p className="-mt-1 mb-3 text-xs text-muted-foreground">
+                {artistPlaces.length > 1
+                  ? `From ${artistPlaces.slice(0, 4).join(', ')}${artistPlaces.length > 4 ? ' and more' : ''}. Any artist, anywhere, can release here.`
+                  : 'Any artist, anywhere, can release here.'}
+              </p>
               <div className="max-h-[340px] overflow-y-auto pr-1 sm:pr-2">
               <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
                 {previewArtists.map((artist) => (
@@ -1371,7 +1390,18 @@ export default function Auth() {
           </div>
         ) : (
           <div className="fixed right-3 sm:right-5 bottom-24 z-[64] flex flex-col items-end gap-2">
-            {moshaTransient && (
+            <MoshaIntroPopup
+              placement="inline"
+              show={moshaIntro.show}
+              title="Meet Mo$ha"
+              line="Your $ongChainn guide. Ask anything."
+              onOpen={() => {
+                moshaIntro.accept();
+                setIsMoshaOpen(true);
+              }}
+              onDismiss={moshaIntro.dismiss}
+            />
+            {moshaTransient && !moshaIntro.show && (
               <div className="max-w-xs rounded-xl border border-border bg-background/95 px-3 py-2 text-xs text-foreground shadow-xl">
                 {moshaTransient}
               </div>
