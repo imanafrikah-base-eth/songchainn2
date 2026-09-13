@@ -396,7 +396,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!isAddress(wallet)) {
+    // A points gate is answered from the loyalty ledger, which needs the person,
+    // not a wallet. Returning the outer ring here for everyone without a linked
+    // wallet meant a points-keyed world (GESD1's, 13 Sep 2026) could never open
+    // for the fans most likely to have points and no wallet.
+    if (!isAddress(wallet) && !(pointsGate && userId)) {
       return json(origin, {
         rings: {
           ring0: true, ring1: false, ring2: false, council: false,
@@ -407,8 +411,8 @@ Deno.serve(async (req) => {
     }
 
     const [tokenBalance, heldNfts] = await Promise.all([
-      getTokenBalance(cfg, wallet),
-      getDropBalances(keyDrops, wallet),
+      isAddress(wallet) ? getTokenBalance(cfg, wallet) : Promise.resolve(0),
+      isAddress(wallet) ? getDropBalances(keyDrops, wallet) : Promise.resolve({} as Record<string, number>),
     ]);
     // On a points gate the "balance" the doors read is the person's points.
     let balance = tokenBalance;
@@ -441,7 +445,8 @@ Deno.serve(async (req) => {
     // Remember what was verified, for the database to price against. This is
     // real holdings only, which is why the owner branch above returns before
     // reaching it: an artist's open doors must never price a meeting request.
-    if (userId) {
+    // The snapshot records a verified WALLET's holdings; a points-only answer has none to record.
+    if (userId && isAddress(wallet)) {
       const { error } = await db.from("world_access_snapshots").upsert(
         {
           user_id: userId,
