@@ -28,7 +28,18 @@ function adFor(world: WorldConfig): { poster?: string; video?: string; fitKey: s
  * slot in the builder (the gate loop, the hero loop, or a clip made for it).
  * With one world open there is nothing to slide and the doorway stands alone.
  */
-export function WorldsSlideshow({ cta, className = '' }: { cta: ReactNode; className?: string }) {
+export function WorldsSlideshow({
+  cta,
+  className = '',
+}: {
+  /**
+   * The ask under the advert. A function receives the world on the current
+   * slide, so the key offered is that world's own. It used to be a fixed node
+   * built for World #001, which put "Get $IMAN" under GESD1's world.
+   */
+  cta: ReactNode | ((world: WorldConfig) => ReactNode);
+  className?: string;
+}) {
   const { data: worlds = [] } = usePublishedWorlds();
   const [index, setIndex] = useState(0);
   const [held, setHeld] = useState(false);
@@ -51,6 +62,7 @@ export function WorldsSlideshow({ cta, className = '' }: { cta: ReactNode; class
   if (!count) return null;
   const current = Math.min(index, count - 1);
   const world = worlds[current];
+  const ctaForWorld = typeof cta === 'function' ? cta(world) : cta;
 
   return (
     <div
@@ -61,9 +73,9 @@ export function WorldsSlideshow({ cta, className = '' }: { cta: ReactNode; class
       onTouchEnd={() => setHeld(false)}
     >
       {CODE_SLUGS.has(world.slug) ? (
-        <WorldDoorway key={world.slug} cta={cta} />
+        <WorldDoorway key={world.slug} cta={ctaForWorld} />
       ) : (
-        <WorldAd key={world.slug} world={world} cta={cta} />
+        <WorldAd key={world.slug} world={world} cta={ctaForWorld} />
       )}
 
       {count > 1 && (

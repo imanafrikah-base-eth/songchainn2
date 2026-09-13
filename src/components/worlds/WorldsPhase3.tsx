@@ -101,14 +101,16 @@ export function WorldsPhase3({
           with whatever its artist chose to show. */}
       <div className="mt-5">
         <WorldsSlideshow
-          cta={
+          cta={(slideWorld) =>
             isGuest ? (
               <DoorwayCtaGuest
+                world={slideWorld}
                 onSignUp={() => onSignUp?.()}
                 onSignIn={() => onSignIn?.()}
               />
             ) : (
-              <DoorwayCtaMember />
+              // The key offered is always the world on the slide's own, never World #001's.
+              <DoorwayCtaMember world={slideWorld} />
             )
           }
         />

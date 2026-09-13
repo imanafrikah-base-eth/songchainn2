@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { GetKeyModal } from '@/worlds/components/GetKeyModal';
-import { getArtistCoin } from '@/lib/artistCoins';
+import { useArtistCoinMeta } from '@/hooks/useArtistCoinMeta';
+import { worldPath } from '@/hooks/usePublishedWorlds';
+import type { WorldConfig } from '@/worlds/types';
 import { Link } from 'react-router-dom';
 import { ArrowRight, DoorOpen, Glasses, Volume2, VolumeX } from 'lucide-react';
 import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
@@ -528,7 +530,10 @@ export function WorldDoorway({
 export function DoorwayCtaGuest({
   onSignUp,
   onSignIn,
+  world,
 }: {
+  /** The world on the current slide; "look around first" walks into this one. */
+  world?: WorldConfig;
   onSignUp: () => void;
   onSignIn: () => void;
 }) {
@@ -560,7 +565,7 @@ export function DoorwayCtaGuest({
           Log in
         </Button>
         <Link
-          to={`/world/${IMAN_AFRIKAH_WORLD.slug}`}
+          to={worldPath(world ?? IMAN_AFRIKAH_WORLD)}
           className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           Or just look around first
@@ -586,43 +591,62 @@ export function DoorwayCtaGuest({
 }
 
 /**
- * What somebody already signed in is offered.
+ * What somebody already signed in is offered, for the world on the current slide.
  *
- * They do not need an account, they need the key. The rooms in the walk they
- * just watched are gated on holding $IMAN, so this says that plainly and sends
- * them to his creator coin on Zora. It is stated as access, never as an investment,
- * and the app never touches the transaction.
+ * They do not need an account, they need the key, and the key is THAT world's
+ * own. It used to be fixed to World #001, so the slideshow put "The key to those
+ * doors is $IMAN" and "Get $IMAN" under GESD1's world (founder, 13 Sep 2026).
+ * Now the coin is looked up for this world's own artist (the database first,
+ * then the shipped list). An artist with no coin gets no buy button at all: a
+ * world is never sold with somebody else's coin. It is stated as access, never
+ * as an investment, and the app never touches the transaction.
  */
-export function DoorwayCtaMember() {
-  const world = IMAN_AFRIKAH_WORLD;
-  const coin = getArtistCoin(world.artistId);
+export function DoorwayCtaMember({ world = IMAN_AFRIKAH_WORLD }: { world?: WorldConfig } = {}) {
+  const coin = useArtistCoinMeta(world.artistId);
   const [keyOpen, setKeyOpen] = useState(false);
+  const symbol = world.tokenSymbol?.trim() || (coin?.zoraHandle ? `$${coin.zoraHandle.toUpperCase()}` : '');
+  const isWorldOne = world.slug === IMAN_AFRIKAH_WORLD.slug;
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <p className="text-sm font-semibold text-foreground">
-          The key to those doors is {world.tokenSymbol}.
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Hold it and the Gallery and the Studio you just saw open, and the Screening Room with them. Sell it and they
-          close again. You buy it from your own wallet on Base, and it stays there.
-        </p>
+        {coin && symbol ? (
+          <>
+            <p className="text-sm font-semibold text-foreground">
+              The key to those doors is {symbol}.
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {isWorldOne
+                ? 'Hold it and the Gallery and the Studio you just saw open, and the Screening Room with them. Sell it and they close again.'
+                : `It is ${world.artistName}'s own creator coin. Hold it and their inner rooms open; sell it and they close again.`}{' '}
+              You buy it from your own wallet on Base, and it stays there.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-foreground">
+              Walk into {world.artistName}'s world.
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              There is no coin to buy here. Its inner rooms open the way {world.artistName} set them.
+            </p>
+          </>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {/* No buy link inside the Android shell: Play reads "buy to unlock"
             as selling access outside its billing. The words stay; the sale
             happens in the person's own wallet. See ANDROID.md. */}
-        {coin && !isNativeApp() && (
+        {coin && symbol && !isNativeApp() && (
           <>
             <Button className="h-10 rounded-full px-6 text-sm font-semibold" onClick={() => setKeyOpen(true)}>
-              Get {world.tokenSymbol}
+              Get {symbol}
               <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
             <GetKeyModal
               open={keyOpen}
               onOpenChange={setKeyOpen}
               coinAddress={coin.coinAddress}
-              symbol={world.tokenSymbol}
+              symbol={symbol}
               artistName={world.artistName}
               worldSlug={world.slug}
             />
@@ -633,7 +657,7 @@ export function DoorwayCtaMember() {
           variant="outline"
           className="h-10 rounded-full px-5 text-sm font-semibold"
         >
-          <Link to={`/world/${world.slug}`}>
+          <Link to={worldPath(world)}>
             <Glasses className="mr-1.5 h-4 w-4" />
             Enter the world
           </Link>
