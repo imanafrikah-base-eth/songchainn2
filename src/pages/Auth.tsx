@@ -2,7 +2,7 @@ import { songPath } from '@/lib/slugRoutes';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Disc3, Flame, Sparkles, Headphones, LineChart, ArrowRight, Search, Shuffle, Bot, Store, Mic, Lock, Waves } from 'lucide-react';
+import { Wallet, ExternalLink, Loader2, Shield, Users, CheckCircle2, Mail, Phone, ChevronDown, Eye, EyeOff, ArrowLeft, AlertCircle, Play, Flame, Sparkles, Headphones, LineChart, ArrowRight, Search, Shuffle, Bot, Store, Mic, Lock, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -64,6 +64,7 @@ const ABOUT_HIGHLIGHTS = [
   {
     title: 'WaveWarz Africa',
     description: 'Two artists. One battle. Back your favorite in a live song battle and watch the crowd decide.',
+    href: '/wavewarz-africa',
     icon: Waves,
     accent: 'text-orange-400',
     surface: 'bg-orange-500/10',
@@ -688,12 +689,13 @@ export default function Auth() {
     setIsMoshaTourRunning(true);
     setIsMoshaTourCompleted(false);
 
+    // In page order: music first, then who is here, then the community.
     const steps: Array<{ id?: string; text: string }> = [
-      { text: 'This is Hot Today. It surfaces songs listeners are actively pushing right now.' },
-      { id: 'about-songchainn', text: 'This section explains $ongChainn vision and what early listeners unlock first.' },
+      { text: 'Start here. Press play on the Daily Mix or the record of the day, free, no account needed.' },
+      { id: 'trending-artists', text: 'These are the artists on $ongChainn. Tap one to hear more.' },
       { id: 'featured-catalogs', text: 'Featured Catalogs group the strongest drops so you can discover faster.' },
-      { id: 'trending-artists', text: 'Trending Artists helps you catch talent early and stay ahead of the crowd.' },
-      { id: 'all-songs', text: 'All Songs is your broad map. Sample quickly, then sign up to unlock full depth.' },
+      { id: 'all-songs', text: 'Pick a genre and sample quickly, then sign up free to keep going.' },
+      { id: 'about-songchainn', text: 'This is what people do together here: The Room, battles, DJ $huffle and Mo$ha.' },
     ];
 
     const runStep = (index: number) => {
@@ -877,43 +879,11 @@ export default function Auth() {
           </div>
         </div>
 
-        <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-4 md:pt-6">
-          <MusicianCta
-            onSignUp={() => {
-              setAuthMode('signup');
-              setAuthView('email');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        </div>
-
-        {/* Phase Three, to a person who has not signed up yet. It sits this
-            high on purpose: a world is the most interesting thing on this page
-            and burying it under six rows of song art wastes it. */}
-        {WORLDS_ENABLED && (
-        <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-6 md:pt-8">
-          <WorldsPhase3
-            variant="guest"
-            onSignUp={() => {
-              setAuthMode('signup');
-              setAuthView('email');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onSignIn={() => {
-              setAuthMode('signin');
-              setAuthView('email');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        </div>
-        )}
-
-        {ZABAL_GAMEZ_ENABLED && (
-          <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-3 md:pt-4">
-            <ZabalGamezSection source="auth" />
-          </div>
-        )}
-
+        {/* A stranger meets music first. The page runs in the order a listener
+            needs it: hear something, see who is here, see what people do
+            together, and only then the door for people who make music. The
+            musician door and the worlds (keys and coins) used to sit above the
+            first record; they now follow the listening. */}
         <div className={`max-w-[1400px] mx-auto p-3 md:p-4${hotTodaySongs.length > 0 ? ' lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-4' : ''}`}>
           {hotTodaySongs.length > 0 && (
           <aside className="hidden lg:block rounded-xl border border-border/40 bg-background/80 backdrop-blur p-3">
@@ -947,11 +917,9 @@ export default function Auth() {
                       <p className="text-[11px] text-muted-foreground truncate"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                     </div>
                   </div>
+                  {/* No coin badge up here: a guest has not heard anything yet. */}
                   <div className="mt-1 flex items-center justify-between gap-1.5">
                     <span className="text-[10px] text-primary font-semibold">#{index + 1}</span>
-                    {coinAddressBySongId.has(song.id) && (
-                      <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" />
-                    )}
                   </div>
                 </button>
               ))}
@@ -960,6 +928,47 @@ export default function Auth() {
           )}
 
           <main className="min-w-0 rounded-xl border border-border/40 bg-background/80 backdrop-blur p-4 md:p-5">
+            {/* The first thing a stranger reads: listening is free, and one tap
+                plays something. Every claim here is true for a guest today:
+                the Daily Mix and the featured record play with no account and
+                no wallet. */}
+            <section
+              id="listen-free"
+              className="relative isolate overflow-hidden rounded-2xl border border-border bg-secondary/30 p-4 md:p-5 mb-6"
+            >
+              <TileBackdrop image={CARD_TILES.dailyMix} opacity={0.22} />
+              <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1.5 mb-1">
+                <Headphones className="w-3.5 h-3.5" />
+                Free to listen
+              </p>
+              <h1 className="font-heading text-2xl md:text-3xl text-foreground mb-1.5">
+                Press play. Listening here is free.
+              </h1>
+              <p className="text-sm text-muted-foreground max-w-xl">
+                Start the Daily Mix or the record below right now. No account and no wallet needed to listen. Make a
+                free account when you want to keep going.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => handleStartDailyMix('manual')}
+                  className="h-11 rounded-full px-6 text-sm font-semibold"
+                >
+                  <Play className="w-4 h-4 mr-2 fill-current" />
+                  {currentSong?.id === DAILY_MIX_ID && isPlaying ? 'Playing the Daily Mix' : 'Play the Daily Mix'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => scrollToSection('trending-artists')}
+                  className="h-11 rounded-full px-5 text-sm border-border"
+                >
+                  Meet the artists
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </section>
+
             {/* Landing hero: one real record, its own artwork, at size. */}
             {landingFeature ? (
               <HomeHero feature={landingFeature} onPlay={handlePlayLanding} faces={landingFaces} />
@@ -1000,9 +1009,6 @@ export default function Auth() {
                     <p className="text-xs text-muted-foreground truncate"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></p>
                     <div className="mt-1 flex items-center justify-between gap-1.5">
                       <span className="text-[11px] text-primary font-semibold">#{index + 1}</span>
-                      {coinAddressBySongId.has(song.id) && (
-                        <OnchainVerifiedBadge coinAddress={coinAddressBySongId.get(song.id)!} size="sm" />
-                      )}
                     </div>
                   </button>
                 ))}
@@ -1011,138 +1017,47 @@ export default function Auth() {
             </section>
             )}
 
-            <div className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-border p-4 md:p-5 mb-6">
-              <TileBackdrop image={CARD_TILES.dailyMix} opacity={0.32} />
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-primary font-semibold flex items-center gap-1.5 mb-1">
-                    <Disc3 className="w-3.5 h-3.5" />
-                    Daily mix preview
-                  </p>
-                  <h1 className="font-heading text-2xl md:text-3xl text-foreground mb-1">Have a taste</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Use accents and playlists. Find this and more mixes on $ongChainn.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => scrollToSection('about-songchainn')}
-                    className="rounded-full border-border text-primary hover:bg-primary/10"
-                  >
-                    About $ongChainn
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                  <Button type="button" onClick={() => handleStartDailyMix('manual')} className="gradient-primary text-primary-foreground rounded-full px-5">
-                    <Play className="w-4 h-4 mr-2" />
-                    {currentSong?.id === DAILY_MIX_ID && isPlaying ? 'Playing' : 'Play mix'}
-                  </Button>
-                </div>
+            <section id="trending-artists" className="mb-7">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-heading text-foreground">Trending Artists</h2>
+                <button type="button" onClick={handleBrowseWithoutAuthModal} className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
-            </div>
-
-            <section id="about-songchainn" className="mb-7 scroll-mt-24">
-              <div className="rounded-3xl border border-border/50 bg-gradient-to-br from-background via-background to-primary/5 p-5 md:p-6">
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary mb-3">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      About $ongChainn
+              <div className="max-h-[340px] overflow-y-auto pr-1 sm:pr-2">
+              <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
+                {previewArtists.map((artist) => (
+                  <button key={artist.id} type="button" onClick={handleBrowseWithoutAuthModal} className="text-center group">
+                    <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-secondary/40 border border-border/40 mx-auto mb-2 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+                      {artist.profileImage ? (
+                        <>
+                          <img
+                            src={thumb(artist.profileImage, 96)}
+                            alt=""
+                            aria-hidden="true"
+                            width={96}
+                            height={96}
+                            loading="lazy"
+                            decoding="async"
+                            className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
+                          />
+                          <img
+                            src={thumb(artist.profileImage, 96)}
+                            alt={artist.name}
+                            width={96}
+                            height={96}
+                            className="relative w-full h-full object-contain"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </>
+                      ) : (
+                        <Users className="w-7 h-7 text-muted-foreground" />
+                      )}
                     </div>
-                    <h2 className="font-heading text-2xl md:text-3xl text-foreground mb-3">
-                      This is $ongChainn. Come have some fun.
-                    </h2>
-                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-5">
-                      Press play, hang out in The Room, back your favorite in a WaveWarz Africa battle, or just let
-                      DJ $huffle and Mo$ha keep you company. Preview it all right now, no account needed.
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                      {ABOUT_HIGHLIGHTS.map(({ title, description, icon: Icon, accent, surface, photo }) => (
-                        <div key={title} className="relative isolate overflow-hidden rounded-2xl border border-border/40 bg-background/70 p-4">
-                          <TileBackdrop image={photo} opacity={0.38} />
-                          <div className={`inline-flex rounded-xl p-2 ${surface} mb-3`}>
-                            <Icon className={`w-4 h-4 ${accent}`} />
-                          </div>
-                          <h3 className="text-sm font-semibold text-foreground mb-1.5">{title}</h3>
-                          <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="relative isolate overflow-hidden mt-4 rounded-2xl border border-dashed border-border bg-primary/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <TileBackdrop image={CARD_TILES.makeMusic} opacity={0.28} />
-                      <div className="flex items-start gap-2.5">
-                        <Mic className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">Make music?</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Submit your music to $ongChainn and get discovered by early listeners.
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="rounded-full border-border text-primary hover:bg-primary/10 shrink-0"
-                        onClick={() => navigate('/about#artist-submission')}
-                      >
-                        Submit Your Music
-                        <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="rounded-2xl border border-border bg-primary/5 p-4 md:p-5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
-                        How your journey works
-                      </p>
-                      <div className="space-y-3">
-                        {ABOUT_STEPS.map((step, index) => (
-                          <div key={step} className="flex items-start gap-3">
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                              {index + 1}
-                            </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{step}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="relative isolate overflow-hidden rounded-2xl border border-border/40 bg-background/80 p-4 md:p-5">
-                      <TileBackdrop image={CARD_TILES.signupCrowd} opacity={0.4} />
-                      <p className="text-sm font-semibold text-foreground mb-2">Ready to jump in?</p>
-                      <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                        Create a free account and unlock the full experience, The Room, DJ $huffle, Mo$ha and more.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          className="rounded-full gradient-primary text-primary-foreground"
-                          onClick={() => {
-                            setAuthMode('signup');
-                            setAuthView('email');
-                          }}
-                        >
-                          Sign up free
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="rounded-full border-border text-primary hover:bg-primary/10"
-                          onClick={() => {
-                            setAuthMode('signin');
-                            setAuthView('email');
-                          }}
-                        >
-                          Log in
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                    <p className="text-xs text-foreground truncate"><ArtistName name={artist.name} artistId={artist.id} size={12} /></p>
+                    <p className="text-[11px] text-muted-foreground truncate">{artist.location}</p>
+                  </button>
+                ))}
+              </div>
               </div>
             </section>
 
@@ -1259,50 +1174,6 @@ export default function Auth() {
             </section>
             )}
 
-            <section id="trending-artists" className="mb-7">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-heading text-foreground">Trending Artists</h2>
-                <button type="button" onClick={handleBrowseWithoutAuthModal} className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Show all</button>
-              </div>
-              <div className="max-h-[340px] overflow-y-auto pr-1 sm:pr-2">
-              <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
-                {previewArtists.map((artist) => (
-                  <button key={artist.id} type="button" onClick={handleBrowseWithoutAuthModal} className="text-center group">
-                    <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-secondary/40 border border-border/40 mx-auto mb-2 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-                      {artist.profileImage ? (
-                        <>
-                          <img
-                            src={thumb(artist.profileImage, 96)}
-                            alt=""
-                            aria-hidden="true"
-                            width={96}
-                            height={96}
-                            loading="lazy"
-                            decoding="async"
-                            className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
-                          />
-                          <img
-                            src={thumb(artist.profileImage, 96)}
-                            alt={artist.name}
-                            width={96}
-                            height={96}
-                            className="relative w-full h-full object-contain"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        </>
-                      ) : (
-                        <Users className="w-7 h-7 text-muted-foreground" />
-                      )}
-                    </div>
-                    <p className="text-xs text-foreground truncate"><ArtistName name={artist.name} artistId={artist.id} size={12} /></p>
-                    <p className="text-[11px] text-muted-foreground truncate">{artist.location}</p>
-                  </button>
-                ))}
-              </div>
-              </div>
-            </section>
-
             {/* Was "All Songs": 230 records in a six-column dump, with the same
                 cover repeating four and five times in a row because catalog
                 mates share artwork. Replaced by a way in. */}
@@ -1311,7 +1182,137 @@ export default function Auth() {
               onPlay={handleSongPlayAttempt}
               isLocked={(song) => !user && guestLockedSongIds.has(song.id)}
             />
+
+            <section id="about-songchainn" className="mt-7 scroll-mt-24">
+              <div className="rounded-3xl border border-border/50 bg-gradient-to-br from-background via-background to-primary/5 p-5 md:p-6">
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary mb-3">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      About $ongChainn
+                    </div>
+                    <h2 className="font-heading text-2xl md:text-3xl text-foreground mb-3">
+                      This is $ongChainn. Come have some fun.
+                    </h2>
+                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-5">
+                      Press play, hang out in The Room, back your favorite in a WaveWarz Africa battle, or just let
+                      DJ $huffle and Mo$ha keep you company. Preview it all right now, no account needed.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                      {ABOUT_HIGHLIGHTS.map((item) => {
+                        const { title, description, icon: Icon, accent, surface, photo } = item;
+                        const href = 'href' in item ? item.href : undefined;
+                        return (
+                        <div key={title} className="relative isolate overflow-hidden rounded-2xl border border-border/40 bg-background/70 p-4">
+                          <TileBackdrop image={photo} opacity={0.38} />
+                          <div className={`inline-flex rounded-xl p-2 ${surface} mb-3`}>
+                            <Icon className={`w-4 h-4 ${accent}`} />
+                          </div>
+                          <h3 className="text-sm font-semibold text-foreground mb-1.5">{title}</h3>
+                          <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+                          {href ? (
+                            <Link
+                              to={href}
+                              className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-foreground hover:underline underline-offset-4"
+                            >
+                              Watch a battle
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </Link>
+                          ) : null}
+                        </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-border bg-primary/5 p-4 md:p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                        How your journey works
+                      </p>
+                      <div className="space-y-3">
+                        {ABOUT_STEPS.map((step, index) => (
+                          <div key={step} className="flex items-start gap-3">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                              {index + 1}
+                            </div>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{step}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="relative isolate overflow-hidden rounded-2xl border border-border/40 bg-background/80 p-4 md:p-5">
+                      <TileBackdrop image={CARD_TILES.signupCrowd} opacity={0.4} />
+                      <p className="text-sm font-semibold text-foreground mb-2">Ready to jump in?</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                        Create a free account and unlock the full experience, The Room, DJ $huffle, Mo$ha and more.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          className="rounded-full gradient-primary text-primary-foreground"
+                          onClick={() => {
+                            setAuthMode('signup');
+                            setAuthView('email');
+                          }}
+                        >
+                          Sign up free
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-full border-border text-primary hover:bg-primary/10"
+                          onClick={() => {
+                            setAuthMode('signin');
+                            setAuthView('email');
+                          }}
+                        >
+                          Log in
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
           </main>
+        </div>
+
+        {/* After the music and the community: the worlds (where keys and coins
+            come in), then the door for people who make music. */}
+        {WORLDS_ENABLED && (
+        <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-6 md:pt-8">
+          <WorldsPhase3
+            variant="guest"
+            onSignUp={() => {
+              setAuthMode('signup');
+              setAuthView('email');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSignIn={() => {
+              setAuthMode('signin');
+              setAuthView('email');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </div>
+        )}
+
+        {ZABAL_GAMEZ_ENABLED && (
+          <div className="max-w-[1400px] mx-auto px-3 md:px-4 pt-3 md:pt-4">
+            <ZabalGamezSection source="auth" />
+          </div>
+        )}
+
+        <div id="for-musicians" className="max-w-[1400px] mx-auto px-3 md:px-4 pt-6 md:pt-8">
+          <MusicianCta
+            onSignUp={() => {
+              setAuthMode('signup');
+              setAuthView('email');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         </div>
 
         {/* Clearance for the Mo$ha launcher.

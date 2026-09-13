@@ -389,15 +389,11 @@ const HostCreate = () => {
 
     const roomRoute = `/wavewarz-africa/entry/${battleId}`;
     const hostRoute = `/wavewarz-africa/host/control/${battleId}`;
-    const directMessages = selectedCoHosts.map((coHost) => ({
-      id: crypto.randomUUID(),
-      user_id: coHost.user_id,
-      sender: "mosha",
-      text: `You have been selected as a co-host for "${title}".\nCTA::Open Battle Room::${roomRoute}\nCTA::Open Host Controls::${hostRoute}\nCTA::BattleZone Home::/wavewarz-africa`,
-      created_at: new Date().toISOString(),
-    }));
-    try { await (supabase as any).from("direct_messages").insert(directMessages); } catch { void 0; }
-
+    // There used to be a direct_messages insert here too. It never landed:
+    // that table is each person's own Mo$ha line (thread_id, sender_type,
+    // message_text) and this sent user_id/sender/text with no thread, and RLS
+    // only lets a person write to their own thread. The notification below is
+    // the co-host invite that actually arrives.
     const notificationsPayload = selectedCoHosts.map((coHost) => ({
       user_id: coHost.user_id,
       type: "cohost_invite",

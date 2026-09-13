@@ -2,6 +2,18 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { backgroundPools, type BackgroundPoolName, type BgImage } from '@/data/backgroundPools';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { cn } from '@/lib/utils';
+import { thumb } from '@/lib/img';
+
+/**
+ * A backdrop is decorative, low opacity and sits under a gradient, so it never
+ * needs the original cover (1 to 2 MB each, and this rotates every few seconds).
+ * The same address is used for the preload and the painted layer, so each
+ * picture downloads once.
+ */
+function bgSrc(src: string): string {
+  const width = typeof window !== 'undefined' ? Math.min(window.innerWidth || 540, 540) : 540;
+  return thumb(src, width) ?? src;
+}
 
 type OverlayVariant = 'hero' | 'card' | 'text' | 'none';
 
@@ -35,7 +47,7 @@ const OVERLAY_CLASSES: Record<OverlayVariant, string> = {
 
 function bgStyle(img: BgImage, opacity: number): React.CSSProperties {
   return {
-    backgroundImage: `url(${img.src})`,
+    backgroundImage: `url("${bgSrc(img.src)}")`,
     backgroundSize: img.size ?? 'cover',
     backgroundPosition: img.position ?? 'center',
     backgroundRepeat: 'no-repeat',
@@ -117,7 +129,7 @@ export const AmbientBackground = memo(function AmbientBackground({
           });
         });
       };
-      img.src = next.src;
+      img.src = bgSrc(next.src);
     }, interval);
 
     return () => window.clearInterval(timer);

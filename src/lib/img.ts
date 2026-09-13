@@ -60,6 +60,9 @@ export function thumb(src: string | null | undefined, cssPx: number): string | u
   if (url.protocol !== 'https:' || !OPTIMIZABLE_HOST.test(url.hostname)) return src;
   if (/\.(gif|svg)(\?|$)/i.test(url.pathname)) return src;
   if (url.pathname.startsWith('/_vercel/image')) return src;
+  // Bundled build assets are already compressed, hashed files, and /assets is not
+  // in vercel.json images.localPatterns, so the optimizer answers 400 for them.
+  if (url.origin === window.location.origin && url.pathname.startsWith('/assets/')) return src;
   // A picture on our own origin is passed as a path, which is how Vercel expects local images.
   const target = url.origin === window.location.origin ? `${url.pathname}${url.search}` : url.toString();
   return `/_vercel/image?url=${encodeURIComponent(target)}&w=${pickWidth(cssPx)}&q=${THUMB_QUALITY}`;

@@ -3,6 +3,7 @@ import { ArtistName } from '@/components/ArtistName';
 import { Lock, Play, Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Song } from '@/data/musicData';
+import { thumb } from '@/lib/img';
 
 /**
  * Browsing the catalog by the sound of it.
@@ -143,9 +144,14 @@ export function GenreExplorer({ songs, onPlay, isLocked }: GenreExplorerProps) {
                   <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-secondary">
                     {song.coverImage ? (
                       <img
-                        src={song.coverImage}
+                        /* Tiles are w-36 / sm:w-40 (144 to 160 CSS px). This was the raw
+                           R2 cover, 1 to 2 MB each, repeated across catalog mates. */
+                        src={thumb(song.coverImage, 160)}
                         alt=""
+                        width={160}
+                        height={160}
                         loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                       />
                     ) : null}

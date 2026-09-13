@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -21,7 +22,7 @@ export function MusicianCta({ onSignUp }: { onSignUp?: () => void }) {
   return (
     <section className="relative border-t border-border py-8 sm:py-10">
       <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        For musicians
+        I make music
       </p>
 
       <h2 className="mt-2 font-heading text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
@@ -48,6 +49,11 @@ export function MusicianCta({ onSignUp }: { onSignUp?: () => void }) {
         <Button size="lg" onClick={onSignUp} className="h-11 rounded-full px-7 text-sm font-semibold">
           Sign up as a musician
           <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+        {/* The submission form used to live on a card in the middle of the
+            landing; the musician door carries it now. */}
+        <Button asChild size="lg" variant="outline" className="h-11 rounded-full px-6 text-sm">
+          <Link to="/about#artist-submission">Submit your music</Link>
         </Button>
         <p className="text-xs text-muted-foreground">
           Already have music on here? Your artist account is waiting, ask us for it.
