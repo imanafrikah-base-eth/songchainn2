@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, UploadCloud, Loader2, CheckCircle2, Wrench, Music4, Wallet, Coins, AlertCircle,
-  Image as ImageIcon, Globe2, Trash2, RefreshCw, CalendarClock, X, ListMusic,
+  Image as ImageIcon, Globe2, Trash2, RefreshCw, CalendarClock, ListMusic,
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -30,13 +30,27 @@ import { toast } from 'sonner';
 import { ChevronDown, Pencil } from 'lucide-react';
 import { SongDetailsFields, DistributionChoice } from '@/components/studio/SongDetailsFields';
 import { SongDetailsDialog } from '@/components/studio/SongDetailsDialog';
-import { UploadProgress } from '@/components/studio/UploadProgress';
 import { ActivityBoard } from '@/components/studio/ActivityBoard';
 import { VerificationCard } from '@/components/studio/VerificationCard';
 import { EMPTY_DETAILS, detailProblems, requestOnchain, type SongDetails } from '@/lib/songDetails';
-import { checkCover, COVER_ACCEPT, COVER_GOOD_PX, NO_COVER, type CoverCheck } from '@/lib/coverArt';
-import { CoverCropDialog, prepareCover } from '@/components/studio/CoverCrop';
+import { useCoverLanding, type CoverStatus } from '@/hooks/useCoverLanding';
+import { ArtworkField } from '@/components/studio/ArtworkField';
+import { ReleaseTypePicker, countAdvice, isCollection, releaseKindOf, typeLabel, type ReleaseType } from '@/components/studio/ReleaseType';
+import { TracklistRow } from '@/components/studio/TracklistRow';
 import { useSongCoin } from '@/hooks/useSongCoins';
+
+const FIELD_LABEL = 'mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground';
+const FIELD_INPUT =
+  'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none disabled:opacity-60';
+
+/** datetime-local speaks the artist's own clock; the row keeps UTC. */
+function localInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 // A WAV master runs about 10.6 MB a minute, so this has to be generous enough
 // that a full lossless record fits. Keep in step with MAX_BYTES in upload-url.
@@ -79,7 +93,7 @@ function useMyProfile() {
     queryFn: async () => {
       const { data } = await supabase
         .from('audience_profiles')
-        .select('display_name, username, wallet_address')
+        .select('display_name, username, wallet_address, avatar_url')
         .eq('user_id', user!.id)
         .maybeSingle();
       return data ?? null;
@@ -93,30 +107,33 @@ const Studio = () => {
   const { becomeArtist, pending: becoming } = useBecomeArtist();
   const { data: profile } = useMyProfile();
   const { data: releases = [], isLoading } = useArtistReleases();
-  const { tracks, busy, landing, finished, add, remove, setTitle, setTrackNumber, numberAll, start, askAgain, reset, setDefaults } = useBatchUpload();
+  const { tracks, busy, landing, finished, add, remove, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults } = useBatchUpload();
   const { cannotUpload } = useCompliance();
 
   const fileRef = useRef<HTMLInputElement>(null);
+  /** Asked first, the way every distributor asks it. */
+  const [releaseType, setReleaseType] = useState<ReleaseType>('single');
+  const collection = isCollection(releaseType);
+  const [releaseTitle, setReleaseTitle] = useState('');
+  const [releaseAbout, setReleaseAbout] = useState('');
+  const [upc, setUpc] = useState('');
   const [artistName, setArtistName] = useState('');
   const [genre, setGenre] = useState('');
-  const [cover, setCover] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [coverCheck, setCoverCheck] = useState<CoverCheck>({ block: null, warn: null });
-  const [cropping, setCropping] = useState<File | null>(null);
-  const acceptCover = (f: File | null) => {
-    setCover(f);
-    setCoverCheck({ block: null, warn: null });
-    if (f) void checkCover(f).then(setCoverCheck);
-    setCoverPreview((old) => {
-      if (old) URL.revokeObjectURL(old);
-      return f ? URL.createObjectURL(f) : null;
-    });
-  };
-  const coverRef = useRef<HTMLInputElement>(null);
+  /** The shared artwork (the single's, the release's, or the catalog default). It uploads the moment it is picked. */
+  const cover = useCoverLanding();
+  /** Artwork a track carries of its own, reported up from its row. */
+  const trackCoverGet = useRef(new Map<string, () => Promise<string> | null>());
+  const [trackCoverStatus, setTrackCoverStatus] = useState<Record<string, CoverStatus>>({});
+  const onTrackCover = useCallback((key: string, status: CoverStatus, get: () => Promise<string> | null) => {
+    trackCoverGet.current.set(key, get);
+    setTrackCoverStatus((s) => (s[key] === status ? s : { ...s, [key]: status }));
+  }, []);
   /** Credits, paperwork, the release and where the records live. Shared by the batch. All optional. */
   const [details, setDetails] = useState<SongDetails>(EMPTY_DETAILS);
   const [moreOpen, setMoreOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const dragFrom = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!artistName && profile) {
@@ -138,8 +155,6 @@ const Studio = () => {
     pending: releases.filter((r) => r.status === 'uploading' || r.status === 'auditioning'),
   }), [releases]);
 
-  // What upload-url will let through today, so a ten-track album is told
-  // here rather than refused on track seven.
   // One world per artist: the world card says "your world", never "build one", once they have it.
   const { hasWorld, worldPath: myWorldPath } = useHasWorld();
 
@@ -148,7 +163,11 @@ const Studio = () => {
   const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
 
   const detailProblem = detailProblems({ ...details, track_number: null })[0] ?? null;
-  const onRelease = !!details.release_id;
+  /** Placing a single or a catalog onto a release that already exists, from the details. */
+  const onRelease = !collection && !!details.release_id;
+  /** A single's artwork is the release artwork; every other type lets a track carry its own. */
+  const ownArtwork = releaseType !== 'single';
+  const validGenre = (g: string | null | undefined) => !!g && (GENRES as string[]).includes(g);
 
   /** What stops this one row from being sent, in the artist's words. */
   const trackProblem = (t: QueuedTrack): string | null => {
@@ -169,35 +188,106 @@ const Studio = () => {
     }
     return null;
   };
-  const sameTitleOf = (t: QueuedTrack): ArtistRelease | null => {
+  /** The allowed case of a shared name: the title marks this one as its own version. */
+  const trackNote = (t: QueuedTrack): string | null => {
     const title = t.title.trim().toLowerCase();
-    return title ? releases.find((r) => (r.title ?? '').trim().toLowerCase() === title) ?? null : null;
-  };
-  const twiceInQueue = (t: QueuedTrack): boolean => {
-    const title = t.title.trim().toLowerCase();
-    return !!title && tracks.some((o) => o.key !== t.key && o.title.trim().toLowerCase() === title);
+    if (!title) return null;
+    if (tracks.some((o) => o.key !== t.key && o.title.trim().toLowerCase() === title)) {
+      return 'Another track here shares this name, and this one is marked as its own version.';
+    }
+    const same = releases.find((r) => (r.title ?? '').trim().toLowerCase() === title);
+    return same ? `You already have a record called this (${STATUS_LABEL[same.status] ?? same.status}). This goes up beside it as its own version.` : null;
   };
 
   // Every record files under a genre. No default: the artist picks one.
-  const genreMissing = !(GENRES as string[]).includes(genre);
+  const genreMissing = !validGenre(genre);
+  const trackGenreMissing = (t: QueuedTrack) => !validGenre(t.genre) && genreMissing;
+  const sharedCoverOk = cover.status !== 'idle' && cover.status !== 'error';
+  const trackCoverState = (t: QueuedTrack): CoverStatus => (ownArtwork ? trackCoverStatus[t.key] ?? 'idle' : 'idle');
+  const trackCoverOk = (t: QueuedTrack) => {
+    const own = trackCoverState(t);
+    return own !== 'idle' ? own !== 'error' : sharedCoverOk;
+  };
 
-  const canSubmit =
-    queued.length > 0 && queued.every((t) => !trackProblem(t)) && !!cover && !coverCheck.block && !detailProblem
-    && !genreMissing && artistName.trim().length > 0 && !busy && !cannotUpload;
+  const kindLabel = typeLabel(releaseType);
+  const releaseProblem = !collection
+    ? null
+    : !releaseTitle.trim()
+      ? `Give the ${kindLabel} a title.`
+      : upc.trim() && !/^\d{12,13}$/.test(upc.replace(/[\s-]/g, ''))
+        ? 'A UPC is 12 or 13 digits. Leave it empty if you do not have one.'
+        : null;
+  const advice = countAdvice(releaseType, tracks.length);
+  const today = new Date().toISOString().slice(0, 10);
+  const scheduledAhead = Boolean((details.release_at && new Date(details.release_at).getTime() > Date.now()) || (!details.release_at && details.release_date && details.release_date > today));
+
+  /** The one thing standing between the artist and Send, in their words. */
+  const blocker: string | null = (() => {
+    if (cannotUpload || !queued.length) return null;
+    if (releaseProblem) return releaseProblem;
+    if (queued.some((t) => !trackCoverOk(t))) {
+      const own = queued.find((t) => trackCoverState(t) === 'error');
+      if (own) return `The artwork for "${own.title || own.file.name}" did not work. Pick it again, or remove it to use the shared artwork.`;
+      if (cover.status === 'error') return 'The artwork did not work. Pick it again; your audio stays right where it is.';
+      return ownArtwork
+        ? 'Add artwork: shared artwork above, or its own in each track\'s details. Nothing goes live without it.'
+        : 'Add the artwork. Nothing goes live without it.';
+    }
+    if (queued.some(trackGenreMissing)) return 'Pick a genre. A record cannot go out without one.';
+    if (!artistName.trim()) return 'Add the artist name.';
+    const bad = queued.find((t) => trackProblem(t));
+    if (bad) return `Track ${tracks.indexOf(bad) + 1}: ${trackProblem(bad)}`;
+    if (detailProblem) return detailProblem;
+    return null;
+  })();
+
+  const canSubmit = queued.length > 0 && !blocker && !busy && !cannotUpload;
 
   const meta = (): BatchMeta => ({
     artistName: artistName.trim(),
     genre: genreMissing ? undefined : genre,
-    cover,
-    details,
+    coverUrl: sharedCoverOk ? cover.whenReady() : null,
+    coverFor: ownArtwork
+      ? (key) => {
+          const st = trackCoverStatus[key];
+          if (!st || st === 'idle' || st === 'error') return null;
+          return trackCoverGet.current.get(key)?.() ?? null;
+        }
+      : undefined,
+    release: collection
+      ? {
+          title: releaseTitle.trim(),
+          kind: releaseKindOf(releaseType)!,
+          release_date: details.release_date,
+          description: releaseAbout.trim() || null,
+          upc: upc.replace(/[\s-]/g, '') || null,
+        }
+      : null,
+    details: collection ? { ...details, release_id: null, track_number: null } : details,
   });
 
   const addFiles = (incoming: FileList | File[] | null) => {
-    const files = Array.from(incoming ?? []).filter(
+    const all = Array.from(incoming ?? []);
+    const files = all.filter(
       (f) => /\.(wav|mp3)$/i.test(f.name) || /^audio\/(wav|x-wav|mpeg)$/.test(f.type),
     );
-    if (!files.length) return;
+    // A picture dropped with the audio is the artwork.
+    const image = all.find((f) => f.type.startsWith('image/'));
+    if (image && cover.status === 'idle') cover.pick(image);
+    if (!files.length) {
+      if (!image && all.length) toast('Only WAV and MP3 files can be sent', { description: 'Export the track as WAV or MP3 and pick it again.' });
+      return;
+    }
     add(files, { onRelease });
+  };
+
+  /** An EP, album, mixtape or compilation is made here, so an existing release picked in the details is let go. */
+  const changeReleaseType = (next: ReleaseType) => {
+    if (isCollection(next) && details.release_id) {
+      setDetails((d) => ({ ...d, release_id: null, track_number: null }));
+      numberAll(false);
+    }
+    setReleaseType(next);
   };
 
   /** Turning a release on numbers the queue in order; turning it off clears the numbers. */
@@ -215,19 +305,25 @@ const Studio = () => {
     }
   };
 
+  const dropAt = (index: number) => {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setDragOverIndex(null);
+    if (from !== null && from !== index) moveTo(from, index);
+  };
+
   const startOver = () => {
     reset();
     setGenre('');
     setDetails(EMPTY_DETAILS);
     setMoreOpen(false);
-    setCover(null);
-    setCoverCheck({ block: null, warn: null });
-    setCoverPreview((url) => {
-      if (url) URL.revokeObjectURL(url);
-      return null;
-    });
+    cover.clear();
+    setReleaseTitle('');
+    setReleaseAbout('');
+    setUpc('');
+    setTrackCoverStatus({});
+    trackCoverGet.current.clear();
     if (fileRef.current) fileRef.current.value = '';
-    if (coverRef.current) coverRef.current.value = '';
   };
 
   const doneCount = tracks.filter((t) => t.phase === 'done' && t.result?.passed).length;
@@ -292,7 +388,7 @@ const Studio = () => {
           <h1 className="font-heading text-3xl font-bold text-foreground">Studio</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-8">
-          Send a finished record. The judges listen, and it is live the same minute. One or a whole EP at once.
+          Send a finished record. The judges listen, and it is live the same minute. A single, an EP, an album, or your whole back catalogue at once.
         </p>
 
         {/* ------------------------------------------------------- world --- */}
@@ -335,52 +431,216 @@ const Studio = () => {
         {/* ------------------------------------------------------ upload --- */}
 
         {!finished && (
-          <div className="rounded-2xl border border-border bg-card p-5 mb-8">
-            <div
-              onDragOver={(e) => { e.preventDefault(); if (!busy) setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setDragging(false); if (!busy) addFiles(e.dataTransfer.files); }}
-              className={`rounded-xl border border-dashed p-3 transition-colors ${dragging ? 'border-primary bg-primary/5' : 'border-border'}`}
-            >
+          <div className="mb-8 rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <ReleaseTypePicker value={releaseType} onChange={changeReleaseType} disabled={busy} />
+
+            {/* -------------------------------------------- the release --- */}
+            <div className="mt-5 space-y-4">
+              {collection && (
+                <label className="block">
+                  <span className={FIELD_LABEL}>{kindLabel} title</span>
+                  <input
+                    value={releaseTitle}
+                    onChange={(e) => setReleaseTitle(e.target.value)}
+                    disabled={busy}
+                    maxLength={120}
+                    placeholder={`The name of the ${kindLabel}`}
+                    aria-invalid={tracks.length > 0 && !releaseTitle.trim()}
+                    className={`${FIELD_INPUT} h-11`}
+                  />
+                </label>
+              )}
+
+              <ArtworkField
+                cover={cover}
+                disabled={busy}
+                listenPaste
+                profileUrl={profile?.avatar_url ?? null}
+                label={collection ? `${kindLabel} artwork` : releaseType === 'catalog' ? 'Shared artwork (optional)' : 'Artwork'}
+                hint={
+                  collection
+                    ? 'Any photo, squared for you. It goes on every track; a track can have its own in Track details.'
+                    : releaseType === 'catalog'
+                      ? 'Goes on every song without its own. Each song can have its own in Track details.'
+                      : 'Any photo, squared for you. Nothing goes live without artwork.'
+                }
+              />
+
               <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {tracks.length > 0 ? 'Add more audio files' : 'Audio files'}
-                </span>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  multiple
-                  accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg"
+                <span className={FIELD_LABEL}>{releaseType === 'catalog' ? 'Default genre' : 'Genre'}</span>
+                <select
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
                   disabled={busy}
-                  onChange={(e) => {
-                    addFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                  className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-primary/15 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/25"
-                />
+                  required
+                  aria-required="true"
+                  aria-invalid={queued.some(trackGenreMissing)}
+                  className={`${FIELD_INPUT} h-11 ${queued.some(trackGenreMissing) ? 'border-amber-500/60' : ''}`}
+                >
+                  <option value="" disabled>Pick the closest one</option>
+                  {GENRES.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+                {queued.some(trackGenreMissing) ? (
+                  <span className="mt-1 block text-xs text-amber-500">
+                    Pick a genre. A record cannot go out without one.
+                  </span>
+                ) : (
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {releaseType === 'single'
+                      ? 'This is where the record files in Discover. Pick the nearest fit; you can change it later.'
+                      : 'Every track files here unless you pick another in its Track details.'}
+                  </span>
+                )}
               </label>
+
+              {collection && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className={FIELD_LABEL}>Release date and time</span>
+                    <input
+                      type="datetime-local"
+                      value={localInput(details.release_at) || (details.release_date ? `${details.release_date}T00:00` : '')}
+                      disabled={busy}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) { setDetails((d) => ({ ...d, release_at: null, release_date: null })); return; }
+                        const d = new Date(v);
+                        if (Number.isNaN(d.getTime())) return;
+                        setDetails((cur) => ({ ...cur, release_at: d.toISOString(), release_date: d.toISOString().slice(0, 10) }));
+                      }}
+                      className={`${FIELD_INPUT} h-11`}
+                    />
+                    <span className={`mt-1 block text-xs ${scheduledAhead ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {scheduledAhead
+                        ? 'Scheduled. It stays yours alone until that moment, then goes public and your followers are told.'
+                        : 'Blank means out the minute the judges are done. A time ahead schedules it.'}
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className={FIELD_LABEL}>UPC <span className="normal-case font-normal">(optional)</span></span>
+                    <input
+                      value={upc}
+                      onChange={(e) => setUpc(e.target.value)}
+                      disabled={busy}
+                      inputMode="numeric"
+                      maxLength={16}
+                      placeholder="12 or 13 digits"
+                      className={`${FIELD_INPUT} h-11 font-mono`}
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className={FIELD_LABEL}>About the {kindLabel} <span className="normal-case font-normal">(optional)</span></span>
+                    <textarea
+                      value={releaseAbout}
+                      onChange={(e) => setReleaseAbout(e.target.value)}
+                      disabled={busy}
+                      rows={3}
+                      maxLength={2000}
+                      placeholder="What it is, where it was made, who was in the room."
+                      className={`${FIELD_INPUT} resize-y`}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* ----------------------------------------------- the audio --- */}
+            <div
+              onDragOver={(e) => { if (!e.dataTransfer.types.includes('Files')) return; e.preventDefault(); if (!busy) setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => { if (!e.dataTransfer.files.length) return; e.preventDefault(); setDragging(false); if (!busy) addFiles(e.dataTransfer.files); }}
+              className={`mt-5 rounded-xl border border-dashed p-3 transition-colors ${dragging ? 'border-primary bg-primary/5' : 'border-border'}`}
+            >
+              <span className={FIELD_LABEL}>
+                {collection ? 'Tracklist' : releaseType === 'catalog' ? 'Songs' : 'Audio'}
+              </span>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg"
+                disabled={busy}
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={busy}
+                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary/15 px-4 text-sm font-semibold text-primary hover:bg-primary/25 disabled:opacity-60"
+              >
+                <UploadCloud className="h-4 w-4" />
+                {tracks.length > 0 ? 'Add more audio' : collection ? 'Add the tracks' : releaseType === 'catalog' ? 'Add songs' : 'Add the audio'}
+              </button>
               <p className="mt-2 text-xs text-muted-foreground">
-                WAV or MP3, up to {MAX_MB} MB each. Pick one, or a whole EP.
+                WAV or MP3, up to {MAX_MB} MB each.{' '}
+                {collection
+                  ? 'Pick them all at once. They start uploading straight away and you set the order below.'
+                  : releaseType === 'catalog'
+                    ? 'Pick as many as you like. Each one goes out as its own single.'
+                    : 'It starts uploading the moment you pick it.'}
+                <span className="hidden sm:inline"> Or drop the files here.</span>
               </p>
             </div>
 
+            {advice && (
+              <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-xs text-foreground">{advice}</p>
+            )}
+            {releaseType === 'single' && tracks.length > 1 && !busy && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => changeReleaseType(tracks.length > 6 ? 'album' : 'ep')}
+                  className="inline-flex min-h-11 items-center rounded-full border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted"
+                >
+                  Make it {tracks.length > 6 ? 'an album' : 'an EP'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeReleaseType('catalog')}
+                  className="inline-flex min-h-11 items-center rounded-full border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted"
+                >
+                  Send as a catalog
+                </button>
+              </div>
+            )}
+
             {tracks.length > 0 && (
-              <ul className="mt-4 space-y-2" aria-label="Tracks to send">
-                {tracks.map((t) => (
-                  <TrackRow
+              <ul className="mt-4 space-y-2" aria-label={collection ? 'Tracklist' : 'Tracks to send'}>
+                {tracks.map((t, i) => (
+                  <TracklistRow
                     key={t.key}
                     track={t}
-                    onRelease={onRelease}
+                    index={i}
+                    count={tracks.length}
+                    position={collection}
+                    manualNumber={onRelease}
                     problem={trackProblem(t)}
-                    sameTitle={sameTitleOf(t)}
-                    twice={twiceInQueue(t)}
+                    note={trackNote(t)}
                     busy={busy}
+                    retryReady={!trackProblem(t) && trackCoverOk(t) && !trackGenreMissing(t) && !releaseProblem && !detailProblem && artistName.trim().length > 0 && !cannotUpload}
+                    ownArtwork={ownArtwork}
+                    sharedGenre={genreMissing ? '' : genre}
+                    sharedCoverPreview={sharedCoverOk ? cover.preview : null}
+                    artistId={artistId}
+                    dragOver={dragOverIndex === i}
                     onTitle={(v) => setTitle(t.key, v)}
                     onNumber={(v) => setTrackNumber(t.key, v)}
                     onRemove={() => remove(t.key)}
                     onRetry={() => void start(meta(), t.key).catch((err) => toast.error((err as Error)?.message || 'That did not go through. Try again.'))}
                     onAskAgain={() => void askAgain(t.key)}
-                    retryReady={!trackProblem(t) && !!cover && !coverCheck.block && !detailProblem && !genreMissing && artistName.trim().length > 0 && !cannotUpload}
+                    onMove={(delta) => move(t.key, delta)}
+                    onExtras={(p) => setExtras(t.key, p)}
+                    onCover={onTrackCover}
+                    onDragStart={() => { dragFrom.current = i; }}
+                    onDragEnter={() => setDragOverIndex(i)}
+                    onDrop={() => dropAt(i)}
+                    onDragEnd={() => { dragFrom.current = null; setDragOverIndex(null); }}
                   />
                 ))}
               </ul>
@@ -388,138 +648,76 @@ const Studio = () => {
             {tracks.length > 1 && !busy && (
               <p className="mt-2 text-xs text-muted-foreground">
                 They go up one after the other and each one is judged the moment it lands. Titles come from the file names; fix any that look wrong before you send.
+                {collection ? ' The arrows set the running order.' : ''}
               </p>
             )}
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Artist name</span>
+            <div className="mt-5 grid gap-4">
+              <label className="block">
+                <span className={FIELD_LABEL}>Artist name</span>
                 <input
                   value={artistName}
                   onChange={(e) => setArtistName(e.target.value)}
                   disabled={busy}
                   maxLength={120}
                   placeholder="How it should appear"
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
+                  className={`${FIELD_INPUT} h-11`}
                 />
               </label>
-              <CoverCropDialog
-                file={cropping}
-                onCancel={() => setCropping(null)}
-                onDone={(f) => { setCropping(null); acceptCover(f); }}
+
+              <DistributionChoice
+                value={details.distribution}
+                onChange={(v) => setDetails((d) => ({ ...d, distribution: v }))}
+                hasWallet={hasWallet}
+                disabled={busy}
               />
-              <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Cover art <span className="normal-case font-normal">{tracks.length > 1 ? '(one for the whole batch)' : ''}</span>
-                </span>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
-                    {coverPreview
-                      ? <img src={coverPreview} alt="" className="h-full w-full object-cover" />
-                      : <ImageIcon className="h-5 w-5 text-muted-foreground" />}
-                  </div>
-                  <input
-                    ref={coverRef}
-                    type="file"
-                    accept={COVER_ACCEPT}
-                    disabled={busy}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null;
-                      e.target.value = '';
-                      if (!f) return;
-                      // Any photo: one that is not square opens the square window first.
-                      void prepareCover(f).then((prepared) => {
-                        if (prepared.needsCrop) setCropping(f);
-                        else acceptCover(prepared.file);
-                      });
-                    }}
-                    className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-foreground"
-                  />
-                </div>
-                {coverCheck.block ? (
-                  <p className="mt-2 text-xs text-destructive">{coverCheck.block}</p>
-                ) : coverCheck.warn ? (
-                  <p className="mt-2 text-xs text-amber-500">{coverCheck.warn}</p>
-                ) : tracks.length > 0 && !cover ? (
-                  <p className="mt-2 text-xs text-amber-500">{NO_COVER}</p>
-                ) : (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Any JPG, PNG or WEBP photo. Not square? You drag it square here. {COVER_GOOD_PX} pixels or more looks best. Nothing goes live without it.
-                  </p>
-                )}
-              </label>
 
-              <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Genre</span>
-                <select
-                  value={genre}
-                  onChange={(e) => setGenre(e.target.value)}
-                  disabled={busy}
-                  required
-                  aria-required="true"
-                  aria-invalid={tracks.length > 0 && genreMissing}
-                  className={`w-full rounded-xl border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none ${tracks.length > 0 && genreMissing ? 'border-amber-500/60' : 'border-border'}`}
-                >
-                  <option value="" disabled>Pick the closest one</option>
-                  {GENRES.map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </select>
-                {tracks.length > 0 && genreMissing ? (
-                  <span className="mt-1 block text-xs text-amber-500">
-                    Pick a genre. A record cannot go out without one.
-                  </span>
-                ) : (
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    This is where the record files in Discover. Pick the nearest fit; you can change it later.
-                  </span>
-                )}
-              </label>
-
-              <div className="sm:col-span-2">
-                <DistributionChoice
-                  value={details.distribution}
-                  onChange={(v) => setDetails((d) => ({ ...d, distribution: v }))}
-                  hasWallet={hasWallet}
-                  disabled={busy}
-                />
-              </div>
-
-              <div className="sm:col-span-2 rounded-xl border border-border">
+              <div className="rounded-xl border border-border">
                 <button
                   type="button"
                   onClick={() => setMoreOpen((v) => !v)}
                   aria-expanded={moreOpen}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                  className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
                 >
-                  <span>
+                  <span className="min-w-0">
                     <span className="block text-sm font-semibold text-foreground">
-                      {tracks.length > 1 ? 'EP or album, credits and paperwork' : 'Lyrics, credits and paperwork'}
+                      {tracks.length > 1 || collection ? 'Credits, splits and paperwork' : 'Lyrics, credits and paperwork'}
                     </span>
                     <span className="block text-xs text-muted-foreground">
-                      {tracks.length > 1 ? 'Put these tracks on one release. Optional now, editable any time.' : 'Optional now, editable any time from your catalog.'}
+                      {collection
+                        ? 'Shared by every track on the release. Optional now, editable any time.'
+                        : tracks.length > 1
+                          ? 'Shared by every song in this batch. Optional now, editable any time.'
+                          : 'Optional now, editable any time from your catalog.'}
                     </span>
                   </span>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {moreOpen && (
                   <div className="border-t border-border p-3">
-                    <SongDetailsFields value={details} onChange={changeDetails} disabled={busy} artistId={artistId} shared={tracks.length > 1} />
+                    <SongDetailsFields
+                      value={details}
+                      onChange={changeDetails}
+                      disabled={busy}
+                      artistId={artistId}
+                      shared={tracks.length > 1 || collection}
+                      hideRelease={collection}
+                      hideReleaseDate={collection}
+                      hideFeatured
+                      hideExplicit
+                    />
                   </div>
                 )}
               </div>
             </div>
 
-            {detailProblem && (
-              <p className="mt-4 text-xs text-destructive">{detailProblem}</p>
-            )}
-            {tracks.length > 0 && genreMissing && !busy && (
-              <p className="mt-4 text-xs text-destructive">Pick a genre above before you send.</p>
+            {!busy && blocker && (
+              <p className="mt-4 text-xs text-amber-500" aria-live="polite">{blocker}</p>
             )}
 
             {busy && tracks.length > 1 && (
               <div className="mt-5 flex items-center gap-2 text-sm text-foreground">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
                 {sentCount} of {tracks.length} sent. Keep this page open until the last one is with the judges; after that they finish without you.
               </div>
             )}
@@ -541,10 +739,16 @@ const Studio = () => {
               type="button"
               onClick={submit}
               disabled={!canSubmit}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-              {busy ? 'Working' : landing ? (queued.length > 1 ? `Finish and send all ${queued.length}` : 'Finish and send') : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in'}
+              {busy
+                ? 'Working'
+                : landing
+                  ? (queued.length > 1 ? `Finish and send all ${queued.length}` : 'Finish and send')
+                  : collection
+                    ? `Send the ${kindLabel} in`
+                    : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in'}
             </button>
           </div>
         )}
@@ -567,7 +771,7 @@ const Studio = () => {
                     workshopCount ? `${workshopCount} in the workshop` : null,
                     stuckCount ? `${stuckCount} waiting on the judges` : null,
                   ].filter(Boolean).join(', ')}.
-                  {details.release_id ? ' They sit together on the release, in track order.' : ''}
+                  {details.release_id || collection ? ' They sit together on the release, in track order.' : ''}
                 </p>
               </div>
             )}
@@ -674,107 +878,6 @@ const Studio = () => {
     </div>
   );
 };
-
-function mmss(seconds: number): string {
-  return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
-}
-
-/** One record in the queue: its title, what is wrong with it, and how far along it is. */
-function TrackRow({
-  track: t, onRelease, problem, sameTitle, twice, busy, retryReady, onTitle, onNumber, onRemove, onRetry, onAskAgain,
-}: {
-  track: QueuedTrack;
-  onRelease: boolean;
-  problem: string | null;
-  sameTitle: ArtistRelease | null;
-  twice: boolean;
-  busy: boolean;
-  retryReady: boolean;
-  onTitle: (v: string) => void;
-  onNumber: (v: number | null) => void;
-  onRemove: () => void;
-  onRetry: () => void;
-  onAskAgain: () => void;
-}) {
-  const editable = t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId);
-  const mb = (t.file.size / (1024 * 1024)).toFixed(1);
-  return (
-    <li className="rounded-xl border border-border p-3">
-      <div className="flex items-start gap-2">
-        {onRelease && (
-          <input
-            type="number"
-            min={1}
-            max={99}
-            value={t.trackNumber ?? ''}
-            disabled={!editable}
-            aria-label="Track number"
-            placeholder="#"
-            onChange={(e) => onNumber(e.target.value ? Number(e.target.value) : null)}
-            className="w-14 shrink-0 rounded-xl border border-border bg-background px-2 py-2 text-center text-sm tabular-nums text-foreground focus:border-primary focus:outline-none disabled:opacity-60"
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <input
-            value={t.title}
-            onChange={(e) => onTitle(e.target.value)}
-            disabled={!editable}
-            maxLength={120}
-            placeholder="Song title"
-            aria-label="Song title"
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none disabled:opacity-60"
-          />
-          <p className="mt-1 truncate text-xs text-muted-foreground">
-            {t.file.name}{t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}, {mb} MB
-          </p>
-          {problem && editable && <p className="mt-1 text-xs text-destructive">{problem}</p>}
-          {/* A plain duplicate is stopped in trackProblem now. What is left to
-              say here is the allowed case: the title marks this as its own
-              version, so it goes up beside the other one instead of over it. */}
-          {!problem && editable && (twice || sameTitle) && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {twice
-                ? 'Another track here shares this name, and this one is marked as its own version.'
-                : `You already have a record called this (${STATUS_LABEL[sameTitle!.status] ?? sameTitle!.status}). This goes up beside it as its own version.`}
-            </p>
-          )}
-          {(t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || t.phase === 'auditioning') && (
-            <UploadProgress phase={t.phase} progress={t.progress} />
-          )}
-          {t.phase === 'done' && t.result && (
-            <p className={`mt-2 inline-flex items-center gap-1.5 text-xs font-semibold ${t.result.passed ? 'text-primary' : 'text-amber-500'}`}>
-              {t.result.passed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Wrench className="h-3.5 w-3.5" />}
-              {t.result.passed ? (t.result.tier ? `Live. ${TIER_LABEL[t.result.tier]}` : 'Live') : 'In the workshop'}
-            </p>
-          )}
-          {t.phase === 'error' && t.error && (
-            <div className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2.5">
-              <p className="text-xs text-foreground">{t.error}</p>
-              <button
-                type="button"
-                onClick={t.songId ? onAskAgain : onRetry}
-                disabled={busy || (!t.songId && !retryReady)}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50 min-h-10"
-              >
-                <RefreshCw className="h-3 w-3" /> {t.songId ? 'Ask the judges again' : 'Try again'}
-              </button>
-            </div>
-          )}
-        </div>
-        {editable && !busy && (
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label={`Remove ${t.title || t.file.name}`}
-            className="shrink-0 rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-    </li>
-  );
-}
 
 /** What the judges said about one record, once the batch is through. */
 function ResultCard({ track: t, many, releaseDate, releaseAt, onAskAgain }: { track: QueuedTrack; many: boolean; releaseDate: string | null; releaseAt?: string | null; onAskAgain: () => void }) {

@@ -22,10 +22,19 @@ export function SongDetailsFields({
   disabled = false,
   artistId,
   shared = false,
+  hideRelease = false,
+  hideReleaseDate = false,
+  hideFeatured = false,
+  hideExplicit = false,
 }: {
   value: SongDetails;
   onChange: (next: SongDetails) => void;
   disabled?: boolean;
+  /** The upload form asks for these elsewhere (the release card, or per track). */
+  hideRelease?: boolean;
+  hideReleaseDate?: boolean;
+  hideFeatured?: boolean;
+  hideExplicit?: boolean;
   /** When known, the track can be placed on one of this artist's releases. */
   artistId?: string | null;
   /**
@@ -61,7 +70,7 @@ export function SongDetailsFields({
           : 'Everything here is optional and can be changed later. Lyrics and credits show on the song page; the identifiers are what a distributor, a publisher or a sync desk asks for.'}
       </p>
 
-      {artistId && (
+      {artistId && !hideRelease && (
         <ReleasePicker
           artistId={artistId}
           releaseId={value.release_id}
@@ -149,19 +158,19 @@ export function SongDetailsFields({
         )}
       </div>
 
-      <FeaturedArtists
+      {!hideFeatured && <FeaturedArtists
         value={value.featured}
         onChange={(next) => set('featured', next)}
         disabled={disabled}
         selfArtistId={artistId}
-      />
+      />}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className={label}>Language</span>
           <input value={value.language ?? ''} disabled={disabled} maxLength={40} placeholder="Bemba, English, Nyanja..." onChange={(e) => set('language', e.target.value)} className={input} />
         </label>
-        <label className="block">
+        {!hideReleaseDate && <label className="block">
           <span className={label}>Release date and time</span>
           <input
             type="datetime-local"
@@ -181,7 +190,7 @@ export function SongDetailsFields({
               ? 'Scheduled. It stays yours alone until that moment, then goes public and your followers are told.'
               : 'Blank means out the minute the judges are done. A time ahead schedules it, to the minute.'}
           </span>
-        </label>
+        </label>}
         {!shared && <label className="block">
           <span className={label}>ISRC</span>
           <input
@@ -211,7 +220,7 @@ export function SongDetailsFields({
         </label>
       </div>
 
-      <label className="flex items-center gap-3 text-sm text-foreground">
+      {!hideExplicit && <label className="flex items-center gap-3 text-sm text-foreground">
         <input
           type="checkbox"
           checked={value.explicit}
@@ -220,7 +229,7 @@ export function SongDetailsFields({
           className="h-4 w-4 accent-[hsl(var(--primary))]"
         />
         Explicit lyrics
-      </label>
+      </label>}
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">

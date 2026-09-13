@@ -50,6 +50,39 @@ export async function prepareCover(file: File): Promise<{ file: File; needsCrop:
   return { file: await shrinkCover(file), needsCrop: false };
 }
 
+/** Whether this browser can open the picture at all, and how big it is. */
+export function readCoverSize(file: File): Promise<{ width: number; height: number } | null> {
+  return readSize(file);
+}
+
+/**
+ * The cover without asking: a square photo comes back shrunk, any other shape
+ * is cut to its centre square here, and the artist can adjust it afterwards if
+ * the centre is not the part they wanted. Throws a plain sentence when the
+ * browser cannot open the picture.
+ */
+export async function squareCover(file: File): Promise<{ file: File; cropped: boolean }> {
+  const size = await readSize(file);
+  if (!size || !size.width || !size.height) {
+    throw new Error(
+      /hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)
+        ? 'This browser cannot open HEIC photos. Pick a JPG or PNG, or set your camera to save as Most Compatible.'
+        : 'That picture could not be opened. Try a JPG, PNG or WEBP.',
+    );
+  }
+  const ratio = size.width / size.height;
+  // Anything the upload door would not take as it is gets re-encoded as a JPEG.
+  const plainType = /^image\/(jpeg|jpg|png|webp)$/.test(file.type);
+  if (Math.abs(ratio - 1) <= SQUARE_SLACK && plainType) return { file: await shrinkCover(file), cropped: false };
+  const out = await cropImage(file, CENTRE_CROP, {
+    outputWidth: COVER_OUTPUT_PX,
+    mime: 'image/jpeg',
+    quality: 0.9,
+    fileName: file.name.replace(/\.[^.]+$/, '') + '-cover',
+  });
+  return { file: out, cropped: Math.abs(ratio - 1) > SQUARE_SLACK };
+}
+
 /** Drag a photo square. Open while `file` is set. */
 export function CoverCropDialog({
   file,

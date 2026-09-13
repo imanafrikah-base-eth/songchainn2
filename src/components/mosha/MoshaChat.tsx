@@ -10,12 +10,28 @@ import { useDuplicateAccounts } from '@/hooks/useAccountLinks';
 import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
 import { getWorldByArtistId } from '@/worlds/registry';
 
-const STARTERS = [
+/**
+ * The questions offered before the first word, by who is asking.
+ *
+ * One list served everybody, and two of its five were musician questions, so
+ * the landing page, where nearly everyone is a listener, leaned toward artists
+ * (founder, 13 Sep 2026). A listener is offered listening; the door for someone
+ * who makes music stays, once, at the end. An artist account gets its own set.
+ */
+const LISTENER_STARTERS = [
   'What is this place?',
+  'What should I listen to first?',
+  'Is it really free to stream?',
   'How do I get closer to an artist?',
-  'What can I do without a wallet?',
+  'I make music. Where do I start?',
+];
+
+const ARTIST_STARTERS = [
   'How do I put my music out?',
-  'How do I switch to my artist account?',
+  'How do I get paid for my music?',
+  'Who is listening to my songs?',
+  'How do I build my world?',
+  'What can my fans do here?',
 ];
 
 /**
@@ -351,7 +367,7 @@ export function MoshaChat({
         )}
         {turns.length === 0 && !busy && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {(suggestions?.length ? suggestions : STARTERS).map((s) => (
+            {(suggestions?.length ? suggestions : isArtist ? ARTIST_STARTERS : LISTENER_STARTERS).map((s) => (
               <button key={s} type="button" onClick={() => send(s)} className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted min-h-10">
                 {s}
               </button>

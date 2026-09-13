@@ -79,7 +79,7 @@ export interface Song {
   volume?: string;
   /** The releases row behind `volume`, when there is one. */
   releaseId?: string;
-  releaseKind?: 'single' | 'ep' | 'album';
+  releaseKind?: 'single' | 'ep' | 'album' | 'mixtape' | 'compilation';
   /** Position on the release, 1-based. Unset means "in the order it arrived". */
   trackNumber?: number;
   explicit?: boolean;
@@ -112,7 +112,7 @@ export interface Catalog {
   songIds: string[];
   volume?: Song['volume'];
   releaseId?: string;
-  kind?: 'single' | 'ep' | 'album';
+  kind?: 'single' | 'ep' | 'album' | 'mixtape' | 'compilation';
   addedAt?: string;
   genre: Genre;
   totalPlays: number;

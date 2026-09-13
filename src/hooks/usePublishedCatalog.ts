@@ -65,7 +65,7 @@ function leadNameOf(row: PublishedSongRow): string {
 interface ReleaseRow {
   id: string;
   title: string;
-  kind: 'single' | 'ep' | 'album';
+  kind: 'single' | 'ep' | 'album' | 'mixtape' | 'compilation';
   cover_art_url: string | null;
 }
 

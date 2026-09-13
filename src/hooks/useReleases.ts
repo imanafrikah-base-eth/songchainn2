@@ -8,13 +8,60 @@ import { useAuth } from '@/context/AuthContext';
  * a track number, so a record can finally be more than a pile of singles.
  */
 
-export type ReleaseKind = 'single' | 'ep' | 'album';
+export type ReleaseKind = 'single' | 'ep' | 'album' | 'mixtape' | 'compilation';
 
 export const RELEASE_KIND_LABEL: Record<ReleaseKind, string> = {
   single: 'Single',
   ep: 'EP',
   album: 'Album',
+  mixtape: 'Mixtape',
+  compilation: 'Compilation',
 };
+
+/**
+ * What a kind is stored as when the database does not know it yet. Mixtape and
+ * compilation arrive with migration 20260913000500; until it is applied the
+ * CHECK on releases.kind refuses them, and the release is kept as an album
+ * rather than lost.
+ */
+const KIND_FALLBACK: Partial<Record<ReleaseKind, ReleaseKind>> = {
+  mixtape: 'album',
+  compilation: 'album',
+};
+
+export interface NewRelease {
+  artistId: string;
+  ownerId: string;
+  title: string;
+  kind: ReleaseKind;
+  release_date?: string | null;
+  description?: string | null;
+  upc?: string | null;
+  cover_art_url?: string | null;
+}
+
+/** Insert one releases row, retrying an unknown kind as its fallback. */
+export async function insertRelease(input: NewRelease): Promise<ReleaseGroup> {
+  const title = input.title.trim();
+  if (!title) throw new Error('A release needs a title.');
+  const row = (kind: ReleaseKind) => ({
+    artist_id: input.artistId,
+    owner_id: input.ownerId,
+    title,
+    kind,
+    release_date: input.release_date || null,
+    description: input.description?.trim() || null,
+    upc: input.upc?.trim() || null,
+    cover_art_url: input.cover_art_url || null,
+  });
+  let { data, error } = await supabase.from('releases' as never).insert(row(input.kind) as never).select(COLUMNS).single();
+  const fallback = KIND_FALLBACK[input.kind];
+  if (error && fallback && (error.code === '23514' || /releases_kind_check/.test(error.message ?? ''))) {
+    ({ data, error } = await supabase.from('releases' as never).insert(row(fallback) as never).select(COLUMNS).single());
+  }
+  if (error) throw new Error(error.message || 'The release could not be made. Try again.');
+  return data as unknown as ReleaseGroup;
+}
 
 export interface ReleaseGroup {
   id: string;
@@ -78,24 +125,9 @@ export function useReleaseGroupActions(artistId: string | null | undefined) {
   const createRelease = useCallback(
     async (input: { title: string; kind: ReleaseKind; release_date?: string | null; description?: string | null; upc?: string | null }) => {
       if (!user || !artistId) throw new Error('Sign in as an artist first.');
-      const title = input.title.trim();
-      if (!title) throw new Error('A release needs a title.');
-      const { data, error } = await supabase
-        .from('releases' as never)
-        .insert({
-          artist_id: artistId,
-          owner_id: user.id,
-          title,
-          kind: input.kind,
-          release_date: input.release_date || null,
-          description: input.description?.trim() || null,
-          upc: input.upc?.trim() || null,
-        } as never)
-        .select(COLUMNS)
-        .single();
-      if (error) throw error;
+      const made = await insertRelease({ ...input, artistId, ownerId: user.id });
       await refresh();
-      return data as unknown as ReleaseGroup;
+      return made;
     },
     [user, artistId, refresh],
   );

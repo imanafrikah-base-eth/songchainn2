@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music, Headphones } from 'lucide-react';
 import { CATALOGS, SONGS, ARTISTS, buildCatalogs, type Song } from '@/data/musicData';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+import { RELEASE_KIND_LABEL } from '@/hooks/useReleases';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
@@ -129,7 +130,7 @@ export default function CatalogDetail() {
 
             <div className="flex-1">
               <p className="text-sm text-muted-foreground mb-2 uppercase tracking-wide">
-                {catalog.kind === 'album' ? 'Album' : catalog.kind === 'ep' ? 'EP' : catalog.kind === 'single' ? 'Single' : 'Catalog'}
+                {(catalog.kind && RELEASE_KIND_LABEL[catalog.kind]) || 'Catalog'}
               </p>
               <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground mb-4">
                 {catalog.title}

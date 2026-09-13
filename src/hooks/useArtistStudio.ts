@@ -2,10 +2,11 @@ import { useCallback, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { saveSongDetails, type SongDetails } from '@/lib/songDetails';
+import { EMPTY_DETAILS, saveSongDetails, type Featured, type SongDetails } from '@/lib/songDetails';
 import { landCover as landCoverFile, NO_COVER } from '@/lib/coverArt';
 import { sendFile } from '@/lib/storageUpload';
 import { GENRES } from '@/data/musicData';
+import { insertRelease, type ReleaseKind } from '@/hooks/useReleases';
 
 /**
  * The artist side of SONGCHAINN: upload a track, have it auditioned, and see
@@ -219,12 +220,33 @@ export interface QueuedTrack {
   error: string | null;
   result: AuditionResult | null;
   songId: string | null;
+  /** This track's own genre, when it differs from the release. Null follows the release. */
+  genre: string | null;
+  explicit: boolean;
+  /** Who is on this one track. Empty falls back to the batch's featured list. */
+  featured: Featured[];
+}
+
+/** A new EP, album, mixtape or compilation made for this batch. */
+export interface NewReleaseMeta {
+  title: string;
+  kind: ReleaseKind;
+  release_date?: string | null;
+  description?: string | null;
+  upc?: string | null;
 }
 
 export interface BatchMeta {
   artistName: string;
   genre?: string;
+  /** A cover file, landed at send time (the Mo$ha flow). */
   cover?: File | null;
+  /** A cover already landing or landed in the background (the Studio). Wins over `cover`. */
+  coverUrl?: string | Promise<string> | null;
+  /** A track's own artwork, when it has one. Wins over the shared cover. */
+  coverFor?: (key: string) => string | Promise<string> | null;
+  /** Make one releases row for the whole batch; tracks are numbered in queue order. */
+  release?: NewReleaseMeta | null;
   /** Credits, splits, paperwork, release and distribution, shared by every track. */
   details?: SongDetails;
 }
@@ -235,9 +257,37 @@ const PER_TRACK_ONLY: Array<keyof SongDetails> = ['lyrics', 'description', 'isrc
 let keySeq = 0;
 const nextKey = () => `t${Date.now().toString(36)}${(keySeq++).toString(36)}`;
 
-/** A title from a file name: the extension and any leading track number go. */
-export function titleFromFileName(name: string): string {
-  return name.replace(/\.[^.]+$/, '').replace(/^\d+[\s._-]+/, '').trim() || name;
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** "(Final)", "[Master]", "(v2)" and the like, which are notes to self, never part of a title. */
+const JUNK_TAIL = /\s*[([]\s*(final|master(ed)?|mastered final|final master|mix ?down|wav|mp3|hq|320 ?(kbps)?|v\d+)\s*[)\]]\s*$/i;
+/** "01 ", "01. ", "3 - ", "Track 04 - ". A bare "7 Rings" keeps its number. */
+const LEADING_NUMBER = /^(?:(?:track|trk)\s*\d{1,3}\s*[-.)_]?\s*|0\d\s*[-.)_]?\s*|\d{1,3}\s*[-.)_]\s*)/i;
+
+/**
+ * A title from a file name, the way an artist would have typed it: the
+ * extension, underscores, a leading track number, their own name in front
+ * ("ARTIST - Song") or behind, and notes like "(Final)" all go.
+ */
+export function titleFromFileName(name: string, artistName?: string): string {
+  let t = name.replace(/\.[^.]+$/, '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
+  t = t.replace(LEADING_NUMBER, '');
+  const artist = (artistName ?? '').trim();
+  if (artist) {
+    const a = escapeRe(artist);
+    t = t.replace(new RegExp(`^${a}\\s*[-–:]\\s*`, 'i'), '').replace(new RegExp(`\\s*[-–]\\s*${a}$`, 'i'), '');
+    t = t.replace(LEADING_NUMBER, '');
+  }
+  for (let i = 0; i < 2; i++) t = t.replace(JUNK_TAIL, '');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t || name.replace(/\.[^.]+$/, '') || name;
+}
+
+/** When every file in a pick shares one "Something - " prefix, that prefix is the artist, not the title. */
+function stripSharedPrefix(titles: string[]): string[] {
+  if (titles.length < 2) return titles;
+  const prefixes = titles.map((t) => t.match(/^(.+?)\s+[-–]\s+(.+)$/)?.[1]?.toLowerCase() ?? null);
+  if (!prefixes[0] || prefixes.some((p) => p !== prefixes[0])) return titles;
+  return titles.map((t) => t.replace(/^(.+?)\s+[-–]\s+/, '').replace(LEADING_NUMBER, '').trim() || t);
 }
 
 /**
@@ -252,7 +302,7 @@ export function titleFromFileName(name: string): string {
  * without touching the ones that are already live.
  */
 export function useBatchUpload() {
-  const { user } = useAuth();
+  const { user, artistId } = useAuth();
   const queryClient = useQueryClient();
   const [tracks, setTracks] = useState<QueuedTrack[]>([]);
   const tracksRef = useRef<QueuedTrack[]>([]);
@@ -260,6 +310,8 @@ export function useBatchUpload() {
   const [running, setRunning] = useState(false);
   // The cover lands once; every song row points at the same file.
   const coverUrlRef = useRef<string | null>(null);
+  /** The release made for this batch, once, so a retry never makes a second one. */
+  const releaseIdRef = useRef<string | null>(null);
   /** What a ticket is stamped with before the artist has typed anything. */
   const defaultsRef = useRef<{ artistName: string }>({ artistName: '' });
   /** One file at a time: the landing chain. */
@@ -277,10 +329,11 @@ export function useBatchUpload() {
     const taken = new Set(list.map((t) => `${t.file.name}:${t.file.size}`));
     const fresh = files.filter((f) => !taken.has(`${f.name}:${f.size}`));
     const highest = list.reduce((m, t) => Math.max(m, t.trackNumber ?? 0), 0);
+    const titles = stripSharedPrefix(fresh.map((f) => titleFromFileName(f.name, defaultsRef.current.artistName)));
     const entries: QueuedTrack[] = fresh.map((file, i) => ({
       key: nextKey(),
       file,
-      title: titleFromFileName(file.name),
+      title: titles[i],
       trackNumber: opts?.onRelease ? highest + i + 1 : null,
       seconds: null,
       phase: 'queued',
@@ -288,6 +341,9 @@ export function useBatchUpload() {
       error: null,
       result: null,
       songId: null,
+      genre: null,
+      explicit: false,
+      featured: [],
     }));
     if (!entries.length) return;
     setTracks((cur) => [...cur, ...entries]);
@@ -314,6 +370,27 @@ export function useBatchUpload() {
   const setSeconds = useCallback((key: string, seconds: number | null) => patch(key, { seconds }), [patch]);
   const setTitle = useCallback((key: string, title: string) => patch(key, { title }), [patch]);
   const setTrackNumber = useCallback((key: string, trackNumber: number | null) => patch(key, { trackNumber }), [patch]);
+  /** A track's own genre, explicit flag and featured artists. */
+  const setExtras = useCallback(
+    (key: string, p: Partial<Pick<QueuedTrack, 'genre' | 'explicit' | 'featured'>>) => patch(key, p),
+    [patch],
+  );
+
+  /** Move a track to another place in the running order. */
+  const moveTo = useCallback((from: number, to: number) => {
+    setTracks((list) => {
+      if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+      const next = [...list];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      // A numbered queue keeps its numbers in running order.
+      return next.some((t) => t.trackNumber) ? next.map((t, i) => ({ ...t, trackNumber: i + 1 })) : next;
+    });
+  }, []);
+  const move = useCallback((key: string, delta: number) => {
+    const i = tracksRef.current.findIndex((t) => t.key === key);
+    if (i >= 0) moveTo(i, i + delta);
+  }, [moveTo]);
 
   /** Number every queued track 1..n in queue order, or clear the numbers. */
   const numberAll = useCallback((on: boolean) => {
@@ -323,6 +400,7 @@ export function useBatchUpload() {
   const reset = useCallback(() => {
     setTracks([]);
     coverUrlRef.current = null;
+    releaseIdRef.current = null;
     landedRef.current = new Map();
   }, []);
 
@@ -430,7 +508,13 @@ export function useBatchUpload() {
    * promise so the caller can move on to the next file while the judges work.
    */
   const sendOne = useCallback(
-    async (track: QueuedTrack, meta: BatchMeta, batchSize: number): Promise<{ audition: Promise<void> }> => {
+    async (
+      track: QueuedTrack,
+      meta: BatchMeta,
+      batchSize: number,
+      coverUrl: string | null,
+      release: { id: string; trackNumber: number } | null,
+    ): Promise<{ audition: Promise<void> }> => {
       if (!user) throw new Error('Sign in to upload.');
       const { key } = track;
       // Still landing, or failed before it landed: get it in first.
@@ -443,18 +527,22 @@ export function useBatchUpload() {
       const songId = cur.songId;
       const warnings: string[] = [];
 
-      const details: SongDetails | undefined = meta.details
+      const base = meta.details ?? (release ? EMPTY_DETAILS : undefined);
+      const details: SongDetails | undefined = base
         ? {
-            ...meta.details,
+            ...base,
             ...(batchSize > 1 ? (Object.fromEntries(PER_TRACK_ONLY.map((k) => [k, null])) as Partial<SongDetails>) : {}),
-            track_number: meta.details.release_id ? cur.trackNumber : null,
+            ...(release
+              ? { release_id: release.id, track_number: release.trackNumber }
+              : { track_number: base.release_id ? cur.trackNumber : null }),
+            featured: cur.featured?.length ? cur.featured : base.featured,
+            explicit: Boolean(cur.explicit) || base.explicit,
           }
         : undefined;
 
       // The names the artist typed, and the cover, onto the row that already
       // holds the file. The cover landed before this was called (start does
       // it once for the batch); with no cover nothing goes live, so nothing is sent.
-      const coverUrl = coverUrlRef.current;
       if (!coverUrl) {
         // This used to return quietly. The audio was already in the bucket by
         // then, so the row sat at 'uploading' for ever: no cover, no audition,
@@ -468,7 +556,7 @@ export function useBatchUpload() {
         .update({
           title: cur.title.trim() || titleFromFileName(cur.file.name),
           artist_name: meta.artistName,
-          genre: meta.genre || null,
+          genre: cur.genre || meta.genre || null,
           cover_art_url: coverUrl,
         } as never)
         .eq('id', songId);
@@ -516,28 +604,72 @@ export function useBatchUpload() {
         && (t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId)),
       );
       if (!todo.length) return;
-      // A record always files under a genre. The form enforces it; this
-      // stops any other caller sending one without.
-      if (!meta.genre || !(GENRES as string[]).includes(meta.genre)) {
+      // A record always files under a genre, its own or the release's. The
+      // form enforces it; this stops any other caller sending one without.
+      const genreOk = (g: string | null | undefined) => !!g && (GENRES as string[]).includes(g);
+      if (todo.some((t) => !genreOk(t.genre) && !genreOk(meta.genre))) {
         throw new Error('Pick a genre before you send. Every record files under one.');
       }
+      // Nothing goes live without artwork, so nothing is sent without it:
+      // every track needs its own or the shared one.
+      const hasShared = !!meta.coverUrl || !!meta.cover;
+      if (!hasShared && todo.some((t) => !meta.coverFor?.(t.key))) throw new Error(NO_COVER);
       setRunning(true);
       const auditions: Promise<void>[] = [];
+      /** The artwork failing never costs the audio: the files stay in and the send can be pressed again. */
+      const artwork = async (p: string | Promise<string>): Promise<string> => {
+        try {
+          return await p;
+        } catch (err) {
+          throw new Error(`${(err as Error)?.message || 'The artwork did not upload.'} Your audio is safe. Add the artwork again and send.`);
+        }
+      };
       try {
-        // The cover, once for the whole batch, before a single record is
-        // sent. Nothing goes live without it, so nothing is sent without it.
-        if (!meta.cover) throw new Error(NO_COVER);
-        await landCover(meta.cover);
+        const shared = meta.coverUrl
+          ? await artwork(meta.coverUrl)
+          : meta.cover ? await artwork(landCover(meta.cover)) : null;
+
+        // One releases row for an EP, album, mixtape or compilation, made
+        // once. The running order is the order of the queue.
+        let release: { id: string } | null = null;
+        if (meta.release) {
+          if (!releaseIdRef.current) {
+            if (!user || !artistId) {
+              throw new Error('This account is not linked to an artist page yet, so the release cannot be made. Send the tracks as a catalog, or claim your page first.');
+            }
+            const made = await insertRelease({
+              artistId,
+              ownerId: user.id,
+              title: meta.release.title,
+              kind: meta.release.kind,
+              release_date: meta.release.release_date ?? null,
+              description: meta.release.description ?? null,
+              upc: meta.release.upc ?? null,
+              cover_art_url: shared,
+            });
+            releaseIdRef.current = made.id;
+            await queryClient.invalidateQueries({ queryKey: ['release-groups'] });
+          }
+          release = { id: releaseIdRef.current };
+        }
+
+        let firstCover: string | null = shared;
         for (const t of todo) {
-          auditions.push((await sendOne(t, meta, tracks.length)).audition);
+          const own = meta.coverFor?.(t.key);
+          const cover = own ? await artwork(own) : shared;
+          firstCover = firstCover ?? cover;
+          const position = tracksRef.current.findIndex((x) => x.key === t.key) + 1;
+          const slot = release ? { id: release.id, trackNumber: Math.max(1, position) } : null;
+          auditions.push((await sendOne(t, meta, tracks.length, cover, slot)).audition);
         }
         await Promise.all(auditions);
         // The release gets the batch's cover if it has none of its own.
-        if (meta.details?.release_id && coverUrlRef.current) {
+        const releaseId = release?.id ?? meta.details?.release_id ?? null;
+        if (releaseId && firstCover) {
           await supabase
             .from('releases' as never)
-            .update({ cover_art_url: coverUrlRef.current } as never)
-            .eq('id', meta.details.release_id)
+            .update({ cover_art_url: firstCover } as never)
+            .eq('id', releaseId)
             .is('cover_art_url', null);
           await queryClient.invalidateQueries({ queryKey: ['release-groups'] });
         }
@@ -545,7 +677,7 @@ export function useBatchUpload() {
         setRunning(false);
       }
     },
-    [running, tracks, sendOne, landCover, queryClient],
+    [running, tracks, sendOne, landCover, queryClient, user, artistId],
   );
 
   /** Something is with the judges or the send is running. Files landing on their own do not block the form. */
@@ -555,7 +687,7 @@ export function useBatchUpload() {
   /** Every track has had its go: live, in the workshop, or stuck with a file in. Nothing left to send. */
   const finished = tracks.length > 0 && !busy && tracks.every((t) => t.phase === 'done' || (t.phase === 'error' && !!t.songId));
 
-  return { tracks, busy, landing, finished, add, remove, setSeconds, setTitle, setTrackNumber, numberAll, start, askAgain, reset, setDefaults };
+  return { tracks, busy, landing, finished, add, remove, setSeconds, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults };
 }
 
 /** How long the audio runs, read in the browser before anything is sent. */
