@@ -7,9 +7,11 @@
 -- upload-on-pick reservation (inserted by upload-url with genre null at
 -- status 'uploading') is not affected.
 --
--- NOT APPLIED: written for review. /api/audition sets status to published;
--- with this in place an audition of a genre-less row fails its update, which
--- the Studio already prevents on the client.
+-- Applied to the live project 13 Sep 2026 via MCP, straight after the Studio
+-- that requires a genre went live (28c63ca). Applying it earlier would have
+-- failed auditions from the old Studio, which let genre be empty.
+-- /api/audition sets status to published; an audition of a genre-less row
+-- now fails its update, which the Studio already prevents on the client.
 
 create or replace function public.songs_require_genre()
 returns trigger
