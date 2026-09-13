@@ -171,16 +171,19 @@ export function WorldDoorway({
   cta,
   className = '',
   /**
-   * The Home worlds slideshow plays the doors by itself: they open with no tap,
-   * hold a moment on the other side, and then onFinished moves the slideshow to
-   * the next world. No room tour and no "Open the doors" button in this mode;
-   * everywhere else the doors still wait for the visitor's own push.
+   * Inside the worlds slideshow: no room tour and no "Open the doors" button;
+   * once through the doors it holds a moment and onFinished hands over to the
+   * next world. Kept apart from autoPlay on purpose: scrolling the section half
+   * out of view must not turn a slide back into the full five-room tour.
    */
+  inSlideshow = false,
+  /** Push the doors now (the slideshow sets this once the section is on screen). */
   autoPlay = false,
   onFinished,
 }: {
   cta: React.ReactNode;
   className?: string;
+  inSlideshow?: boolean;
   autoPlay?: boolean;
   onFinished?: () => void;
 }) {
@@ -360,13 +363,13 @@ export function WorldDoorway({
   const finishedRef = useRef(onFinished);
   useEffect(() => { finishedRef.current = onFinished; }, [onFinished]);
   useEffect(() => {
-    if (!autoPlay || phase !== 'inside') return;
+    if (!inSlideshow || phase !== 'inside') return;
     const t = window.setTimeout(
       () => finishedRef.current?.(),
       motionOk && !reduceMotion ? AUTO_HOLD_MS : AUTO_HOLD_STILL_MS,
     );
     return () => window.clearTimeout(t);
-  }, [autoPlay, phase, motionOk, reduceMotion]);
+  }, [inSlideshow, phase, motionOk, reduceMotion]);
 
   /* Walking from room to room. After the last room the doors shut again and
      the walk is over: a preview that stays open on a loop reads as if the
@@ -374,7 +377,7 @@ export function WorldDoorway({
      still under them, say the true thing: you have seen it, the way in is
      below. A montage that never ends is wallpaper besides. */
   useEffect(() => {
-    if (phase !== 'inside' || reduceMotion || autoPlay) return;
+    if (phase !== 'inside' || reduceMotion || inSlideshow) return;
     const last = room >= tour.length - 1;
     const t = window.setTimeout(() => {
       if (last) {
@@ -386,7 +389,7 @@ export function WorldDoorway({
       }
     }, last ? LAST_ROOM_MS : ROOM_MS);
     return () => window.clearTimeout(t);
-  }, [phase, room, tour.length, reduceMotion, autoPlay]);
+  }, [phase, room, tour.length, reduceMotion, inSlideshow]);
 
   /* Shut doors play nothing. */
   useEffect(() => {
@@ -501,7 +504,7 @@ export function WorldDoorway({
                 ? 'That was a look through them. To walk in for real, the way is just below.'
                 : world.positioning}
             </p>
-            {!autoPlay && (
+            {!inSlideshow && (
               <Button
                 onClick={open}
                 size="lg"
@@ -554,7 +557,7 @@ export function WorldDoorway({
 
       {/* The ask, under the picture rather than over it, so it is never
           competing with his art for the same pixels. */}
-      {(phase === 'inside' || toured || autoPlay) && (
+      {(phase === 'inside' || toured || inSlideshow) && (
         <div className="border-t border-border bg-card animate-in fade-in slide-in-from-top-2 duration-500">
           <div className="p-4 sm:p-5">{cta}</div>
         </div>

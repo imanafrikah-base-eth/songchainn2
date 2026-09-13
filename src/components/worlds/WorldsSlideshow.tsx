@@ -83,12 +83,16 @@ export function WorldsSlideshow({
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
+  // Starts false and only the browser says otherwise. It used to be set true
+  // while the list was still loading (no node to watch yet), which pushed the
+  // doors open for a moment off screen and then left the slideshow waiting.
   useEffect(() => {
-    const node = host.current;
-    if (!node || typeof IntersectionObserver === 'undefined') {
+    if (typeof IntersectionObserver === 'undefined') {
       setInView(true);
       return;
     }
+    const node = host.current;
+    if (!node) return;
     const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { threshold: 0.35 });
     io.observe(node);
     return () => io.disconnect();
@@ -167,7 +171,12 @@ export function WorldsSlideshow({
           again plays its animation again: the doors open every time. */}
       <div key={`${world.slug}-${cycle}`} className="animate-in fade-in duration-500">
         {isDoors ? (
-          <WorldDoorway cta={ctaForWorld} autoPlay={count > 1 && inView && !reducedMotion} onFinished={onDoorsFinished} />
+          <WorldDoorway
+            cta={ctaForWorld}
+            inSlideshow={count > 1}
+            autoPlay={count > 1 && inView && !reducedMotion}
+            onFinished={onDoorsFinished}
+          />
         ) : (
           <WorldAd world={world} cta={ctaForWorld} />
         )}
