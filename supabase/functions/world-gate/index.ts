@@ -8,8 +8,8 @@
 // is unset is in pre-launch mode: every balance reads zero, doors stay
 // locked, and the client shows the "key is being cut" state.
 //
-// Request:  POST { world: string }  with the caller's Supabase JWT in Authorization
-// Response: { rings: { ring0, ring1, ring2, council, balance, thresholds, rank, tokenLive, heldNfts } }
+// Request:  POST { world: string, asVisitor?: boolean }  with the caller's JWT
+// Response: { rings: { ring0, ring1, ring2, council, balance, thresholds, rank, tokenLive, heldNfts, isOwner, viewingAsVisitor } }
 //
 // WHOSE WALLET. The first version took a wallet address in the request body
 // and reported that address's holdings as the caller's. Balances are public,
@@ -18,6 +18,18 @@
 // and the wallet is the one linked to their own account (audience_profiles
 // or the SIWE metadata written by wallet-auth), the same rule song-holdings
 // uses. No session, or no linked wallet, means the outer ring only.
+//
+// THE ARTIST IS NOT A VISITOR TO THEIR OWN WORLD. Until v9 the only way to
+// see the inside of a world was to hold enough of its coin, which locked an
+// artist out of the rooms they had just built: they could not check their own
+// gallery, and a draft world answered "Unknown world" so it could not be
+// previewed at all. An artist now walks through every door of the world they
+// own, draft or open, because owning it is a stronger claim than holding a
+// balance. They can ask for a visitor's view with asVisitor, which reports
+// exactly what somebody with their real holdings would see. Ownership is read
+// from worlds.owner_id against their JWT, never from anything the browser
+// says, and an owner's open doors are never written to the access snapshot
+// that prices meeting requests.
 //
 // The verified result is also written to world_access_snapshots, so database
 // triggers (meeting request pricing) can price by real holdings instead of by
@@ -111,8 +123,9 @@ const WORLD_TOKENS: Record<string, WorldTokenConfig> = {
 const ARTIST_CREATOR_COINS: Record<string, string> = {
   "nda": "0xd95f5343ddd180e560dcdf165c39d2e904da3d8f",
   "santana": "0xedbad33620e105d499cbe97a00c0deee252064b6",
+  // 7ROO7H BASED was renamed 7ROO7H on 13 Sep 2026. Both slugs keep the same
+  // coin so a world under either address has its key.
   "7roo7h": "0x846ddf7f47b3c65e73b24db75fb4211f5f1df3b5",
-  // His address before the rename to 7ROO7H; kept so a world made under it stays gated.
   "7roo7h-based": "0x846ddf7f47b3c65e73b24db75fb4211f5f1df3b5",
   "denajah": "0x0f2a0e134a19f53d266b976fd2fae370ac832d13",
   "sanchy": "0xc8b3b18f1c51bdcab4b7e971e093780bd074e9fd",
@@ -279,35 +292,77 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { world } = await req.json().catch(() => ({}));
-    let cfg = typeof world === "string" ? worldConfigFor(world) : undefined;
+    const body = await req.json().catch(() => ({}));
+    const world = body?.world;
+    // An owner asking to see their world the way a stranger sees it.
+    const asVisitor = body?.asVisitor === true;
     const db = admin();
+
+    // Who is asking. This has to happen before the world is looked up, because
+    // whether a draft world exists at all depends on whether the caller owns it.
+    let userId: string | null = null;
+    let wallet: string | null = null;
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    if (token) {
+      const { data } = await db.auth.getUser(token);
+      const user = data?.user;
+      if (user) {
+        userId = user.id;
+        const { data: profile } = await db
+          .from("audience_profiles")
+          .select("wallet_address")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+        wallet =
+          [profile?.wallet_address, meta.wallet_address, meta.farcaster_address].find(isAddress) ?? null;
+      }
+    }
+
+    let cfg = typeof world === "string" ? worldConfigFor(world) : undefined;
+    // Does the caller own this world? Read from the database against their JWT,
+    // never from anything the request claims.
+    let isOwner = false;
     // A world built in the builder brings its own gate row. A token gate is
     // read from its own contract with its own thresholds; a points gate is
     // answered from the loyalty ledger; anything else opens the outer ring
     // and whatever its drops unlock.
     let pointsGate: { fan: number; insider: number } | null = null;
-    if (!cfg && typeof world === "string" && /^[a-z0-9-]{1,64}$/.test(world)) {
-      const { data: row } = await db.from("worlds").select("id, slug").eq("slug", world).eq("status", "published").maybeSingle();
-      if (row) {
-        cfg = builderWorldConfig();
-        const { data: gate } = await db
-          .from("world_gates")
-          .select("kind, token_address, token_decimals, fan_threshold, insider_threshold")
-          .eq("world_id", (row as { id: string }).id)
-          .maybeSingle();
-        const g = gate as { kind?: string; token_address?: string | null; token_decimals?: number | null; fan_threshold?: number | null; insider_threshold?: number | null } | null;
-        if (g?.kind === "token" && isAddress(g.token_address)) {
-          cfg = {
-            ...cfg,
-            defaultTokenAddress: g.token_address as string,
-            defaultDecimals: Number(g.token_decimals ?? 18),
-            defaultFan: Number(g.fan_threshold ?? cfg.defaultFan),
-            defaultInsider: Number(g.insider_threshold ?? cfg.defaultInsider),
-          };
-        } else if (g?.kind === "points") {
-          pointsGate = { fan: Number(g.fan_threshold ?? 1000), insider: Number(g.insider_threshold ?? 10000) };
-          cfg = { ...cfg, defaultFan: pointsGate.fan, defaultInsider: pointsGate.insider };
+    if (typeof world === "string" && /^[a-z0-9-]{1,64}$/.test(world)) {
+      // No status filter: a draft is a real world to the person who made it,
+      // and refusing to resolve it is what made previewing impossible.
+      const { data: row } = await db
+        .from("worlds")
+        .select("id, slug, status, owner_id")
+        .eq("slug", world)
+        .maybeSingle();
+      const w = row as { id: string; status: string; owner_id: string | null } | null;
+      if (w) {
+        isOwner = Boolean(userId && w.owner_id === userId);
+        // A draft belongs to nobody but its owner.
+        if (w.status !== "published" && !isOwner) {
+          return json(origin, { error: "Unknown world" }, 404);
+        }
+        if (!cfg) {
+          cfg = builderWorldConfig();
+          const { data: gate } = await db
+            .from("world_gates")
+            .select("kind, token_address, token_decimals, fan_threshold, insider_threshold")
+            .eq("world_id", w.id)
+            .maybeSingle();
+          const g = gate as { kind?: string; token_address?: string | null; token_decimals?: number | null; fan_threshold?: number | null; insider_threshold?: number | null } | null;
+          if (g?.kind === "token" && isAddress(g.token_address)) {
+            cfg = {
+              ...cfg,
+              defaultTokenAddress: g.token_address as string,
+              defaultDecimals: Number(g.token_decimals ?? 18),
+              defaultFan: Number(g.fan_threshold ?? cfg.defaultFan),
+              defaultInsider: Number(g.insider_threshold ?? cfg.defaultInsider),
+            };
+          } else if (g?.kind === "points") {
+            pointsGate = { fan: Number(g.fan_threshold ?? 1000), insider: Number(g.insider_threshold ?? 10000) };
+            cfg = { ...cfg, defaultFan: pointsGate.fan, defaultInsider: pointsGate.insider };
+          }
         }
       }
     }
@@ -329,24 +384,16 @@ Deno.serve(async (req) => {
     // A points gate has no token and is live all the same.
     const tokenLive = tokenAddressFor(cfg) !== null || pointsGate !== null;
 
-    // Who is asking, and which wallet is really theirs.
-    let userId: string | null = null;
-    let wallet: string | null = null;
-    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-    if (token) {
-      const { data } = await db.auth.getUser(token);
-      const user = data?.user;
-      if (user) {
-        userId = user.id;
-        const { data: profile } = await db
-          .from("audience_profiles")
-          .select("wallet_address")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-        wallet =
-          [profile?.wallet_address, meta.wallet_address, meta.farcaster_address].find(isAddress) ?? null;
-      }
+    // The artist walks through their own doors. Holding your own coin is not a
+    // condition of seeing the rooms you built, and a draft has no coin at all.
+    if (isOwner && !asVisitor) {
+      return json(origin, {
+        rings: {
+          ring0: true, ring1: true, ring2: true, council: true,
+          balance: 0, thresholds, rank: null, tokenLive,
+          heldNfts: {}, isOwner: true, viewingAsVisitor: false,
+        },
+      });
     }
 
     if (!isAddress(wallet)) {
@@ -354,6 +401,7 @@ Deno.serve(async (req) => {
         rings: {
           ring0: true, ring1: false, ring2: false, council: false,
           balance: 0, thresholds, rank: null, tokenLive,
+          isOwner, viewingAsVisitor: isOwner && asVisitor,
         },
       });
     }
@@ -386,9 +434,13 @@ Deno.serve(async (req) => {
       rank,
       tokenLive,
       heldNfts,
+      isOwner,
+      viewingAsVisitor: isOwner && asVisitor,
     };
 
-    // Remember what was verified, for the database to price against.
+    // Remember what was verified, for the database to price against. This is
+    // real holdings only, which is why the owner branch above returns before
+    // reaching it: an artist's open doors must never price a meeting request.
     if (userId) {
       const { error } = await db.from("world_access_snapshots").upsert(
         {
