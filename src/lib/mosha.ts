@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { lastEditWhere, recentDoings } from '@/lib/moshaWatch';
+import type { MoshaAttachment } from '@/lib/moshaAttachments';
+import { isMoshaDoOp, type MoshaDoOp } from '@/lib/moshaDo';
 
 /**
  * Talking to Mo$ha.
@@ -21,7 +23,11 @@ export type MoshaAction =
   | { type: 'flow'; flow: 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery' | 'merge_accounts' }
   | { type: 'go'; path: string }
   /** "Here in the chat, or on the page?" The chat shows both as buttons. */
-  | { type: 'choose'; flow: 'edit_world'; path: string };
+  | { type: 'choose'; flow: 'edit_world'; path: string }
+  /** One tap does it: a button under the reply (src/lib/moshaDo.ts). */
+  | { type: 'do'; op: MoshaDoOp }
+  /** Songs and art sent in the chat, handed to the release flow. */
+  | { type: 'flow'; flow: 'release_files'; attachments?: MoshaAttachment[] };
 
 export type MoshaSurface = 'bubble' | 'inbox' | 'guide';
 
@@ -44,7 +50,7 @@ export async function askMosha(turns: MoshaTurn[], surface: MoshaSurface = 'bubb
 export async function askMoshaFull(
   turns: MoshaTurn[],
   surface: MoshaSurface = 'bubble',
-  opts: { silent?: boolean } = {},
+  opts: { silent?: boolean; attachments?: MoshaAttachment[] } = {},
 ): Promise<MoshaReply> {
   if (!isSupabaseConfigured) {
     return { reply: 'I am offline right now. Everything here still plays; come back to me in a bit.' };
@@ -55,13 +61,24 @@ export async function askMoshaFull(
       // recent: what they just did on the builder, so his next question
       // follows on from it. silent: an automatic ask from the card riding
       // along, which is not written into their chat history.
-      body: { messages: turns.slice(-12), surface, page, recent: recentDoings(), editWhere: lastEditWhere(), silent: Boolean(opts.silent) },
+      // attachments: the files sent with the newest user turn (MoshaAttachment[]).
+      body: {
+        messages: turns.slice(-12),
+        surface,
+        page,
+        recent: recentDoings(),
+        editWhere: lastEditWhere(),
+        silent: Boolean(opts.silent),
+        attachments: opts.attachments ?? [],
+      },
     });
     if (error || !data?.reply) return { reply: DROPPED };
     const raw = data.action as MoshaAction | undefined;
     const action: MoshaAction | undefined =
-      raw?.type === 'flow' && ['upload_song', 'build_world', 'become_artist', 'connect_wallet', 'edit_world', 'edit_gallery', 'merge_accounts'].includes(raw.flow)
+      raw?.type === 'flow' && ['upload_song', 'build_world', 'become_artist', 'connect_wallet', 'edit_world', 'edit_gallery', 'merge_accounts', 'release_files'].includes(raw.flow)
         ? raw
+        : raw?.type === 'do' && isMoshaDoOp(raw.op)
+          ? raw
         : raw?.type === 'go' && typeof raw.path === 'string' && raw.path.startsWith('/')
           ? raw
           : raw?.type === 'choose' && typeof raw.path === 'string' && raw.path.startsWith('/world-builder')

@@ -22,7 +22,7 @@ import { getEnv } from '@/lib/env';
  * slow connections.
  */
 
-export type StorageTarget = { kind: 'visual' | 'song' | 'episode'; id: string };
+export type StorageTarget = { kind: 'visual' | 'song' | 'episode' | 'mosha'; id: string };
 
 /** Largest file the relay carries. Keep in step with RELAY_MAX_BYTES in upload-relay. */
 export const RELAY_MAX_BYTES = 25 * 1024 * 1024;

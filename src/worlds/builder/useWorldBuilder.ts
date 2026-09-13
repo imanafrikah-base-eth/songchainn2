@@ -303,6 +303,10 @@ export function useWorldBuilder(worldId?: string) {
         // The rules that refuse a world (an account holds one; a name belongs
         // to whoever took it) say why in plain words and name the world to
         // open instead, so the artist reads that rather than a code.
+        // No song out yet: the worlds insert policy refuses (has_live_song).
+        if (ce?.code === '42501' || /row-level security/i.test(ce?.message ?? '')) {
+          throw new Error('Worlds open once you have a song out on $ongChainn. Put your first song out and your world opens.');
+        }
         throw new Error(
           ce?.message && ce.code === '23505'
             ? ce.message

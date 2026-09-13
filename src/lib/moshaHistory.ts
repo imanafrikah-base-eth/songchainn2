@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { MoshaAction, MoshaTurn } from '@/lib/mosha';
+import { cleanAttachments, type MoshaAttachment } from '@/lib/moshaAttachments';
 
 /**
  * Where a conversation with Mo$ha lives. There is ONE history per person.
@@ -25,12 +26,14 @@ export interface StoredTurn extends MoshaTurn {
   at: string;
   action?: MoshaAction;
   source?: MoshaSource;
+  /** Files sent with this line. */
+  attachments?: MoshaAttachment[];
 }
 
 export const RECENT_HOURS = 48;
 const GUEST_KEY = 'songchainn_mosha_chat';
 const PAGE = 60;
-const COLUMNS = 'id, role, content, action, source, created_at';
+const COLUMNS = 'id, role, content, action, source, attachments, created_at';
 
 type Row = {
   id: string;
@@ -38,11 +41,21 @@ type Row = {
   content: string;
   action: MoshaAction | null;
   source: MoshaSource | null;
+  attachments: unknown;
   created_at: string;
 };
 
 function fromRow(r: Row): StoredTurn {
-  return { id: r.id, role: r.role, content: r.content, at: r.created_at, action: r.action ?? undefined, source: r.source ?? 'chat' };
+  const attachments = cleanAttachments(r.attachments);
+  return {
+    id: r.id,
+    role: r.role,
+    content: r.content,
+    at: r.created_at,
+    action: r.action ?? undefined,
+    source: r.source ?? 'chat',
+    attachments: attachments.length ? attachments : undefined,
+  };
 }
 
 /**

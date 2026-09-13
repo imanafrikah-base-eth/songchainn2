@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { celebrateLive } from '@/components/studio/LiveCelebration';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -7,6 +9,7 @@ import { landCover as landCoverFile, NO_COVER } from '@/lib/coverArt';
 import { sendFile } from '@/lib/storageUpload';
 import { GENRES } from '@/data/musicData';
 import { insertRelease, type ReleaseKind } from '@/hooks/useReleases';
+import { fileMatchesRow, type DraftTrack, type UploadedRow } from '@/lib/studioDraft';
 
 /**
  * The artist side of SONGCHAINN: upload a track, have it auditioned, and see
@@ -93,6 +96,8 @@ export interface ArtistRelease {
   track_number: number | null;
   isrc: string | null;
   explicit: boolean | null;
+  storage_key: string | null;
+  file_bytes: number | null;
 }
 
 /** A published record whose day has not come yet. */
@@ -119,7 +124,7 @@ export function useArtistReleases() {
     queryFn: async (): Promise<ArtistRelease[]> => {
       let q = supabase
         .from('songs')
-        .select('id, title, artist_name, genre, status, audio_url, cover_art_url, duration_seconds, created_at, published_at, audition, distribution, onchain_requested_at, release_date, release_at, release_id, track_number, isrc, explicit');
+        .select('id, title, artist_name, genre, status, audio_url, cover_art_url, duration_seconds, created_at, published_at, audition, distribution, onchain_requested_at, release_date, release_at, release_id, track_number, isrc, explicit, storage_key, file_bytes');
       q = artistId
         ? q.or(`owner_id.eq.${user!.id},artist_id.eq.${artistId.replace(/,/g, '')}`)
         : q.eq('owner_id', user!.id);
@@ -230,7 +235,13 @@ export interface QueuedTrack {
    * this release instead of a new file. Its row is reused, never uploaded
    * again, and taking it out of the queue never deletes it.
    */
-  existing?: { coverUrl: string | null };
+  existing?: { coverUrl: string | null; storageKey?: string | null; fileBytes?: number | null };
+  /**
+   * The page closed before this file got in (a reload, Android dropping the
+   * tab behind its file picker). The row keeps its place and title and asks
+   * for the file again; the size is how the same file is recognised.
+   */
+  stopped?: { fileSize: number };
 }
 
 /** The row an existing record is brought onto a release from. */
@@ -241,6 +252,110 @@ export interface ExistingRecord {
   cover_art_url: string | null;
   duration_seconds: number | string | null;
   storage_key: string | null;
+  file_bytes?: number | string | null;
+}
+
+const okGenre = (g: string | null | undefined): g is string => !!g && (GENRES as string[]).includes(g);
+
+/** A record whose file is already in, as a row on the tracklist. Sending it never uploads it again. */
+export function trackFromRow(
+  song: ExistingRecord,
+  from?: Pick<DraftTrack, 'title' | 'trackNumber' | 'genre' | 'explicit' | 'featured'>,
+): QueuedTrack {
+  const name = (song.storage_key ?? '').split('/').pop() || `${song.title || 'track'}.mp3`;
+  const seconds = song.duration_seconds === null || song.duration_seconds === undefined ? null : Number(song.duration_seconds);
+  const bytes = song.file_bytes === null || song.file_bytes === undefined ? null : Number(song.file_bytes);
+  return {
+    key: nextKey(),
+    file: new File([], name),
+    title: from?.title?.trim() || (song.title ?? '').trim() || titleFromFileName(name),
+    trackNumber: from?.trackNumber ?? null,
+    seconds: seconds !== null && Number.isFinite(seconds) ? seconds : null,
+    phase: 'ready',
+    progress: 100,
+    error: null,
+    result: null,
+    songId: song.id,
+    genre: okGenre(from?.genre) ? from!.genre : okGenre(song.genre) ? song.genre : null,
+    explicit: from?.explicit ?? false,
+    featured: from?.featured ?? [],
+    existing: { coverUrl: song.cover_art_url, storageKey: song.storage_key, fileBytes: bytes !== null && Number.isFinite(bytes) ? bytes : null },
+  };
+}
+
+/** A track the page lost before its file got in: same place, same title, waiting for the file. */
+export function stoppedTrack(d: DraftTrack): QueuedTrack {
+  return {
+    key: nextKey(),
+    file: new File([], d.fileName || 'track'),
+    title: d.title,
+    trackNumber: d.trackNumber,
+    seconds: null,
+    phase: 'error',
+    progress: 0,
+    error: `This one stopped before it finished uploading. Pick ${d.fileName || 'the file'} again and it goes back in this place.`,
+    result: null,
+    songId: null,
+    genre: okGenre(d.genre) ? d.genre : null,
+    explicit: !!d.explicit,
+    featured: d.featured ?? [],
+    stopped: { fileSize: d.fileSize },
+  };
+}
+
+/**
+ * Does this audio file actually exist at that address? Loads only its
+ * metadata through an audio element, which needs no CORS (the bucket sends no
+ * Access-Control-Allow-Origin on HEAD, so the length cannot be read from a
+ * fetch). A PUT into R2 is all or nothing, so a file that loads is whole.
+ */
+export function audioLoads(url: string, timeoutMs = 12_000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const a = document.createElement('audio');
+    a.preload = 'metadata';
+    let settled = false;
+    const done = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      a.removeAttribute('src');
+      resolve(ok);
+    };
+    const timer = setTimeout(() => done(false), timeoutMs);
+    a.onloadedmetadata = () => done(true);
+    a.onerror = () => done(false);
+    a.src = url;
+  });
+}
+
+/**
+ * The same file picked again after it already went up: the row that holds it,
+ * so it is used instead of uploading a second copy (N3M3SIS sent "wagwan" twice
+ * on 13 Sep 2026, identical bytes, after the page reset under her). 'queued'
+ * means that row is already on the tracklist. Never throws; any doubt uploads.
+ */
+async function findLandedCopy(file: File, userId: string, queue: QueuedTrack[]): Promise<UploadedRow | 'queued' | null> {
+  if (!file.size) return null;
+  try {
+    const { data, error } = await supabase
+      .from('songs')
+      .select('id, title, status, release_id, audio_url, storage_key, file_bytes, cover_art_url, genre, duration_seconds')
+      .eq('owner_id', userId)
+      .eq('status', 'uploading')
+      .is('release_id', null)
+      .eq('file_bytes', file.size)
+      .order('created_at', { ascending: true })
+      .limit(10);
+    if (error || !data) return null;
+    const rows = (data as unknown as UploadedRow[]).filter((r) => !!r.audio_url && fileMatchesRow(file, r));
+    for (const r of rows) {
+      if (!(await audioLoads(r.audio_url as string))) continue;
+      return queue.some((t) => t.songId === r.id) ? 'queued' : r;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /** A new EP, album, mixtape or compilation made for this batch. */
@@ -334,16 +449,42 @@ export function useBatchUpload() {
   const landingRef = useRef<Promise<void>>(Promise.resolve());
   /** Per track, the promise that resolves once its file has landed (or failed). */
   const landedRef = useRef<Map<string, Promise<void>>>(new Map());
+  /** Titles the judges passed since the last celebration. */
+  const passedRef = useRef<string[]>([]);
 
   const patch = useCallback((key: string, p: Partial<QueuedTrack> | ((t: QueuedTrack) => Partial<QueuedTrack>)) => {
     setTracks((list) => list.map((t) => (t.key === key ? { ...t, ...(typeof p === 'function' ? p(t) : p) } : t)));
   }, []);
 
-  /** Queue files. The same file twice is ignored; each one's length is read as it lands in the list. */
-  const add = useCallback((files: File[], opts?: { onRelease: boolean }) => {
+  /**
+   * Queue files. The same file twice is ignored, and so is a file that is
+   * already on the list as an uploaded record. A file the page lost goes back
+   * into its own place. Each one's length is read as it lands in the list.
+   * Returns the names that were already there, so the form can say so.
+   */
+  const add = useCallback((files: File[], opts?: { onRelease: boolean }): { added: number; already: string[] } => {
     const list = tracksRef.current;
-    const taken = new Set(list.map((t) => `${t.file.name}:${t.file.size}`));
-    const fresh = files.filter((f) => !taken.has(`${f.name}:${f.size}`));
+    const already: string[] = [];
+    const taken = new Set(list.filter((t) => !t.stopped && !t.existing).map((t) => `${t.file.name}:${t.file.size}`));
+    const unique = files.filter((f) => {
+      const k = `${f.name}:${f.size}`;
+      const onList =
+        taken.has(k) ||
+        list.some((t) => t.existing && fileMatchesRow(f, { storage_key: t.existing.storageKey ?? null, file_bytes: t.existing.fileBytes ?? null }));
+      if (onList) {
+        already.push(f.name);
+        return false;
+      }
+      taken.add(k);
+      return true;
+    });
+    const refilled: Array<{ key: string; file: File }> = [];
+    const fresh = unique.filter((f) => {
+      const slot = list.find((t) => t.stopped && t.file.name === f.name && t.stopped.fileSize === f.size && !refilled.some((r) => r.key === t.key));
+      if (!slot) return true;
+      refilled.push({ key: slot.key, file: f });
+      return false;
+    });
     const highest = list.reduce((m, t) => Math.max(m, t.trackNumber ?? 0), 0);
     const titles = stripSharedPrefix(fresh.map((f) => titleFromFileName(f.name, defaultsRef.current.artistName)));
     const entries: QueuedTrack[] = fresh.map((file, i) => ({
@@ -361,47 +502,57 @@ export function useBatchUpload() {
       explicit: false,
       featured: [],
     }));
-    if (!entries.length) return;
-    setTracks((cur) => [...cur, ...entries]);
+    if (!entries.length && !refilled.length) return { added: 0, already };
+    const refill = (t: QueuedTrack, file: File): QueuedTrack => ({ ...t, file, stopped: undefined, phase: 'queued', progress: 0, error: null });
+    setTracks((cur) => [
+      ...cur.map((t) => {
+        const r = refilled.find((x) => x.key === t.key);
+        return r ? refill(t, r.file) : t;
+      }),
+      ...entries,
+    ]);
+    for (const r of refilled) {
+      const slot = list.find((t) => t.key === r.key);
+      if (!slot) continue;
+      void readDuration(r.file).then((seconds) => patch(r.key, { seconds }));
+      queueLanding(refill(slot, r.file));
+    }
     for (const e of entries) {
       void readDuration(e.file).then((seconds) => patch(e.key, { seconds }));
       queueLanding(e);
     }
+    return { added: entries.length + refilled.length, already };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patch]);
 
   const setDefaults = useCallback((d: { artistName: string }) => { defaultsRef.current = d; }, []);
 
   /**
-   * Put a record that is already uploaded at the top of the tracklist. The
-   * file is in, so the row is 'ready' straight away and Send only writes the
-   * names, the release and the track number onto it before the judges.
+   * Put a record that is already uploaded on the tracklist, at the top by
+   * default. The file is in, so the row is 'ready' straight away and Send only
+   * writes the names, the release and the track number onto it before the judges.
    */
-  const attachExisting = useCallback((song: ExistingRecord) => {
-    if (tracksRef.current.some((t) => t.songId === song.id)) return;
-    const name = (song.storage_key ?? '').split('/').pop() || `${song.title || 'track'}.mp3`;
-    const seconds = song.duration_seconds === null ? null : Number(song.duration_seconds);
-    const entry: QueuedTrack = {
-      key: nextKey(),
-      file: new File([], name),
-      title: (song.title ?? '').trim() || titleFromFileName(name),
-      trackNumber: null,
-      seconds: Number.isFinite(seconds) ? seconds : null,
-      phase: 'ready',
-      progress: 100,
-      error: null,
-      result: null,
-      songId: song.id,
-      genre: song.genre && (GENRES as string[]).includes(song.genre) ? song.genre : null,
-      explicit: false,
-      featured: [],
-      existing: { coverUrl: song.cover_art_url },
-    };
+  const attachExisting = useCallback((song: ExistingRecord, opts?: { atEnd?: boolean }) => {
+    const entry = trackFromRow(song);
     setTracks((cur) => {
-      const next = [entry, ...cur];
+      // Checked inside the update, so two callers in the same moment cannot both add it.
+      if (cur.some((t) => t.songId === song.id)) return cur;
+      const next = opts?.atEnd ? [...cur, entry] : [entry, ...cur];
       return next.some((t) => t.trackNumber) ? next.map((t, i) => ({ ...t, trackNumber: i + 1 })) : next;
     });
   }, []);
+
+  /** A tracklist rebuilt after a reload goes in first, in its saved order; anything picked since stays after it. */
+  const restoreTracks = useCallback((list: QueuedTrack[]) => {
+    setTracks((cur) => {
+      const ids = new Set(list.map((t) => t.songId).filter(Boolean));
+      return [...list, ...cur.filter((t) => !t.songId || !ids.has(t.songId))];
+    });
+  }, []);
+
+  /** The release made for this batch survives a reload too, so Send never makes a second one. */
+  const getReleaseId = useCallback(() => releaseIdRef.current, []);
+  const setReleaseId = useCallback((id: string | null) => { releaseIdRef.current = id; }, []);
 
   /** Take a track out. A row already reserved for it goes too, unless it is live or was already in the Studio. */
   const remove = useCallback((key: string) => {
@@ -466,6 +617,10 @@ export function useBatchUpload() {
         const result = await res.json();
         if (!res.ok && !result?.status) throw new Error(result?.error || 'The audition could not finish.');
         patch(key, { phase: 'done', progress: 100, error: null, result: shapeResult(result, warnings) });
+        // Live now, not the workshop and not a later release day.
+        if (result?.passed === true && (typeof result?.status !== 'string' || result.status === 'published')) {
+          passedRef.current.push(tracksRef.current.find((x) => x.key === key)?.title?.trim() || 'Your song');
+        }
       } catch (err) {
         // The file is in and the row exists: this is a stuck audition, not a
         // lost record. The row offers to ask again.
@@ -494,6 +649,23 @@ export function useBatchUpload() {
       patch(key, { phase: 'preparing', progress: 0, error: null, result: null });
       let reservedSongId: string | null = null;
       try {
+        // Already up once (the page reset after it landed, and the artist
+        // picked it again): use that row, never send a second copy.
+        const copy = await findLandedCopy(file, user.id, tracksRef.current);
+        if (copy === 'queued') {
+          setTracks((list) => list.filter((t) => t.key !== key));
+          return;
+        }
+        if (copy) {
+          patch(key, {
+            songId: copy.id,
+            phase: 'ready',
+            progress: 100,
+            existing: { coverUrl: copy.cover_art_url, storageKey: copy.storage_key, fileBytes: file.size },
+          });
+          return;
+        }
+
         const { data: ticket, error: ticketError } = await supabase.functions.invoke('upload-url', {
           body: {
             title: (tracksRef.current.find((t) => t.key === key)?.title ?? track.title).trim() || titleFromFileName(file.name),
@@ -634,6 +806,8 @@ export function useBatchUpload() {
       const t = tracksRef.current.find((x) => x.key === key);
       if (!t || t.phase !== 'error' || !t.songId) return;
       await runAudition(key, t.songId, t.result?.warnings ?? []);
+      const wentLive = passedRef.current.splice(0);
+      if (wentLive.length) celebrateLive({ titles: wentLive });
     },
     [runAudition],
   );
@@ -648,6 +822,7 @@ export function useBatchUpload() {
       if (running) return;
       const todo = tracks.filter((t) =>
         (only ? t.key === only : true)
+        && !t.stopped
         && (t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId)),
       );
       if (!todo.length) return;
@@ -711,6 +886,9 @@ export function useBatchUpload() {
           auditions.push((await sendOne(t, meta, tracks.length, cover, slot)).audition);
         }
         await Promise.all(auditions);
+        // Once for the whole send: the notes and "Your EP is live".
+        const wentLive = passedRef.current.splice(0);
+        if (wentLive.length) celebrateLive({ titles: wentLive, releaseTitle: meta.release?.title ?? null, kind: meta.release?.kind ?? null });
         // The release gets the batch's cover if it has none of its own.
         const releaseId = release?.id ?? meta.details?.release_id ?? null;
         if (releaseId && firstCover) {
@@ -735,19 +913,66 @@ export function useBatchUpload() {
   /** Every track has had its go: live, in the workshop, or stuck with a file in. Nothing left to send. */
   const finished = tracks.length > 0 && !busy && tracks.every((t) => t.phase === 'done' || (t.phase === 'error' && !!t.songId));
 
-  return { tracks, busy, landing, finished, add, attachExisting, remove, setSeconds, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults };
+  /**
+   * Two soft notes, once each per batch: one when the music starts going up,
+   * one when every file in the batch is in. Files go up one after another, so
+   * "landing" blinks off between two of them; the success note waits a moment
+   * to be sure the next file is not about to start.
+   */
+  const announcedRef = useRef(false);
+  const doneTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (doneTimerRef.current !== null) {
+      window.clearTimeout(doneTimerRef.current);
+      doneTimerRef.current = null;
+    }
+    if (landing) {
+      if (!announcedRef.current) {
+        announcedRef.current = true;
+        toast('Upload in progress', { id: 'music-upload', description: 'Your music is going up. Keep filling in the details.', duration: 3500 });
+      }
+      return;
+    }
+    if (!announcedRef.current) return;
+    doneTimerRef.current = window.setTimeout(() => {
+      doneTimerRef.current = null;
+      announcedRef.current = false;
+      const list = tracksRef.current;
+      if (list.some((t) => t.phase === 'queued' && !t.stopped)) return;
+      const failed = list.some((t) => t.phase === 'error' && !t.songId && !t.stopped);
+      if (failed) return;
+      if (list.some((t) => !!t.songId)) {
+        toast.success('Upload successful', { id: 'music-upload', description: 'Your files are in.', duration: 3500 });
+      }
+    }, 900);
+  }, [landing]);
+  useEffect(() => () => { if (doneTimerRef.current !== null) window.clearTimeout(doneTimerRef.current); }, []);
+
+  return { tracks, busy, landing, finished, add, attachExisting, restoreTracks, getReleaseId, setReleaseId, remove, setSeconds, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults };
 }
 
-/** How long the audio runs, read in the browser before anything is sent. */
+/**
+ * How long the audio runs, read in the browser before anything is sent.
+ * Metadata only, through an object URL: the file is never read into memory,
+ * and the URL is let go as soon as the answer (or a timeout) comes.
+ */
 export function readDuration(file: File): Promise<number | null> {
+  if (!file.size) return Promise.resolve(null);
   const url = URL.createObjectURL(file);
   return new Promise((resolve) => {
     const a = document.createElement('audio');
     a.preload = 'metadata';
+    let settled = false;
     const done = (v: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      a.removeAttribute('src');
       URL.revokeObjectURL(url);
       resolve(v);
     };
+    // Some webviews never answer for a WAV; the URL must not be held for ever.
+    const timer = setTimeout(() => done(null), 15_000);
     a.onloadedmetadata = () => done(Number.isFinite(a.duration) ? a.duration : null);
     a.onerror = () => done(null);
     a.src = url;

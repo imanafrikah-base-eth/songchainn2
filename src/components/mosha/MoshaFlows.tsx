@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBecomeArtist } from '@/hooks/useBecomeArtist';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { useBatchUpload, type QueuedTrack } from '@/hooks/useArtistStudio';
+import { useHasLiveSong } from '@/hooks/useHasLiveSong';
 import { useMediaUpload, useMyMedia, useMediaActions, type ArtistMediaItem } from '@/hooks/useArtistMedia';
 import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
 import { useMyWorlds, whenLabel } from '@/worlds/builder/useMyWorlds';
@@ -24,11 +25,14 @@ import { EMPTY_DETAILS } from '@/lib/songDetails';
 import { checkCover, COVER_ACCEPT } from '@/lib/coverArt';
 import { CoverCropDialog, prepareCover } from '@/components/studio/CoverCrop';
 import { useAccountLinkActions, useDuplicateAccounts, type DuplicateAccount } from '@/hooks/useAccountLinks';
+import { ReleaseFilesFlow } from '@/components/mosha/ReleaseFilesFlow';
+import type { MoshaAttachment } from '@/lib/moshaAttachments';
 
-export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery' | 'merge_accounts';
+export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery' | 'merge_accounts' | 'release_files';
 
 export const FLOW_LABEL: Record<MoshaFlowName, string> = {
   upload_song: 'Put a record out',
+  release_files: 'Release what you sent',
   build_world: 'Build my world',
   edit_world: 'Edit my world',
   edit_gallery: 'Edit my gallery',
@@ -42,7 +46,7 @@ const HUES = ['emerald', 'violet', 'sky', 'amber', 'rose', 'cyan', 'orange', 'ye
 /** The kinds a city may be (a database rule); a named city takes them in turn. */
 const CITY_KINDS = ['music', 'canvas', 'motion', 'vault', 'word'];
 
-export function MoshaFlow({ flow, onClose }: { flow: MoshaFlowName; onClose?: () => void }) {
+export function MoshaFlow({ flow, onClose, attachments }: { flow: MoshaFlowName; onClose?: () => void; /** The chat's files, for release_files. */ attachments?: MoshaAttachment[] }) {
   const [current, setCurrent] = useState<MoshaFlowName>(flow);
   return (
     <div className="mt-2 w-full rounded-2xl border border-primary/30 bg-card p-3 text-foreground">
@@ -61,6 +65,7 @@ export function MoshaFlow({ flow, onClose }: { flow: MoshaFlowName; onClose?: ()
       {current === 'edit_world' && <EditWorldFlow onNeedArtist={() => setCurrent('become_artist')} />}
       {current === 'edit_gallery' && <EditGalleryFlow onNeedArtist={() => setCurrent('become_artist')} />}
       {current === 'merge_accounts' && <MergeAccountsFlow />}
+      {current === 'release_files' && <ReleaseFilesFlow attachments={attachments ?? []} onNeedArtist={() => setCurrent('become_artist')} />}
     </div>
   );
 }
@@ -538,6 +543,8 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   const [log, setLog] = useState<string[]>([]);
   const [publishMsg, setPublishMsg] = useState<string | null>(null);
   const b = useWorldBuilder(worldId);
+  // A world only opens for a musician with a song out (founder, 14 Sep 2026).
+  const { hasLiveSong, isLoading: releasesLoading } = useHasLiveSong();
 
   useEffect(() => {
     if (!artistName && audienceProfile) setArtistName(audienceProfile.display_name || audienceProfile.username || '');
@@ -558,8 +565,18 @@ function BuildWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   if (!isArtist) {
     return (
       <div className="space-y-2">
-        <p className="text-sm">Worlds belong to artist accounts. Yours can be one right now.</p>
+        <p className="text-sm">Worlds are for musicians with a song out on $ongChainn. Make this an artist account and put your first song out.</p>
         <Button size="sm" className="h-10 rounded-full text-xs" onClick={onNeedArtist}><Mic2 className="mr-1 h-3.5 w-3.5" /> Make this an artist account</Button>
+      </div>
+    );
+  }
+
+  if (releasesLoading && step === 'about') return <p className="text-sm text-muted-foreground">One second.</p>;
+  if (!hasLiveSong && step === 'about') {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm">Put your first song out and your world opens.</p>
+        <Button asChild size="sm" className="h-10 rounded-full text-xs"><Link to="/studio"><Upload className="mr-1 h-3.5 w-3.5" /> Open the Studio</Link></Button>
       </div>
     );
   }

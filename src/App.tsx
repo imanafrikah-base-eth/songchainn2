@@ -18,6 +18,7 @@ import { BackToTop } from "@/components/BackToTop";
 import { ConnectWalletModal } from "@/components/ConnectWalletModal";
 import { AgePrompt } from "@/components/AgePrompt";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
+import { LiveCelebrationHost } from "@/components/studio/LiveCelebration";
 import { PointsMilestones } from "@/components/PointsMilestones";
 import { RoomPresenceKeeper } from "@/components/RoomPresenceKeeper";
 import { NotificationBanner } from "@/components/NotificationBanner";
@@ -255,6 +256,7 @@ function AppShell() {
           uploads and messaging. */}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><AgePrompt /></ErrorBoundary>}
       <ErrorBoundary fallback={null}><UpdateAvailableBanner /></ErrorBoundary>
+      <ErrorBoundary fallback={null}><LiveCelebrationHost /></ErrorBoundary>
       <ErrorBoundary fallback={null}><ConnectWalletModal /></ErrorBoundary>
       <ErrorBoundary fallback={null}><PointsMilestones /></ErrorBoundary>
       <ErrorBoundary fallback={null}><RoomPresenceKeeper /></ErrorBoundary>

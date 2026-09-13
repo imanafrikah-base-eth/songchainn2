@@ -44,6 +44,8 @@ export interface CoverLanding extends CoverState {
   adjust: (cropped: File) => void;
   /** The artist's own profile picture, as a one-tap fallback. */
   fromProfileUrl: (url: string) => void;
+  /** Artwork that already landed (a restored draft): shown and used as it is, never sent again. */
+  fromLandedUrl: (url: string) => void;
   retry: () => void;
   clear: () => void;
   /** Resolves to the landed URL, or null when nothing is picked or it failed. */
@@ -161,7 +163,15 @@ export function useCoverLanding(): CoverLanding {
     })();
   }, [run]);
 
+  const fromLandedUrl = useCallback((url: string) => {
+    seq.current++;
+    lastRef.current = null;
+    setBlob(null);
+    promiseRef.current = Promise.resolve(url);
+    setState({ ...IDLE, status: 'ready', url, preview: url, progress: 100 });
+  }, []);
+
   const whenReady = useCallback(() => promiseRef.current, []);
 
-  return { ...state, pick, adjust, fromProfileUrl, retry, clear, whenReady };
+  return { ...state, pick, adjust, fromProfileUrl, fromLandedUrl, retry, clear, whenReady };
 }

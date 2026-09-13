@@ -20,6 +20,12 @@ interface AuthContextType {
   artistId: string | null;
   /** Blue tick. Set by us on the artist_accounts row, never self-declared. */
   isVerifiedArtist: boolean;
+  /**
+   * The artist and admin flags above are known for the signed-in account.
+   * Until then they read false, which is not the same as "not an artist": a
+   * page that shuts its door on non-artists must wait for this.
+   */
+  rolesReady: boolean;
   isLoading: boolean;
   audienceProfile: AudienceProfile | null;
   needsOnboarding: boolean;
@@ -57,6 +63,25 @@ function isFbUserId(id?: string | null) {
 
 function isSyntheticUserId(id?: string | null) {
   return isFcUserId(id) || isFbUserId(id);
+}
+
+type AuthUser = { id: string; email?: string | null; user_metadata?: Record<string, any> };
+
+/**
+ * The same account again (a token refresh, the tab coming back into view)
+ * keeps the same object, so nothing downstream re-runs as if somebody new had
+ * signed in.
+ */
+function keepIfSame(prev: AuthUser | null, next: AuthUser): AuthUser {
+  if (
+    prev &&
+    prev.id === next.id &&
+    (prev.email ?? null) === (next.email ?? null) &&
+    JSON.stringify(prev.user_metadata ?? {}) === JSON.stringify(next.user_metadata ?? {})
+  ) {
+    return prev;
+  }
+  return next;
 }
 
 function loadFcUserFromStorage(): { user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null; profile: AudienceProfile | null } {
@@ -154,6 +179,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isArtist, setIsArtist] = useState(false);
   const [artistId, setArtistId] = useState<string | null>(null);
   const [isVerifiedArtist, setIsVerifiedArtist] = useState(false);
+  /** The account whose roles have been read. */
+  const [rolesFor, setRolesFor] = useState<string | null>(null);
+  /** The account the roles on screen belong to (or are being read for). */
+  const rolesForRef = React.useRef<string | null>(null);
   const [audienceProfile, setAudienceProfile] = useState<AudienceProfile | null>(bootProfile);
   const [needsOnboarding, setNeedsOnboarding] = useState(bootUser ? false : shouldRequireOnboardingFromStorage());
   const [needsName, setNeedsName] = useState(false);
@@ -203,21 +232,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshRoles = useCallback(async (userId: string) => {
     if (!isSupabaseConfigured) return;
 
-    const [{ data: roleRow }, { data: artistRow }] = await Promise.all([
-      supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
-      supabase
-        .from('artist_accounts')
-        .select('artist_id, is_verified')
-        .eq('user_id', userId)
-        .maybeSingle(),
-    ]);
+    const read = () =>
+      Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+        supabase
+          .from('artist_accounts')
+          .select('artist_id, is_verified')
+          .eq('user_id', userId)
+          .maybeSingle(),
+      ]);
 
-    setIsAdmin(roleRow?.role === 'admin');
+    let [roleRes, artistRes] = await read();
+    // A read that fell over on a bad line is not an answer. Ask once more, and
+    // never turn an artist into a listener because the network blinked: the
+    // Studio swapped its whole upload form for "The Studio is for artist
+    // accounts" whenever that happened.
+    if (roleRes.error || artistRes.error) {
+      await new Promise((r) => setTimeout(r, 1500));
+      [roleRes, artistRes] = await read();
+    }
+    // Somebody else signed in while this was on its way.
+    if (rolesForRef.current && rolesForRef.current !== userId) return;
 
-    const artist = artistRow as { artist_id?: string; is_verified?: boolean } | null;
-    setIsArtist(Boolean(artist?.artist_id));
-    setArtistId(artist?.artist_id ?? null);
-    setIsVerifiedArtist(Boolean(artist?.is_verified));
+    if (!roleRes.error) setIsAdmin(roleRes.data?.role === 'admin');
+    if (!artistRes.error) {
+      const artist = artistRes.data as { artist_id?: string; is_verified?: boolean } | null;
+      setIsArtist(Boolean(artist?.artist_id));
+      setArtistId(artist?.artist_id ?? null);
+      setIsVerifiedArtist(Boolean(artist?.is_verified));
+    }
+    setRolesFor(userId);
+  }, []);
+
+  /**
+   * Roles belong to one account, so they are cleared only when the account
+   * changes. They used to be cleared on every auth event, and supabase-js
+   * sends SIGNED_IN each time a tab comes back into view (_recoverAndRefresh),
+   * which includes coming back from the phone's file picker: the Studio read
+   * isArtist false for a moment and threw its upload form off the screen.
+   */
+  const resetRolesFor = useCallback((id: string | null) => {
+    if (rolesForRef.current === id) return;
+    rolesForRef.current = id;
+    setIsArtist(false);
+    setArtistId(null);
+    setIsVerifiedArtist(false);
+    setRolesFor(null);
+    setWalletAddress(null);
+    if (!id) setIsAdmin(false);
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -344,24 +406,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
         const u = sessionResult.data?.session?.user ?? null;
         if (u) {
-          setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+          setUser((prev) => keepIfSame(prev, { id: u.id, email: u.email, user_metadata: u.user_metadata as any }));
+          resetRolesFor(u.id);
+          void refreshRoles(u.id);
         } else if (!isSyntheticUserId(userRef.current?.id)) {
           setUser(null);
-          setIsAdmin(false);
+          resetRolesFor(null);
         }
-        setIsArtist(false);
-        setArtistId(null);
-        setIsVerifiedArtist(false);
-        if (u) void refreshRoles(u.id);
       } catch {
-        // On timeout or network error, don't touch user/isAdmin — onAuthStateChange
+        // On timeout or network error, don't touch user or roles — onAuthStateChange
         // already fired INITIAL_SESSION with any stored session from localStorage and
         // called refreshRoles. Overriding state here would log out a valid session.
-        if (mounted) {
-          setIsArtist(false);
-          setArtistId(null);
-          setIsVerifiedArtist(false);
-        }
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -372,7 +427,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       if (u) {
-        setUser({ id: u.id, email: u.email, user_metadata: u.user_metadata as any });
+        setUser((prev) => keepIfSame(prev, { id: u.id, email: u.email, user_metadata: u.user_metadata as any }));
+        resetRolesFor(u.id);
         // A real Supabase session supersedes any synthetic fc-/fb- identity —
         // drop the stored fallback so it can't shadow the session on next boot.
         try { localStorage.removeItem(FC_USER_KEY); } catch { void 0; }
@@ -385,12 +441,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (!isSyntheticUserId(userRef.current?.id)) {
         // Don't wipe a synthetic FC/FB session when no Supabase session exists.
         setUser(null);
-        setIsAdmin(false);
+        resetRolesFor(null);
       }
-      setIsArtist(false);
-      setArtistId(null);
-      setIsVerifiedArtist(false);
-      setWalletAddress(null);
     });
 
     return () => {
@@ -901,6 +953,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { localStorage.removeItem(FC_USER_KEY); } catch { void 0; }
     try { localStorage.removeItem(FB_USER_KEY); } catch { void 0; }
     setUser(null);
+    rolesForRef.current = null;
+    setRolesFor(null);
     setIsAdmin(false);
     setIsArtist(false);
     setArtistId(null);
@@ -919,6 +973,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isArtist,
       artistId,
       isVerifiedArtist,
+      rolesReady: !!user && (isSyntheticUserId(user.id) || !isSupabaseConfigured || rolesFor === user.id),
       isLoading,
       audienceProfile,
       needsOnboarding,
@@ -960,6 +1015,7 @@ export function useAuth() {
       isArtist: false,
       artistId: null,
       isVerifiedArtist: false,
+      rolesReady: false,
       isLoading: false,
       audienceProfile: null,
       needsOnboarding: false,

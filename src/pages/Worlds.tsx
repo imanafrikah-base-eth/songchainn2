@@ -9,6 +9,7 @@ import { usePublishedWorlds, worldPath } from '@/hooks/usePublishedWorlds';
 import { useAuth } from '@/context/AuthContext';
 import { WORLD_BUILDER_ENABLED } from '@/lib/features';
 import { useHasWorld } from '@/worlds/builder/useHasWorld';
+import { useHasLiveSong } from '@/hooks/useHasLiveSong';
 
 /**
  * Artist Worlds: every world that is open, in the order they were numbered.
@@ -19,6 +20,9 @@ const Worlds = () => {
   const { isArtist } = useAuth();
   // One world per artist: somebody who has one is shown theirs, never "build one".
   const { hasWorld, worldPath: myWorldPath } = useHasWorld();
+  // Worlds are for musicians with a song out: only they get a build button.
+  const { hasLiveSong } = useHasLiveSong();
+  const canBuild = isArtist && hasLiveSong;
 
   return (
     <div className="min-h-screen bg-background pb-28">
@@ -96,18 +100,22 @@ const Worlds = () => {
               <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
                 <Hammer className="h-3 w-3" /> Your own
               </p>
-              <h2 className="mt-1 font-heading text-xl font-bold text-foreground">Build a world of your own</h2>
+              <h2 className="mt-1 font-heading text-xl font-bold text-foreground">
+                {canBuild ? 'Build a world of your own' : 'Worlds are for musicians'}
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {isArtist
+                {canBuild
                   ? 'Name it, lay out the streets, dress it, set the key. Six screens, one afternoon.'
-                  : 'Make music? Open your Studio and this same account becomes an artist account; the builder is right there.'}
+                  : isArtist
+                    ? 'Put your first song out and your world opens.'
+                    : 'Worlds are for musicians with a song out on $ongChainn. Make music? Open your Studio and put your first song out.'}
               </p>
             </div>
             <Link
-              to={isArtist ? '/world-builder' : '/studio'}
+              to={canBuild ? '/world-builder' : '/studio'}
               className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
             >
-              {isArtist ? 'Start building' : 'Open the Studio'}
+              {canBuild ? 'Start building' : 'Open the Studio'}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

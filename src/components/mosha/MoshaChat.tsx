@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { rememberEditWhere } from '@/lib/moshaWatch';
-import { Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
+import { Loader2, Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
+import { AttachButton, AttachmentTray, useAttachDrop, useMoshaTray } from '@/components/mosha/MoshaAttachmentTray';
+import { MoshaAttachmentList } from '@/components/mosha/MoshaAttachmentView';
+import { MoshaDoPopup, MoshaDoStatus } from '@/components/mosha/MoshaDoCard';
+import { doJobKey, onMoshaJobDone } from '@/lib/moshaJobs';
+import { useHasLiveSong } from '@/hooks/useHasLiveSong';
+import type { MoshaDoOp } from '@/lib/moshaDo';
+import { filesOnlyLine, type MoshaAttachment } from '@/lib/moshaAttachments';
+import { clearTray, getTray, settleTray } from '@/lib/moshaTray';
 import { askMoshaFull, MOSHA_INTRO, type MoshaAction, type MoshaTurn } from '@/lib/mosha';
 import {
   getCache,
@@ -69,6 +77,12 @@ interface ChatTurn extends MoshaTurn {
   local?: boolean;
   /** Mo$ha asked where to change their world: here, or on this builder page. */
   choice?: { path: string };
+  /** Files sent with this line. */
+  attachments?: MoshaAttachment[];
+  /** A one-tap job Mo$ha offered: a button that does it. */
+  doOp?: MoshaDoOp;
+  /** The chat's files, handed to the release flow. */
+  flowFiles?: MoshaAttachment[];
 }
 
 function toChat(t: StoredTurn): ChatTurn {
@@ -79,6 +93,8 @@ function toChat(t: StoredTurn): ChatTurn {
     content: t.content,
     source: t.source,
     action: t.action?.type === 'go' ? { label: 'Take me there', to: t.action.path } : undefined,
+    doOp: t.action?.type === 'do' ? t.action.op : undefined,
+    attachments: t.attachments,
   };
 }
 
@@ -89,7 +105,8 @@ function toStored(t: ChatTurn): StoredTurn {
     role: t.role,
     content: t.content,
     source: t.source,
-    action: t.action ? { type: 'go', path: t.action.to } : undefined,
+    action: t.action ? { type: 'go', path: t.action.to } : t.doOp ? { type: 'do', op: t.doOp } : undefined,
+    attachments: t.attachments,
   };
 }
 
@@ -156,6 +173,8 @@ export function MoshaChat({
    * had Mo$ha offering to build him a world he already has.
    */
   const hasWorld = myWorlds.length > 0 || Boolean(getWorldByArtistId(artistId ?? undefined));
+  // A world only opens for a musician with a song out (founder, 14 Sep 2026).
+  const { hasLiveSong } = useHasLiveSong();
   const [turns, setTurns] = useState<ChatTurn[]>(initial ?? []);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -171,6 +190,11 @@ export function MoshaChat({
   const queryClient = useQueryClient();
   const turnsRef = useRef<ChatTurn[]>(turns);
   turnsRef.current = turns;
+  // Files waiting to go with the next message. The tray outlives this window.
+  const tray = useMoshaTray(userId);
+  const drop = useAttachDrop(userId);
+  const [waiting, setWaiting] = useState(false);
+  const waitingRef = useRef(false);
 
   // The thread comes back when Mo$ha is shown again: from the page cache
   // first, then the server (or the phone, for a guest). The server is asked
@@ -245,14 +269,33 @@ export function MoshaChat({
   }, [userId, pulling, turns]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, withFiles = true) => {
       const clean = text.trim();
-      if (!clean || busy) return;
-      const next: ChatTurn[] = [...turns, { role: 'user', content: clean, at: new Date().toISOString() }];
+      const useFiles = withFiles && Boolean(userId) && getTray(userId).items.length > 0;
+      if ((!clean && !useFiles) || busy || waitingRef.current) return;
+      let attachments: MoshaAttachment[] = [];
+      if (useFiles && userId) {
+        // Send waits for anything still going up, then takes every file with it.
+        waitingRef.current = true;
+        setWaiting(true);
+        const settled = await settleTray(userId);
+        waitingRef.current = false;
+        setWaiting(false);
+        if (!settled.ok) return;
+        attachments = settled.attachments;
+        if (!clean && !attachments.length) return;
+        clearTray(userId);
+      }
+      const content = clean || filesOnlyLine(attachments.length);
+      const next: ChatTurn[] = [
+        ...turnsRef.current,
+        { role: 'user', content, at: new Date().toISOString(), attachments: attachments.length ? attachments : undefined },
+      ];
       setTurns(next);
-      setDraft('');
+      // Anything typed while the files finished stays in the box.
+      setDraft((d) => (d === text ? '' : d));
       setBusy(true);
-      const { reply, action: moshaAction } = await askMoshaFull(toModelTurns(next), 'bubble');
+      const { reply, action: moshaAction } = await askMoshaFull(toModelTurns(next), 'bubble', { attachments });
       const flow = moshaAction?.type === 'flow' ? moshaAction.flow : undefined;
       const go = moshaAction?.type === 'go' ? moshaAction : undefined;
       const choose = moshaAction?.type === 'choose' ? moshaAction : undefined;
@@ -265,11 +308,13 @@ export function MoshaChat({
             ? { label: 'Open the Studio', to: '/studio' }
             : { label: 'Switch to artist account', to: '/claim' }
           : undefined;
-      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow, choice: choose ? { path: choose.path } : undefined, at: new Date().toISOString() }]);
+      const doOp = moshaAction?.type === 'do' ? moshaAction.op : undefined;
+      const flowFiles = moshaAction?.type === 'flow' && 'attachments' in moshaAction ? moshaAction.attachments : undefined;
+      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow, doOp, flowFiles, choice: choose ? { path: choose.path } : undefined, at: new Date().toISOString() }]);
       setBusy(false);
       input.current?.focus();
     },
-    [busy, turns, isArtist],
+    [busy, isArtist, userId],
   );
 
   /* A question handed in with the call, asked once, so nobody has to type
@@ -285,6 +330,24 @@ export function MoshaChat({
   const openFlow = useCallback((flow: MoshaFlowName) => {
     setTurns((prev) => [...prev, { role: 'assistant', content: FLOW_LABEL[flow] + '. Right here.', flow, local: true, at: new Date().toISOString() }]);
   }, []);
+
+  // A job finishes while they keep talking: the report lands in the thread as Mo$ha's line.
+  useEffect(
+    () =>
+      onMoshaJobDone(({ message }) => {
+        setTurns((prev) => [...prev, { role: 'assistant', content: message, local: true, source: 'notice', at: new Date().toISOString() }]);
+      }),
+    [],
+  );
+
+  /** The newest job Mo$ha offered in this sitting: shown as a pop-up over the composer until it is tapped, done or put away. */
+  const pendingDo = (() => {
+    for (let i = turns.length - 1; i >= 0; i--) {
+      const t = turns[i];
+      if (t.role === 'assistant' && t.doOp && !t.id) return { op: t.doOp, jobId: doJobKey(t.doOp, t.at) };
+    }
+    return null;
+  })();
 
   return (
     <div className={`flex flex-col ${compact ? 'h-[60vh] max-h-[28rem]' : 'h-[68vh] max-h-[34rem]'}`}>
@@ -315,7 +378,7 @@ export function MoshaChat({
         {/* Only to an artist who has not built one. Offering to build a world
             to somebody who already has one is the app telling them it never
             looked, and that is the fastest way to lose their trust. */}
-        {isArtist && !hasWorld && turns.length === 0 && !greeting && (
+        {isArtist && hasLiveSong && !hasWorld && turns.length === 0 && !greeting && (
           <Bubble role="assistant">Want me to build your world for you? Say the word and it is done in a few taps. I can replace or change anything on it after, whenever you like.</Bubble>
         )}
         {isArtist && hasWorld && turns.length === 0 && (
@@ -346,6 +409,7 @@ export function MoshaChat({
             {t.flow && (
               <MoshaFlow
                 flow={t.flow}
+                attachments={t.flowFiles}
                 onClose={() => setTurns((prev) => prev.map((x, j) => (j === i ? { ...x, flow: undefined } : x)))}
               />
             )}
@@ -379,6 +443,7 @@ export function MoshaChat({
                 </button>
               </div>
             )}
+            {t.doOp && t.role === 'assistant' && <MoshaDoStatus jobId={doJobKey(t.doOp, t.id ?? t.at)} />}
             {t.action && (
               <Link
                 to={t.action.to}
@@ -418,11 +483,17 @@ export function MoshaChat({
       {/* The things Mo$ha can do, always one tap away, not only before the first word. */}
       {user && (
         <div className="flex gap-1.5 overflow-x-auto border-t border-border px-3 py-1.5 scrollbar-hide">
-          {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).filter((c) => c.flow !== 'merge_accounts' || twins.length > 0).filter((c) => (hasWorld ? c.flow !== 'build_world' : c.flow !== 'edit_world')).map((c) => (
+          {DO_CHIPS.filter((c) => (isArtist ? c.flow !== 'become_artist' : !c.artistOnly)).filter((c) => c.flow !== 'merge_accounts' || twins.length > 0).filter((c) => (hasWorld ? c.flow !== 'build_world' : c.flow !== 'edit_world' && (c.flow !== 'build_world' || hasLiveSong))).map((c) => (
             <button key={c.flow} type="button" disabled={busy} onClick={() => openFlow(c.flow)} className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50 min-h-10">
               {FLOW_LABEL[c.flow]}
             </button>
           ))}
+        </div>
+      )}
+
+      {pendingDo && (
+        <div className="px-3 pb-2">
+          <MoshaDoPopup jobId={pendingDo.jobId} op={pendingDo.op} />
         </div>
       )}
 

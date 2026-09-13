@@ -6,6 +6,7 @@ import { WorldsSlideshow } from './WorldsSlideshow';
 import { useWorldsStanding, FOUNDING_PLACES } from '@/hooks/useWorldsStanding';
 import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
 import { useHasWorld } from '@/worlds/builder/useHasWorld';
+import { useHasLiveSong } from '@/hooks/useHasLiveSong';
 import { WorldArt } from '@/worlds/components/WorldArt';
 import { thumb } from '@/lib/img';
 
@@ -76,6 +77,9 @@ export function WorldsPhase3({
   // One world per artist. A member who already has one is sent into it, not offered another.
   const { hasWorld, worldPath: myWorldPath } = useHasWorld();
   const ownsWorld = !isGuest && hasWorld && Boolean(myWorldPath);
+  // Worlds are for musicians with a song out: only they are offered the builder.
+  const { hasLiveSong } = useHasLiveSong();
+  const canBuild = !isGuest && hasLiveSong;
 
   return (
     <section className={`relative ${className}`}>
@@ -153,7 +157,7 @@ export function WorldsPhase3({
               {ownsWorld ? 'Your world is standing.' : 'Build your own world, free.'}
             </h3>
             <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
-              The first {FOUNDING_PLACES} artists get a full world free. Ask Mo$ha and it builds it with you.
+              The first {FOUNDING_PLACES} artists get a full world free. Worlds open for musicians with a song out on $ongChainn.
             </p>
             {typeof placesLeft === 'number' && (
               <p className="mt-2 text-xs font-medium text-foreground">
@@ -184,8 +188,8 @@ export function WorldsPhase3({
             ) : (
               <>
                 <Button asChild className="h-11 rounded-full px-6 text-sm font-semibold">
-                  <Link to={ownsWorld && myWorldPath ? myWorldPath : '/world-builder'}>
-                    {ownsWorld ? 'Walk into your world' : 'Start building'}
+                  <Link to={ownsWorld && myWorldPath ? myWorldPath : canBuild ? '/world-builder' : '/studio'}>
+                    {ownsWorld ? 'Walk into your world' : canBuild ? 'Start building' : 'Put your first song out'}
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Link>
                 </Button>

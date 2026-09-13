@@ -12,6 +12,8 @@
 //
 // Request:  POST { title, artistName, fileName, contentType, fileBytes, genre? }
 // Response: { songId, uploadUrl, storageKey, publicUrl, expiresIn }
+// Mo$ha:    POST { purpose: 'mosha', fileName, contentType, fileBytes }
+//        -> { attachmentId, uploadUrl, storageKey, publicUrl, expiresIn }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -297,6 +299,71 @@ async function presignEpisode(o: {
   return { status: 200, body: { episodeId, uploadUrl, storageKey: key, publicUrl, expiresIn: PRESIGN_TTL } };
 }
 
+/* ------------------------------------------------------ Mo$ha files --- */
+
+// A clip sent to Mo$ha in the chat: a song an artist wants released for them,
+// a recording of a bug. It rides the same presigned PUT into the same bucket
+// as a record, but reserves NO songs row: sending Mo$ha a clip is not
+// releasing a song. Any signed-in person may send one, artist or not.
+//
+// The key is fixed by (user, id, type) alone, so upload-relay can rebuild it
+// for the fallback road without a row: mosha/<user id>/<id>.<ext>.
+// Keep MOSHA_AUDIO_TYPES in step with the copy in upload-relay.
+const MAX_MOSHA_AUDIO_BYTES = 100 * 1024 * 1024;
+const MOSHA_AUDIO_TYPES: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/wave": "wav",
+  "audio/vnd.wave": "wav",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/m4a": "m4a",
+  "audio/aac": "aac",
+  "audio/ogg": "ogg",
+  "audio/opus": "opus",
+  "audio/webm": "webm",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/aiff": "aiff",
+  "audio/x-aiff": "aiff",
+};
+
+async function presignMosha(o: {
+  userId: string;
+  contentType: string;
+  fileBytes: number;
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  publicBase: string;
+}): Promise<{ status: number; body: unknown }> {
+  const baseType = o.contentType.split(";")[0].trim();
+  const ext = MOSHA_AUDIO_TYPES[baseType];
+  if (!ext) {
+    return { status: 415, body: { error: "Mo$ha takes audio as MP3, WAV, M4A, AAC, OGG, OPUS, WEBM, FLAC or AIFF." } };
+  }
+  if (!Number.isFinite(o.fileBytes) || o.fileBytes <= 0 || o.fileBytes > MAX_MOSHA_AUDIO_BYTES) {
+    return { status: 413, body: { error: `Audio must be under ${MAX_MOSHA_AUDIO_BYTES / (1024 * 1024)} MB.` } };
+  }
+  const attachmentId = crypto.randomUUID();
+  const key = ["mosha", o.userId, `${attachmentId}.${ext}`].join("/");
+  const uploadUrl = await presignPut({
+    accountId: o.accountId,
+    accessKeyId: o.accessKeyId,
+    secretAccessKey: o.secretAccessKey,
+    bucket: o.bucket,
+    key,
+    expiresIn: PRESIGN_TTL,
+  });
+  return {
+    status: 200,
+    body: { attachmentId, uploadUrl, storageKey: key, publicUrl: `${o.publicBase}/${key}`, expiresIn: PRESIGN_TTL },
+  };
+}
+
 /* ------------------------------------------------- AWS SigV4 presign --- */
 
 const enc = new TextEncoder();
@@ -476,6 +543,98 @@ Deno.serve(async (req) => {
   const contentType = str(body.contentType, 100).toLowerCase();
   const genre = str(body.genre, 60) || null;
   const fileBytes = Number(body.fileBytes);
+
+  /* ------------------------------------------------------- Mo$ha files --- */
+
+  // purpose: 'mosha' is audio sent to Mo$ha in a chat. No row, no artist
+  // account needed, nothing released.
+  if (str(body.purpose, 20) === "mosha") {
+    const mosha = await presignMosha({
+      userId: user.id,
+      contentType,
+      fileBytes,
+      accountId: accountId!,
+      accessKeyId: accessKeyId!,
+      secretAccessKey: secretAccessKey!,
+      bucket: bucket!,
+      publicBase,
+    });
+    return json(origin, mosha.body, mosha.status);
+  }
+
+  /* ------------------------------------- Mo$ha files into a release --- */
+
+  // purpose: 'adopt_mosha' turns a song already sent to Mo$ha in the chat
+  // (mosha/<user id>/<id>.mp3|wav, in R2) into a songs row where it sits, so
+  // the release flow in the chat sends it without the artist uploading the
+  // same bytes a second time. Only the person who sent it, only an artist
+  // account, only WAV or MP3 (what the audition listens to). Asking twice for
+  // the same file hands back the same row.
+  if (str(body.purpose, 20) === "adopt_mosha") {
+    const storageKey = str(body.storageKey, 200);
+    const keyOk = new RegExp(`^mosha/${user.id}/[0-9a-f-]{36}\\.(mp3|wav)$`, "i").test(storageKey);
+    if (!keyOk) return json(origin, { error: "Only a WAV or MP3 you sent to Mo$ha yourself can go on a release." }, 400);
+    if (!title) return json(origin, { error: "Give the track a title." }, 400);
+    if (!artistName) return json(origin, { error: "Tell us the artist name." }, 400);
+
+    const adb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    const { data: acct } = await adb.from("artist_accounts").select("artist_id").eq("user_id", user.id).maybeSingle();
+    const adoptArtistId = (acct as { artist_id?: string } | null)?.artist_id ?? null;
+    if (!adoptArtistId) {
+      return json(origin, {
+        error: "The Studio is for artist accounts. Open your profile and tap Switch to artist account; it takes one tap and this account becomes your artist account right now.",
+      }, 403);
+    }
+
+    const publicUrl = `${publicBase}/${storageKey}`;
+    const { data: already } = await adb
+      .from("songs").select("id, file_bytes").eq("owner_id", user.id).eq("storage_key", storageKey).maybeSingle();
+    if (already) {
+      const a = already as { id: string; file_bytes: number | null };
+      return json(origin, { songId: a.id, storageKey, publicUrl, fileBytes: a.file_bytes, adopted: true });
+    }
+
+    // The bytes have to really be there before a row points at them.
+    let bytes = 0;
+    try {
+      const head = await fetch(publicUrl, { method: "HEAD" });
+      if (head.ok) bytes = Number(head.headers.get("content-length") ?? 0);
+    } catch {
+      bytes = 0;
+    }
+    if (!Number.isFinite(bytes) || bytes < MIN_BYTES) {
+      return json(origin, { error: "That song never fully reached us. Send it to Mo$ha again." }, 409);
+    }
+    if (bytes > MAX_BYTES) {
+      return json(origin, { error: `Audio must be under ${MAX_BYTES / (1024 * 1024)} MB.` }, 413);
+    }
+
+    const { data: aprof } = await adb
+      .from("audience_profiles").select("profile_picture_url, avatar_url, location").eq("user_id", user.id).maybeSingle();
+    const ap = aprof as { profile_picture_url?: string | null; avatar_url?: string | null; location?: string | null } | null;
+
+    const adoptedId = crypto.randomUUID();
+    const { error: adoptErr } = await adb.from("songs").insert({
+      id: adoptedId,
+      title,
+      artist_name: artistName,
+      genre,
+      artist_id: adoptArtistId,
+      artist_image_url: ap?.profile_picture_url ?? ap?.avatar_url ?? null,
+      town_square: ap?.location ?? null,
+      owner_id: user.id,
+      status: "uploading",
+      storage_key: storageKey,
+      file_bytes: Math.round(bytes),
+      audio_url: publicUrl,
+      cover_art_url: null,
+    });
+    if (adoptErr) {
+      console.error("upload-url adopt failed:", adoptErr);
+      return json(origin, { error: "Could not bring that song in. Try again." }, 500);
+    }
+    return json(origin, { songId: adoptedId, storageKey, publicUrl, fileBytes: Math.round(bytes), adopted: true });
+  }
 
   /* ---------------------------------------------------------- episodes --- */
 

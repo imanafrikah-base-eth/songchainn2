@@ -40,6 +40,7 @@ export function TracklistRow({
   onRemove,
   onRetry,
   onAskAgain,
+  onPickAgain,
   onMove,
   onExtras,
   onCover,
@@ -70,6 +71,8 @@ export function TracklistRow({
   onRemove: () => void;
   onRetry: () => void;
   onAskAgain: () => void;
+  /** Open the file picker for a track the page lost before its file got in. */
+  onPickAgain: () => void;
   onMove: (delta: number) => void;
   onExtras: (p: Partial<Pick<QueuedTrack, 'genre' | 'explicit' | 'featured'>>) => void;
   onCover: (key: string, status: CoverStatus, get: () => Promise<string> | null) => void;
@@ -147,7 +150,9 @@ export function TracklistRow({
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {t.existing
               ? `Already uploaded${t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}`
-              : <>{t.file.name}{t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}, {mb} MB</>}
+              : t.stopped
+                ? `${t.file.name}, stopped before it finished uploading`
+                : <>{t.file.name}{t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}, {mb} MB</>}
           </p>
         </div>
         {editable && !busy && (
@@ -179,11 +184,11 @@ export function TracklistRow({
           <p className="text-xs text-foreground">{t.error}</p>
           <button
             type="button"
-            onClick={t.songId ? onAskAgain : onRetry}
-            disabled={busy || (!t.songId && !retryReady)}
+            onClick={t.stopped ? onPickAgain : t.songId ? onAskAgain : onRetry}
+            disabled={busy || (!t.stopped && !t.songId && !retryReady)}
             className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground disabled:opacity-50"
           >
-            <RefreshCw className="h-3 w-3" /> {t.songId ? 'Ask the judges again' : 'Try again'}
+            <RefreshCw className="h-3 w-3" /> {t.stopped ? 'Pick it again' : t.songId ? 'Ask the judges again' : 'Try again'}
           </button>
         </div>
       )}

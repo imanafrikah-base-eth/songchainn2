@@ -4,6 +4,7 @@ import { RefreshCw, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { markUpdateAvailable, applyAppUpdate, subscribeAppUpdate, getAppUpdate } from '@/lib/appUpdate';
 import { useSyncExternalStore } from 'react';
+import { isAppBusy, subscribeAppBusy } from '@/lib/appBusy';
 
 // Pathname of the entry script this running session was booted from
 // (e.g. /assets/index-VHTG525f.js). A deploy changes the hash, so comparing
@@ -24,7 +25,10 @@ export function UpdateAvailableBanner() {
   // navigation, which keeps an Update button up after this banner is put away.
   const update = useSyncExternalStore(subscribeAppUpdate, getAppUpdate, getAppUpdate);
   const [dismissed, setDismissed] = useState(false);
-  const showUpdate = update.available && !dismissed;
+  // Not over a form with files on their way up: a tap on it mid-upload would
+  // reload the page. The Update button in the navigation stays available.
+  const appBusy = useSyncExternalStore(subscribeAppBusy, isAppBusy, isAppBusy);
+  const showUpdate = update.available && !dismissed && !appBusy;
   const isUpdating = update.applying;
 
   // Deploy detection: ask the server (bypassing every cache) which entry

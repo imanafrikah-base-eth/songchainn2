@@ -130,6 +130,15 @@ interface RoomEntry {
 
 const rooms = new Map<string, RoomEntry>();
 
+// Coming back to the app asks again straight away, instead of showing the
+// number from before the phone was locked until the next poll.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    for (const id of rooms.keys()) refresh(id);
+  });
+}
+
 /** How long a room's channel stays open with nobody listening. */
 const LINGER_MS = 5_000;
 
@@ -188,7 +197,7 @@ function ensureRoom(roomId: string): RoomEntry {
     teardown: null,
     inFlight: null,
     dirty: false,
-    poll: window.setInterval(() => refresh(roomId), 30_000),
+    poll: window.setInterval(() => refresh(roomId), 15_000),
   };
   rooms.set(roomId, entry);
   refresh(roomId);

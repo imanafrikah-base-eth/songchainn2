@@ -13,6 +13,7 @@
 
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 import { markUpdateAvailable } from "@/lib/appUpdate";
+import { isAppBusy } from "@/lib/appBusy";
 
 const AUTO_RELOAD_COUNT_KEY = "__songchainn_reload_count";
 const AUTO_RELOAD_TS_KEY = "__songchainn_reload_at";
@@ -68,6 +69,12 @@ let reloadStarted = false;
 export function recoverFromStaleBuild(): boolean {
   if (typeof window === "undefined") return false;
   if (reloadStarted) return true;
+  // Something is uploading or waiting to be sent. Do not reload under it; raise
+  // the Update button and let the person take it when they are done.
+  if (isAppBusy()) {
+    markUpdateAvailable();
+    return false;
+  }
   if (!canAutoReload()) return false;
   markAutoReload();
   reloadStarted = true;

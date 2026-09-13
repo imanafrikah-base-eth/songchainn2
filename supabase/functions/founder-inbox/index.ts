@@ -8,12 +8,16 @@
 // stored only in the tables that allow a note without an account.
 //
 // Request:  POST { kind: 'suggestion' | 'bug' | 'feature', text, subject?, page?,
-//                  screen_size?, world_id?, world_slug?, build_step? }
+//                  screen_size?, world_id?, world_slug?, build_step?,
+//                  attachments?: [{ kind: 'audio'|'image'|'file', name, mime?, size?, durationSec?,
+//                                   storage?: 'r2'|'private', path?, url? }] (signed in only, max 15) }
 //           with the caller's JWT when signed in.
-// Response: { success: true, stored: boolean, emailed: boolean, dmed: boolean }
+// Response: { success: true, stored: boolean, emailed: boolean, dmed: boolean, filesDmed: boolean }
 //
 // Every note also reaches IMan Afrikah's DMs from Mo$ha: stored notes through
-// the table triggers, unstored ones through rpc mosha_dm_founder below.
+// the table triggers, unstored ones through rpc mosha_dm_founder below. Files
+// sent with a note (screenshots handed on by Mo$ha) follow it into the DM as
+// links, a private upload re-signed here for 7 days, and go in the email too.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -51,6 +55,119 @@ function admin() {
   );
 }
 
+type Db = ReturnType<typeof admin>;
+
+/* ------------------------------------------------------------ files --- */
+
+type FileKind = "audio" | "image" | "file";
+type InboxFile = { kind: FileKind; name: string; size: number; url: string; durationSec?: number };
+
+const FILE_MAX = 15;
+const FILE_BUCKET = "mosha-attachments";
+const FILE_LINK_SECONDS = 7 * 24 * 60 * 60;
+const KIND_WORD: Record<FileKind, string> = { image: "Picture", audio: "Song", file: "File" };
+/** mosha_dm_founder keeps 2000 characters of a message. */
+const DM_MAX = 1900;
+
+function fileText(v: unknown, max: number): string {
+  return typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "";
+}
+
+/** Only inside the sender's own `<uid>/` folder. */
+function safeOwnPath(path: string, uid: string): boolean {
+  if (!path || path.length > 500 || !path.startsWith(`${uid}/`)) return false;
+  if (/[\\\u0000-\u001f\u007f]/.test(path)) return false;
+  return !path.split("/").some((seg) => seg === "" || seg === "." || seg === "..");
+}
+
+/** A link we will put in front of the founder: a public R2 bucket, songchainn.xyz, or a signed link into the sender's own folder. */
+function trustedLink(url: string, uid: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:" || u.username || u.password) return false;
+  const host = u.hostname.toLowerCase();
+  if (host.endsWith(".r2.dev") || host === "songchainn.xyz" || host.endsWith(".songchainn.xyz")) return true;
+  let project = "";
+  try {
+    project = new URL(Deno.env.get("SUPABASE_URL") ?? "").hostname.toLowerCase();
+  } catch {
+    /* no project host */
+  }
+  return !!project && host === project && u.pathname.startsWith(`/storage/v1/object/sign/${FILE_BUCKET}/${uid}/`);
+}
+
+/** The files a signed-in sender attached, each with a link the founder can open. Guests send none. */
+async function cleanFiles(db: Db, input: unknown, uid: string | null): Promise<InboxFile[]> {
+  if (!uid || !Array.isArray(input)) return [];
+  const picked = input.slice(0, FILE_MAX).filter((r) => r && typeof r === "object" && !Array.isArray(r)) as Array<Record<string, unknown>>;
+  const files = await Promise.all(
+    picked.map(async (a): Promise<InboxFile | null> => {
+      if (a.kind !== "audio" && a.kind !== "image" && a.kind !== "file") return null;
+      let url = "";
+      // A private upload is signed again here, whatever link came with it.
+      const path = typeof a.path === "string" ? a.path.trim() : "";
+      if (a.storage === "private" && safeOwnPath(path, uid)) {
+        try {
+          const { data } = await db.storage.from(FILE_BUCKET).createSignedUrl(path, FILE_LINK_SECONDS);
+          url = data?.signedUrl ?? "";
+        } catch {
+          /* fall back to the link it came with */
+        }
+      }
+      if (!url) {
+        const given = fileText(a.url, 2000);
+        if (given && trustedLink(given, uid)) url = given;
+      }
+      if (!url) return null;
+      const size = typeof a.size === "number" && Number.isFinite(a.size) && a.size > 0 ? Math.floor(a.size) : 0;
+      const dur = typeof a.durationSec === "number" && Number.isFinite(a.durationSec) && a.durationSec > 0 ? a.durationSec : undefined;
+      return { kind: a.kind, name: fileText(a.name, 200) || "untitled", size, url, ...(dur ? { durationSec: dur } : {}) };
+    }),
+  );
+  return files.filter((f): f is InboxFile => !!f);
+}
+
+function sizeWords(n: number): string {
+  if (!n) return "";
+  return n < 1048576 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`;
+}
+
+function fileLabel(f: InboxFile): string {
+  const bits = [sizeWords(f.size), f.durationSec ? `${Math.floor(f.durationSec / 60)}:${String(Math.round(f.durationSec) % 60).padStart(2, "0")}` : ""].filter(Boolean);
+  return `${KIND_WORD[f.kind]} "${f.name}"${bits.length ? ` (${bits.join(", ")})` : ""}`;
+}
+
+/** Lines into messages that each fit a DM, the heading on the first. */
+function dmChunks(heading: string, lines: string[]): string[] {
+  const out: string[] = [];
+  let cur = heading;
+  for (const raw of lines) {
+    const line = raw.slice(0, DM_MAX);
+    if (cur && cur.length + 1 + line.length > DM_MAX) {
+      out.push(cur);
+      cur = line;
+    } else {
+      cur = cur ? `${cur}\n${line}` : line;
+    }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+async function senderName(db: Db, uid: string | null, email: string | null): Promise<string> {
+  if (!uid) return "a guest";
+  const { data: prof } = await db
+    .from("audience_profiles")
+    .select("display_name, profile_name, username")
+    .eq("user_id", uid)
+    .maybeSingle();
+  return prof?.display_name?.trim() || prof?.profile_name?.trim() || prof?.username?.trim() || email || "someone without a name yet";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -72,6 +189,13 @@ Deno.serve(async (req) => {
       const { data } = await db.auth.getUser(token);
       uid = data?.user?.id ?? null;
       email = data?.user?.email ?? null;
+    }
+
+    let files: InboxFile[] = [];
+    try {
+      files = await cleanFiles(db, body?.attachments, uid);
+    } catch (err) {
+      console.error("founder-inbox: could not read the files", err);
     }
 
     /* ------------------------------------------------- the table --- */
@@ -130,15 +254,7 @@ Deno.serve(async (req) => {
     let dmed = !!stored;
     if (!stored) {
       try {
-        let name = "a guest";
-        if (uid) {
-          const { data: prof } = await db
-            .from("audience_profiles")
-            .select("display_name, profile_name, username")
-            .eq("user_id", uid)
-            .maybeSingle();
-          name = prof?.display_name?.trim() || prof?.profile_name?.trim() || prof?.username?.trim() || email || "someone without a name yet";
-        }
+        const name = await senderName(db, uid, email);
         const heading =
           kind === "bug"
             ? /mo\$ha/i.test(subject) ? `Report from ${name} via Mo$ha` : `Bug report from ${name}`
@@ -169,11 +285,35 @@ Deno.serve(async (req) => {
       }
     }
 
+    /* --------------------------------------- the files, into IMan's DM --- */
+    // A DM holds 2000 characters and a signed link is a few hundred, so the
+    // files follow the note in their own messages, right under it (the note's
+    // DM was already written above or by the table trigger). The inbox turns
+    // each link into a tap.
+    let filesDmed = false;
+    if (files.length) {
+      try {
+        const name = await senderName(db, uid, email);
+        const heading = `${files.length === 1 ? "The file" : `The ${files.length} files`} ${name} sent with that ${kind === "bug" ? "report" : "note"}${/mo\$ha/i.test(subject) ? " via Mo$ha" : ""} (links work for 7 days):`;
+        const lines = files.map((f, i) => `${i + 1}. ${fileLabel(f)}\n${f.url}`);
+        for (const chunk of dmChunks(heading, lines)) {
+          const { error: fileErr } = await db.rpc("mosha_dm_founder", {
+            p_body: chunk,
+            p_meta: { report_kind: kind, files: files.length, ...(stored ? { report_id: stored } : {}) },
+          });
+          if (fileErr) throw fileErr;
+        }
+        filesDmed = true;
+      } catch (err) {
+        console.error("founder-inbox: could not DM the files", err);
+      }
+    }
+
     /* ------------------------------------------------- the inbox --- */
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) {
       console.error("founder-inbox: RESEND_API_KEY not configured; note saved without the email");
-      return json({ success: true, stored: !!stored, emailed: false, dmed, storeError });
+      return json({ success: true, stored: !!stored, emailed: false, dmed, filesDmed, storeError });
     }
 
     // Send from a verified Resend domain when one exists; the sandbox sender
@@ -210,6 +350,7 @@ Deno.serve(async (req) => {
       subject ? `${subject}\n` : "",
       text,
       "",
+      ...(files.length ? ["Files (links work for 7 days):", ...files.map((f, i) => `${i + 1}. ${fileLabel(f)}: ${f.url}`), ""] : []),
       stored ? `Saved in the app as ${stored}.` : `Not saved to a table${uid ? "" : " (guest)"}${storeError ? `: ${storeError}` : ""}.`,
     ].join("\n");
 
@@ -229,6 +370,7 @@ Deno.serve(async (req) => {
           ${extra.map((e) => `<p>${esc(e)}</p>`).join("")}
           ${subject ? `<p><strong>${esc(subject)}</strong></p>` : ""}
           <p style="white-space:pre-wrap">${esc(text)}</p>
+          ${files.length ? `<p><strong>Files</strong> (links work for 7 days)</p><ol>${files.map((f) => `<li><a href="${esc(f.url)}">${esc(fileLabel(f))}</a>${f.kind === "image" ? `<br><img src="${esc(f.url)}" alt="${esc(f.name)}" style="max-width:360px;margin-top:6px;">` : ""}</li>`).join("")}</ol>` : ""}
           <p style="color:#888;font-size:12px;">${stored ? `Saved in the app as ${esc(stored)}.` : "Not saved to a table."}</p>
         `,
       }),
@@ -239,7 +381,7 @@ Deno.serve(async (req) => {
       await db.from("suggestion_forms").update({ email_sent: true }).eq("id", stored);
     }
 
-    return json({ success: true, stored: !!stored, emailed, dmed, storeError });
+    return json({ success: true, stored: !!stored, emailed, dmed, filesDmed, storeError });
   } catch (err) {
     console.error("founder-inbox error:", err);
     return json({ error: "That did not go through. Try again in a moment." }, 500);

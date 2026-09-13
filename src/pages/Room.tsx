@@ -1,8 +1,8 @@
 import { artistPath, songPath } from '@/lib/slugRoutes';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Link2, ListMusic, Settings, Share2, HardDrive, Bot } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ListMusic, LogOut, Share2, HardDrive, Bot, SendHorizontal, SmilePlus, UserPlus, UserRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
@@ -18,6 +18,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Slider } from '@/components/ui/slider';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { RoomPeople } from '@/components/room/RoomPeople';
+import { RoomChatMessage } from '@/components/room/RoomChatMessage';
+import { HdEmoji, isEmojiOnly, withHdEmoji } from '@/components/room/HdEmoji';
 import { toast } from 'sonner';
 
 type RoomMessage = {
@@ -37,8 +39,14 @@ type RoomLiveUser = {
   last_seen_at?: string | null;
 };
 
-const QUICK_REACTIONS = ['🔥', '👀', '💯'] as const;
-const TEXT_EMOJIS = ['🔥', '👀', '💯', '😂', '😍', '😤', '🤝', '🎧', '🚀', '🫡', '🙏', '⚡'] as const;
+const TEXT_EMOJIS = ['🔥', '👀', '💯', '😂', '😍', '😤', '🤝', '🎧', '🚀', '🫡', '🙏', '⚡', '❤️', '👍', '😮', '😢', '🎉', '🙌', '😎', '👏'] as const;
+
+/** The two buttons at either end of the Room's top bar. */
+const ROOM_PILL =
+  'inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-sm font-medium text-zinc-100 transition-colors hover:bg-white/10 active:bg-white/15';
+/** The row of Room tools under it: icon over a short word on a phone, side by side on a computer. */
+const ROOM_TOOL =
+  'flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] px-1.5 text-[11px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.08] active:bg-white/[0.12] disabled:opacity-40 sm:min-h-11 sm:flex-row sm:gap-2 sm:text-sm';
 const CUSTOM_EMOJI_TOKENS = [':BASED:', ':LFB!:', ':MALAKAS:', ':TWEAKING:'] as const;
 const STICKER_EMOJI_TOKENS = new Set([':MALAKAS:', ':TWEAKING:']);
 
@@ -185,9 +193,9 @@ function renderMessageWithCustomEmojis(text: string, options?: { allowStickers?:
     .filter(x => x.index >= 0)
     .sort((a, b) => a.index - b.index)[0];
 
-  if (!firstIndex) return text;
+  if (!firstIndex) return withHdEmoji(text);
 
-  const nodes: Array<string | JSX.Element> = [];
+  const nodes: ReactNode[] = [];
   let cursor = 0;
   let key = 0;
   while (cursor < text.length) {
@@ -197,11 +205,11 @@ function renderMessageWithCustomEmojis(text: string, options?: { allowStickers?:
       .sort((a, b) => a.index - b.index)[0];
 
     if (!next) {
-      nodes.push(text.slice(cursor));
+      nodes.push(...withHdEmoji(text.slice(cursor), 20, `t${key++}`));
       break;
     }
 
-    if (next.index > cursor) nodes.push(text.slice(cursor, next.index));
+    if (next.index > cursor) nodes.push(...withHdEmoji(text.slice(cursor, next.index), 20, `t${key++}`));
     const uri = CUSTOM_EMOJI_URI_BY_TOKEN[next.token as (typeof CUSTOM_EMOJI_TOKENS)[number]];
     const isSticker = allowStickers && STICKER_EMOJI_TOKENS.has(next.token as (typeof CUSTOM_EMOJI_TOKENS)[number]);
     if (isSticker && nodes.length > 0) {
@@ -795,11 +803,12 @@ export default function Room() {
         joined_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),
       };
-      setLiveUsers((prev) => {
-        const withoutSelf = prev.filter((entry) => entry.user_id !== user.id);
-        return [optimisticUser, ...withoutSelf];
-      });
-      setOnlineCount((prev) => prev + 1);
+      // Only when nobody else can be read: just this person. It used to add
+      // one to whatever was there and keep the old names, so every empty read
+      // (a realtime change arriving before the view caught up) pushed the
+      // count up by one and kept people listed who had already left.
+      setLiveUsers([optimisticUser]);
+      setOnlineCount(1);
     };
 
     const refreshLiveUsers = async () => {
@@ -1513,7 +1522,11 @@ export default function Room() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 relative isolate">
+    // One screen tall, in three rows: the top bar, the chat (the only part that
+    // scrolls) and the composer. The page used to scroll as a whole under a
+    // sticky top bar and a fixed composer, so the first and last messages sat
+    // behind them.
+    <div className="relative isolate flex h-[100dvh] flex-col overflow-hidden bg-black text-zinc-100">
       <AmbientBackground
         pool="theRoom"
         opacity={0.12}
@@ -1521,42 +1534,38 @@ export default function Room() {
         glow
         className="fixed -z-10"
       />
-      <div className="sticky top-0 z-20 bg-black/60 backdrop-blur border-b border-white/10">
-        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  hideRoom();
-                  navigate('/');
-                }}
-                className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Hide Room</span>
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await exitRoomMode();
-                  navigate('/');
-                }}
-                className="inline-flex sm:hidden items-center gap-2 text-sm text-zinc-400 hover:text-red-400 transition-colors"
-              >
-                <span>Leave Room</span>
-              </button>
-            </div>
-          <div className="flex items-center gap-3">
+      <div className="z-20 shrink-0 border-b border-white/10 bg-black/85">
+        <div className="max-w-3xl lg:max-w-5xl mx-auto space-y-2 px-4 pb-2 pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                hideRoom();
+                navigate('/');
+              }}
+              aria-label="Hide the Room and keep listening"
+              title="Hide the Room. The music keeps playing."
+              className={ROOM_PILL}
+            >
+              <ChevronDown className="h-4 w-4" />
+              <span>Hide</span>
+            </button>
+            <div className="min-w-0 truncate text-center text-base font-semibold text-zinc-50">The Room</div>
             <button
               type="button"
               onClick={async () => {
                 await exitRoomMode();
                 navigate('/');
               }}
-              className="hidden sm:inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-red-400 transition-colors"
+              aria-label="Leave the Room and stop the music"
+              title="Leave the Room"
+              className={`${ROOM_PILL} hover:text-red-300`}
             >
-              <span>Leave Room</span>
+              <LogOut className="h-4 w-4" />
+              <span>Leave</span>
             </button>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
             <button
               type="button"
               onClick={async () => {
@@ -1568,13 +1577,15 @@ export default function Room() {
                   toast.error('Could not copy invite link');
                 }
               }}
-              className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+              aria-label="Copy an invite link to the Room"
+              className={ROOM_TOOL}
             >
-              <Link2 className="w-4 h-4" />
-              <span>Invite</span>
+              <UserPlus className="h-[18px] w-[18px] shrink-0" />
+              <span className="max-w-full truncate">Invite</span>
             </button>
             <button
               type="button"
+              disabled={!currentSong}
               onClick={async () => {
                 if (!currentSong) return;
                 const songUrl = `${window.location.origin}${songPath(currentSong)}`;
@@ -1586,18 +1597,21 @@ export default function Room() {
                   toast.error('Could not copy song link');
                 }
               }}
-              className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+              aria-label="Copy a link to the song playing now"
+              className={ROOM_TOOL}
             >
-              <Share2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Share song</span>
+              <Share2 className="h-[18px] w-[18px] shrink-0" />
+              <span className="max-w-full truncate">Share song</span>
             </button>
             <button
               type="button"
               onClick={() => setMoshaMode((prev) => (prev === 'vibe' ? 'chat' : 'vibe'))}
-              className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+              aria-pressed={moshaMode === 'chat'}
+              aria-label={moshaMode === 'vibe' ? 'Mo$ha is on vibe. Tap to chat with Mo$ha' : 'Mo$ha is on chat. Tap for vibe'}
+              className={ROOM_TOOL}
             >
-              <Bot className="w-4 h-4" />
-              <span>{`Mo$ha: ${moshaMode === 'vibe' ? 'Vibe' : 'Chat'}`}</span>
+              <Bot className="h-[18px] w-[18px] shrink-0" />
+              <span className="max-w-full truncate">{`Mo$ha: ${moshaMode === 'vibe' ? 'Vibe' : 'Chat'}`}</span>
             </button>
             <button
               type="button"
@@ -1609,10 +1623,11 @@ export default function Room() {
                 setNameDraft(roomName || '');
                 setIsNamePromptOpen(true);
               }}
-              className="inline-flex items-center gap-2 text-sm text-zinc-200 hover:text-white transition-colors"
+              aria-label={roomName ? `Your Room name is ${roomName}. Tap to change it` : 'Set your Room name'}
+              className={ROOM_TOOL}
             >
-              <Settings className="w-4 h-4" />
-              <span>{roomName ? roomName : 'Set name'}</span>
+              <UserRound className="h-[18px] w-[18px] shrink-0" />
+              <span className="max-w-full truncate">{roomName ? roomName : 'Set name'}</span>
             </button>
           </div>
         </div>
@@ -1711,40 +1726,32 @@ export default function Room() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-10 px-3 text-zinc-300 hover:text-zinc-100"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  navigate('/');
-                }}
-              >
-                <span className="text-xs sm:text-sm">Invite friends from Home</span>
-              </Button>
-            </div>
           </div>
         </div>
       </div>
 
-      <div className="pt-4 pb-24">
-        <div className="max-w-3xl lg:max-w-5xl mx-auto px-4">
-          <div className="lg:flex lg:gap-6">
+      <div className="min-h-0 flex-1">
+        <div className="h-full max-w-3xl lg:max-w-5xl mx-auto px-4">
+          <div className="h-full lg:flex lg:gap-6">
             <div
               ref={listRef}
               onScroll={handleListScroll}
-              className="h-[calc(100vh-14rem)] overflow-y-auto lg:flex-1"
+              className="h-full overflow-y-auto overscroll-contain lg:flex-1"
             >
-              <div className="space-y-2 py-4">
+              <div className="space-y-3 pb-6 pt-4">
                 {messages.map(m => {
                   const parent = m.reply_to_message_id ? messageById.get(m.reply_to_message_id) : undefined;
+                  const text = m.content || m.message || '';
+                  const big = isEmojiOnly(text);
                   return (
-                    <SwipeToReplyMessage
+                    <RoomChatMessage
                       key={m.id}
-                      message={m}
-                      parent={parent}
+                      name={m.room_name}
+                      userId={m.user_id}
+                      body={big ? withHdEmoji(text.replace(/\s+/g, ''), 44, m.id) : renderMessageWithCustomEmojis(text)}
+                      copyText={text}
+                      bigEmoji={big}
+                      parent={parent ? { name: parent.room_name, text: parent.content || parent.message || '' } : null}
                       onReply={() => setReplyTo(m)}
                       reactions={reactionsByMessageId[m.id]}
                       myReactions={myReactionsByMessageId[m.id]}
@@ -1756,7 +1763,7 @@ export default function Room() {
               </div>
             </div>
 
-            <aside className="hidden lg:flex lg:flex-col lg:w-80 lg:h-[calc(100vh-14rem)] lg:py-4 lg:gap-4">
+            <aside className="hidden lg:flex lg:flex-col lg:w-80 lg:h-full lg:py-4 lg:gap-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center gap-1.5 text-xs text-zinc-400">
                   <span>Now playing</span>
@@ -1829,7 +1836,7 @@ export default function Room() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-black/70 backdrop-blur border-t border-white/10">
+      <div className="z-20 shrink-0 border-t border-white/10 bg-zinc-950 pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 space-y-2">
           {Object.keys(typingUsersById).length > 0 && (
             <div className="text-[11px] text-zinc-500 truncate">
@@ -1838,7 +1845,7 @@ export default function Room() {
           )}
           {!replyTo && (
             <div className="text-[11px] text-zinc-600 truncate">
-              Slide a message to reply
+              Hold a message to react. Slide it right to reply.
             </div>
           )}
           {replyTo && (
@@ -1861,7 +1868,7 @@ export default function Room() {
           )}
 
           <div className="flex items-center gap-3">
-            <div className="w-28 flex items-center gap-2">
+            <div className="hidden w-28 items-center gap-2 sm:flex">
               <span className="text-xs text-zinc-400 w-10">{Math.round(volume * 100)}%</span>
               <Slider value={[volume * 100]} onValueChange={handleVolumeChange} max={100} step={1} />
             </div>
@@ -1932,7 +1939,7 @@ export default function Room() {
                   onFocus={() => void unlockBeep()}
                   onPointerDown={() => void unlockBeep()}
                   placeholder="Say something..."
-                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-white/20"
+                  className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-white/20"
                   disabled={isSending}
                   autoComplete="off"
                 />
@@ -1943,12 +1950,13 @@ export default function Room() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-10 w-10 p-0 bg-white/5 hover:bg-white/10 text-zinc-200"
+                    aria-label="Emoji"
+                    className="h-11 w-11 shrink-0 rounded-xl p-0 bg-white/5 hover:bg-white/10 text-zinc-200"
                     onClick={() => {
                       lastCursorRef.current = inputRef.current?.selectionStart ?? draftRef.current.length;
                     }}
                   >
-                    🙂
+                    <SmilePlus className="h-5 w-5" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-72 p-3 bg-zinc-950 border-white/10 text-zinc-100">
@@ -1957,10 +1965,11 @@ export default function Room() {
                       <button
                         key={emoji}
                         type="button"
-                        className="h-10 w-10 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xl"
+                        aria-label={`Add ${emoji}`}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
                         onClick={() => insertTextAtCursor(emoji)}
                       >
-                        {emoji}
+                        <HdEmoji emoji={emoji} size={26} />
                       </button>
                     ))}
                     {(CUSTOM_EMOJI_TOKENS as readonly string[]).map((token) => (
@@ -1984,10 +1993,12 @@ export default function Room() {
 
               <Button
                 type="submit"
-                className="h-10 px-4 bg-white/10 hover:bg-white/15 text-zinc-100"
+                aria-label="Send"
+                className="h-11 shrink-0 gap-1.5 rounded-xl px-4 bg-zinc-100 text-zinc-950 hover:bg-white disabled:bg-white/10 disabled:text-zinc-500"
                 disabled={isSending || !draft.trim()}
               >
-                Send
+                <SendHorizontal className="h-4 w-4" />
+                <span className="hidden sm:inline">Send</span>
               </Button>
             </form>
           </div>
@@ -2153,157 +2164,3 @@ export default function Room() {
   );
 }
 
-function SwipeToReplyMessage({
-  message,
-  parent,
-  onReply,
-  reactions,
-  myReactions,
-  onReact,
-  isMine = false,
-}: {
-  message: RoomMessage;
-  parent?: RoomMessage;
-  onReply: () => void;
-  reactions?: Record<string, number>;
-  myReactions?: Record<string, boolean>;
-  onReact: (emoji: string) => void;
-  /** Your own words, tinted so the column is readable at a glance. */
-  isMine?: boolean;
-}) {
-  const startRef = useRef<{ x: number; y: number } | null>(null);
-  const modeRef = useRef<'undecided' | 'swipe' | 'scroll'>('undecided');
-  const pointerTypeRef = useRef<string | null>(null);
-  const didCaptureRef = useRef(false);
-  const [offsetX, setOffsetX] = useState(0);
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if ((e.target as HTMLElement | null)?.closest('button')) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    startRef.current = { x: e.clientX, y: e.clientY };
-    modeRef.current = 'undecided';
-    pointerTypeRef.current = e.pointerType;
-    didCaptureRef.current = false;
-    setOffsetX(0);
-  }, []);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (pointerTypeRef.current === 'mouse' && e.buttons === 0) return;
-    const start = startRef.current;
-    if (!start) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-
-    if (modeRef.current === 'undecided') {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      modeRef.current = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll';
-    }
-
-    if (modeRef.current !== 'swipe') return;
-    if (!didCaptureRef.current) {
-      (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-      didCaptureRef.current = true;
-    }
-    if (dx <= 0) {
-      setOffsetX(0);
-      return;
-    }
-    e.preventDefault();
-    setOffsetX(Math.min(80, dx));
-  }, []);
-
-  const handlePointerUp = useCallback(() => {
-    if (modeRef.current === 'swipe' && offsetX >= 60) {
-      onReply();
-    }
-    startRef.current = null;
-    modeRef.current = 'undecided';
-    pointerTypeRef.current = null;
-    didCaptureRef.current = false;
-    setOffsetX(0);
-  }, [offsetX, onReply]);
-
-  return (
-    <div className="relative">
-      <div
-        className={[
-          'pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 rounded-full border px-2 py-0.5 text-[11px] transition-opacity',
-          offsetX > 12 ? 'opacity-100 border-primary/30 bg-primary/15 text-primary' : 'opacity-0 border-white/10 bg-white/5 text-zinc-400',
-        ].join(' ')}
-      >
-        Reply
-      </div>
-      <div
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onClick={(e) => {
-          if ((e.target as HTMLElement | null)?.closest('button')) return;
-          if (typeof window === 'undefined') return;
-          if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-          onReply();
-        }}
-        className="group flex items-start gap-2 text-sm leading-relaxed text-zinc-200"
-        style={{ transform: offsetX ? `translateX(${offsetX}px)` : undefined, transition: offsetX ? undefined : 'transform 120ms ease-out' }}
-      >
-      <div
-        aria-hidden
-        className={[
-          'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold uppercase',
-          isMine ? 'bg-primary/25 text-primary' : 'bg-white/10 text-zinc-300',
-        ].join(' ')}
-      >
-        {(message.room_name || '?').trim().charAt(0) || '?'}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div
-          className={[
-            'rounded-2xl border px-3 py-2',
-            isMine ? 'border-primary/25 bg-primary/10' : 'border-white/10 bg-white/[0.04]',
-          ].join(' ')}
-        >
-          {parent && (
-            <div className="mb-1 border-l border-white/15 pl-2 text-xs text-zinc-500 truncate">
-              Reply to {parent.room_name}: {parent.content || parent.message}
-            </div>
-          )}
-          <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-zinc-100">
-            <ArtistName name={message.room_name} userId={(message as { user_id?: string | null }).user_id} size={14} />
-          </span>
-          <div className="text-zinc-200">
-            {renderMessageWithCustomEmojis(message.content || message.message || '')}
-          </div>
-        </div>
-        <div className="mt-1 flex items-center gap-1.5">
-          {QUICK_REACTIONS.map((emoji) => {
-            const count = reactions?.[emoji] ?? 0;
-            const active = Boolean(myReactions?.[emoji]);
-            return (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => onReact(emoji)}
-                className={[
-                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors',
-                  active ? 'border-primary/30 bg-primary/15 text-primary' : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10',
-                ].join(' ')}
-              >
-                <span>{emoji}</span>
-                {count > 0 ? <span className="tabular-nums">{count}</span> : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onReply}
-        className="hidden md:inline-flex px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity min-h-10"
-      >
-        Reply
-      </button>
-      </div>
-    </div>
-  );
-}

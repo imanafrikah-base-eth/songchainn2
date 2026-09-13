@@ -13,6 +13,9 @@ import {
   type StoredTurn,
 } from '@/lib/moshaHistory';
 import { INBOX_UNREAD_KEY } from '@/hooks/useInboxUnread';
+import { filesOnlyLine, type MoshaAttachment } from '@/lib/moshaAttachments';
+import type { MoshaDoOp } from '@/lib/moshaDo';
+import type { MoshaFlowName } from '@/components/mosha/MoshaFlows';
 
 /**
  * The line to Mo$ha in the Inbox. It is the SAME conversation as the Mo$ha
@@ -30,6 +33,12 @@ export type MoshaMessage = {
   sender: 'mosha' | 'user' | 'system';
   text: string;
   created_at: string;
+  attachments?: MoshaAttachment[];
+  /** A one-tap job Mo$ha offered under this reply. */
+  doOp?: MoshaDoOp;
+  /** A flow Mo$ha opened under this reply, with the chat's files for release_files. */
+  flow?: MoshaFlowName;
+  files?: MoshaAttachment[];
 };
 
 export const MOSHA_SEED_TEXT =
@@ -62,6 +71,10 @@ function toMessage(t: StoredTurn, i: number): MoshaMessage {
     sender: t.role === 'user' ? 'user' : 'mosha',
     text: `${t.content}${cta}`,
     created_at: t.at,
+    attachments: t.attachments,
+    doOp: t.action?.type === 'do' ? t.action.op : undefined,
+    flow: t.action?.type === 'flow' ? t.action.flow : undefined,
+    files: t.action?.type === 'flow' && 'attachments' in t.action ? t.action.attachments : undefined,
   };
 }
 
@@ -112,13 +125,20 @@ export function useMoshaThread(userId: string | null) {
   }, [userId, queryClient]);
 
   const send = useCallback(
-    async (raw: string) => {
-      const text = raw.trim();
+    async (raw: string, attachments: MoshaAttachment[] = []) => {
+      // A message that is only files still reads as something said.
+      const text = raw.trim() || (attachments.length ? filesOnlyLine(attachments.length) : '');
       // One question at a time: nothing new goes out until Mo$ha has answered.
       if (!text || busyRef.current) return;
       busyRef.current = true;
       setIsSending(true);
-      const mine: StoredTurn = { role: 'user', content: text, at: new Date().toISOString(), source: 'inbox' };
+      const mine: StoredTurn = {
+        role: 'user',
+        content: text,
+        at: new Date().toISOString(),
+        source: 'inbox',
+        attachments: attachments.length ? attachments : undefined,
+      };
       const next = [...turnsRef.current, mine];
       setTurns(next);
       if (userId) appendCache(userId, [mine]);
@@ -126,7 +146,7 @@ export function useMoshaThread(userId: string | null) {
       setAwaitingReply(true);
       try {
         // mosha-chat writes the question and the answer into the one history.
-        const { reply, action } = await askMoshaFull(toModelTurns(next), 'inbox');
+        const { reply, action } = await askMoshaFull(toModelTurns(next), 'inbox', { attachments });
         const answer: StoredTurn = { role: 'assistant', content: reply, at: new Date().toISOString(), action, source: 'inbox' };
         setTurns((prev) => [...prev, answer]);
         if (userId) appendCache(userId, [answer]);

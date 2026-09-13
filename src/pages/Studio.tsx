@@ -38,6 +38,9 @@ import { ArtworkField } from '@/components/studio/ArtworkField';
 import { ReleaseTypePicker, RELEASE_TYPES, countAdvice, isCollection, releaseKindOf, typeLabel, type ReleaseType } from '@/components/studio/ReleaseType';
 import { TracklistRow } from '@/components/studio/TracklistRow';
 import { useSongCoin } from '@/hooks/useSongCoins';
+import { audioLoads, stoppedTrack, trackFromRow } from '@/hooks/useArtistStudio';
+import { clearDraft, clearPickerOpen, loadDraft, markPickerOpen, planRestore, saveDraft, type DraftTrack, type UploadedRow } from '@/lib/studioDraft';
+import { setAppBusy } from '@/lib/appBusy';
 
 const FIELD_LABEL = 'mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground';
 const FIELD_INPUT =
@@ -103,11 +106,11 @@ function useMyProfile() {
 }
 
 const Studio = () => {
-  const { user, isArtist, artistId } = useAuth();
+  const { user, isArtist, artistId, rolesReady } = useAuth();
   const { becomeArtist, pending: becoming } = useBecomeArtist();
   const { data: profile } = useMyProfile();
   const { data: releases = [], isLoading } = useArtistReleases();
-  const { tracks, busy, landing, finished, add, attachExisting, remove, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults } = useBatchUpload();
+  const { tracks, busy, landing, finished, add, attachExisting, restoreTracks, getReleaseId, setReleaseId, remove, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults } = useBatchUpload();
   const { cannotUpload } = useCompliance();
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -144,6 +147,74 @@ const Studio = () => {
   const hasWallet = !!profile?.wallet_address;
 
   /**
+   * A release in progress comes back after a reload. Android drops a page
+   * behind its file picker, and N3M3SIS lost an EP that way on 13 Sep 2026:
+   * wagwan uploaded, she opened the picker for the next track, and the app
+   * started over. The form is kept on the phone as it changes (below); the
+   * tracks whose files landed are rebuilt from their songs rows, and one that
+   * never got in keeps its place and asks to be picked again.
+   */
+  const [restored, setRestored] = useState(false);
+  const restoreRan = useRef(false);
+  const { fromLandedUrl: coverFromLanded } = cover;
+  useEffect(() => {
+    if (!user?.id || !rolesReady || restoreRan.current) return;
+    restoreRan.current = true;
+    const draft = isArtist ? loadDraft(user.id) : null;
+    if (!draft) {
+      setRestored(true);
+      return;
+    }
+    const userId = user.id;
+    void (async () => {
+      try {
+        const ids = draft.tracks.map((t) => t.songId).filter((id): id is string => !!id);
+        let rows: UploadedRow[] = [];
+        if (ids.length) {
+          const { data } = await supabase
+            .from('songs')
+            .select('id, title, status, release_id, audio_url, storage_key, file_bytes, cover_art_url, genre, duration_seconds')
+            .in('id', ids)
+            .eq('owner_id', userId);
+          rows = (data ?? []) as unknown as UploadedRow[];
+        }
+        const list: QueuedTrack[] = [];
+        for (const p of planRestore(draft, rows)) {
+          if (p.kind === 'uploaded') list.push(trackFromRow(p.row, p.track));
+          else if (p.kind === 'check' && p.row.audio_url && (await audioLoads(p.row.audio_url))) list.push(trackFromRow(p.row, p.track));
+          else list.push(stoppedTrack(p.track));
+        }
+        const type = RELEASE_TYPES.find((r) => r.value === draft.releaseType)?.value;
+        if (type) setReleaseType(type);
+        setReleaseTitle(draft.releaseTitle ?? '');
+        setReleaseAbout(draft.releaseAbout ?? '');
+        setUpc(draft.upc ?? '');
+        if (draft.genre && (GENRES as string[]).includes(draft.genre)) setGenre(draft.genre);
+        if (draft.artistName) setArtistName(draft.artistName);
+        if (draft.coverUrl) coverFromLanded(draft.coverUrl);
+        if (draft.releaseId) setReleaseId(draft.releaseId);
+        if (list.length) {
+          restoreTracks(list);
+          const lost = list.filter((t) => t.stopped).length;
+          toast('Your release is back where you left it', {
+            description: lost
+              ? `${lost === 1 ? 'One track' : `${lost} tracks`} stopped before finishing the upload. Pick ${lost === 1 ? 'it' : 'them'} again; everything else is still in.`
+              : 'Every track that uploaded is still here.',
+          });
+        }
+      } catch {
+        // An unreadable draft costs nothing: uploaded rows still show under
+        // "Already uploaded, not sent yet".
+      } finally {
+        setRestored(true);
+      }
+    })();
+  }, [user?.id, rolesReady, isArtist, coverFromLanded, restoreTracks, setReleaseId]);
+
+  const coverStatusRef = useRef(cover.status);
+  coverStatusRef.current = cover.status;
+
+  /**
    * /studio?release=ep&with=<song id>: open the upload with a record that is
    * already in the Studio as track one, waiting for the rest of the release.
    * Only its owner gets it, and only while it is not out (uploading or in the
@@ -155,13 +226,14 @@ const Studio = () => {
   const attachedRef = useRef<string | null>(null);
   const { fromProfileUrl: coverFromUrl } = cover;
   useEffect(() => {
-    if (!user?.id || !isArtist || !withSongId || attachedRef.current === withSongId) return;
+    // After the restore, so a reloaded release keeps its own order and artwork.
+    if (!restored || !user?.id || !isArtist || !withSongId || attachedRef.current === withSongId) return;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(withSongId)) return;
     attachedRef.current = withSongId;
     void (async () => {
       const { data } = await supabase
         .from('songs')
-        .select('id, title, genre, cover_art_url, duration_seconds, storage_key, audio_url, status')
+        .select('id, title, genre, cover_art_url, duration_seconds, storage_key, file_bytes, audio_url, status')
         .eq('id', withSongId)
         .eq('owner_id', user.id)
         .maybeSingle();
@@ -173,10 +245,10 @@ const Studio = () => {
       const songGenre = song.genre;
       if (songGenre && (GENRES as string[]).includes(songGenre)) setGenre((g) => g || songGenre);
       // Its artwork starts as the release artwork; picking another replaces it.
-      if (song.cover_art_url) coverFromUrl(song.cover_art_url);
+      if (song.cover_art_url && coverStatusRef.current === 'idle') coverFromUrl(song.cover_art_url);
       attachExisting(song);
     })();
-  }, [user?.id, isArtist, withSongId, releaseParam, attachExisting, coverFromUrl]);
+  }, [restored, user?.id, isArtist, withSongId, releaseParam, attachExisting, coverFromUrl]);
 
   // What a ticket carries before the artist has typed anything.
   useEffect(() => {
@@ -192,6 +264,71 @@ const Studio = () => {
 
   // One world per artist: the world card says "your world", never "build one", once they have it.
   const { hasWorld, worldPath: myWorldPath } = useHasWorld();
+
+  /**
+   * What is kept on the phone: everything needed to rebuild the form. Upload
+   * progress is left out on purpose, so a moving progress bar does not write
+   * to storage on every percent.
+   */
+  const draftJson = useMemo(() => {
+    const unsentTracks = tracks.filter(
+      (t) => !!t.stopped || t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId),
+    );
+    const list: DraftTrack[] = unsentTracks.map((t) => ({
+      songId: t.songId,
+      title: t.title,
+      fileName: t.file.name,
+      fileSize: t.stopped ? t.stopped.fileSize : t.file.size,
+      phase: t.stopped ? 'error' : (t.phase as DraftTrack['phase']),
+      existing: !!t.existing,
+      trackNumber: t.trackNumber,
+      genre: t.genre,
+      explicit: t.explicit,
+      featured: t.featured,
+    }));
+    return JSON.stringify({
+      releaseType,
+      releaseTitle,
+      releaseAbout,
+      upc,
+      genre,
+      artistName,
+      coverUrl: cover.status === 'ready' ? cover.url : null,
+      tracks: list,
+    });
+  }, [tracks, releaseType, releaseTitle, releaseAbout, upc, genre, artistName, cover.status, cover.url]);
+
+  useEffect(() => {
+    if (!user?.id || !restored || !isArtist) return;
+    if (finished) {
+      clearDraft(user.id);
+      return;
+    }
+    saveDraft(user.id, { ...JSON.parse(draftJson), releaseId: getReleaseId() });
+  }, [user?.id, restored, isArtist, finished, draftJson, getReleaseId]);
+
+  // Nothing reloads the page while a file is on its way up or tracks are
+  // waiting to be sent: no service worker takeover, no stale-build recovery,
+  // no update banner over the form. See src/lib/appBusy.ts.
+  const unsent = tracks.some(
+    (t) => !!t.stopped || t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || t.phase === 'auditioning',
+  );
+  useEffect(() => {
+    setAppBusy('studio', unsent || busy);
+  }, [unsent, busy]);
+  useEffect(() => () => setAppBusy('studio', false), []);
+
+  // Back from the picker with the page alive: the way-back note is not needed.
+  useEffect(() => {
+    const onFocus = () => window.setTimeout(clearPickerOpen, 2000);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
+  /** Records whose files are in but were never sent, and are not on the tracklist. */
+  const waitingUploads = releases.filter(
+    (r) => r.status === 'uploading' && !r.release_id && !!r.audio_url && !tracks.some((t) => t.songId === r.id),
+  );
 
   // No daily track limit (founder, 13 Sep 2026): an artist sends as many
   // records as they like, whenever they like, so nothing here counts "today".
@@ -217,6 +354,7 @@ const Studio = () => {
 
   /** What stops this one row from being sent, in the artist's words. */
   const trackProblem = (t: QueuedTrack): string | null => {
+    if (t.stopped) return 'This one did not finish uploading. Pick the same file again, or remove it.';
     if (t.file.size > MAX_MB * 1024 * 1024) return `That file is ${(t.file.size / (1024 * 1024)).toFixed(1)} MB. The limit is ${MAX_MB} MB.`;
     if (t.seconds !== null && t.seconds < MIN_SECONDS) return `That runs ${Math.round(t.seconds)} seconds. A record has to be at least ${MIN_SECONDS}; anything shorter goes straight to the workshop as a snippet.`;
     if (!t.title.trim()) return 'Give it a title.';
@@ -315,7 +453,7 @@ const Studio = () => {
   const addFiles = (incoming: FileList | File[] | null) => {
     const all = Array.from(incoming ?? []);
     const files = all.filter(
-      (f) => /\.(wav|mp3)$/i.test(f.name) || /^audio\/(wav|x-wav|mpeg)$/.test(f.type),
+      (f) => /\.(wav|mp3)$/i.test(f.name) || /^audio\/(wav|x-wav|wave|vnd\.wave|mpeg|mp3)$/.test(f.type),
     );
     // A picture dropped with the audio is the artwork.
     const image = all.find((f) => f.type.startsWith('image/'));
@@ -324,7 +462,18 @@ const Studio = () => {
       if (!image && all.length) toast('Only WAV and MP3 files can be sent', { description: 'Export the track as WAV or MP3 and pick it again.' });
       return;
     }
-    add(files, { onRelease });
+    const { already } = add(files, { onRelease });
+    if (already.length) {
+      toast(already.length === 1 ? `${already[0]} is already on the tracklist` : `${already.length} of those are already on the tracklist`, {
+        description: 'It uploaded once already, so it was not sent a second time.',
+      });
+    }
+  };
+
+  /** The file picker, with a note of where to come back to if the phone drops the page meanwhile. */
+  const openPicker = () => {
+    markPickerOpen(`${window.location.pathname}${window.location.search}`);
+    fileRef.current?.click();
   };
 
   /** An EP, album, mixtape or compilation is made here, so an existing release picked in the details is let go. */
@@ -359,6 +508,7 @@ const Studio = () => {
   };
 
   const startOver = () => {
+    if (user?.id) clearDraft(user.id);
     reset();
     setGenre('');
     setDetails(EMPTY_DETAILS);
@@ -392,6 +542,20 @@ const Studio = () => {
           </Link>
         </div>
         <AudioPlayer />
+      </div>
+    );
+  }
+
+  // Whether this account is an artist is not known yet. Reading "not an
+  // artist" here used to swap the upload form out for the listener's door on
+  // every reload and every return to the tab.
+  if (!rolesReady) {
+    return (
+      <div className="min-h-screen bg-background pb-28">
+        <Navigation />
+        <div className="flex justify-center py-24">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Opening your Studio" />
+        </div>
       </div>
     );
   }
@@ -606,17 +770,18 @@ const Studio = () => {
                 ref={fileRef}
                 type="file"
                 multiple
-                accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg"
+                accept=".wav,.mp3,audio/wav,audio/x-wav,audio/wave,audio/vnd.wave,audio/mpeg,audio/mp3"
                 disabled={busy}
                 className="hidden"
                 onChange={(e) => {
+                  clearPickerOpen();
                   addFiles(e.target.files);
                   e.target.value = '';
                 }}
               />
               <button
                 type="button"
-                onClick={() => fileRef.current?.click()}
+                onClick={openPicker}
                 disabled={busy}
                 className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary/15 px-4 text-sm font-semibold text-primary hover:bg-primary/25 disabled:opacity-60"
               >
@@ -680,6 +845,7 @@ const Studio = () => {
                     onRemove={() => remove(t.key)}
                     onRetry={() => void start(meta(), t.key).catch((err) => toast.error((err as Error)?.message || 'That did not go through. Try again.'))}
                     onAskAgain={() => void askAgain(t.key)}
+                    onPickAgain={openPicker}
                     onMove={(delta) => move(t.key, delta)}
                     onExtras={(p) => setExtras(t.key, p)}
                     onCover={onTrackCover}
@@ -690,6 +856,39 @@ const Studio = () => {
                   />
                 ))}
               </ul>
+            )}
+            {restored && waitingUploads.length > 0 && (
+              <div className="mt-4 rounded-xl border border-border p-3">
+                <p className="text-sm font-semibold text-foreground">Already uploaded, not sent yet</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  These files are safely in. Add one here instead of uploading it again.
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {waitingUploads.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm text-foreground">
+                        {r.title || 'Untitled'}{' '}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(r.created_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          attachExisting(
+                            { id: r.id, title: r.title, genre: r.genre, cover_art_url: r.cover_art_url, duration_seconds: r.duration_seconds, storage_key: r.storage_key, file_bytes: r.file_bytes },
+                            { atEnd: true },
+                          )
+                        }
+                        className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-60"
+                      >
+                        Add
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
             {tracks.length > 1 && !busy && (
               <p className="mt-2 text-xs text-muted-foreground">

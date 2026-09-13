@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ClipboardEvent, type ReactNode } from 'react';
 import { ArrowUp, Loader2 } from 'lucide-react';
 
 /**
@@ -21,6 +21,10 @@ export function Composer({
   placeholder,
   maxLength = 2000,
   above,
+  leading,
+  canSendEmpty = false,
+  submitDisabled = false,
+  onPaste,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -30,9 +34,15 @@ export function Composer({
   placeholder: string;
   maxLength?: number;
   above?: ReactNode;
+  /** Beside the box, before it: e.g. the paperclip. */
+  leading?: ReactNode;
+  /** Something other than text can be sent (files waiting). */
+  canSendEmpty?: boolean;
+  submitDisabled?: boolean;
+  onPaste?: (e: ClipboardEvent<HTMLTextAreaElement>) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const canSend = value.trim().length > 0 && !sending && !disabled;
+  const canSend = (value.trim().length > 0 || canSendEmpty) && !sending && !disabled && !submitDisabled;
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -60,6 +70,7 @@ export function Composer({
         }}
         className="flex items-end gap-2 px-3 py-2.5"
       >
+        {leading}
         <label className="sr-only" htmlFor="dm-composer">
           {placeholder}
         </label>
@@ -72,6 +83,7 @@ export function Composer({
           disabled={disabled}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
+          onPaste={onPaste}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
             if (isTouchKeyboard()) return;

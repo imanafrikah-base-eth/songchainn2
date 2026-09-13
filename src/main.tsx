@@ -15,6 +15,8 @@ import { installStorageShim } from "./lib/storageShim";
 import { capturePendingReferralCode } from "./hooks/useReferrals";
 import { installLoadErrorRecovery } from "./lib/chunkRecovery";
 import { installMediaProtection, restoreReturnPath } from "./lib/deviceGuards";
+import { restoreStudioAfterPicker } from "./lib/studioDraft";
+import { whenAppIdle } from "./lib/appBusy";
 import { installAppWideBattleAudioUnlock } from "./battlezone/lib/audioUnlock";
 
 // FIRST, ahead of every other line in this file.
@@ -37,6 +39,11 @@ capturePendingReferralCode();
 // reads the address; and the ordinary doors to saving an artist's media, shut.
 restoreReturnPath();
 installMediaProtection();
+
+// An installed app that Android killed while the Studio's file picker was open
+// starts again at "/". Put the artist back in the Studio, where the release
+// they were making is rebuilt. See src/lib/studioDraft.ts.
+restoreStudioAfterPicker();
 
 // In a battle room everybody listens. The tap that carries someone into a room
 // from anywhere in the app counts as the browser's required gesture, so the
@@ -148,7 +155,9 @@ if ("serviceWorker" in navigator && import.meta.env.PROD && shouldRegisterServic
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (swRefreshing || !existingController) return;
     swRefreshing = true;
-    window.location.reload();
+    // Never under a file on its way up: the reload waits until the Studio
+    // (or anything else that said so) is done. See src/lib/appBusy.ts.
+    whenAppIdle(() => window.location.reload());
   });
 }
 

@@ -10,6 +10,8 @@ import { BLOCK_TYPES, BlockList, getBlockType, type BlockContext } from '@/world
 import { PropForm } from '@/worlds/builder/PropForm';
 import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
 import { useMyWorlds } from '@/worlds/builder/useMyWorlds';
+import { useHasWorld } from '@/worlds/builder/useHasWorld';
+import { useHasLiveSong } from '@/hooks/useHasLiveSong';
 import { MyWorldsList } from '@/worlds/builder/MyWorldsList';
 import { OtherWorlds } from '@/worlds/builder/OtherWorlds';
 import { StreetKey } from '@/worlds/builder/StreetKey';
@@ -93,8 +95,12 @@ export default function WorldBuilder() {
   const worldId = params.get('id') ?? undefined;
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, artistId } = useAuth();
+  const { user, artistId, isArtist } = useAuth();
   const b = useWorldBuilder(worldId);
+  /* Worlds are for musicians with a song out. Somebody who already has a
+     world keeps it whatever happens; only starting one needs a live song. */
+  const { hasLiveSong, isLoading: liveLoading } = useHasLiveSong();
+  const { hasWorld, isLoading: worldsLoading } = useHasWorld();
   /* Worlds this artist already started. Without this the builder greets
      everybody with "name your world", including the person who is half way
      through one, and their draft becomes unreachable. */
@@ -285,6 +291,44 @@ export default function WorldBuilder() {
           <p className="mt-2 text-sm text-muted-foreground">
             A world belongs to somebody, so it needs a name attached to it.
           </p>
+        </main>
+      </div>
+    );
+  }
+
+  // Starting a world, with no world yet: only a musician with a song out.
+  const starting = !worldId && !hasWorld && myWorlds.length === 0;
+  if (starting && (liveLoading || worldsLoading)) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <main className="mx-auto max-w-2xl px-4 py-16 text-center">
+          <p className="text-sm text-muted-foreground">Opening the builder.</p>
+        </main>
+      </div>
+    );
+  }
+  if (starting && !hasLiveSong) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <main className="mx-auto max-w-2xl px-4 py-16 text-center">
+          <h1 className="font-heading text-2xl font-semibold text-foreground">
+            {isArtist ? 'Put your first song out and your world opens.' : 'Worlds are for musicians with a song out on $ongChainn.'}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isArtist
+              ? 'The World Builder opens the moment one of your records is live.'
+              : 'Make music? Open your Studio, put your first song out, and the builder is yours.'}
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <Button asChild className="h-11 rounded-full px-6">
+              <Link to="/studio">Open the Studio</Link>
+            </Button>
+            <Button asChild variant="outline" className="h-11 rounded-full px-6">
+              <Link to="/worlds">Walk the worlds</Link>
+            </Button>
+          </div>
         </main>
       </div>
     );

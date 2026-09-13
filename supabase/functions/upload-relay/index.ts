@@ -13,7 +13,7 @@
 // upload-url already reserved for the caller's own row, so it cannot be used
 // to put anything anywhere else.
 //
-// Request:  POST ?kind=visual|song|episode&id=<artist_media.id | songs.id | world_episodes.id>
+// Request:  POST ?kind=visual|song|episode|mosha&id=<artist_media.id | songs.id | world_episodes.id | upload-url attachmentId>
 //           body: the raw file bytes, Content-Type the file's type,
 //           Authorization: the artist's JWT.
 // Response: { ok: true } | { error, status? }
@@ -52,6 +52,16 @@ const RELAY_MAX_BYTES = 25 * 1024 * 1024;
 
 const AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Audio sent to Mo$ha has no reserved row. Its key is fixed by who is asking,
+// the id upload-url handed out and the type, so it can only ever land under
+// the caller's own mosha/<user id>/ folder. Keep in step with upload-url.
+const MOSHA_AUDIO_TYPES: Record<string, string> = {
+  "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav",
+  "audio/vnd.wave": "wav", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/m4a": "m4a", "audio/aac": "aac",
+  "audio/ogg": "ogg", "audio/opus": "opus", "audio/webm": "webm", "audio/flac": "flac", "audio/x-flac": "flac",
+  "audio/aiff": "aiff", "audio/x-aiff": "aiff",
+};
 
 /* ------------------------------------------------- AWS SigV4 presign --- */
 // The same signing upload-url uses. Kept as a copy rather than a shared file
@@ -159,7 +169,7 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const kind = url.searchParams.get("kind");
   const id = url.searchParams.get("id") ?? "";
-  if ((kind !== "visual" && kind !== "song" && kind !== "episode") || !UUID.test(id)) {
+  if ((kind !== "visual" && kind !== "song" && kind !== "episode" && kind !== "mosha") || !UUID.test(id)) {
     return json(origin, { error: "Bad request." }, 400);
   }
 
@@ -175,7 +185,13 @@ Deno.serve(async (req) => {
   let key: string;
   let expected: number | null;
   let contentType: string;
-  if (kind === "visual") {
+  if (kind === "mosha") {
+    contentType = (req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    const ext = MOSHA_AUDIO_TYPES[contentType];
+    if (!ext) return json(origin, { error: "That audio type is not one Mo$ha takes." }, 415);
+    key = ["mosha", user.id, `${id.toLowerCase()}.${ext}`].join("/");
+    expected = null;
+  } else if (kind === "visual") {
     const { data: row } = await db
       .from("artist_media")
       .select("storage_key, bytes, mime_type")
