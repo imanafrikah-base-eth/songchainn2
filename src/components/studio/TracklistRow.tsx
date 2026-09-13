@@ -145,7 +145,9 @@ export function TracklistRow({
             className={`${input} h-10`}
           />
           <p className="mt-1 truncate text-xs text-muted-foreground">
-            {t.file.name}{t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}, {mb} MB
+            {t.existing
+              ? `Already uploaded${t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}`
+              : <>{t.file.name}{t.seconds !== null ? `, ${mmss(t.seconds)} long` : ''}, {mb} MB</>}
           </p>
         </div>
         {editable && !busy && (

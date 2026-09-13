@@ -225,6 +225,22 @@ export interface QueuedTrack {
   explicit: boolean;
   /** Who is on this one track. Empty falls back to the batch's featured list. */
   featured: Featured[];
+  /**
+   * A record already in the Studio (audio landed, not out yet) brought onto
+   * this release instead of a new file. Its row is reused, never uploaded
+   * again, and taking it out of the queue never deletes it.
+   */
+  existing?: { coverUrl: string | null };
+}
+
+/** The row an existing record is brought onto a release from. */
+export interface ExistingRecord {
+  id: string;
+  title: string | null;
+  genre: string | null;
+  cover_art_url: string | null;
+  duration_seconds: number | string | null;
+  storage_key: string | null;
 }
 
 /** A new EP, album, mixtape or compilation made for this batch. */
@@ -356,11 +372,42 @@ export function useBatchUpload() {
 
   const setDefaults = useCallback((d: { artistName: string }) => { defaultsRef.current = d; }, []);
 
-  /** Take a track out. A row already reserved for it goes too, unless it is live. */
+  /**
+   * Put a record that is already uploaded at the top of the tracklist. The
+   * file is in, so the row is 'ready' straight away and Send only writes the
+   * names, the release and the track number onto it before the judges.
+   */
+  const attachExisting = useCallback((song: ExistingRecord) => {
+    if (tracksRef.current.some((t) => t.songId === song.id)) return;
+    const name = (song.storage_key ?? '').split('/').pop() || `${song.title || 'track'}.mp3`;
+    const seconds = song.duration_seconds === null ? null : Number(song.duration_seconds);
+    const entry: QueuedTrack = {
+      key: nextKey(),
+      file: new File([], name),
+      title: (song.title ?? '').trim() || titleFromFileName(name),
+      trackNumber: null,
+      seconds: Number.isFinite(seconds) ? seconds : null,
+      phase: 'ready',
+      progress: 100,
+      error: null,
+      result: null,
+      songId: song.id,
+      genre: song.genre && (GENRES as string[]).includes(song.genre) ? song.genre : null,
+      explicit: false,
+      featured: [],
+      existing: { coverUrl: song.cover_art_url },
+    };
+    setTracks((cur) => {
+      const next = [entry, ...cur];
+      return next.some((t) => t.trackNumber) ? next.map((t, i) => ({ ...t, trackNumber: i + 1 })) : next;
+    });
+  }, []);
+
+  /** Take a track out. A row already reserved for it goes too, unless it is live or was already in the Studio. */
   const remove = useCallback((key: string) => {
     const t = tracksRef.current.find((x) => x.key === key);
     setTracks((list) => list.filter((x) => x.key !== key));
-    if (t?.songId && user && t.phase !== 'done') {
+    if (t?.songId && user && t.phase !== 'done' && !t.existing) {
       void supabase.from('songs').delete().eq('id', t.songId).eq('owner_id', user.id).neq('status', 'published').then(() => {
         void queryClient.invalidateQueries({ queryKey: ['artist_releases'] });
       });
@@ -613,7 +660,7 @@ export function useBatchUpload() {
       // Nothing goes live without artwork, so nothing is sent without it:
       // every track needs its own or the shared one.
       const hasShared = !!meta.coverUrl || !!meta.cover;
-      if (!hasShared && todo.some((t) => !meta.coverFor?.(t.key))) throw new Error(NO_COVER);
+      if (!hasShared && todo.some((t) => !meta.coverFor?.(t.key) && !t.existing?.coverUrl)) throw new Error(NO_COVER);
       setRunning(true);
       const auditions: Promise<void>[] = [];
       /** The artwork failing never costs the audio: the files stay in and the send can be pressed again. */
@@ -656,7 +703,8 @@ export function useBatchUpload() {
         let firstCover: string | null = shared;
         for (const t of todo) {
           const own = meta.coverFor?.(t.key);
-          const cover = own ? await artwork(own) : shared;
+          // A record already in the Studio keeps the artwork it has when nothing else is given.
+          const cover = own ? await artwork(own) : (shared ?? t.existing?.coverUrl ?? null);
           firstCover = firstCover ?? cover;
           const position = tracksRef.current.findIndex((x) => x.key === t.key) + 1;
           const slot = release ? { id: release.id, trackNumber: Math.max(1, position) } : null;
@@ -687,7 +735,7 @@ export function useBatchUpload() {
   /** Every track has had its go: live, in the workshop, or stuck with a file in. Nothing left to send. */
   const finished = tracks.length > 0 && !busy && tracks.every((t) => t.phase === 'done' || (t.phase === 'error' && !!t.songId));
 
-  return { tracks, busy, landing, finished, add, remove, setSeconds, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults };
+  return { tracks, busy, landing, finished, add, attachExisting, remove, setSeconds, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults };
 }
 
 /** How long the audio runs, read in the browser before anything is sent. */

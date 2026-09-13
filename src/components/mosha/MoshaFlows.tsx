@@ -821,7 +821,7 @@ function EditWorldFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">The key</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
-            {([['points', 'Loyalty points'], ['pass', 'A pass'], ['token', zoraCoin ? 'My creator coin' : 'My own token']] as const).map(([v, t]) => (
+            {([['points', 'Loyalty points'], ['token', zoraCoin ? 'My creator coin' : 'My own token']] as const).map(([v, t]) => (
               <button key={v} type="button" disabled={v === 'token' && !zoraCoin && !b.gate.token_address} onClick={() => { void b.saveGate({ kind: v, ...(v === 'token' && zoraCoin ? { token_address: zoraCoin[1] } : {}) }); done(`Key: ${t}`); }} className={`h-10 rounded-full px-3 text-xs font-medium disabled:opacity-40 ${b.gate.kind === v ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground'}`}>{t}</button>
             ))}
           </div>

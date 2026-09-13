@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, UploadCloud, Loader2, CheckCircle2, Wrench, Music4, Wallet, Coins, AlertCircle,
@@ -23,7 +23,7 @@ import { useHasWorld } from '@/worlds/builder/useHasWorld';
 import { supabase } from '@/integrations/supabase/client';
 import {
   useArtistReleases, useBatchUpload, useReleaseActions, isScheduled, AUDITION_STALE_MS,
-  TIER_LABEL, type ArtistRelease, type ReleaseTier, type QueuedTrack, type BatchMeta,
+  TIER_LABEL, type ArtistRelease, type ReleaseTier, type QueuedTrack, type BatchMeta, type ExistingRecord,
 } from '@/hooks/useArtistStudio';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -35,7 +35,7 @@ import { VerificationCard } from '@/components/studio/VerificationCard';
 import { EMPTY_DETAILS, detailProblems, requestOnchain, type SongDetails } from '@/lib/songDetails';
 import { useCoverLanding, type CoverStatus } from '@/hooks/useCoverLanding';
 import { ArtworkField } from '@/components/studio/ArtworkField';
-import { ReleaseTypePicker, countAdvice, isCollection, releaseKindOf, typeLabel, type ReleaseType } from '@/components/studio/ReleaseType';
+import { ReleaseTypePicker, RELEASE_TYPES, countAdvice, isCollection, releaseKindOf, typeLabel, type ReleaseType } from '@/components/studio/ReleaseType';
 import { TracklistRow } from '@/components/studio/TracklistRow';
 import { useSongCoin } from '@/hooks/useSongCoins';
 
@@ -107,7 +107,7 @@ const Studio = () => {
   const { becomeArtist, pending: becoming } = useBecomeArtist();
   const { data: profile } = useMyProfile();
   const { data: releases = [], isLoading } = useArtistReleases();
-  const { tracks, busy, landing, finished, add, remove, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults } = useBatchUpload();
+  const { tracks, busy, landing, finished, add, attachExisting, remove, setTitle, setTrackNumber, setExtras, move, moveTo, numberAll, start, askAgain, reset, setDefaults } = useBatchUpload();
   const { cannotUpload } = useCompliance();
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -142,6 +142,41 @@ const Studio = () => {
   }, [profile, artistName]);
 
   const hasWallet = !!profile?.wallet_address;
+
+  /**
+   * /studio?release=ep&with=<song id>: open the upload with a record that is
+   * already in the Studio as track one, waiting for the rest of the release.
+   * Only its owner gets it, and only while it is not out (uploading or in the
+   * workshop). Anyone else, or an id that is not theirs, gets the Studio as usual.
+   */
+  const [searchParams] = useSearchParams();
+  const withSongId = searchParams.get('with');
+  const releaseParam = searchParams.get('release');
+  const attachedRef = useRef<string | null>(null);
+  const { fromProfileUrl: coverFromUrl } = cover;
+  useEffect(() => {
+    if (!user?.id || !isArtist || !withSongId || attachedRef.current === withSongId) return;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(withSongId)) return;
+    attachedRef.current = withSongId;
+    void (async () => {
+      const { data } = await supabase
+        .from('songs')
+        .select('id, title, genre, cover_art_url, duration_seconds, storage_key, audio_url, status')
+        .eq('id', withSongId)
+        .eq('owner_id', user.id)
+        .maybeSingle();
+      const song = data as unknown as (ExistingRecord & { audio_url: string | null; status: string }) | null;
+      if (!song?.audio_url || (song.status !== 'uploading' && song.status !== 'workshop')) return;
+      const wanted = RELEASE_TYPES.find((r) => r.value === releaseParam)?.value ?? 'ep';
+      setReleaseType(wanted);
+      if (wanted !== 'single' && wanted !== 'catalog') setDetails((d) => ({ ...d, release_id: null, track_number: null }));
+      const songGenre = song.genre;
+      if (songGenre && (GENRES as string[]).includes(songGenre)) setGenre((g) => g || songGenre);
+      // Its artwork starts as the release artwork; picking another replaces it.
+      if (song.cover_art_url) coverFromUrl(song.cover_art_url);
+      attachExisting(song);
+    })();
+  }, [user?.id, isArtist, withSongId, releaseParam, attachExisting, coverFromUrl]);
 
   // What a ticket carries before the artist has typed anything.
   useEffect(() => {
@@ -217,7 +252,7 @@ const Studio = () => {
   const trackCoverState = (t: QueuedTrack): CoverStatus => (ownArtwork ? trackCoverStatus[t.key] ?? 'idle' : 'idle');
   const trackCoverOk = (t: QueuedTrack) => {
     const own = trackCoverState(t);
-    return own !== 'idle' ? own !== 'error' : sharedCoverOk;
+    return own !== 'idle' ? own !== 'error' : sharedCoverOk || !!t.existing?.coverUrl;
   };
 
   const kindLabel = typeLabel(releaseType);
@@ -1140,6 +1175,15 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
         >
           <Pencil className="h-3.5 w-3.5" /> Edit details
         </button>
+        {release.status === 'uploading' && release.audio_url && (
+          <Link
+            to={`/studio?release=ep&with=${release.id}`}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted min-h-10"
+          >
+            <ListMusic className="h-3.5 w-3.5" /> Send it with more tracks
+          </Link>
+        )}
         {minted ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
             <Coins className="h-3.5 w-3.5" /> On chain
