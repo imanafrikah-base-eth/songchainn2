@@ -146,7 +146,7 @@ export function useAudienceInteractions() {
     setLikedSongs(next);
 
     // Optimistic cache update — like count changes instantly for this user
-    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+    queryClient.setQueriesData({ queryKey: ['song-popularity'] }, (old: any[] | undefined) => {
       if (!old) return old;
       return old.map((item: any) =>
         String(item.song_id) === String(songId)
@@ -171,7 +171,7 @@ export function useAudienceInteractions() {
     } catch {
       // Revert optimistic updates on failure
       setLikedSongs(likedSongs);
-      queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+      queryClient.setQueriesData({ queryKey: ['song-popularity'] }, (old: any[] | undefined) => {
         if (!old) return old;
         return old.map((item: any) =>
           String(item.song_id) === String(songId)

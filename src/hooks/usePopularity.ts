@@ -158,7 +158,8 @@ interface CountDeltaPayload {
 
 function handleCountDelta(queryClient: ReturnType<typeof useQueryClient>, p: CountDeltaPayload) {
   if (p.type === 'play' && p.songId) {
-    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+    // Prefix match: the live query is keyed ['song-popularity', catalogSize].
+    queryClient.setQueriesData({ queryKey: ['song-popularity'] }, (old: any[] | undefined) => {
       if (!old) return old;
       return old.map((item: any) =>
         String(item.song_id) === String(p.songId)
@@ -167,7 +168,8 @@ function handleCountDelta(queryClient: ReturnType<typeof useQueryClient>, p: Cou
       );
     });
   } else if (p.type === 'like' && p.songId) {
-    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+    // Prefix match: the live query is keyed ['song-popularity', catalogSize].
+    queryClient.setQueriesData({ queryKey: ['song-popularity'] }, (old: any[] | undefined) => {
       if (!old) return old;
       return old.map((item: any) =>
         String(item.song_id) === String(p.songId)

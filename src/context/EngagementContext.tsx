@@ -252,7 +252,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
     setEngagementPoints(prev => prev + POINTS_PER_PLAY);
 
     // Optimistic update: increment play count in cache immediately
-    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+    queryClient.setQueriesData({ queryKey: ['song-popularity'] }, (old: any[] | undefined) => {
       if (!old) return old;
       return old.map((item: any) =>
         String(item.song_id) === String(songId)
@@ -277,7 +277,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       if (error) {
         if (import.meta.env.DEV) console.error('Failed to record play', error);
         // Roll back the optimistic increment so the count stays accurate
-        queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+        queryClient.setQueriesData({ queryKey: ['song-popularity'] }, (old: any[] | undefined) => {
           if (!old) return old;
           return old.map((item: any) =>
             String(item.song_id) === String(songId)
@@ -453,7 +453,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       return newLikes;
     });
     const likeDelta = isCurrentlyLiked ? -1 : 1;
-    queryClient.setQueryData(['song-popularity'], (old: any[] | undefined) => {
+    queryClient.setQueriesData({ queryKey: ['song-popularity'] }, (old: any[] | undefined) => {
       if (!old) return old;
       return old.map((item: any) =>
         String(item.song_id) === String(songId)
