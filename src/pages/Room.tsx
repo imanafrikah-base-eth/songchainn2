@@ -862,7 +862,7 @@ export default function Room() {
       if (byUserId.size === 0) {
         // Only trust room_profiles rows with a fresh heartbeat — is_active
         // alone lingers when a user closes the app without leave_room.
-        const freshCutoff = new Date(Date.now() - 60 * 1000).toISOString();
+        const freshCutoff = new Date(Date.now() - 90 * 1000).toISOString();
         const profileRes = await (supabase as any)
           .from('room_profiles')
           .select('*')

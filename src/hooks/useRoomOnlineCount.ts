@@ -90,7 +90,7 @@ async function readLiveCount(roomId: string): Promise<number> {
     // Last resort: count room_profiles rows, but only ones with a fresh
     // heartbeat. is_active alone lingers forever when a user closes the app
     // without a clean leave_room.
-    const freshCutoff = new Date(Date.now() - 60 * 1000).toISOString();
+    const freshCutoff = new Date(Date.now() - 90 * 1000).toISOString();
     const profilesRes = await (supabase as any)
       .from('room_profiles')
       .select('user_id', { count: 'exact', head: true })

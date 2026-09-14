@@ -693,7 +693,8 @@ export function useBatchUpload() {
       } catch (err) {
         if (reservedSongId) {
           const orphan = reservedSongId;
-          void supabase.from('songs').delete().eq('id', orphan).eq('owner_id', user.id).neq('status', 'published');
+          // .then, or the lazy builder never sends and the empty record stays stuck at uploading.
+          void supabase.from('songs').delete().eq('id', orphan).eq('owner_id', user.id).neq('status', 'published').then(() => undefined);
         }
         patch(key, { phase: 'error', progress: 0, songId: null, error: err instanceof Error ? err.message : 'Something went wrong.', result: null });
       }
