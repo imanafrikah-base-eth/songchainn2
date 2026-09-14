@@ -683,6 +683,28 @@ export default function Room() {
         const raw = (messagesRes?.data as any[] | undefined) ?? [];
         const loaded = raw.map(coerceRoomMessage).filter(Boolean) as RoomMessage[];
         setMessages(loaded.slice().reverse());
+
+        // The reactions on those messages, as they were left. Without this a
+        // reaction lived only as a broadcast and was gone after leaving.
+        const ids = loaded.map((m) => m.id).filter(Boolean);
+        if (ids.length) {
+          const reactRes = await (supabase as any)
+            .from('room_message_reactions')
+            .select('message_id, user_id, emoji')
+            .in('message_id', ids);
+          if (!reactRes?.error) {
+            const counts: Record<string, Record<string, number>> = {};
+            const mine: Record<string, Record<string, boolean>> = {};
+            for (const r of ((reactRes?.data ?? []) as Array<{ message_id: string; user_id: string; emoji: string }>)) {
+              const forMessage = counts[r.message_id] ?? {};
+              forMessage[r.emoji] = (forMessage[r.emoji] ?? 0) + 1;
+              counts[r.message_id] = forMessage;
+              if (r.user_id === user.id) mine[r.message_id] = { ...(mine[r.message_id] ?? {}), [r.emoji]: true };
+            }
+            setReactionsByMessageId(counts);
+            setMyReactionsByMessageId(mine);
+          }
+        }
       }
       setTimeout(() => {
         listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -1321,6 +1343,15 @@ export default function Room() {
     broadcastRoomReaction(payload);
     if (chatBackend === 'local') {
       broadcastRef.current?.postMessage({ type: 'reaction', reaction: payload });
+    } else {
+      // Kept, so it is still there after leaving and coming back.
+      const table = (supabase as any).from('room_message_reactions');
+      const write = already
+        ? table.delete().eq('message_id', messageId).eq('user_id', user.id).eq('emoji', emoji)
+        : table.insert({ message_id: messageId, user_id: user.id, emoji });
+      void write.then(({ error }: { error: unknown }) => {
+        if (error) console.warn('room reaction not saved', error);
+      });
     }
   }, [applyReactionDelta, broadcastRoomReaction, chatBackend, myReactionsByMessageId, user]);
 
