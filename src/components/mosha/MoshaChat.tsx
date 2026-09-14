@@ -4,6 +4,7 @@ import { rememberEditWhere } from '@/lib/moshaWatch';
 import { Loader2, Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
 import { AttachButton, AttachmentTray, useAttachDrop, useMoshaTray } from '@/components/mosha/MoshaAttachmentTray';
 import { MoshaAttachmentList } from '@/components/mosha/MoshaAttachmentView';
+import { MoshaText } from '@/components/mosha/MoshaText';
 import { MoshaDoPopup, MoshaDoStatus } from '@/components/mosha/MoshaDoCard';
 import { doJobKey, onMoshaJobDone } from '@/lib/moshaJobs';
 import { useHasLiveSong } from '@/hooks/useHasLiveSong';
@@ -350,7 +351,7 @@ export function MoshaChat({
   })();
 
   return (
-    <div className={`flex flex-col ${compact ? 'h-[60vh] max-h-[28rem]' : 'h-[68vh] max-h-[34rem]'}`}>
+    <div className={`flex flex-col ${compact ? 'h-[60vh] max-h-[28rem]' : 'h-[68vh] max-h-[34rem]'}`} {...drop.bind}>
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
           <Sparkles className="h-3.5 w-3.5" /> Mo$ha
@@ -405,7 +406,8 @@ export function MoshaChat({
         )}
         {turns.map((t, i) => (
           <Bubble key={i} role={t.role} wide={Boolean(t.flow)}>
-            {t.content}
+            {t.role === 'assistant' ? <MoshaText text={t.content} /> : t.content}
+            {t.attachments?.length ? <MoshaAttachmentList attachments={t.attachments} mine={t.role === 'user'} /> : null}
             {t.flow && (
               <MoshaFlow
                 flow={t.flow}
@@ -497,6 +499,9 @@ export function MoshaChat({
         </div>
       )}
 
+      {/* Files waiting to go with the next message: songs, cover art, screenshots. */}
+      <AttachmentTray userId={userId} waiting={waiting} dragging={drop.dragging} />
+
       <form
         className="flex items-end gap-2 border-t border-border px-3 py-2"
         onSubmit={(e) => {
@@ -504,6 +509,7 @@ export function MoshaChat({
           void send(draft);
         }}
       >
+        <AttachButton userId={userId} disabled={busy} />
         <textarea
           ref={input}
           value={draft}
@@ -514,19 +520,20 @@ export function MoshaChat({
               void send(draft);
             }
           }}
+          onPaste={drop.onPaste}
           rows={1}
           maxLength={1500}
-          placeholder="Ask me anything about $ongChainn"
+          placeholder={userId ? 'Message Mo$ha, or add files' : 'Ask me anything about $ongChainn'}
           aria-label="Message Mo$ha"
           className="max-h-24 min-h-[2.5rem] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
         />
         <button
           type="submit"
-          disabled={busy || !draft.trim()}
+          disabled={busy || waiting || tray.blocked > 0 || (!draft.trim() && tray.count === 0)}
           aria-label="Send"
           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
         >
-          <SendHorizontal className="h-4 w-4" />
+          {waiting ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
         </button>
       </form>
     </div>

@@ -16,6 +16,8 @@ import { useBecomeArtist } from '@/hooks/useBecomeArtist';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { useBatchUpload, type QueuedTrack } from '@/hooks/useArtistStudio';
 import { useHasLiveSong } from '@/hooks/useHasLiveSong';
+import { ReleaseTypePicker, countAdvice, isCollection, releaseKindOf, type ReleaseType } from '@/components/studio/ReleaseType';
+import { GENRES } from '@/data/musicData';
 import { useMediaUpload, useMyMedia, useMediaActions, type ArtistMediaItem } from '@/hooks/useArtistMedia';
 import { useWorldBuilder, slugify } from '@/worlds/builder/useWorldBuilder';
 import { useMyWorlds, whenLabel } from '@/worlds/builder/useMyWorlds';
@@ -31,7 +33,7 @@ import type { MoshaAttachment } from '@/lib/moshaAttachments';
 export type MoshaFlowName = 'upload_song' | 'build_world' | 'become_artist' | 'connect_wallet' | 'edit_world' | 'edit_gallery' | 'merge_accounts' | 'release_files';
 
 export const FLOW_LABEL: Record<MoshaFlowName, string> = {
-  upload_song: 'Put a record out',
+  upload_song: 'Release music',
   release_files: 'Release what you sent',
   build_world: 'Build my world',
   edit_world: 'Edit my world',
@@ -130,6 +132,10 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   const [artistName, setArtistName] = useState('');
   const [cover, setCover] = useState<File | null>(null);
   const [cropping, setCropping] = useState<File | null>(null);
+  // A single, or a whole project: the same choice the Studio offers.
+  const [releaseType, setReleaseType] = useState<ReleaseType>('single');
+  const [releaseTitle, setReleaseTitle] = useState('');
+  const [genre, setGenre] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const coverRef = useRef<HTMLInputElement>(null);
 
@@ -148,8 +154,20 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
   }
 
   const queued = tracks.filter((t) => t.phase === 'queued' || t.phase === 'preparing' || t.phase === 'uploading' || t.phase === 'ready' || (t.phase === 'error' && !t.songId));
-  const ready = queued.length > 0 && queued.every((t) => t.title.trim()) && artistName.trim() && !!cover && !busy;
-  const send = () => void start({ artistName: artistName.trim(), cover, details: EMPTY_DETAILS }).catch((err) => toast.error((err as Error)?.message || 'That did not go through. Try again.'));
+  const collection = isCollection(releaseType);
+  const advice = countAdvice(releaseType, queued.length);
+  const ready =
+    queued.length > 0 && queued.every((t) => t.title.trim()) && !!artistName.trim() && !!cover && !!genre &&
+    (!collection || !!releaseTitle.trim()) && !busy;
+  const missingLabel = !tracks.length ? null : !cover ? 'Add the cover art' : !genre ? 'Pick a genre' : collection && !releaseTitle.trim() ? 'Name the release' : null;
+  const send = () =>
+    void start({
+      artistName: artistName.trim(),
+      genre,
+      cover,
+      release: collection ? { title: releaseTitle.trim(), kind: releaseKindOf(releaseType)! } : null,
+      details: EMPTY_DETAILS,
+    }).catch((err) => toast.error((err as Error)?.message || 'That did not go through. Try again.'));
   const acceptCover = async (f: File) => {
     const check = await checkCover(f);
     if (check.block) { toast.error(check.block); return; }
@@ -171,6 +189,10 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
         <>
           <input ref={fileRef} type="file" multiple accept=".wav,.mp3,audio/wav,audio/x-wav,audio/mpeg" className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
           <input ref={coverRef} type="file" accept={COVER_ACCEPT} className="hidden" onChange={(e) => { void pickCover(e.target.files?.[0] ?? null); e.target.value = ''; }} />
+          <ReleaseTypePicker value={releaseType} onChange={setReleaseType} disabled={busy} />
+          {collection && (
+            <input value={releaseTitle} onChange={(e) => setReleaseTitle(e.target.value)} disabled={busy} placeholder="Release title" maxLength={120} className={input} />
+          )}
           <div className="flex flex-wrap gap-1.5">
             <Button size="sm" variant={tracks.length ? 'outline' : 'default'} className="h-10 rounded-full text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
               <Music4 className="mr-1 h-3.5 w-3.5" /> {tracks.length ? 'Add more' : 'Pick the audio'}
@@ -180,8 +202,15 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
             </Button>
           </div>
           {tracks.length > 0 && (
-            <input value={artistName} onChange={(e) => setArtistName(e.target.value)} disabled={busy} placeholder="Artist name" className={input} />
+            <div className="grid grid-cols-2 gap-1.5">
+              <input value={artistName} onChange={(e) => setArtistName(e.target.value)} disabled={busy} placeholder="Artist name" className={input} />
+              <select value={genre} onChange={(e) => setGenre(e.target.value)} disabled={busy} aria-label="Genre" className={input}>
+                <option value="">Genre</option>
+                {(GENRES as string[]).map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
           )}
+          {advice && tracks.length > 0 && <p className="text-[11px] text-muted-foreground">{advice}</p>}
         </>
       )}
       {tracks.length > 0 && (
@@ -193,16 +222,16 @@ function UploadSongFlow({ onNeedArtist }: { onNeedArtist: () => void }) {
         tracks.length > 0 && (
           <Button size="sm" className="h-10 w-full rounded-full text-xs" disabled={!ready} onClick={send}>
             {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1 h-3.5 w-3.5" />}
-            {busy ? 'Working' : landing ? 'Finish and send' : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in'}
+            {busy ? 'Working' : missingLabel ?? (landing ? 'Finish and send' : queued.length > 1 ? `Send all ${queued.length} in` : 'Send it in')}
           </Button>
         )
       ) : (
         <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => { reset(); setCover(null); }}>Send another</Button>
+          <Button size="sm" variant="outline" className="h-10 rounded-full text-xs" onClick={() => { reset(); setCover(null); setReleaseTitle(''); }}>Send another</Button>
           <Button asChild size="sm" variant="ghost" className="h-10 rounded-full text-xs"><Link to="/studio">See it in the Studio</Link></Button>
         </div>
       )}
-      <p className="text-[11px] text-muted-foreground">WAV or MP3, up to 100 MB each, and a cover: nothing goes live without it. Any photo works, you drag it square right here. Lyrics, credits and the artwork can be changed any time from the Studio.</p>
+      <p className="text-[11px] text-muted-foreground">A single, an EP, an album, a mixtape, a compilation or a catalog of singles. WAV or MP3, up to 100 MB each, and a cover: nothing goes live without it. Any photo works, you drag it square right here. Or send the files to me with the paperclip and tell me what it is.</p>
     </div>
   );
 }
