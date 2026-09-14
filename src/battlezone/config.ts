@@ -5,7 +5,7 @@
 // Since 11 Sep 2026 it is on, and each battle decides for itself through
 // battles.voice_enabled: the host turns voice on from the room ($3 in $WWAT on
 // the Main Stage, free for the hosts the founder named). A battle without it
-// keeps the X Space link, voting and text chat, exactly as before. Setting this
+// still plays the songs and keeps voting and text chat. Setting this
 // back to false hides in-app voice everywhere at once.
 export const VOICE_ENABLED: boolean = true;
 

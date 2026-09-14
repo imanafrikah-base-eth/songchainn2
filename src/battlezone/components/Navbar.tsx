@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Zap, Home, Radio, Calendar, Trophy, HelpCircle, LogOut, ArrowLeft } from "lucide-react";
+import { Zap, Home, Radio, Calendar, Trophy, HelpCircle, LogOut, ArrowLeft, Wallet } from "lucide-react";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
 import NotificationsDropdown from "@/battlezone/components/NotificationsDropdown";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
@@ -47,6 +47,20 @@ const Navbar = () => {
 
           <div className="flex items-center gap-2">
             <NotificationsDropdown />
+            {profile && (
+              <AppLink
+                to="/wallet"
+                aria-label="Battle wallet"
+                title="Battle wallet"
+                className={`inline-flex h-11 w-11 items-center justify-center rounded-lg border transition-colors ${
+                  location.pathname.endsWith("/wallet")
+                    ? "border-primary/60 bg-primary/15 text-primary"
+                    : "border-border text-muted-foreground hover:text-primary hover:border-primary/40"
+                }`}
+              >
+                <Wallet className="h-4 w-4" />
+              </AppLink>
+            )}
             <Link
               to="/"
               className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"

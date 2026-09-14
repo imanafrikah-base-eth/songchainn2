@@ -124,3 +124,15 @@
 .wavewarz-theme ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground));
 }
+
+/* The battle wallet card: the arena floor, lit neon green from one corner and
+   cyan from the other, with the green edge the rest of the zone glows with. */
+.wallet-card-wavewarz {
+  background:
+    radial-gradient(120% 90% at 100% 100%, hsl(145 80% 45% / 0.28), transparent 55%),
+    radial-gradient(90% 80% at 0% 0%, hsl(195 90% 50% / 0.22), transparent 60%),
+    linear-gradient(135deg, hsl(220 22% 9%), hsl(220 18% 14%));
+  border: 1px solid hsl(145 80% 45% / 0.45);
+  box-shadow: 0 0 24px hsl(145 80% 45% / 0.18), inset 0 0 30px hsl(145 80% 45% / 0.05);
+  color: #fff;
+}

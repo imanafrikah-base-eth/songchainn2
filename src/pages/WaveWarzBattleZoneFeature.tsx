@@ -17,6 +17,7 @@ import RoomEntry from "@/battlezone/pages/RoomEntry";
 import HostCreate from "@/battlezone/pages/HostCreate";
 import HostControl from "@/battlezone/pages/HostControl";
 import NotFound from "@/battlezone/pages/NotFound";
+import BattleWallet from "@/battlezone/pages/BattleWallet";
 import { RequireSignIn } from "@/battlezone/components/RequireSignIn";
 import "@/battlezone/index.css";
 
@@ -47,6 +48,7 @@ export default function WaveWarzBattleZoneFeature() {
                   else's battle. */}
               <Route path="entry/:roomId" element={<RequireSignIn what="this battle room"><RoomEntry /></RequireSignIn>} />
               <Route path="room/:roomId" element={<RequireSignIn what="this battle room"><LiveRoom /></RequireSignIn>} />
+              <Route path="wallet" element={<RequireSignIn what="your battle wallet"><BattleWallet /></RequireSignIn>} />
               <Route path="host/create" element={<HostCreate />} />
               <Route path="host/control/:roomId" element={<RequireSignIn what="the host controls"><HostControl /></RequireSignIn>} />
               <Route path="live" element={<Navigate to="/wavewarz-africa/battles/live" replace />} />

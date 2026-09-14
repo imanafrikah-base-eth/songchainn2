@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Wallet, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
@@ -22,6 +22,8 @@ import { useMyWallets, WALLET_NAMES, providerFromRdns, rememberWallet, shortAddr
  */
 export function WalletChip() {
   const navigate = useNavigate();
+  // Inside the battle zone the chip opens the battle wallet, so nobody is thrown out of the arena.
+  const location = useLocation();
   const { walletAddress, user } = useAuth();
   const { active, wallets, isLoading: walletsLoading, refresh } = useMyWallets();
   const [browserAddress, setBrowserAddress] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function WalletChip() {
 
   return (
     <button
-      onClick={() => navigate('/wallet')}
+      onClick={() => navigate(location.pathname.startsWith('/wavewarz-africa') ? '/wavewarz-africa/wallet' : '/wallet')}
       aria-label={`${which} connected, ${shortAddress(address)}${more}, ${shown} ETH on Base. Open your wallet.`}
       title={`${which} · ${shortAddress(address)} · Base`}
       className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-primary/20"

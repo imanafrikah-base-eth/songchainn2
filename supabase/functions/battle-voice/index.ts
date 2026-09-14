@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
       available: false,
       exempt: false,
       usd: VOICE_FEE_USD,
-      reason: "The Open Mic takes no money, so in-app voice is for Main Stage battles. The X Space link still carries the sound here.",
+      reason: "The Open Mic takes no money, so in-app voice is for Main Stage battles. The songs, voting and chat still run here.",
     });
   }
 

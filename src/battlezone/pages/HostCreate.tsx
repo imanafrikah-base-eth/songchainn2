@@ -288,7 +288,7 @@ const HostCreate = () => {
     };
   };
 
-  // Live audio runs on X Spaces while in-app voice is off; store a clean absolute URL.
+  // X Spaces are gone (founder, 15 Sep 2026): voice is in the app. Old battles may still carry a link.
   const normalizedSpaceUrl = (): string | null => {
     const raw = form.xSpaceUrl.trim();
     if (!raw) return null;
@@ -838,23 +838,6 @@ const HostCreate = () => {
             </p>
           </div>
 
-          {/* X Space link for live audio */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">X Space Link (optional)</label>
-            <div className="relative">
-              <Radio className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <input
-                value={form.xSpaceUrl}
-                onChange={(e) => update("xSpaceUrl", e.target.value)}
-                placeholder="https://x.com/i/spaces/..."
-                className={inputClass}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Live audio runs on X Spaces. Paste your Space link and listeners get a "Listen on X" button in the battle room, while voting and chat stay right here.
-            </p>
-          </div>
-
           {/* Co-Host Invites */}
           <div className="space-y-3">
             <label className="text-sm font-medium text-foreground">Co-Host Invites (max 4) - $ongChainn users</label>
@@ -967,8 +950,8 @@ const HostCreate = () => {
             )}
             <p className="text-xs text-muted-foreground">
               {stage === "main_stage"
-                ? `In-app voice: once the battle is up, turn it on from the room. It costs $3 in $WWAT, and never more than ${VOICE_FEE_MAX_TOKENS.toLocaleString('en-US')} $WWAT, so while the coin is this cheap you pay the cap, which is a few cents. Without it, the X Space link above still carries the sound.`
-                : "The Open Mic takes no money, so it keeps the X Space link above for sound."}
+                ? `In-app voice: once the battle is up, turn it on from the room. It costs $3 in $WWAT, and never more than ${VOICE_FEE_MAX_TOKENS.toLocaleString('en-US')} $WWAT, so while the coin is this cheap you pay the cap, which is a few cents. The songs, voting and chat run in the room either way.`
+                : "The Open Mic takes no money, so in-app voice is for Main Stage battles. An Open Mic room still plays the songs and runs the voting and chat."}
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <button

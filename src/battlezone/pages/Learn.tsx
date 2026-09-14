@@ -13,7 +13,7 @@ import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 
 const flowSteps = [
   { emoji: "\u{1F451}", title: "Host creates", desc: "A host sets up the battle: artists, songs, region" },
-  { emoji: "\u{1F534}", title: "Room goes live", desc: "Voice runs on the host's X Space" },
+  { emoji: "\u{1F534}", title: "Room goes live", desc: "Songs play in the room, and the host can turn voice on" },
   { emoji: "\u{1F525}", title: "Crowd votes", desc: "Audience votes and chats in real time" },
   { emoji: "⚖️", title: "The judges speak", desc: "$HIKULU and NAKULU drop their verdicts" },
   { emoji: "\u{1F3C6}", title: "Results drop", desc: "Winner posted to the feed and results page" },
@@ -21,7 +21,7 @@ const flowSteps = [
 
 const roomGuide = [
   { title: "Live badge and round tracker", desc: "Quick battles are one round. Community battles run three rounds, one song per round from each artist." },
-  { title: "Listen on X is your speaker", desc: "The live voice room runs on the host's X Space. Tap it to hear the songs, the commentary and the trash talk. Keep this tab open to vote and chat while you listen." },
+  { title: "The sound is in the room", desc: "The songs play right here in the battle room. When the host turns voice on you hear the commentary and the trash talk too, and you can tap Request to Speak to get on the mic." },
   { title: "The face-off", desc: "Both artists, their songs and the live vote meter. Watch it swing in real time as votes land." },
   { title: "The vote buttons", desc: "One vote per round, and you can change it any time before the round ends. Vote with your ears, not your friendships." },
   { title: "View Battle Charts", desc: "Opens the live trading screen for both battle songs. Totally optional, totally fun to watch." },
@@ -32,15 +32,15 @@ const hostSteps = [
   { title: "Tap Host a Battle and name it", desc: "Give it a title with flavor (\"Lusaka Heat: The Zambian Showdown\") and pick the region." },
   { title: "Choose your battle type", desc: "Quick Battle: one song each, single round, winner takes it. Community Battle: three songs each, one per round across 3 rounds." },
   { title: "Pick the fighters", desc: "Select Artist A and Artist B from the $ongChainn catalog, then their battle songs. Quick needs one song each, Community needs three." },
-  { title: "Start your X Space and paste the link", desc: "Open X, start a Space (you can schedule it too), copy its link into X Space Link. Listeners get the Listen on X button automatically while voting and chat stay in the room." },
+  { title: "Turn voice on from the room", desc: "Once the battle is up, tap Turn on voice in the battle room. On the Main Stage it costs a few cents in $WWAT, paid from your own wallet. Then talk to the room, bring people up to speak and take requests." },
   { title: "Launch now or schedule", desc: "Launch Battle Now goes live instantly and notifies the community feed. Or schedule it and it sits in Upcoming until showtime." },
   { title: "Run the show from Host Controls", desc: "Advance rounds, watch the vote race, and end the battle when it is done (early if you must). Results post automatically." },
 ];
 
 const cheatSheet = [
-  { label: "Get in", audience: "Live Battles, then View Battle", host: "Host a Battle, then fill the form", speaker: "Listen on X, then request the mic" },
-  { label: "Your job", audience: "Vote, chat, spread the word", host: "Launch, run rounds, declare results", speaker: "Commentate and hype the Space" },
-  { label: "Voice", audience: "Listen on X", host: "Run the X Space", speaker: "Speak on the X Space" },
+  { label: "Get in", audience: "Live Battles, then View Battle", host: "Host a Battle, then fill the form", speaker: "Join the room, then Request to Speak" },
+  { label: "Your job", audience: "Vote, chat, spread the word", host: "Launch, run rounds, declare results", speaker: "Commentate and hype the room" },
+  { label: "Voice", audience: "Listen in the room", host: "Turn on voice in the room", speaker: "Speak once the host approves you" },
   { label: "Optional", audience: "Buy song coins, watch charts", host: "Schedule ahead, invite co-hosts", speaker: "Rep an artist's side" },
 ];
 
@@ -66,10 +66,10 @@ const RoomMock = () => (
     <div className="m-3 rounded-xl border border-border bg-card p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-[11px] font-bold text-foreground">Live audio is on X Spaces</p>
-          <p className="text-[9px] text-muted-foreground leading-snug mt-0.5">Join the Space to hear the battle. Vote and chat right here while you listen.</p>
+          <p className="text-[11px] font-bold text-foreground">Voice is on</p>
+          <p className="text-[9px] text-muted-foreground leading-snug mt-0.5">Hear the host and the speakers right here. Vote and chat while you listen.</p>
         </div>
-        <span className="shrink-0 rounded-lg border border-border bg-black px-2.5 py-1.5 text-[10px] font-bold text-white whitespace-nowrap">&#120143; Listen on X</span>
+        <span className="shrink-0 rounded-lg bg-primary px-2.5 py-1.5 text-[10px] font-bold text-primary-foreground whitespace-nowrap">Request to Speak</span>
       </div>
     </div>
     <div className="flex items-center justify-around px-2 pt-1">
@@ -168,17 +168,17 @@ const Learn = () => {
             <div className="rounded-2xl border border-accent/40 bg-accent/5 p-6">
               <Crown className="h-8 w-8 text-accent mb-3" />
               <h3 className="text-lg font-black text-accent mb-2">The Host</h3>
-              <p className="text-sm text-muted-foreground">You are the ringmaster. You create the battle, choose the artists and songs, run the X Space for live commentary, control the rounds, and declare the results. The room moves at your pace.</p>
+              <p className="text-sm text-muted-foreground">You are the ringmaster. You create the battle, choose the artists and songs, turn on voice for live commentary, control the rounds, and declare the results. The room moves at your pace.</p>
             </div>
             <div className="rounded-2xl border border-secondary/40 bg-secondary/5 p-6">
               <Mic className="h-8 w-8 text-secondary mb-3" />
               <h3 className="text-lg font-black text-secondary mb-2">The Speaker</h3>
-              <p className="text-sm text-muted-foreground">You are the voice. Join the host's X Space as a speaker to commentate, hype the crowd, break down the bars, or rep your artist on the mic while the battle plays out.</p>
+              <p className="text-sm text-muted-foreground">You are the voice. Request to Speak in the battle room to commentate, hype the crowd, break down the bars, or rep your artist on the mic while the battle plays out.</p>
             </div>
             <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6">
               <Flame className="h-8 w-8 text-primary mb-3" />
               <h3 className="text-lg font-black text-primary mb-2">The Audience</h3>
-              <p className="text-sm text-muted-foreground">You are the judge and jury. Join any live room free, listen on X, vote for the song that moves you, talk in the chat, and if you really believe, own a piece of the song itself.</p>
+              <p className="text-sm text-muted-foreground">You are the judge and jury. Join any live room free, listen right there, vote for the song that moves you, talk in the chat, and if you really believe, own a piece of the song itself.</p>
             </div>
           </div>
         </section>
@@ -400,9 +400,9 @@ const Learn = () => {
             <Radio className="h-7 w-7 text-secondary mb-3" />
             <h3 className="text-lg font-bold text-secondary mb-3">Speaking on a battle</h3>
             <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-              <li>Voice lives on the host's X Space. Tap Listen on X, then request to speak in the Space, or get invited by the host.</li>
+              <li>Voice lives in the battle room. When the host has turned it on, tap Request to Speak and wait for the host to bring you up.</li>
               <li>Artists, managers and superfans all make great speakers. Commentate rounds, break down lyrics, rep your side.</li>
-              <li>Keep the battle room chat open next to the Space: that is where the votes and the crowd reactions live.</li>
+              <li>The chat sits right beside the mic: that is where the votes and the crowd reactions live.</li>
               <li>Golden rule of the mic: war the songs, respect the people.</li>
             </ul>
           </div>

@@ -147,8 +147,7 @@ const TermsOfUse = () => {
         <Section title="10. WaveWarz Africa battles">
           <p>
             Battles are community events. Hosts run them, audiences vote, and results come from real votes.
-            Live battle audio may run on an X Space hosted by the battle host; joining that Space happens on X
-            under X's terms. Battle results, votes, and room chat are part of the public community experience.
+            Live battle audio runs inside the app, in the battle room, when the host turns voice on. Battle results, votes, and room chat are part of the public community experience.
           </p>
         </Section>
 
