@@ -19,6 +19,7 @@ import { ARTISTS, SONGS, type Song } from "@/data/musicData";
 import { BattleSongPicker, type SongOption } from "@/battlezone/components/BattleSongPicker";
 import { BattleArtistPicker } from "@/battlezone/components/BattleArtistPicker";
 import { usePublishedCatalog } from "@/hooks/usePublishedCatalog";
+import { countryOf, useArtistRegions } from "@/battlezone/lib/regions";
 import { durationsFromUrls } from "@/battlezone/lib/songDuration";
 import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
 import { HOST_FEE_ENABLED, VOICE_FEE_MAX_TOKENS } from "@/battlezone/config";
@@ -29,7 +30,6 @@ import { quoteHostFee, payHostFee, confirmHostFee } from "@/battlezone/lib/hostF
 let channelSeq = 0;
 const nextChannelId = () => ++channelSeq;
 
-const regions = ["Zambia", "South Africa", "Nigeria", "Zimbabwe", "Botswana"];
 
 interface SongchainUser {
   id: string;
@@ -78,7 +78,12 @@ const HostCreate = () => {
   const perks = useHostPerks();
   /* Everything an artist has here, not just what shipped with the app. A
      record sent in through the Studio could never be picked for a battle. */
-  const { songs: publishedSongs } = usePublishedCatalog();
+  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  /* The countries the artists here are from, read off the roster, so a new
+     artist from a new country brings their region with them. */
+  const regions = useArtistRegions();
+  /* The region follows Artist A's country until the host picks one themselves. */
+  const [regionTouched, setRegionTouched] = useState(false);
   const coHostDropdownRef = useRef<HTMLDivElement>(null);
   const { data: liveBattles = [] } = useBattles("live");
   // Battles stuck on 'live' for over a day are stale and must not brick the
@@ -105,40 +110,55 @@ const HostCreate = () => {
       alive = false;
     };
   }, []);
+  /* Every artist with music here: the founding roster and everyone who
+     released through the Studio. Only the founding eleven used to be pickable,
+     so seven artists with uploads live could never be put in a battle. */
+  const allArtists = useMemo(() => {
+    const ids = new Set(ARTISTS.map((a) => String(a.id)));
+    return [...ARTISTS, ...publishedArtists.filter((a) => !ids.has(String(a.id)))];
+  }, [publishedArtists]);
+
   const artistOptions = useMemo(
     () =>
-      [...ARTISTS]
+      [...allArtists]
         // Fail open. A picker that silently offers nobody is worse than one
         // that offers everybody and lets the server explain the refusal, which
         // is exactly what an empty ready-list did the first time round.
         .filter((artist) => stage !== "main_stage" || !readyIds || readyIds.size === 0 || readyIds.has(String(artist.id)))
         // Their face comes with them: a name in a grey dropdown is the driest
         // way to show an artist, and the picture is already in the catalogue.
-        .map((artist) => ({ id: artist.id, name: artist.name, image: artist.profileImage ?? null, region: artist.location ?? null }))
+        .map((artist) => ({ id: artist.id, name: artist.name, image: artist.profileImage ?? null, region: countryOf(artist.location || artist.townSquare) }))
         .sort((a, b) => a.name.localeCompare(b.name)),
-    [stage, readyIds]
+    [stage, readyIds, allArtists]
   );
 
   const artistById = useMemo(() => {
     const map = new Map<string, (typeof ARTISTS)[number]>();
-    ARTISTS.forEach((artist) => {
+    allArtists.forEach((artist) => {
       map.set(artist.id, artist);
     });
     return map;
-  }, []);
+  }, [allArtists]);
+
+  const everySong = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
 
   const songsByArtist = useMemo(() => {
     const map = new Map<string, Song[]>();
     const seen = new Set<string>();
-    [...SONGS, ...publishedSongs].forEach((song) => {
+    const add = (artistId: string, song: Song) => {
+      const current = map.get(artistId) || [];
+      current.push(song);
+      map.set(artistId, current);
+    };
+    everySong.forEach((song) => {
       if (seen.has(song.id)) return;
       seen.add(song.id);
-      const current = map.get(song.artistId) || [];
-      current.push(song);
-      map.set(song.artistId, current);
+      add(song.artistId, song);
+      // A collaboration is in both artists' catalogues, so either can battle with it.
+      for (const collabId of song.collabArtistIds ?? []) if (collabId !== song.artistId) add(collabId, song);
     });
     return map;
-  }, [publishedSongs]);
+  }, [everySong]);
   
   // Fetch songchainn users for co-host search
   useEffect(() => {
@@ -304,6 +324,7 @@ const HostCreate = () => {
         artistAId: artistId,
         artistA: selectedArtist?.name || "",
         songAIds: ["", "", ""],
+        region: !regionTouched && selectedArtist?.region ? selectedArtist.region : prev.region,
       }));
       return;
     }
@@ -334,7 +355,8 @@ const HostCreate = () => {
     return ids
       .filter(Boolean)
       .map((id) => {
-        const song = SONGS.find((s) => s.id === id);
+        // Uploaded records too: looking only in the founding catalogue saved them with no title.
+        const song = everySong.find((s) => s.id === id);
         return { id, title: song?.title || "" };
       })
       .filter((s) => s.title);
@@ -422,8 +444,8 @@ const HostCreate = () => {
         artist_b_name: form.artistB || "TBD",
         artist_a_image: artistA?.profileImage ?? null,
         artist_b_image: artistB?.profileImage ?? null,
-        artist_a_region: artistA?.location ?? form.region,
-        artist_b_region: artistB?.location ?? form.region,
+        artist_a_region: countryOf(artistA?.location || artistA?.townSquare) ?? form.region,
+        artist_b_region: countryOf(artistB?.location || artistB?.townSquare) ?? form.region,
         song_a: songsA[0]?.title || "TBD",
         song_b: songsB[0]?.title || "TBD",
         songs_a: songsA.length ? songsA : null,
@@ -579,8 +601,8 @@ const HostCreate = () => {
           artist_b_name: form.artistB || "TBD",
           artist_a_image: artistA?.profileImage ?? null,
           artist_b_image: artistB?.profileImage ?? null,
-          artist_a_region: artistA?.location ?? form.region,
-          artist_b_region: artistB?.location ?? form.region,
+          artist_a_region: countryOf(artistA?.location || artistA?.townSquare) ?? form.region,
+          artist_b_region: countryOf(artistB?.location || artistB?.townSquare) ?? form.region,
           song_a: songsA[0]?.title || "TBD",
           song_b: songsB[0]?.title || "TBD",
           songs_a: songsA,
@@ -688,8 +710,8 @@ const HostCreate = () => {
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Region</label>
             <SelectWrapper icon={MapPin}>
-              <select value={form.region} onChange={(e) => update("region", e.target.value)} className={selectClass}>
-                {regions.map((r) => <option key={r} value={r}>{r}</option>)}
+              <select value={form.region} onChange={(e) => { setRegionTouched(true); update("region", e.target.value); }} className={selectClass}>
+                {(regions.includes(form.region) ? regions : [form.region, ...regions]).map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </SelectWrapper>
           </div>

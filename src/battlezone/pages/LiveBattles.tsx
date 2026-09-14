@@ -6,17 +6,18 @@ import BattleCard from "@/battlezone/components/BattleCard";
 import { useBattles } from "@/battlezone/hooks/useBattles";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
-
-const regions = ["All", "Zambia", "South Africa", "Nigeria", "Zimbabwe"];
+import { countryOf, useArtistRegions } from "@/battlezone/lib/regions";
 
 const LiveBattles = () => {
   const { isEmbedded } = useEmbedMode();
   const [search, setSearch] = useState("");
   const [region, setRegion] = useState("All");
   const { data: liveBattles = [], isLoading } = useBattles("live");
+  /* Every country an artist here is from, plus any a live battle is set in. */
+  const regions = ["All", ...useArtistRegions(liveBattles.map((b) => b.region))];
 
   const filtered = liveBattles.filter((b) => {
-    if (region !== "All" && b.region !== region) return false;
+    if (region !== "All" && countryOf(b.region) !== region) return false;
     if (search && !b.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
