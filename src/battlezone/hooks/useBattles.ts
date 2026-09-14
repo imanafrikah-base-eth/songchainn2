@@ -43,6 +43,7 @@ export interface BattleRow {
   closes_at: string | null;
   launched_at?: string | null;
   voice_enabled?: boolean | null;
+  room_closed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -103,7 +104,22 @@ export interface Battle {
   launchedAt?: string;
   /** In-app voice is on for this battle. Only the server turns it on. */
   voiceEnabled: boolean;
+  /** When the host closed the room after reading the results. */
+  roomClosedAt?: string;
   createdAt: string;
+}
+
+/** A room left open by a host who walked away does not stay open for ever. */
+const RESULTS_ROOM_HOURS = 3;
+
+/**
+ * The battle is over but its room is still open: the host is reading the
+ * results to the people in it. Ends when the host closes the room.
+ */
+export function isResultsRoomOpen(battle: Pick<Battle, "status" | "roomClosedAt" | "endedTime"> | null | undefined): boolean {
+  if (!battle || battle.status !== "ended" || battle.roomClosedAt) return false;
+  const ended = battle.endedTime ? Date.parse(battle.endedTime) : NaN;
+  return Number.isFinite(ended) && Date.now() - ended < RESULTS_ROOM_HOURS * 3600_000;
 }
 
 function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Battle {
@@ -157,6 +173,7 @@ function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Bat
     closesAt: row.closes_at || undefined,
     launchedAt: row.launched_at || undefined,
     voiceEnabled: row.voice_enabled === true,
+    roomClosedAt: row.room_closed_at || undefined,
     createdAt: row.created_at,
   };
 }

@@ -68,8 +68,10 @@ export function primeBattleAudio() {
   if (!a) return;
 
   // The stage wants music right now and the browser held it back: this tap starts it.
+  // Never a song that already finished: play() on an ended element starts it
+  // again from the top, which is how a tap in the room used to replay a record.
   if (a.dataset.track && a.dataset.wantPlaying === "1") {
-    if (a.paused) {
+    if (a.paused && !a.ended) {
       void a
         .play()
         .then(() => setBattleAudioBlocked(false))

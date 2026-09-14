@@ -46,6 +46,7 @@ export const MicControls: React.FC<MicControlsProps> = ({
   const {
     myRole,
     myParticipant,
+    loading: rolesLoading,
     requestToSpeak,
     removeSpeaker,
     toggleParticipantMute,
@@ -151,10 +152,11 @@ export const MicControls: React.FC<MicControlsProps> = ({
 
   // Back in the audience: the mic goes off.
   useEffect(() => {
-    if (roleCanPublish || !liveKitRoom) return;
+    // Not while this person's row is still loading: everyone reads as audience until it arrives.
+    if (rolesLoading || roleCanPublish || !liveKitRoom) return;
     setIsRequestingToSpeak(false);
     if (liveKitRoom.localParticipant.isMicrophoneEnabled) void setLiveMic(liveKitRoom, false, { quiet: true });
-  }, [roleCanPublish, liveKitRoom, setLiveMic]);
+  }, [rolesLoading, roleCanPublish, liveKitRoom, setLiveMic]);
 
   // Promoted: the pending request is done.
   useEffect(() => {
@@ -164,13 +166,14 @@ export const MicControls: React.FC<MicControlsProps> = ({
   // Honour the DB mute flag. A host muting this person only writes the DB; this
   // client is the one that can actually turn its own mic off.
   useEffect(() => {
-    if (!dbMuted || !liveKitRoom || !roleCanPublish) return;
+    // Only a real row saying muted counts; a row that has not loaded is not the host muting anyone.
+    if (!myParticipant || !dbMuted || !liveKitRoom || !roleCanPublish) return;
     if (selfChangeRef.current) return;
     if (!liveKitRoom.localParticipant.isMicrophoneEnabled) return;
     void setLiveMic(liveKitRoom, false, { quiet: true }).then((ok) => {
       if (ok) toast({ title: 'You were muted', description: 'The host muted your mic. Tap Unmute when you are asked to speak.' });
     });
-  }, [dbMuted, liveKitRoom, roleCanPublish, setLiveMic, toast]);
+  }, [myParticipant, dbMuted, liveKitRoom, roleCanPublish, setLiveMic, toast]);
 
   const toggleMicrophone = async () => {
     if (!roleCanPublish || busy) return;
@@ -309,7 +312,7 @@ export const MicControls: React.FC<MicControlsProps> = ({
     </div>
   );
 
-  if (!roleCanPublish && !hasPermission('canRequestToSpeak')) {
+  if (rolesLoading || (!roleCanPublish && !hasPermission('canRequestToSpeak'))) {
     return null;
   }
 

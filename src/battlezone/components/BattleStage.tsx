@@ -236,8 +236,12 @@ const BattleStage = ({
         );
         el.load();
       } else if (el.readyState >= 1) {
-        // A song shorter than its slot: let it finish, then silence until the next.
-        if (Number.isFinite(el.duration) && offset >= el.duration - 0.25) return;
+        // Each song plays once. A song shorter than its slot finishes, then
+        // silence until the next; nothing (a seek, a tap) may start it again.
+        if (el.ended || (Number.isFinite(el.duration) && offset >= el.duration - 0.25)) {
+          el.dataset.wantPlaying = "";
+          return;
+        }
         if (Math.abs(el.currentTime - offset) > DRIFT_SECONDS) {
           try {
             el.currentTime = offset;
@@ -285,7 +289,7 @@ const BattleStage = ({
   const nothingPlayable = resolved !== null && resolved.every((t) => !t.audioUrl);
 
   let message: string | null = null;
-  if (ended) message = "The battle is over. The music has stopped.";
+  if (ended) message = "The battle is over. Every song has had its play.";
   else if (!live) message = "The music starts when the battle goes live.";
   else if (resolved === null) message = "Getting the songs ready.";
   else if (nothingPlayable) message = "No playable track is attached to this battle.";

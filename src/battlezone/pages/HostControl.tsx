@@ -90,13 +90,20 @@ const HostControl = () => {
     void supabase.functions.invoke("battle-settle", { body: { battleId: roomId } });
   };
 
+  /* Ends the battle if it is still going, and closes its room. Ending from the
+     live room instead keeps the room open for the results. */
   const handleEndRoom = async () => {
     if (!roomId) return;
+    const now = new Date().toISOString();
     await supabase
       .from("battles")
-      .update({ status: "ended", voting_open: false, ended_time: new Date().toISOString() })
+      .update(
+        (ended
+          ? { room_closed_at: now }
+          : { status: "ended", voting_open: false, ended_time: now, room_closed_at: now }) as never,
+      )
       .eq("id", roomId);
-    void requestHikuluVerdict(roomId);
+    if (!ended) void requestHikuluVerdict(roomId);
     navigate(`/wavewarz-africa/battle/${roomId}`);
   };
 
@@ -298,7 +305,7 @@ const HostControl = () => {
             <button
               type="button"
               onClick={() => void handleEndRoom()}
-              disabled={ended}
+              disabled={ended && !!battle.roomClosedAt}
               className="ml-auto rounded-lg bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Square className="h-4 w-4" /> End Room

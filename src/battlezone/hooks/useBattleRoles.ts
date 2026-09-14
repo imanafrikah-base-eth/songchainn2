@@ -95,6 +95,10 @@ export const getRolePermissions = (role: BattleRole): RolePermissions => {
 
 const VALID_ROLES: BattleRole[] = ['host', 'co-host', 'speaker', 'audience'];
 
+/** How long somebody counts as in the room after their last heartbeat (every 20s). */
+const AUDIENCE_WINDOW_MS = 3 * 60_000;
+const STAGE_WINDOW_MS = 10 * 60_000;
+
 // Supabase's generated types type battle_rooms.role as plain `string` (codegen doesn't
 // derive unions from CHECK constraints), even though the DB guarantees one of BattleRole.
 function toBattleRole(role: string | null | undefined): BattleRole {
@@ -113,18 +117,34 @@ export const useBattleRoles = (battleId: string) => {
     if (!battleId) return;
 
     try {
+      /* Every row, with freshness judged here rather than in the query.
+         The old query dropped anybody not seen in the last 60 seconds, measured
+         against this device's clock while last_seen_at was written by theirs.
+         A phone a minute out, or a host whose screen throttled its heartbeat,
+         fell out of the list, and on the host's own screen that made them
+         audience: the host controls vanished, the mic switched off and voice
+         reconnected listen-only, then it all came back on the next beat. */
       const { data, error } = await supabase
         .from('battle_rooms')
         .select('*')
         .eq('battle_id', battleId)
-        .gte('last_seen_at', new Date(Date.now() - 60000).toISOString())
-        .order('joined_at', { ascending: true });
+        .order('joined_at', { ascending: true })
+        .limit(1000);
 
       if (error) throw error;
-      const typedParticipants = (data || []).map((row) => ({ ...row, role: toBattleRole(row.role) }));
+      const now = Date.now();
+      const typedParticipants = (data || [])
+        .map((row) => ({ ...row, role: toBattleRole(row.role) }))
+        .filter((p) => {
+          if (user && p.user_id === user.id) return true;
+          const seen = Date.parse(p.last_seen_at);
+          if (!Number.isFinite(seen)) return p.role !== 'audience';
+          // The stage holds its people through a missed beat or two; the audience list is looser still than it was.
+          return now - seen < (p.role === 'audience' ? AUDIENCE_WINDOW_MS : STAGE_WINDOW_MS);
+        });
       setParticipants(typedParticipants);
 
-      // Set current user's role
+      // My own role always comes from my own row, however stale its timestamp.
       if (user) {
         const myParticipant = typedParticipants.find(p => p.user_id === user.id);
         setMyRole(myParticipant?.role || 'audience');

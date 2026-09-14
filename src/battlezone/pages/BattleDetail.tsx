@@ -2,11 +2,13 @@ import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Users, Share2, Play, Trophy, Crown, Heart, Radio, SlidersHorizontal, Gavel } from "lucide-react";
+import { ArrowLeft, Users, Share2, Play, Trophy, Radio, SlidersHorizontal } from "lucide-react";
+import BattleResults from "@/battlezone/components/BattleResults";
+import { durationsFromUrls } from "@/battlezone/lib/songDuration";
 import Navbar from "@/battlezone/components/Navbar";
 import Footer from "@/battlezone/components/Footer";
 import LiveBadge from "@/battlezone/components/LiveBadge";
-import { useBattle, useBattles } from "@/battlezone/hooks/useBattles";
+import { isResultsRoomOpen, useBattle, useBattles } from "@/battlezone/hooks/useBattles";
 import { supabase } from "@/battlezone/integrations/supabase/client";
 import { useAuth } from "@/battlezone/contexts/AuthContext";
 import { useToast } from "@/battlezone/hooks/use-toast";
@@ -112,10 +114,22 @@ const BattleDetail = () => {
     /* The clock starts now, not when the battle was created, and it is written
        as timestamps so every viewer counts down to the same instant rather than
        to their own device. */
+    /* Each song's real length, read from its file the same way the stage reads
+       it. The catalogue carries no duration for an uploaded record, so this used
+       to give it a flat slot: a three minute song ran in a slot longer than
+       itself, and the gap after it was where a tap in the room started it again. */
+    const allSongs = [...battle.songsA, ...battle.songsB];
+    const uploadedIds = allSongs.map((s) => s.id).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    const uploadedUrls = new Map<string, string | null>();
+    if (uploadedIds.length) {
+      const { data: rows } = await supabase.from("songs").select("id, audio_url").in("id", uploadedIds);
+      for (const r of rows ?? []) uploadedUrls.set(String(r.id), r.audio_url);
+    }
+    const measured = await durationsFromUrls(
+      allSongs.map((s) => SONGS.find((catalogue) => catalogue.id === s.id)?.audioUrl || uploadedUrls.get(s.id) || null),
+    );
     const clock = buildClock(
-      [...battle.songsA, ...battle.songsB].map(
-        (s) => SONGS.find((catalogue) => catalogue.id === s.id)?.duration,
-      ),
+      allSongs.map((s, i) => measured[i] ?? SONGS.find((catalogue) => catalogue.id === s.id)?.duration),
     );
     const startedAt = Date.now();
 
@@ -339,92 +353,7 @@ const BattleDetail = () => {
         )}
 
         {/* The judges' verdicts */}
-        {battle.status === "ended" && (
-          battle.hikuluVerdict ? (
-            <div className="rounded-2xl border-2 border-amber-400/50 bg-gradient-to-b from-amber-400/10 to-transparent p-6 space-y-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Crown className="h-5 w-5 text-amber-400" />
-                  <h3 className="font-black text-amber-400">$HIKULU's Verdict</h3>
-                </div>
-                <p className="text-sm italic text-foreground">"{battle.hikuluVerdict}"</p>
-              </div>
-              {battle.nakuluVerdict && (
-                <div className="space-y-1 rounded-xl border border-rose-400/30 bg-rose-400/5 p-3">
-                  <div className="flex items-center gap-2">
-                    <Heart className="h-5 w-5 text-rose-400" />
-                    <h3 className="font-black text-rose-400">NAKULU's Verdict</h3>
-                  </div>
-                  <p className="text-sm italic text-foreground">"{battle.nakuluVerdict}"</p>
-                </div>
-              )}
-              {/*
-                The Council of Elders only appears when it actually sat, which
-                is when $HIKULU and NAKULU picked opposite winners or came out
-                level. When it sat, it decided.
-              */}
-              {battle.councilVerdicts.length > 0 && (
-                <div className="space-y-3 rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-3">
-                  <div className="flex items-center gap-2">
-                    <Gavel className="h-5 w-5 text-emerald-400" />
-                    <h3 className="font-black text-emerald-400">The Council of Elders was summoned</h3>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    The bench was split, so the high council came down to settle it.
-                  </p>
-                  <div className="space-y-2">
-                    {battle.councilVerdicts.map((elder) => (
-                      <div key={elder.key} className="rounded-lg border border-border bg-background/40 p-2.5">
-                        <div className="flex items-baseline justify-between gap-2 mb-1">
-                          <span className="text-xs font-black text-foreground">{elder.name}</span>
-                          <span className="text-[10px] text-muted-foreground tabular-nums">
-                            {battle.artistA.name} {elder.points_a}, {battle.artistB.name} {elder.points_b}
-                          </span>
-                        </div>
-                        <p className="text-xs italic text-muted-foreground">"{elder.verdict}"</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-center">
-                  <p className="font-bold text-foreground">{battle.artistA.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {battle.votesA.toLocaleString()} votes + {battle.hikuluPointsA} $HIKULU + {battle.nakuluPointsA} NAKULU
-                    {battle.councilPointsA > 0 ? ` + ${battle.councilPointsA} council` : ""}
-                  </p>
-                  <p className="font-black text-primary text-lg">
-                    {(battle.votesA + battle.hikuluPointsA + battle.nakuluPointsA + battle.councilPointsA).toLocaleString()}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-secondary/30 bg-secondary/5 p-3 text-center">
-                  <p className="font-bold text-foreground">{battle.artistB.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {battle.votesB.toLocaleString()} votes + {battle.hikuluPointsB} $HIKULU + {battle.nakuluPointsB} NAKULU
-                    {battle.councilPointsB > 0 ? ` + ${battle.councilPointsB} council` : ""}
-                  </p>
-                  <p className="font-black text-secondary text-lg">
-                    {(battle.votesB + battle.hikuluPointsB + battle.nakuluPointsB + battle.councilPointsB).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <p className="text-[11px] text-muted-foreground text-center">
-                {battle.decidedBy === "council"
-                  ? "Settled by the Council of Elders. The judges heard the records, the crowd cast its own vote, and neither side of the bench could break it."
-                  : battle.decidedBy === "host"
-                    ? "Called by the host. Judge points and crowd votes are shown for the record."
-                    : "Final score: crowd votes plus judge points. The judges heard the records and never saw the votes."}
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 flex items-center gap-3">
-              <Crown className="h-5 w-5 text-amber-400 shrink-0" />
-              <p className="text-sm text-muted-foreground">$HIKULU and NAKULU are weighing their verdicts on this battle. Check back in a moment.</p>
-            </div>
-          )
-        )}
+        <BattleResults battle={battle} />
 
         <div className="rounded-2xl border border-border bg-card/80 p-6 space-y-2 text-sm text-muted-foreground backdrop-blur">
           <p><Users className="inline h-4 w-4 mr-1" /> {battle.listeners.toLocaleString()} listeners</p>
@@ -466,6 +395,11 @@ const BattleDetail = () => {
           {battle.status === "live" && (
             <AppLink to={`/room/${battle.id}`} className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-all">
               <Play className="h-4 w-4" /> Enter Room
+            </AppLink>
+          )}
+          {isResultsRoomOpen(battle) && (
+            <AppLink to={`/room/${battle.id}`} className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-all">
+              <Play className="h-4 w-4" /> {isHost ? "Back to your room" : "Join the room, the results are being read"}
             </AppLink>
           )}
           {battle.status === "live" && (

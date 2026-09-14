@@ -89,8 +89,7 @@ export const SpeakerManagement: React.FC<SpeakerManagementProps> = ({
     const success = await toggleParticipantMute(participantId, !currentMuted);
     if (success) {
       toast({
-        title: 'Audio toggled',
-        description: currentMuted ? 'Speaker unmuted' : 'Speaker muted',
+        title: currentMuted ? 'Speaker unmuted' : 'Speaker muted',
       });
     }
   };

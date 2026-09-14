@@ -7,8 +7,8 @@ import {
 } from "lucide-react";
 import { VOICE_ENABLED } from "@/battlezone/config";
 import LiveBadge from "@/battlezone/components/LiveBadge";
-import { useBattle } from "@/battlezone/hooks/useBattles";
-import { useBattles } from "@/battlezone/hooks/useBattles";
+import { isResultsRoomOpen, useBattle, useBattles } from "@/battlezone/hooks/useBattles";
+import BattleResults from "@/battlezone/components/BattleResults";
 import { useBattleRoles } from "@/battlezone/hooks/useBattleRoles";
 import { useSpeakingLevels } from "@/battlezone/hooks/useSpeakingLevels";
 import { NowTalkingCaption, SpeakingAvatar, SpeakingStatus } from "@/battlezone/components/SpeakingAvatar";
@@ -118,6 +118,7 @@ const LiveRoom = () => {
   const {
     participants,
     myRole,
+    loading: rolesLoading,
     hasPermission,
     getParticipantsByRole,
     approveSpeakerRequest,
@@ -192,8 +193,19 @@ const LiveRoom = () => {
   // Server-owned gates. battle is re-polled every 5s, so when the host ends the
   // battle or closes voting the whole room reacts, not just the host's screen.
   const battleEnded = battle?.status === "ended";
+  /* The battle is over but the room is not: the host reads the results to
+     everyone still in it, on voice, and closes the room when they are done. */
+  const resultsOpen = isResultsRoomOpen(battle);
+  const roomClosed = battleEnded && !resultsOpen;
   const votingOpen = battle?.votingOpen !== false;
   const canVote = !!battle && !battleEnded && votingOpen && !clockClosed;
+
+  /* The host closed the room (or it was closed before this screen opened):
+     everyone goes to the battle page, where the result stays. */
+  useEffect(() => {
+    if (!roomClosed || !roomId) return;
+    navigate(embedTo(`/battle/${roomId}`), { replace: true });
+  }, [roomClosed, roomId, navigate, embedTo]);
 
   /* The clock is a real gate, not a decoration, so it is re-read from the row
      every time the battle refetches. Somebody who opens the room after it has
@@ -341,14 +353,36 @@ const LiveRoom = () => {
     await supabase.from("battles").update({ round: newRound, voting_open: true }).eq("id", roomId);
   };
 
+  /* Ends the battle and keeps the room. The host stays on voice to read the
+     results; closing the room is its own step. */
   const endBattle = async () => {
     if (!roomId) return;
-    await supabase
+    const { error } = await supabase
       .from("battles")
       .update({ status: "ended", voting_open: false, ended_time: new Date().toISOString() })
       .eq("id", roomId);
+    if (error) {
+      toast({ title: "Could not end the battle", description: "Please try again." });
+      return;
+    }
     void requestHikuluVerdict(roomId);
-    navigate(embedTo(`/battle/${roomId}`));
+    void refetchBattle();
+  };
+
+  const [closingRoom, setClosingRoom] = useState(false);
+  const closeRoom = async () => {
+    if (!roomId || closingRoom) return;
+    setClosingRoom(true);
+    const { error } = await supabase
+      .from("battles")
+      .update({ room_closed_at: new Date().toISOString() } as never)
+      .eq("id", roomId);
+    setClosingRoom(false);
+    if (error) {
+      toast({ title: "Could not close the room", description: "Please try again." });
+      return;
+    }
+    navigate(embedTo(`/battle/${roomId}`), { replace: true });
   };
 
   const setVotingOpen = async (open: boolean) => {
@@ -454,11 +488,16 @@ const LiveRoom = () => {
     };
   }, [roomId, user, profile?.display_name, profile?.username]);
 
+  const voiceUserId = user?.id;
   useEffect(() => {
     if (!voiceOn) return;
-    if (!roomId || !user) return;
+    if (!roomId || !voiceUserId) return;
+    /* Wait for this person's row, so the host joins as the host the first
+       time rather than as audience and then again a second later. */
+    if (rolesLoading) return;
     let cancelled = false;
-    const participantName = profile?.display_name || profile?.username || "WWA Listener";
+    const participantName =
+      profileRef.current?.display_name || profileRef.current?.username || "WWA Listener";
 
     /* Every remote voice has to be attached to an audio element or nobody hears
        anything. Elements are tracked per room so a late event from an old room
@@ -477,7 +516,7 @@ const LiveRoom = () => {
 
     const connectLiveKit = async () => {
       try {
-        const { token, wsUrl } = await getLiveKitToken(roomId, user.id, participantName);
+        const { token, wsUrl } = await getLiveKitToken(roomId, voiceUserId, participantName);
         if (cancelled) return;
 
         if (!wsUrl || !token) {
@@ -572,7 +611,10 @@ const LiveRoom = () => {
     // the initial token is minted before approval and LiveKit doesn't let a grant be
     // upgraded in place, so without this a newly-approved speaker couldn't be heard until
     // they manually left and rejoined the room.
-  }, [roomId, user, profile?.display_name, profile?.username, canPublishAudio, voiceOn]);
+    // The user id, not the user object, and the name read from a ref: a session
+    // refresh hands out a new user object and a profile loading late changes the
+    // name, and each of those used to drop everybody's voice and reconnect it.
+  }, [roomId, voiceUserId, canPublishAudio, voiceOn, rolesLoading]);
 
 
   useEffect(() => {
@@ -626,7 +668,7 @@ const LiveRoom = () => {
      shared link opened straight into the room. Any tap unlocks everything. */
   const battleLiveNow = battle?.status === "live" && !battleEnded;
   const voicesBlocked = voiceOn && audioConnected && !canPlayAudio;
-  const needsTap = battleLiveNow && (musicBlocked || voicesBlocked);
+  const needsTap = (battleLiveNow && musicBlocked) || ((battleLiveNow || resultsOpen) && voicesBlocked);
   const unlockRoomAudio = () => {
     primeBattleAudio();
     const room = liveKitRoomRef.current;
@@ -641,10 +683,12 @@ const LiveRoom = () => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  if (isLoading || !battle) {
+  if (isLoading || !battle || roomClosed) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">{isLoading ? "Loading battle..." : "Battle not found."}</p>
+        <p className="text-muted-foreground">
+          {isLoading ? "Loading battle..." : roomClosed ? "The host closed the room. Taking you to the result." : "Battle not found."}
+        </p>
       </div>
     );
   }
@@ -677,7 +721,11 @@ const LiveRoom = () => {
             </button>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <LiveBadge />
+                {resultsOpen ? (
+                  <span className="rounded-full bg-neon-gold/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-neon-gold">Results</span>
+                ) : (
+                  <LiveBadge />
+                )}
                 <h1 className={`font-bold text-foreground truncate ${isVerySmallMobile ? "text-xs max-w-[150px]" : "text-sm"}`}>{battle.title}</h1>
               </div>
               <p className={`${isVerySmallMobile ? "text-[11px]" : "text-xs"} text-muted-foreground truncate`}>
@@ -736,6 +784,18 @@ const LiveRoom = () => {
                 )}
               </div>
               <div ref={audioBoxRef} className="hidden" aria-hidden />
+            </div>
+          )}
+
+          {/* The results, read out by the host while the room stays open. */}
+          {resultsOpen && (
+            <div className="space-y-2">
+              <p className="text-center text-sm font-semibold text-foreground">
+                {myRole === "host"
+                  ? "The battle is over. Read the results to your room, then close it when you are done."
+                  : "The battle is over. Stay in the room while the host reads the results."}
+              </p>
+              <BattleResults battle={battle} />
             </div>
           )}
 
@@ -854,19 +914,11 @@ const LiveRoom = () => {
                 <div className="text-center space-y-2">
                   <p className="text-xs text-muted-foreground">
                     {battleEnded
-                      ? "This battle has ended. The judges' verdict and the final score are on the battle page."
+                      ? "The poll is closed. These are the final votes."
                       : clockClosed
                         ? "Time is up. The poll is closed and the verdict is next."
                         : "The host has paused voting. It reopens when the next round starts."}
                   </p>
-                  {battleEnded && (
-                    <button
-                      onClick={() => navigate(embedTo(`/battle/${roomId}`))}
-                      className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
-                    >
-                      See the result
-                    </button>
-                  )}
                 </div>
               )}
               <div className={`flex ${isVerySmallMobile ? "flex-col" : "gap-3"} ${canVote ? "" : "opacity-60"}`}>
@@ -940,8 +992,22 @@ const LiveRoom = () => {
             <BattleVoiceSwitch battleId={roomId} onEnabled={() => void refetchBattle()} />
           )}
 
+          {/* Host Controls, once the battle is over: the room stays until the host closes it. */}
+          {myRole === "host" && battleEnded && (
+            <div className="space-y-2">
+              <button
+                onClick={() => void closeRoom()}
+                disabled={closingRoom}
+                className="w-full sm:w-auto min-h-11 rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                <Square className="h-4 w-4" /> {closingRoom ? "Closing the room" : "Close the room"}
+              </button>
+              <p className="text-xs text-muted-foreground">Everyone in the room is taken to the battle page when you close it.</p>
+            </div>
+          )}
+
           {/* Host Controls */}
-          {myRole === "host" && (
+          {myRole === "host" && !battleEnded && (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 <button

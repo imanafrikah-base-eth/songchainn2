@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AppLink from "@/battlezone/components/AppLink";
-import { useBattle } from "@/battlezone/hooks/useBattles";
+import { isResultsRoomOpen, useBattle } from "@/battlezone/hooks/useBattles";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import { installBattleAudioGestureUnlock } from "@/battlezone/lib/audioUnlock";
 
@@ -40,7 +40,7 @@ export default function RoomEntry() {
     sent.current = true;
     // A live battle goes to the room. Anything else goes to the battle page,
     // which already renders the right upcoming or ended state.
-    const target = battle.status === "live" ? `/room/${battle.id}` : `/battle/${battle.id}`;
+    const target = battle.status === "live" || isResultsRoomOpen(battle) ? `/room/${battle.id}` : `/battle/${battle.id}`;
     navigate(embedTo(target), { replace: true });
   }, [battle, embedTo, navigate]);
 
