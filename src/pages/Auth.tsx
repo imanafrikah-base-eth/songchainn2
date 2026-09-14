@@ -1417,7 +1417,10 @@ export default function Auth() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="w-[90vw] max-w-[18.5rem] sm:w-full sm:max-w-sm border border-border bg-background/95 shadow-2xl rounded-2xl p-3 sm:p-5 shine-overlay max-h-[80vh] sm:max-h-[88vh] overflow-auto"
+              // !overflow-y-auto, not overflow-auto: .shine-overlay sets overflow hidden in a later
+              // CSS layer and was winning, so on a laptop at 100% the Log in button sat below the
+              // edge with no way to scroll to it (founder, 14 Sep 2026).
+              className="w-[90vw] max-w-[18.5rem] sm:w-full sm:max-w-sm border border-border bg-background/95 shadow-2xl rounded-2xl p-3 sm:p-5 shine-overlay max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] !overflow-y-auto overscroll-contain"
             >
               <AnimatePresence mode="wait">
             {connectionState === 'success' && !pendingWalletConnection ? (
