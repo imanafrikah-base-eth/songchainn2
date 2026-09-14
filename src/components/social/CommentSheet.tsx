@@ -1,5 +1,5 @@
 import { artistPath } from '@/lib/slugRoutes';
-import { useState, useRef, useEffect, useMemo, type SyntheticEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, type SyntheticEvent } from 'react';
 import { ArtistName, VerifiedMark } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Heart, MoreHorizontal, Reply, Trash2, Flag, Pencil } from 'lucide-react';
@@ -14,7 +14,12 @@ import { ReportDialog } from '@/components/ReportDialog';
 import { InlineEdit, EditedMark } from '@/components/social/InlineEdit';
 import { useAuth } from '@/context/AuthContext';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
-import { Input } from '@/components/ui/input';
+import { MentionInput, type MentionInputHandle } from '@/components/social/MentionInput';
+import { MentionText } from '@/components/social/MentionText';
+import { Reactable, ReactionPicker, ReactionChips } from '@/components/social/FeedReactions';
+import { useMentions } from '@/hooks/useMentions';
+import { useFeedReactions } from '@/hooks/useFeedReactions';
+import type { MentionPerson } from '@/lib/mentions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PostComment } from '@/types/social';
@@ -31,7 +36,7 @@ interface CommentSheetProps {
   onClose: () => void;
   comments: PostComment[];
   isLoading: boolean;
-  onAddComment: (content: string) => void;
+  onAddComment: (content: string, mentions?: MentionPerson[]) => void;
   /** Your own comments only. Resolves true when it is really gone. */
   onDeleteComment?: (commentId: string) => Promise<boolean> | void;
   /** Optional so existing callers keep working; without it Edit stays hidden. */
@@ -67,6 +72,10 @@ export function CommentSheet({
   const [likingCommentId, setLikingCommentId] = useState<string | null>(null);
   const [reporting, setReporting] = useState<{ id: string; userId: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [mentioned, setMentioned] = useState<MentionPerson[]>([]);
+  const [picker, setPicker] = useState<{ id: string; rect: DOMRect } | null>(null);
+  // Stable, because the picker listens for scroll with it and re-binds whenever it changes.
+  const closePicker = useCallback(() => setPicker(null), []);
 
   const handleDeleteComment = async (commentId: string) => {
     if (!onDeleteComment || deletingId) return;
@@ -82,11 +91,14 @@ export function CommentSheet({
       setDeletingId(null);
     }
   };
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<MentionInputHandle>(null);
   const navigate = useNavigate();
   const { fetchCommentLikesData, toggleCommentLike } = useCommentLikes();
   const commentUserIds = useMemo(() => localComments.map(comment => comment.user_id), [localComments]);
   const { onlineUserIds } = useOnlineUsers(commentUserIds);
+  const commentIds = useMemo(() => localComments.map((c) => c.id), [localComments]);
+  const { data: mentionsById } = useMentions('comment', commentIds);
+  const { reactions, toggle: toggleReaction } = useFeedReactions('comment', commentIds);
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
     if (target.dataset.fallbackApplied === 'true') return;
@@ -119,6 +131,8 @@ export function CommentSheet({
     if (!isOpen) {
       setReplyingTo(null);
       setNewComment('');
+      setMentioned([]);
+      setPicker(null);
     }
   }, [isOpen]);
 
@@ -149,18 +163,21 @@ export function CommentSheet({
   const handleReply = (userId: string, userName: string) => {
     setReplyingTo({ userId, userName });
     setNewComment(`@${userName} `);
+    if (userId !== user?.id) setMentioned((prev) => [...prev, { user_id: userId, display_name: userName }]);
     inputRef.current?.focus();
   };
 
   const cancelReply = () => {
     setReplyingTo(null);
     setNewComment('');
+    setMentioned([]);
   };
 
   const handleSubmit = () => {
     if (!newComment.trim()) return;
-    onAddComment(newComment);
+    onAddComment(newComment, mentioned);
     setNewComment('');
+    setMentioned([]);
     setReplyingTo(null);
   };
 
@@ -180,33 +197,6 @@ export function CommentSheet({
       return;
     }
     navigate(`/audience/${userId}`);
-  };
-
-  // Parse and render comment content with clickable @mentions
-  const renderCommentContent = (content: string) => {
-    const mentionRegex = /@(\w+)/g;
-    const parts = content.split(mentionRegex);
-    
-    return parts.map((part, index) => {
-      if (index % 2 === 1) {
-        return (
-          <button
-            key={index}
-            className="text-primary font-semibold hover:underline"
-            onClick={(e) => {
-              e.stopPropagation();
-              const mentionedUser = localComments.find(
-                c => c.profile?.profile_name?.toLowerCase() === part.toLowerCase()
-              );
-              if (mentionedUser) void goToProfile(mentionedUser.user_id, mentionedUser.artist_id);
-            }}
-          >
-            @{part}
-          </button>
-        );
-      }
-      return part;
-    });
   };
 
   return (
@@ -358,11 +348,22 @@ export function CommentSheet({
                               />
                             </div>
                           ) : (
-                            <p className="text-sm text-foreground/90 mt-1">
-                              {renderCommentContent(comment.content)}
-                              {comment.edited_at ? <EditedMark at={comment.edited_at} className="ml-2" /> : null}
-                            </p>
+                            <Reactable
+                              onOpen={(rect) => { if (!isPending) setPicker({ id: comment.id, rect }); }}
+                              onDoubleTap={() => { if (!isPending && !comment.is_liked) void handleLikeComment(comment); }}
+                            >
+                              <p className="text-sm text-foreground/90 mt-1 break-words">
+                                <MentionText text={comment.content} mentions={mentionsById?.[comment.id]} emojiSize={16} />
+                                {comment.edited_at ? <EditedMark at={comment.edited_at} className="ml-2" /> : null}
+                              </p>
+                            </Reactable>
                           )}
+                          <ReactionChips
+                            className="mt-1.5"
+                            counts={reactions[comment.id]?.counts}
+                            mine={reactions[comment.id]?.mine}
+                            onToggle={(emoji) => void toggleReaction(comment.id, emoji)}
+                          />
                           <div className="flex items-center gap-4 mt-2">
                             <button 
                               className={cn(
@@ -418,15 +419,20 @@ export function CommentSheet({
             {/* Input */}
             <div className="p-4 border-t border-border bg-background">
               <div className="flex items-center gap-3">
-                <Input
-                  ref={inputRef}
-                  placeholder={replyingTo ? `Reply to @${replyingTo.userName}...` : "Add a comment..."}
-                  value={newComment}
-                  maxLength={COMMENT_MAX_LENGTH}
-                  onChange={(e) => setNewComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                  className="flex-1 h-11 rounded-full bg-muted border-0"
-                />
+                <div className="min-w-0 flex-1">
+                  <MentionInput
+                    ref={inputRef}
+                    placement="above"
+                    placeholder={replyingTo ? `Reply to @${replyingTo.userName}` : 'Add a comment. Type @ to mention'}
+                    aria-label="Add a comment"
+                    value={newComment}
+                    maxLength={COMMENT_MAX_LENGTH}
+                    onChange={setNewComment}
+                    onPick={(person) => setMentioned((prev) => [...prev, person])}
+                    onEnter={handleSubmit}
+                    className="h-11 w-full rounded-full border-0 bg-muted px-4 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
                 <Button 
                   size="icon" 
                   className="h-11 w-11 rounded-full"
@@ -438,6 +444,16 @@ export function CommentSheet({
               </div>
             </div>
           </motion.div>
+
+          <ReactionPicker
+            anchor={picker?.rect ?? null}
+            mine={picker ? reactions[picker.id]?.mine : undefined}
+            onPick={(emoji) => {
+              if (picker) void toggleReaction(picker.id, emoji);
+              setPicker(null);
+            }}
+            onClose={closePicker}
+          />
 
           {reporting && (
             <ReportDialog

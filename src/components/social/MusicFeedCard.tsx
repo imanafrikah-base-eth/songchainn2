@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
+import { useCallback, useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
 import { Send } from 'lucide-react';
 import type { PostComment } from '@/types/social';
 import { useCompliance } from '@/hooks/useCompliance';
@@ -34,6 +34,11 @@ import { useShare } from '@/hooks/useShare';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePulseCounts } from '@/hooks/usePopularity';
 import { getArtistSlugUrl, getSongSlugUrl, songPath } from '@/lib/slugRoutes';
+import { MentionInput, type MentionInputHandle } from '@/components/social/MentionInput';
+import { MentionText } from '@/components/social/MentionText';
+import { Reactable, ReactionPicker, ReactionChips } from '@/components/social/FeedReactions';
+import type { MentionLink, MentionPerson } from '@/lib/mentions';
+import type { ReactionSummary } from '@/hooks/useFeedReactions';
 
 function formatPulseTime(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -59,30 +64,36 @@ function FeedCommentStrip({
   count: number;
   previews: PostComment[];
   onOpenAll: () => void;
-  onSend?: (content: string) => Promise<boolean>;
+  onSend?: (content: string, mentions: MentionPerson[]) => Promise<boolean>;
 }) {
   const { isMuted, isSuspended } = useCompliance();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const [mentioned, setMentioned] = useState<MentionPerson[]>([]);
   const [sending, setSending] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<MentionInputHandle>(null);
   const canComment = !!onSend && !isMuted && !isSuspended;
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const send = async () => {
     const content = text.trim();
     if (!content || !onSend || sending) return;
     setSending(true);
     setText('');
-    const ok = await onSend(content);
+    const ok = await onSend(content, mentioned);
     setSending(false);
     if (!ok) {
       setText(content);
       inputRef.current?.focus();
     } else {
+      setMentioned([]);
       setOpen(false);
     }
+  };
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void send();
   };
 
   return (
@@ -111,23 +122,26 @@ function FeedCommentStrip({
       )}
 
       {canComment && (open ? (
-        <form onSubmit={(e) => void submit(e)} className="flex items-center gap-2">
-          <input
-            ref={inputRef}
-            autoFocus
-            value={text}
-            maxLength={COMMENT_MAX_LENGTH}
-            onChange={(e) => setText(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setOpen(false);
-            }}
-            onBlur={() => {
-              if (!text.trim()) setOpen(false);
-            }}
-            placeholder="Add a comment"
-            aria-label="Add a comment"
-            className="h-11 min-w-0 flex-1 rounded-full border border-white/20 bg-black/60 px-4 text-sm text-white placeholder:text-white/50 outline-none focus:border-white/50"
-          />
+        <form onSubmit={submit} className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <MentionInput
+              ref={inputRef}
+              autoFocus
+              placement="above"
+              value={text}
+              maxLength={COMMENT_MAX_LENGTH}
+              onChange={setText}
+              onPick={(person) => setMentioned((prev) => [...prev, person])}
+              onEnter={() => void send()}
+              onEscape={() => setOpen(false)}
+              onBlur={() => {
+                if (!text.trim()) setOpen(false);
+              }}
+              placeholder="Add a comment. Type @ to mention"
+              aria-label="Add a comment"
+              className="h-11 w-full rounded-full border border-white/20 bg-black/60 px-4 text-sm text-white placeholder:text-white/50 outline-none focus:border-white/50"
+            />
+          </div>
           <button
             type="submit"
             disabled={!text.trim() || sending}
@@ -158,7 +172,12 @@ interface MusicFeedCardProps {
   /** The newest one or two comments, shown under the caption. */
   previewComments?: PostComment[];
   /** Post a comment from the card itself. Resolves false when it did not send. */
-  onQuickComment?: (postId: string, content: string) => Promise<boolean>;
+  onQuickComment?: (postId: string, content: string, mentions?: MentionPerson[]) => Promise<boolean>;
+  /** Who the caption mentions, so each name links to its person. */
+  mentions?: MentionLink[];
+  /** Emoji reactions on this post, and a way to add or take one back. */
+  reactions?: ReactionSummary;
+  onReact?: (postId: string, emoji: string) => void;
   onLike: (postId: string) => void;
   onFollow: (userId: string) => void;
   isFollowing: boolean;
@@ -171,8 +190,11 @@ interface MusicFeedCardProps {
   onUntagSelf?: (postId: string) => Promise<boolean> | void;
 }
 
-export function MusicFeedCard({ post, previewComments, onQuickComment, onLike, onFollow, isFollowing, onComment, onDelete, onEdit, onUntagSelf }: MusicFeedCardProps) {
+export function MusicFeedCard({ post, previewComments, onQuickComment, mentions, reactions, onReact, onLike, onFollow, isFollowing, onComment, onDelete, onEdit, onUntagSelf }: MusicFeedCardProps) {
   const { user } = useAuth();
+  const [pickerAt, setPickerAt] = useState<DOMRect | null>(null);
+  const closePicker = useCallback(() => setPickerAt(null), []);
+  const canReact = !!onReact && !post.id.startsWith('pending-');
   const { currentSong, isPlaying, playSong, pause, play } = usePlayer();
   const navigate = useNavigate();
   const { shareSong, sharePost, copied, getSongShareUrl, getShareUrl, copyToClipboard } = useShare();
@@ -282,7 +304,8 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, onLike, o
           alone. */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/20 to-black/90 pointer-events-none" />
 
-      {/* Tap to play */}
+      {/* Tap to play. Hold (or right-click) to react. */}
+      <Reactable className="absolute inset-0" onOpen={(rect) => { if (canReact) setPickerAt(rect); }}>
       <div className="absolute inset-0 cursor-pointer" onClick={activeSong ? handlePlayPause : undefined}>
         <div className="absolute inset-0 flex items-center justify-center">
 
@@ -444,6 +467,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, onLike, o
           )}
         </div>
       </div>
+      </Reactable>
 
       {/* Right action bar.
           Six identical 44px circles in a column had no hierarchy at all: the
@@ -669,11 +693,20 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, onLike, o
         ) : (
           !isWelcomePost && !isArtistFollowPost && !isSongLikePost && !isSongPulsePost && !isSongCommentPost
             && !isPlaylistCreatedPost && !isRoomEnteredPost && post.content && (
-            <p className="text-white/90 text-sm mb-2 line-clamp-2">
-              {post.content}
+            <p className="text-white/90 text-sm mb-2 line-clamp-2 break-words">
+              <MentionText text={post.content} mentions={mentions} emojiSize={16} />
               {post.edited_at ? <EditedMark at={post.edited_at} className="ml-2 text-white/60" /> : null}
             </p>
           )
+        )}
+
+        {canReact && (
+          <ReactionChips
+            className="mb-2 [&_button]:border-white/20 [&_button]:bg-black/40 [&_button]:text-white"
+            counts={reactions?.counts}
+            mine={reactions?.mine}
+            onToggle={(emoji) => onReact?.(post.id, emoji)}
+          />
         )}
 
         {/* Who is in it. Names, not avatars: a row of tiny faces tells you
@@ -738,10 +771,20 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, onLike, o
             count={post.comments_count || 0}
             previews={previewComments ?? []}
             onOpenAll={onComment}
-            onSend={onQuickComment ? (content) => onQuickComment(post.id, content) : undefined}
+            onSend={onQuickComment ? (content, picked) => onQuickComment(post.id, content, picked) : undefined}
           />
         )}
       </div>
+
+      <ReactionPicker
+        anchor={pickerAt}
+        mine={reactions?.mine}
+        onPick={(emoji) => {
+          onReact?.(post.id, emoji);
+          setPickerAt(null);
+        }}
+        onClose={closePicker}
+      />
 
       {reporting && (
         <ReportDialog

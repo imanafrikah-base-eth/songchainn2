@@ -11,11 +11,14 @@ import {
   useConversation, blockUser, reportMessage, type Conversation,
 } from '@/hooks/useDirectMessages';
 import { useArtistDmGate, isCoinRequiredError } from '@/hooks/useArtistDmAccess';
+import { useDmDrop, useDmTray } from '@/hooks/useDmTray';
+import { useDmReactions } from '@/hooks/useDmReactions';
 import { ArtistDmGateDialog } from '@/components/social/ArtistDmGateDialog';
 import { HOLDER_PERK_USD } from '@/hooks/useArtistCoinHolding';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessageList, type ChatItem } from './ChatMessageList';
 import { Composer } from './Composer';
+import { DmAttachButton, DmAttachmentList, DmTray } from './DmAttachments';
 import { DmAvatar } from './DmAvatar';
 import { PlaylistInMessage, SongInMessage } from './SharedItems';
 import { ThreadHeader } from './ThreadHeader';
@@ -25,6 +28,8 @@ import { ThreadHeader } from './ThreadHeader';
  *
  * A message can carry a song, and when it does it arrives playable. That is the
  * whole point of messaging inside a music app rather than sending a link to one.
+ * It can also carry photos, video, audio and files: in a private conversation
+ * everybody can send media, listener or artist.
  *
  * A fan messages a musician only while holding the musician's coin. When a send
  * is refused for that, the holding is checked again and the send retried once;
@@ -71,6 +76,10 @@ export function PeopleThread({
   const [sending, setSending] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
   const [rechecking, setRechecking] = useState(false);
+  // Files waiting to go with the next message, and reactions on the thread.
+  const tray = useDmTray(conversation.conversation_id, user?.id ?? null);
+  const drop = useDmDrop(tray.add, Boolean(user));
+  const reactions = useDmReactions(conversation.conversation_id);
 
   // The hook starts idle before its first fetch; do not flash the empty state then.
   const sawLoading = useRef(false);
@@ -96,14 +105,15 @@ export function PeopleThread({
 
   const submit = async () => {
     const text = draft.trim();
-    if (!text || sending) return;
+    const files = tray.ready;
+    if ((!text && !files.length) || sending || tray.pending > 0 || tray.failed > 0) return;
     setSending(true);
     setDraft('');
-    let res = await send(text);
+    let res = await send(text, null, null, files);
     if (!res.ok && isCoinRequiredError(res.error) && otherIsArtist) {
       // The server's holdings check may simply have gone stale. Ask again once.
       const access = await gate.check(true);
-      if (access.allowed) res = await send(text);
+      if (access.allowed) res = await send(text, null, null, files);
     }
     setSending(false);
     if (!res.ok) {
@@ -117,6 +127,7 @@ export function PeopleThread({
         : 'Message not sent', { description: res.error });
       return;
     }
+    tray.clear();
     onSent?.();
   };
 
@@ -137,6 +148,7 @@ export function PeopleThread({
     );
   };
 
+  const { byMessage, toggle } = reactions;
   const items: ChatItem[] = useMemo(
     () =>
       messages.map((m) => {
@@ -156,6 +168,12 @@ export function PeopleThread({
             },
           });
         }
+        const files = m.attachments ?? [];
+        const shared = m.song_id ? (
+          <SongInMessage songId={m.song_id} />
+        ) : m.playlist_id ? (
+          <PlaylistInMessage playlistId={m.playlist_id} />
+        ) : null;
         return {
           id: m.id,
           mine,
@@ -163,15 +181,19 @@ export function PeopleThread({
           createdAt: m.created_at,
           deleted: m.is_deleted,
           text: m.body,
-          attachment: m.song_id ? (
-            <SongInMessage songId={m.song_id} />
-          ) : m.playlist_id ? (
-            <PlaylistInMessage playlistId={m.playlist_id} />
-          ) : null,
+          attachment:
+            files.length || shared ? (
+              <>
+                {files.length > 0 && <DmAttachmentList attachments={files} mine={mine} />}
+                {shared}
+              </>
+            ) : null,
           actions,
+          reactions: byMessage.get(m.id),
+          onReact: m.is_deleted ? undefined : (emoji: string) => void toggle(m.id, emoji),
         };
       }),
-    [messages, user?.id, conversation.other_user_id, unsend],
+    [messages, user?.id, conversation.other_user_id, unsend, byMessage, toggle],
   );
 
   const block = async () => {
@@ -199,7 +221,7 @@ export function PeopleThread({
   const name = <ArtistName name={conversation.other_name} userId={conversation.other_user_id} size={15} />;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 flex-col bg-background" {...drop.bind}>
       <ThreadHeader
         onBack={onBack}
         avatar={<DmAvatar src={conversation.other_avatar} name={conversation.other_name} size={40} />}
@@ -234,7 +256,7 @@ export function PeopleThread({
             <DmAvatar src={conversation.other_avatar} name={conversation.other_name} size={72} />
             <p className="mt-3 text-base font-semibold text-foreground">{name}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              This is the start of your conversation. Say something, or send them a song.
+              This is the start of your conversation. Say something, send a photo, or send them a song.
             </p>
           </div>
         }
@@ -271,6 +293,11 @@ export function PeopleThread({
             onSubmit={() => void submit()}
             sending={sending}
             placeholder={`Message ${conversation.other_name}`}
+            leading={<DmAttachButton onFiles={tray.add} disabled={sending} />}
+            above={<DmTray items={tray.items} dragging={drop.dragging} onRemove={tray.remove} onRetry={tray.retry} />}
+            canSendEmpty={tray.ready.length > 0}
+            submitDisabled={tray.pending > 0 || tray.failed > 0}
+            onPaste={drop.onPaste}
           />
         </AdultOnly>
       </div>

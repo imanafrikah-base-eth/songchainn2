@@ -1,6 +1,7 @@
 import { useRef, useState, type SyntheticEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { MentionInput } from '@/components/social/MentionInput';
+import type { MentionPerson } from '@/lib/mentions';
 import { Music, ListMusic, Send, ImagePlus, UserPlus, X, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { SONGS, ARTISTS } from '@/data/musicData';
@@ -27,6 +28,7 @@ export interface PostExtras {
   mediaSource?: 'upload' | 'songcard' | null;
   songcard?: SongCardData | null;
   tagUserIds?: string[];
+  mentions?: MentionPerson[];
 }
 
 interface PostComposerProps {
@@ -46,6 +48,7 @@ export function PostComposer({ onPost, initialType = 'text', initialSongId }: Po
   const [postType, setPostType] = useState<'text' | 'song_share'>(initialType);
   const [selectedSong, setSelectedSong] = useState<string>(initialSongId ?? '');
   const [isPosting, setIsPosting] = useState(false);
+  const [mentioned, setMentioned] = useState<MentionPerson[]>([]);
 
   /* A picture or a clip, and the people in it.
      Uploading belongs to artists. Everybody makes song cards. */
@@ -109,9 +112,11 @@ export function PostComposer({ onPost, initialType = 'text', initialSongId }: Po
           mediaSource: attached ? 'upload' : songcard ? 'songcard' : null,
           songcard,
           tagUserIds: tagged.map((p) => p.user_id),
+          mentions: mentioned,
         }
       );
       setContent('');
+      setMentioned([]);
       setSelectedSong('');
       setPostType('text');
       setTagged([]);
@@ -152,12 +157,16 @@ export function PostComposer({ onPost, initialType = 'text', initialSongId }: Po
           )}
         </div>
         <div className="flex-1 space-y-3">
-          <Textarea
-            placeholder="Share what you're listening to..."
+          <MentionInput
+            multiline
+            rows={3}
+            placeholder="Share what you're listening to. Type @ to mention someone"
+            aria-label="Write a post"
             value={content}
             maxLength={POST_MAX_LENGTH}
-            onChange={(e) => setContent(e.target.value.slice(0, POST_MAX_LENGTH))}
-            className="min-h-[80px] resize-none bg-background/50 border-border/50"
+            onChange={setContent}
+            onPick={(person) => setMentioned((prev) => [...prev, person])}
+            className="flex min-h-[80px] w-full resize-none rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           {/* The count only appears once it matters. A counter from the first
               character reads as a limit before anyone has hit one. */}

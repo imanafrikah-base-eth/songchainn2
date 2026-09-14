@@ -809,14 +809,9 @@ export default function Room() {
     if (!user) return;
 
     let isActive = true;
-    let heartbeatInterval: number | null = null;
     // Read the name through the ref at call time so name changes never
     // tear down and rebuild presence (that caused the glitchy entry).
     const getFallbackName = () => normalizeRoomName(roomNameRef.current || '') || 'Guest';
-
-    const callRoomRpc = async (fn: 'join_room' | 'heartbeat_room' | 'leave_room') => {
-      return (supabase as any).rpc(fn, { _room_id: ROOM_ID });
-    };
 
     const setOptimisticSelf = () => {
       const optimisticUser: RoomLiveUser = {
@@ -867,7 +862,7 @@ export default function Room() {
       if (byUserId.size === 0) {
         // Only trust room_profiles rows with a fresh heartbeat — is_active
         // alone lingers when a user closes the app without leave_room.
-        const freshCutoff = new Date(Date.now() - 90 * 1000).toISOString();
+        const freshCutoff = new Date(Date.now() - 60 * 1000).toISOString();
         const profileRes = await (supabase as any)
           .from('room_profiles')
           .select('*')
@@ -894,22 +889,12 @@ export default function Room() {
       setOnlineCount(nextUsers.length);
     };
 
-    const joinRoom = async () => {
-      setOptimisticSelf();
-      await callRoomRpc('join_room');
-      await refreshLiveUsers();
-    };
-
-    const heartbeatRoom = async () => {
-      await callRoomRpc('heartbeat_room');
-    };
-
-    void joinRoom().finally(() => {
-      if (!isActive) return;
-      heartbeatInterval = window.setInterval(() => {
-        void heartbeatRoom();
-      }, 25000);
-    });
+    // Joining, the heartbeat and leaving belong to RoomPresenceKeeper alone.
+    // This page used to keep a heartbeat of its own as well, and a beat that
+    // landed just after leave_room marked the person active again, so somebody
+    // who had left kept counting as live (founder, 14 Sep 2026).
+    setOptimisticSelf();
+    void refreshLiveUsers();
 
     const profilesChannel = supabase
       .channel(`room-profiles:${ROOM_ID}:${user.id}`)
@@ -928,7 +913,6 @@ export default function Room() {
 
     return () => {
       isActive = false;
-      if (heartbeatInterval) window.clearInterval(heartbeatInterval);
       supabase.removeChannel(profilesChannel);
       // Do NOT leave_room here: the user may have only hidden the room
       // while still listening. RoomPresenceKeeper (app level) leaves the

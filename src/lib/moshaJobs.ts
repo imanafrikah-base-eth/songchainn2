@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
-import { moshaDo, type MoshaDoOp } from '@/lib/moshaDo';
+import { baseDoCtx, moshaDo, type DoCtx, type MoshaDoOp } from '@/lib/moshaDo';
 
 /**
  * Jobs Mo$ha runs for somebody on one tap, kept outside every component.
@@ -65,14 +65,24 @@ export function onMoshaJobDone(fn: DoneListener): () => void {
   };
 }
 
-export async function runMoshaJob(jobId: string, op: MoshaDoOp, queryClient?: QueryClient): Promise<void> {
+/**
+ * Run a job. `ctx` is what the pop-up had in hand when it was tapped (the
+ * catalogue, the player, offline saving); `arg` is what the job is about, and
+ * `choice` the match the person picked when there was more than one.
+ */
+export async function runMoshaJob(
+  jobId: string,
+  op: MoshaDoOp,
+  queryClient?: QueryClient,
+  opts: { ctx?: DoCtx; arg?: string; choice?: string } = {},
+): Promise<void> {
   const now = jobs.get(jobId)?.status;
   if (now === 'running' || now === 'done') return;
   const task = moshaDo(op);
   jobs.set(jobId, { status: 'running', message: task.working });
   emit();
   try {
-    const message = await task.run();
+    const message = await task.run(opts.ctx ?? baseDoCtx(), opts.arg, opts.choice);
     jobs.set(jobId, { status: 'done', message });
     emit();
     toast.success('Mo$ha', { description: message, duration: 5000 });

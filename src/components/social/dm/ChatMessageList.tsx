@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, MoreHorizontal } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowDown, MoreHorizontal, SmilePlus } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HdEmoji } from '@/components/room/HdEmoji';
+import { ROOM_REACTIONS } from '@/components/room/RoomChatMessage';
 import { cn } from '@/lib/utils';
 import { LinkifiedText } from './LinkifiedText';
 import { clockTime, dayLabel, fullTime, sameDay } from './time';
@@ -18,6 +21,11 @@ import { clockTime, dayLabel, fullTime, sameDay } from './time';
  * It follows the conversation down only when you are already at the bottom.
  * Scrolled up reading something older, a new message shows a pill instead of
  * yanking you away from it.
+ *
+ * A message that takes reactions reacts the way Telegram does: hold it (or
+ * right-click it) and a row of emoji rises above it with the message actions
+ * under it; tap one and it lands as a chip under the bubble. Double-tap sends
+ * a heart. Tapping a chip adds yours, or takes yours back.
  */
 
 export type ChatAction = {
@@ -27,6 +35,8 @@ export type ChatAction = {
   destructive?: boolean;
 };
 
+export type ChatReaction = { emoji: string; count: number; mine: boolean };
+
 export type ChatItem = {
   id: string;
   mine: boolean;
@@ -35,15 +45,23 @@ export type ChatItem = {
   deleted?: boolean;
   /** Plain text of the message, linkified when shown. */
   text?: string | null;
-  /** A card riding along: a song, a playlist. */
+  /** A card riding along: a song, a playlist, photos. */
   attachment?: ReactNode;
   /** Anything that follows the bubble, e.g. Mo$ha's buttons. */
   after?: ReactNode;
   actions?: ChatAction[];
+  /** Reactions on this message, as chips. */
+  reactions?: ChatReaction[];
+  /** Given when the message takes reactions. */
+  onReact?: (emoji: string) => void;
 };
 
 const GROUP_GAP_MS = 5 * 60_000;
 const NEAR_BOTTOM_PX = 120;
+const HOLD_MS = 380;
+const MOVE_SLOP = 8;
+const DOUBLE_TAP_MS = 280;
+const BAR_HEIGHT = 52;
 
 function bubbleCorners(mine: boolean, first: boolean, last: boolean) {
   if (first && last) return '';
@@ -116,6 +134,179 @@ function useMessageMenu(item: ChatItem, align: 'start' | 'end') {
   };
 }
 
+type MenuPlace = { barTop: number; actionsTop: number; left: number };
+
+/** Hold, right-click or double-tap a message to react to it. */
+function useReactionMenu(item: ChatItem) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<MenuPlace | null>(null);
+  const timer = useRef<number | null>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const held = useRef(false);
+  const lastTap = useRef(0);
+
+  const clearHold = () => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+  useEffect(() => clearHold, []);
+
+  const actionCount = item.actions?.length ?? 0;
+  const open = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const barWidth = Math.min(340, window.innerWidth - 32);
+    const wanted = item.mine ? r.right - barWidth : r.left;
+    const left = Math.min(Math.max(16, wanted), window.innerWidth - 16 - barWidth);
+    const actionsHeight = actionCount ? actionCount * 44 + 8 : 0;
+    const below = r.top < BAR_HEIGHT + 72;
+    const barTop = below ? r.bottom + 8 : r.top - BAR_HEIGHT - 8;
+    let actionsTop = below ? barTop + BAR_HEIGHT + 8 : r.bottom + 8;
+    if (actionsTop + actionsHeight > window.innerHeight - 8) {
+      actionsTop = Math.max(8, Math.min(barTop, r.top) - actionsHeight - 8);
+    }
+    setPlace({ barTop: Math.max(8, Math.min(barTop, window.innerHeight - BAR_HEIGHT - 8)), actionsTop, left });
+    try {
+      navigator.vibrate?.(10);
+    } catch {
+      void 0;
+    }
+  }, [item.mine, actionCount]);
+
+  const close = useCallback(() => setPlace(null), []);
+
+  // The menu belongs to where the message was: it goes when the chat moves.
+  useEffect(() => {
+    if (!place) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [place, close]);
+
+  const bind = {
+    onPointerDown: (e: React.PointerEvent) => {
+      if ((e.target as HTMLElement | null)?.closest('button, a, video, audio, input, textarea')) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      start.current = { x: e.clientX, y: e.clientY };
+      held.current = false;
+      clearHold();
+      timer.current = window.setTimeout(() => {
+        timer.current = null;
+        held.current = true;
+        open();
+      }, HOLD_MS);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const s = start.current;
+      if (!s || timer.current === null) return;
+      if (Math.abs(e.clientX - s.x) > MOVE_SLOP || Math.abs(e.clientY - s.y) > MOVE_SLOP) {
+        clearHold();
+        start.current = null;
+      }
+    },
+    onPointerUp: () => {
+      const wasHold = held.current;
+      clearHold();
+      if (start.current && !wasHold) {
+        const now = Date.now();
+        if (now - lastTap.current < DOUBLE_TAP_MS) {
+          lastTap.current = 0;
+          if (!item.reactions?.some((r) => r.emoji === '❤️' && r.mine)) item.onReact?.('❤️');
+        } else {
+          lastTap.current = now;
+        }
+      }
+      start.current = null;
+      held.current = false;
+    },
+    onPointerCancel: () => {
+      clearHold();
+      start.current = null;
+    },
+    onPointerLeave: () => clearHold(),
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      clearHold();
+      open();
+    },
+  };
+
+  const portal =
+    place && typeof document !== 'undefined'
+      ? createPortal(
+          <div className="fixed inset-0 z-[90]">
+            <button type="button" aria-label="Close" className="absolute inset-0 h-full w-full cursor-default bg-black/40" onClick={close} />
+            <div
+              role="menu"
+              aria-label="React"
+              className="absolute flex items-center gap-0.5 rounded-full border border-border bg-popover p-1 shadow-xl animate-in fade-in zoom-in-95 duration-150"
+              style={{ top: place.barTop, left: place.left }}
+            >
+              {ROOM_REACTIONS.map((emoji) => {
+                const mine = Boolean(item.reactions?.some((r) => r.emoji === emoji && r.mine));
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    role="menuitem"
+                    aria-label={`React ${emoji}`}
+                    onClick={() => {
+                      item.onReact?.(emoji);
+                      close();
+                    }}
+                    className={cn(
+                      'flex h-11 w-10 items-center justify-center rounded-full transition-transform hover:scale-125 active:scale-110',
+                      mine && 'bg-muted',
+                    )}
+                  >
+                    <HdEmoji emoji={emoji} size={28} />
+                  </button>
+                );
+              })}
+            </div>
+            {actionCount > 0 && (
+              <div
+                role="menu"
+                aria-label="Message actions"
+                className="absolute w-48 overflow-hidden rounded-2xl border border-border bg-popover py-1 text-popover-foreground shadow-xl animate-in fade-in slide-in-from-top-1 duration-150"
+                style={{ top: place.actionsTop, left: place.left }}
+              >
+                {item.actions?.map((a) => (
+                  <button
+                    key={a.label}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      close();
+                      a.onSelect();
+                    }}
+                    className={cn('flex min-h-11 w-full items-center gap-3 px-4 text-sm hover:bg-muted', a.destructive && 'text-destructive')}
+                  >
+                    {a.icon}
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return { anchorRef, bind, open, portal };
+}
+
 function Row({
   item,
   first,
@@ -127,8 +318,12 @@ function Row({
   last: boolean;
   otherAvatar: ReactNode;
 }) {
-  const { bind, menu } = useMessageMenu(item, item.mine ? 'end' : 'start');
+  const { bind: menuBind, menu } = useMessageMenu(item, item.mine ? 'end' : 'start');
+  const reaction = useReactionMenu(item);
+  const reacts = Boolean(item.onReact) && !item.deleted;
+  const bind = reacts ? reaction.bind : menuBind;
   const hasText = !item.deleted && !!item.text;
+  const chips = !item.deleted ? (item.reactions ?? []).filter((r) => r.count > 0) : [];
 
   return (
     <div className={cn('flex w-full', item.mine ? 'justify-end' : 'justify-start', first ? 'mt-3' : 'mt-0.5')}>
@@ -136,7 +331,12 @@ function Row({
         <div className="mr-2 flex w-7 shrink-0 items-end">{last ? otherAvatar : null}</div>
       )}
       <div className={cn('group flex max-w-[82%] items-center gap-1 sm:max-w-[70%]', item.mine && 'flex-row-reverse')}>
-        <div className={cn('flex min-w-0 flex-col gap-1', item.mine ? 'items-end' : 'items-start')} {...bind}>
+        <div
+          ref={reaction.anchorRef}
+          className={cn('flex min-w-0 flex-col gap-1', item.mine ? 'items-end' : 'items-start', reacts && '[@media(hover:none)]:select-none')}
+          style={reacts ? { WebkitTouchCallout: 'none' } : undefined}
+          {...bind}
+        >
           {item.deleted ? (
             <div
               title={fullTime(item.createdAt)}
@@ -165,14 +365,47 @@ function Row({
               {item.after}
             </>
           )}
+          {chips.length > 0 && (
+            <div className={cn('flex flex-wrap gap-1.5', item.mine ? 'justify-end' : 'justify-start')}>
+              {chips.map((r) => (
+                <button
+                  key={r.emoji}
+                  type="button"
+                  onClick={() => item.onReact?.(r.emoji)}
+                  aria-pressed={r.mine}
+                  aria-label={`${r.emoji} ${r.count}${r.mine ? ', yours. Tap to take it back' : '. Tap to add yours'}`}
+                  className={cn(
+                    'relative inline-flex h-8 items-center gap-1 rounded-full border pl-1.5 pr-2.5 text-xs font-semibold tabular-nums transition-colors',
+                    'after:absolute after:-inset-1.5 after:content-[""]',
+                    r.mine ? 'border-primary/40 bg-primary/15 text-foreground' : 'border-border bg-muted/60 text-muted-foreground hover:bg-muted',
+                  )}
+                >
+                  <HdEmoji emoji={r.emoji} size={16} />
+                  <span>{r.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {last && (
             <span className="px-1 text-[11px] leading-none text-muted-foreground">
               <time dateTime={item.createdAt}>{clockTime(item.createdAt)}</time>
             </span>
           )}
         </div>
+        {reacts && (
+          <button
+            type="button"
+            onClick={reaction.open}
+            aria-label="React to this message"
+            title="React"
+            className="hidden h-9 w-9 shrink-0 items-center justify-center self-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:flex [@media(hover:hover)]:group-hover:opacity-100"
+          >
+            <SmilePlus size={16} aria-hidden="true" />
+          </button>
+        )}
         {menu}
       </div>
+      {reaction.portal}
     </div>
   );
 }

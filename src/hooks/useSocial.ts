@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
 import { listFollows, saveFollows } from '@/lib/localDb';
 import type { Database } from '@/integrations/supabase/types';
+import { mentionsInText, saveMentions, type MentionPerson } from '@/lib/mentions';
 
 function isSyntheticId(id: string | null | undefined): boolean {
   return !!id && (id.startsWith('fc-') || id.startsWith('fb-'));
@@ -368,6 +369,8 @@ export function useSocial() {
         mediaSource?: 'upload' | 'songcard' | null;
         songcard?: SongCardData | null;
         tagUserIds?: string[];
+        /** People picked with "@" while typing. */
+        mentions?: MentionPerson[];
       }
     ): Promise<boolean> => {
       if (!isSupabaseConfigured) {
@@ -480,6 +483,16 @@ export function useSocial() {
           } else {
             void notifyTagged(tagIds, inserted.id, uid);
           }
+        }
+
+        if (inserted?.id && extras?.mentions?.length) {
+          await saveMentions({
+            sourceType: 'post',
+            sourceId: inserted.id,
+            postId: inserted.id,
+            authorId: uid,
+            people: mentionsInText(cleanContent, extras.mentions),
+          });
         }
 
         toast({ title: 'Post shared!' });
@@ -760,21 +773,31 @@ export function useSocial() {
     }));
   }, []);
 
-  const addComment = useCallback(async (postId: string, content: string) => {
+  const addComment = useCallback(async (postId: string, content: string, mentions?: MentionPerson[]) => {
     if (!user) {
       toast({ title: 'Please sign in to comment', variant: 'destructive' });
       return;
     }
 
-    const { error } = await supabase.from('post_comments').insert({
+    const { data: inserted, error } = await supabase.from('post_comments').insert({
       post_id: postId,
       user_id: user.id,
       content,
-    } as any);
+    } as any).select('id').single();
     if (error) {
       // Thrown, not swallowed: the caller shows the comment optimistically and
       // needs to know to take it back down again.
       throw new Error(error.message || 'Failed to add comment');
+    }
+
+    if (inserted?.id && mentions?.length) {
+      await saveMentions({
+        sourceType: 'comment',
+        sourceId: inserted.id,
+        postId,
+        authorId: user.id,
+        people: mentionsInText(content, mentions),
+      });
     }
 
     setPosts(prev => prev.map(p => 

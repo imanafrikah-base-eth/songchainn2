@@ -25,7 +25,7 @@ export type MoshaAction =
   /** "Here in the chat, or on the page?" The chat shows both as buttons. */
   | { type: 'choose'; flow: 'edit_world'; path: string }
   /** One tap does it: a button under the reply (src/lib/moshaDo.ts). */
-  | { type: 'do'; op: MoshaDoOp }
+  | { type: 'do'; op: MoshaDoOp; arg?: string }
   /** Songs and art sent in the chat, handed to the release flow. */
   | { type: 'flow'; flow: 'release_files'; attachments?: MoshaAttachment[] };
 
@@ -78,7 +78,11 @@ export async function askMoshaFull(
       raw?.type === 'flow' && ['upload_song', 'build_world', 'become_artist', 'connect_wallet', 'edit_world', 'edit_gallery', 'merge_accounts', 'release_files'].includes(raw.flow)
         ? raw
         : raw?.type === 'do' && isMoshaDoOp(raw.op)
-          ? raw
+          ? {
+              type: 'do',
+              op: raw.op,
+              ...(typeof raw.arg === 'string' && raw.arg.trim() ? { arg: raw.arg.trim().slice(0, 160) } : {}),
+            }
         : raw?.type === 'go' && typeof raw.path === 'string' && raw.path.startsWith('/')
           ? raw
           : raw?.type === 'choose' && typeof raw.path === 'string' && raw.path.startsWith('/world-builder')

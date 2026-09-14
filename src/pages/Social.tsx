@@ -28,6 +28,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { SONGS } from '@/data/musicData';
 import { useCommentPreviews } from '@/hooks/useCommentPreviews';
+import { useMentions } from '@/hooks/useMentions';
+import { useFeedReactions } from '@/hooks/useFeedReactions';
+import type { MentionPerson } from '@/lib/mentions';
 
 export default function Social() {
   const { user, audienceProfile } = useAuth();
@@ -186,6 +189,12 @@ export default function Social() {
   const { previews, addPreview, removePreview, replacePreviews } = useCommentPreviews(
     postsToRender.map((p) => p.id),
   );
+  const renderedPostIds = postsToRender.map((p) => p.id);
+  const { data: postMentions } = useMentions('post', renderedPostIds);
+  const { reactions: postReactions, toggle: togglePostReaction } = useFeedReactions('post', renderedPostIds);
+  const handleReact = useCallback((postId: string, emoji: string) => {
+    void togglePostReaction(postId, emoji);
+  }, [togglePostReaction]);
 
   const backToFeed = useCallback(() => {
     navigate('/social', { replace: true });
@@ -212,7 +221,7 @@ export default function Social() {
    * once and is taken back down, with the text returned to the box, if the
    * insert fails.
    */
-  const handleQuickComment = useCallback(async (postId: string, content: string) => {
+  const handleQuickComment = useCallback(async (postId: string, content: string, mentions?: MentionPerson[]) => {
     if (!user) return false;
     const pending: PostComment = {
       id: `pending-${Date.now()}`,
@@ -226,7 +235,7 @@ export default function Social() {
     };
     addPreview(pending);
     try {
-      await addComment(postId, content);
+      await addComment(postId, content, mentions);
       const comments = await getPostComments(postId);
       replacePreviews(postId, comments);
       return true;
@@ -351,7 +360,7 @@ export default function Social() {
    * The comment goes up instantly against the real profile, then the refetch
    * reconciles it. If the write fails, it is pulled back out and said so.
    */
-  const handleAddComment = async (content: string) => {
+  const handleAddComment = async (content: string, mentions?: MentionPerson[]) => {
     if (!commentSheet.postId || !user) return;
     const postId = commentSheet.postId;
     const tempId = `pending-${Date.now()}`;
@@ -369,7 +378,7 @@ export default function Social() {
     setCurrentComments((prev) => [...prev, pending]);
 
     try {
-      await addComment(postId, content);
+      await addComment(postId, content, mentions);
       const comments = await getPostComments(postId);
       setCurrentComments(comments);
       replacePreviews(postId, comments);
@@ -457,6 +466,9 @@ export default function Social() {
                 post={post}
                 previewComments={previews[post.id]}
                 onQuickComment={handleQuickComment}
+                mentions={postMentions?.[post.id]}
+                reactions={postReactions[post.id]}
+                onReact={handleReact}
                 onLike={toggleLikePost}
                 onFollow={followUser}
                 isFollowing={isFollowing(post.user_id)}

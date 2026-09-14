@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSafePlayerState } from '@/context/PlayerContext';
 import { supabase } from '@/integrations/supabase/client';
 import { getEnv } from '@/lib/env';
+import { refreshRoomOnlineCount } from '@/hooks/useRoomOnlineCount';
 
 const ROOM_ID = 'global';
 
@@ -64,9 +65,10 @@ export function RoomPresenceKeeper() {
     };
 
     void rpc('join_room');
+    // Every 20 seconds, inside the 60 second window the live views allow.
     heartbeat = window.setInterval(() => {
       void rpc('heartbeat_room');
-    }, 25000);
+    }, 20000);
     window.addEventListener('pagehide', leaveOnUnload);
     window.addEventListener('pageshow', rejoinFromCache);
 
@@ -75,7 +77,8 @@ export function RoomPresenceKeeper() {
       window.removeEventListener('pagehide', leaveOnUnload);
       window.removeEventListener('pageshow', rejoinFromCache);
       authSub.subscription.unsubscribe();
-      void rpc('leave_room');
+      // The number on this screen follows the moment the leave lands.
+      void rpc('leave_room').then(() => refreshRoomOnlineCount(ROOM_ID));
     };
   }, [user, isRoomMode]);
 

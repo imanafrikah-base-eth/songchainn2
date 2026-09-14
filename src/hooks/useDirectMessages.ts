@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { cleanDmAttachments, type DmAttachment } from '@/lib/dmMedia';
 
 /**
  * People messaging people.
@@ -42,6 +43,8 @@ export interface DirectMessage {
   playlist_id: string | null;
   is_deleted: boolean;
   created_at: string;
+  /** Photos, video, audio and files sent with the message. */
+  attachments?: DmAttachment[];
 }
 
 /** An RPC error as something a person can read, without the machine prefix. */
@@ -131,7 +134,12 @@ export function useConversation(conversationId: string | null) {
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
       .limit(300);
-    setMessages((data ?? []) as unknown as DirectMessage[]);
+    setMessages(
+      ((data ?? []) as unknown as Array<DirectMessage & { attachments?: unknown }>).map((m) => ({
+        ...m,
+        attachments: cleanDmAttachments(m.attachments),
+      })),
+    );
     setIsLoading(false);
   }, [conversationId]);
 
@@ -165,13 +173,14 @@ export function useConversation(conversationId: string | null) {
   }, [conversationId, load]);
 
   const send = useCallback(
-    async (body: string, songId?: string | null, playlistId?: string | null) => {
+    async (body: string, songId?: string | null, playlistId?: string | null, attachments: DmAttachment[] = []) => {
       if (!conversationId || !user) return { ok: false, error: 'Not signed in' };
       const { error } = await supabase.rpc('send_direct_message' as never, {
         _conversation_id: conversationId,
         _body: body || null,
         _song_id: songId ?? null,
         _playlist_id: playlistId ?? null,
+        ...(attachments.length ? { _attachments: attachments } : {}),
       } as never);
       if (error) return { ok: false, error: error.message };
       await load();

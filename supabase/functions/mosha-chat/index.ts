@@ -92,7 +92,17 @@ THINGS YOU CAN DO FOR THEM. The app can open a step-by-step flow right inside th
 [[action:connect_wallet]]  when they want to connect a wallet, or need one for a key, a copy or coining.
 [[action:do:delete_duplicate_media]]  when an artist wants duplicate pictures or clips cleared out of their gallery. The app shows ONE button under your words that says how many it will delete ("Delete 4 duplicates now") and does it on their tap. A copy still used by their world, a song or their profile is only taken off the gallery, never deleted, so nothing on their world loses its picture. Say one line like "Tap below and they are gone." Do not open edit_gallery for this.
 [[action:do:mark_notifications_read]]  when they want their notifications cleared or marked read. One button, one tap.
-The do tags are how you do a job for them directly: they tap, it happens. Prefer a do tag over a flow whenever one fits the ask.
+[[action:do:play_song:<song>]]  when they want a song played now. <song> is the title, or "title by artist" when it could be more than one.
+[[action:do:like_song:<song>]]  when they want a song saved to their likes.
+[[action:do:follow_artist:<artist name>]] and [[action:do:unfollow_artist:<artist name>]]  when they want to follow or stop following an artist.
+[[action:do:create_playlist:<playlist name>]]  when they want a new playlist.
+[[action:do:add_to_playlist:<song>|<playlist name>]]  when they want a song put on one of their playlists.
+[[action:do:save_offline:<song>]]  when they want a song to play without internet.
+[[action:do:share_song:<song>]]  when they want to share a song or get its link.
+[[action:do:invite_friends]]  when they want to invite friends or get their invite link.
+[[action:do:remove_failed_uploads]]  when they want uploads that never arrived (no file came through) cleared out of their Studio. Records whose file did arrive are never touched.
+Write what goes after the op in plain words with %20 for each space, for example [[action:do:play_song:APE%20SHITT%20by%20N3M3SIS]]. The app finds the match, and when there is more than one it shows the choices, so never invent an id or a link.
+The do tags are how you do a job for them directly: they tap, it happens. Prefer a do tag over a flow or a go link whenever one fits the ask, and never explain the steps when a tag can just do it.
 [[action:release_files]]  when an artist has sent you songs (and usually artwork) right here in this chat and wants them out. The flow opens in the chat with the files from this conversation already in it, so nothing is picked twice. Before you use it, confirm in one or two short lines: what kind of release it is (a Single, an EP, an Album, a Mixtape, a Compilation, or a Catalog of separate singles), the titles (taken from the file names, cleaned of track numbers and junk), the genre, and which picture is the cover. If they already told you, do not ask again. If they sent songs and no picture, say a cover is needed and the flow will ask for one. A listener who is not an artist yet gets become_artist first, and the files wait in the chat.
 [[action:go:/some/path]]  to take them to a page in the app (for example [[action:go:/worlds]], [[action:go:/wallet]] or [[action:go:/studio]]).
 When you use a tag, your words before it should be one or two lines that say what is about to open, not a description of every step; the flow shows the steps. If a listener asks to upload, use become_artist first, and say the Studio opens the moment they are an artist.
@@ -533,24 +543,52 @@ type Action =
   | { type: "flow"; flow: "upload_song" | "build_world" | "edit_world" | "edit_gallery" | "merge_accounts" | "become_artist" | "connect_wallet" | "release_files"; attachments?: MoshaAttachment[] }
   | { type: "go"; path: string }
   | { type: "choose"; flow: "edit_world"; path: string }
-  | { type: "do"; op: "delete_duplicate_media" | "mark_notifications_read" };
+  | { type: "do"; op: DoOp; arg?: string };
 
-/** One-tap jobs the app runs on the person's own session (src/lib/moshaDo.ts). */
-const DO_OPS = new Set(["delete_duplicate_media", "mark_notifications_read"]);
+/** One-tap jobs the app runs on the person's own session (src/lib/moshaDo.ts). Keep in step with MOSHA_DO_OPS there. */
+const DO_OP_LIST = [
+  "delete_duplicate_media",
+  "mark_notifications_read",
+  "play_song",
+  "like_song",
+  "follow_artist",
+  "unfollow_artist",
+  "create_playlist",
+  "add_to_playlist",
+  "save_offline",
+  "share_song",
+  "invite_friends",
+  "remove_failed_uploads",
+] as const;
+type DoOp = (typeof DO_OP_LIST)[number];
+const DO_OPS = new Set<string>(DO_OP_LIST);
 
 const FLOWS = new Set(["upload_song", "build_world", "edit_world", "edit_gallery", "merge_accounts", "become_artist", "connect_wallet", "release_files"]);
 
 /** Pull the one action tag out of the reply, and hand back the words without it. */
 function splitAction(reply: string): { reply: string; action?: Action; report?: boolean } {
-  const re = /\[\[action:([a-z_]+)(?::([^\]\s]+))?\]\]/i;
+  const re = /\[\[action:([a-z_]+)(?::([^\]]+))?\]\]/i;
   const m = reply.match(re);
   if (!m) return { reply };
   const words = reply.replace(/\s*\[\[action:[^\]]*\]\]\s*/gi, " ").replace(/\s+\n/g, "\n").trim();
   const name = m[1].toLowerCase();
   if (name === "report") return { reply: words, report: true };
   if (name === "do") {
-    const op = (m[2] ?? "").trim().toLowerCase();
-    if (DO_OPS.has(op)) return { reply: words, action: { type: "do", op: op as Extract<Action, { type: "do" }>["op"] } };
+    // do:<op> or do:<op>:<what it is for>, e.g. do:play_song:APE%20SHITT%20by%20N3M3SIS
+    const raw = (m[2] ?? "").trim();
+    const cut = raw.indexOf(":");
+    const op = (cut >= 0 ? raw.slice(0, cut) : raw).trim().toLowerCase();
+    let arg: string | undefined;
+    if (cut >= 0) {
+      const rest = raw.slice(cut + 1);
+      try {
+        arg = decodeURIComponent(rest.replace(/\+/g, " "));
+      } catch {
+        arg = rest;
+      }
+      arg = arg.replace(/\s+/g, " ").trim().slice(0, 160) || undefined;
+    }
+    if (DO_OPS.has(op)) return { reply: words, action: { type: "do", op: op as DoOp, ...(arg ? { arg } : {}) } };
     return { reply: words };
   }
   if (name === "go") {

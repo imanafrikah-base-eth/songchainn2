@@ -116,7 +116,7 @@ export function MoshaThread({
   const pendingDo = (() => {
     for (let i = mosha.messages.length - 1; i >= 0; i--) {
       const m = mosha.messages[i];
-      if (m.sender === 'mosha' && m.doOp && m.id.startsWith('local-')) return { op: m.doOp, jobId: doJobKey(m.doOp, m.id) };
+      if (m.sender === 'mosha' && m.doOp && m.id.startsWith('local-')) return { op: m.doOp, arg: m.doArg, jobId: doJobKey(m.doOp, m.id) };
     }
     return null;
   })();
@@ -155,7 +155,7 @@ export function MoshaThread({
             <>
               {pendingDo && (
                 <div className="px-3 pb-2">
-                  <MoshaDoPopup jobId={pendingDo.jobId} op={pendingDo.op} />
+                  <MoshaDoPopup jobId={pendingDo.jobId} op={pendingDo.op} arg={pendingDo.arg} />
                 </div>
               )}
               <AttachmentTray userId={userId} waiting={waiting} dragging={drop.dragging} />

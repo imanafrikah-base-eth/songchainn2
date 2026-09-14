@@ -82,6 +82,8 @@ interface ChatTurn extends MoshaTurn {
   attachments?: MoshaAttachment[];
   /** A one-tap job Mo$ha offered: a button that does it. */
   doOp?: MoshaDoOp;
+  /** What that job is about: a song, an artist, a playlist name. */
+  doArg?: string;
   /** The chat's files, handed to the release flow. */
   flowFiles?: MoshaAttachment[];
 }
@@ -95,6 +97,7 @@ function toChat(t: StoredTurn): ChatTurn {
     source: t.source,
     action: t.action?.type === 'go' ? { label: 'Take me there', to: t.action.path } : undefined,
     doOp: t.action?.type === 'do' ? t.action.op : undefined,
+    doArg: t.action?.type === 'do' ? t.action.arg : undefined,
     attachments: t.attachments,
   };
 }
@@ -106,7 +109,7 @@ function toStored(t: ChatTurn): StoredTurn {
     role: t.role,
     content: t.content,
     source: t.source,
-    action: t.action ? { type: 'go', path: t.action.to } : t.doOp ? { type: 'do', op: t.doOp } : undefined,
+    action: t.action ? { type: 'go', path: t.action.to } : t.doOp ? { type: 'do', op: t.doOp, ...(t.doArg ? { arg: t.doArg } : {}) } : undefined,
     attachments: t.attachments,
   };
 }
@@ -310,8 +313,9 @@ export function MoshaChat({
             : { label: 'Switch to artist account', to: '/claim' }
           : undefined;
       const doOp = moshaAction?.type === 'do' ? moshaAction.op : undefined;
+      const doArg = moshaAction?.type === 'do' ? moshaAction.arg : undefined;
       const flowFiles = moshaAction?.type === 'flow' && 'attachments' in moshaAction ? moshaAction.attachments : undefined;
-      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow, doOp, flowFiles, choice: choose ? { path: choose.path } : undefined, at: new Date().toISOString() }]);
+      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow, doOp, doArg, flowFiles, choice: choose ? { path: choose.path } : undefined, at: new Date().toISOString() }]);
       setBusy(false);
       input.current?.focus();
     },
@@ -345,7 +349,7 @@ export function MoshaChat({
   const pendingDo = (() => {
     for (let i = turns.length - 1; i >= 0; i--) {
       const t = turns[i];
-      if (t.role === 'assistant' && t.doOp && !t.id) return { op: t.doOp, jobId: doJobKey(t.doOp, t.at) };
+      if (t.role === 'assistant' && t.doOp && !t.id) return { op: t.doOp, arg: t.doArg, jobId: doJobKey(t.doOp, t.at) };
     }
     return null;
   })();
@@ -495,7 +499,7 @@ export function MoshaChat({
 
       {pendingDo && (
         <div className="px-3 pb-2">
-          <MoshaDoPopup jobId={pendingDo.jobId} op={pendingDo.op} />
+          <MoshaDoPopup jobId={pendingDo.jobId} op={pendingDo.op} arg={pendingDo.arg} />
         </div>
       )}
 

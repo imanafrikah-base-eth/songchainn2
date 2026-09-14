@@ -1,7 +1,14 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Check, Loader2, Sparkles, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { moshaDo, type DoCheck, type MoshaDoOp } from '@/lib/moshaDo';
+import { ARTISTS, SONGS } from '@/data/musicData';
+import { useAuth } from '@/context/AuthContext';
+import { usePlayerActions } from '@/context/PlayerContext';
+import { useEngagement } from '@/context/EngagementContext';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+import { useOfflineAudio } from '@/hooks/useOfflineAudio';
+import { useShare } from '@/hooks/useShare';
+import { moshaDo, type DoCheck, type DoCtx, type MoshaDoOp } from '@/lib/moshaDo';
 import {
   dismissMoshaJob,
   getMoshaJob,
@@ -16,30 +23,69 @@ function useJob(jobId: string) {
   return { job: getMoshaJob(jobId), dismissed: isMoshaJobDismissed(jobId) };
 }
 
+/** The player lives only inside a signed-in session; outside it there is simply no player. */
+function useOptionalPlayer() {
+  try {
+    return usePlayerActions();
+  } catch {
+    return null;
+  }
+}
+
+/** Everything a job may need that only a component can reach: the whole catalogue, the player, likes, offline, links. */
+function useDoCtx(): { ctx: DoCtx; ready: boolean } {
+  const { user } = useAuth();
+  const { songs: published, artists: publishedArtists, isLoading } = usePublishedCatalog();
+  const player = useOptionalPlayer();
+  const { isLiked, toggleLike } = useEngagement();
+  const { cacheSong, isSongCached } = useOfflineAudio();
+  const { getSongShareUrl } = useShare();
+  const playSong = player?.playSong;
+  const ctx = useMemo<DoCtx>(
+    () => ({
+      userId: user?.id ?? null,
+      songs: [...SONGS, ...published],
+      artists: [...ARTISTS, ...publishedArtists],
+      playSong: playSong ? (s) => playSong(s) : undefined,
+      isLiked,
+      toggleLike,
+      cacheSong,
+      isSongCached,
+      songShareUrl: (s) => getSongShareUrl({ id: s.id, title: s.title, artist: s.artist }),
+    }),
+    [user?.id, published, publishedArtists, playSong, isLiked, toggleLike, cacheSong, isSongCached, getSongShareUrl],
+  );
+  return { ctx, ready: !isLoading };
+}
+
 const CARD = 'animate-in fade-in slide-in-from-bottom-2 rounded-2xl border border-border bg-card p-3 text-foreground shadow-lg';
 
 /**
- * The pop-up over the composer: one question, one button. It counts first, so
- * the question says exactly what will happen. Once tapped it shows the job
- * running and goes away when it is done; the report itself lands as a toast
- * and a line from Mo$ha, even if the person has moved on.
+ * The pop-up over the composer: one question, one button. It looks first, so
+ * the question says exactly what will happen; when more than one song or
+ * artist fits, each is its own button. Once tapped it shows the job running
+ * and goes away when it is done; the report itself lands as a toast and a line
+ * from Mo$ha, even if the person has moved on.
  */
-export function MoshaDoPopup({ jobId, op }: { jobId: string; op: MoshaDoOp }) {
+export function MoshaDoPopup({ jobId, op, arg }: { jobId: string; op: MoshaDoOp; arg?: string }) {
   const queryClient = useQueryClient();
   const { job, dismissed } = useJob(jobId);
+  const { ctx, ready } = useDoCtx();
+  const ctxRef = useRef(ctx);
+  ctxRef.current = ctx;
   const [check, setCheck] = useState<DoCheck | null>(null);
 
   useEffect(() => {
-    if (job.status !== 'idle' || dismissed) return;
+    if (job.status !== 'idle' || dismissed || !ready) return;
     let live = true;
     moshaDo(op)
-      .check()
+      .check(ctxRef.current, arg)
       .then((c) => live && setCheck(c))
       .catch(() => live && setCheck({ nothing: 'I could not check that just now. Ask me again in a moment.' }));
     return () => {
       live = false;
     };
-  }, [op, job.status, dismissed]);
+  }, [op, arg, job.status, dismissed, ready]);
 
   // Nothing to do is said, then the pop-up goes by itself.
   useEffect(() => {
@@ -49,6 +95,8 @@ export function MoshaDoPopup({ jobId, op }: { jobId: string; op: MoshaDoOp }) {
   }, [check?.nothing, job.status, jobId]);
 
   if (dismissed || job.status === 'done') return null;
+
+  const go = (choice?: string) => void runMoshaJob(jobId, op, queryClient, { ctx: ctxRef.current, arg, choice });
 
   const close = (
     <button
@@ -84,7 +132,7 @@ export function MoshaDoPopup({ jobId, op }: { jobId: string; op: MoshaDoOp }) {
         </div>
         <button
           type="button"
-          onClick={() => void runMoshaJob(jobId, op, queryClient)}
+          onClick={() => go()}
           className="mt-1 inline-flex min-h-11 items-center rounded-full border border-border px-4 text-xs font-semibold hover:bg-muted"
         >
           Try again
@@ -126,22 +174,37 @@ export function MoshaDoPopup({ jobId, op }: { jobId: string; op: MoshaDoOp }) {
         </div>
         {close}
       </div>
-      <div className="mt-2 flex gap-2">
-        <button
-          type="button"
-          onClick={() => void runMoshaJob(jobId, op, queryClient)}
-          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground"
-        >
-          {check.confirm}
-        </button>
-        <button
-          type="button"
-          onClick={() => dismissMoshaJob(jobId)}
-          className="inline-flex min-h-11 items-center justify-center rounded-full border border-border px-4 text-sm font-medium text-foreground hover:bg-muted"
-        >
-          Not now
-        </button>
-      </div>
+      {check.choices?.length ? (
+        <div className="mt-2 flex flex-col gap-1.5">
+          {check.choices.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => go(c.value)}
+              className="inline-flex min-h-11 w-full items-center rounded-xl border border-border px-3 text-left text-sm font-medium hover:bg-muted"
+            >
+              <span className="truncate">{c.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => go()}
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground"
+          >
+            {check.confirm}
+          </button>
+          <button
+            type="button"
+            onClick={() => dismissMoshaJob(jobId)}
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-border px-4 text-sm font-medium text-foreground hover:bg-muted"
+          >
+            Not now
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -36,6 +36,8 @@ export type MoshaMessage = {
   attachments?: MoshaAttachment[];
   /** A one-tap job Mo$ha offered under this reply. */
   doOp?: MoshaDoOp;
+  /** What that job is about: a song, an artist, a playlist name. */
+  doArg?: string;
   /** A flow Mo$ha opened under this reply, with the chat's files for release_files. */
   flow?: MoshaFlowName;
   files?: MoshaAttachment[];
@@ -73,6 +75,7 @@ function toMessage(t: StoredTurn, i: number): MoshaMessage {
     created_at: t.at,
     attachments: t.attachments,
     doOp: t.action?.type === 'do' ? t.action.op : undefined,
+    doArg: t.action?.type === 'do' ? t.action.arg : undefined,
     flow: t.action?.type === 'flow' ? t.action.flow : undefined,
     files: t.action?.type === 'flow' && 'attachments' in t.action ? t.action.attachments : undefined,
   };
