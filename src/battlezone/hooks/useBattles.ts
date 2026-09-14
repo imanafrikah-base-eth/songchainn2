@@ -109,17 +109,13 @@ export interface Battle {
   createdAt: string;
 }
 
-/** A room left open by a host who walked away does not stay open for ever. */
-const RESULTS_ROOM_HOURS = 3;
-
 /**
  * The battle is over but its room is still open: the host is reading the
- * results to the people in it. Ends when the host closes the room.
+ * results to the people in it. Only the host closes it (founder, 14 Sep 2026),
+ * so there is no timer here.
  */
-export function isResultsRoomOpen(battle: Pick<Battle, "status" | "roomClosedAt" | "endedTime"> | null | undefined): boolean {
-  if (!battle || battle.status !== "ended" || battle.roomClosedAt) return false;
-  const ended = battle.endedTime ? Date.parse(battle.endedTime) : NaN;
-  return Number.isFinite(ended) && Date.now() - ended < RESULTS_ROOM_HOURS * 3600_000;
+export function isResultsRoomOpen(battle: Pick<Battle, "status" | "roomClosedAt"> | null | undefined): boolean {
+  return !!battle && battle.status === "ended" && !battle.roomClosedAt;
 }
 
 function rowToBattle(row: BattleRow, votesA = 0, votesB = 0, listeners = 0): Battle {
