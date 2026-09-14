@@ -46,6 +46,12 @@ const FIELD_LABEL = 'mb-1.5 block text-xs font-semibold uppercase tracking-wider
 const FIELD_INPUT =
   'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none disabled:opacity-60';
 
+/** The parts of the upload form that can be missing, so each can be outlined and jumped to. */
+type FieldId = 'audio' | 'releaseTitle' | 'upc' | 'artwork' | 'genre' | 'artistName' | 'tracks' | 'details';
+
+/** A field that stops Send: a red edge the eye finds at once. */
+const FIELD_BAD = ' !border-destructive ring-2 ring-destructive/25';
+
 /** datetime-local speaks the artist's own clock; the row keeps UTC. */
 function localInput(iso: string | null): string {
   if (!iso) return '';
@@ -137,6 +143,9 @@ const Studio = () => {
   const [dragging, setDragging] = useState(false);
   const dragFrom = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  /** Send was tapped with something still missing, so the gaps are shown in red. */
+  const [attempted, setAttempted] = useState(false);
+  const fieldRefs = useRef<Partial<Record<FieldId, HTMLElement | null>>>({});
 
   useEffect(() => {
     if (!artistName && profile) {
@@ -405,27 +414,55 @@ const Studio = () => {
   const today = new Date().toISOString().slice(0, 10);
   const scheduledAhead = Boolean((details.release_at && new Date(details.release_at).getTime() > Date.now()) || (!details.release_at && details.release_date && details.release_date > today));
 
-  /** The one thing standing between the artist and Send, in their words. */
-  const blocker: string | null = (() => {
-    if (cannotUpload || !queued.length) return null;
-    if (releaseProblem) return releaseProblem;
-    if (queued.some((t) => !trackCoverOk(t))) {
+  /**
+   * Everything standing between the artist and Send, all at once, in their
+   * words. Send is never greyed out for any of these (founder, 15 Sep 2026): a
+   * new artist met a dead button and one line of amber text and had no idea
+   * what to do. Tapping Send with gaps outlines each missing field in red and
+   * lists every one above the button, and each red edge clears as it is filled.
+   */
+  const missing: Array<{ id: FieldId; text: string }> = [];
+  if (!cannotUpload) {
+    if (!tracks.length) missing.push({ id: 'audio', text: collection ? 'Add the tracks' : releaseType === 'catalog' ? 'Add the songs' : 'Add the audio file' });
+    if (releaseProblem) missing.push({ id: releaseTitle.trim() ? 'upc' : 'releaseTitle', text: releaseProblem });
+    const coverMissing = queued.length ? queued.some((t) => !trackCoverOk(t)) : releaseType !== 'catalog' && !sharedCoverOk;
+    if (coverMissing) {
       const own = queued.find((t) => trackCoverState(t) === 'error');
-      if (own) return `The artwork for "${own.title || own.file.name}" did not work. Pick it again, or remove it to use the shared artwork.`;
-      if (cover.status === 'error') return 'The artwork did not work. Pick it again; your audio stays right where it is.';
-      return ownArtwork
-        ? 'Add artwork: shared artwork above, or its own in each track\'s details. Nothing goes live without it.'
-        : 'Add the artwork. Nothing goes live without it.';
+      missing.push({
+        id: 'artwork',
+        text: own
+          ? `The artwork for "${own.title || own.file.name}" did not work. Pick it again, or remove it to use the shared artwork.`
+          : cover.status === 'error'
+            ? 'The artwork did not work. Pick it again; your audio stays right where it is.'
+            : ownArtwork
+              ? 'Add artwork, shared above or its own in each track\'s details'
+              : 'Add the artwork',
+      });
     }
-    if (queued.some(trackGenreMissing)) return 'Pick a genre. A record cannot go out without one.';
-    if (!artistName.trim()) return 'Add the artist name.';
-    const bad = queued.find((t) => trackProblem(t));
-    if (bad) return `Track ${tracks.indexOf(bad) + 1}: ${trackProblem(bad)}`;
-    if (detailProblem) return detailProblem;
-    return null;
-  })();
+    if (queued.length ? queued.some(trackGenreMissing) : genreMissing) missing.push({ id: 'genre', text: 'Pick a genre' });
+    if (!artistName.trim()) missing.push({ id: 'artistName', text: 'Add the artist name' });
+    for (const t of queued) {
+      const p = trackProblem(t);
+      if (p) missing.push({ id: 'tracks', text: `Track ${tracks.indexOf(t) + 1}: ${p}` });
+    }
+    if (detailProblem) missing.push({ id: 'details', text: detailProblem });
+  }
+  const showBad = (id: FieldId) => attempted && !busy && missing.some((m) => m.id === id);
+  const refFor = (id: FieldId) => (el: HTMLElement | null) => { fieldRefs.current[id] = el; };
 
-  const canSubmit = queued.length > 0 && !blocker && !busy && !cannotUpload;
+  /** Brings a missing field into view and puts the cursor in it. */
+  const jumpTo = (id: FieldId) => {
+    if (id === 'details') setMoreOpen(true);
+    const el = fieldRefs.current[id];
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const target = el.matches('input,select,textarea,button')
+      ? el
+      : el.querySelector<HTMLElement>('input:not([type=file]),select,textarea,button');
+    window.setTimeout(() => target?.focus({ preventScroll: true }), 400);
+  };
+
+  const canSubmit = queued.length > 0 && missing.length === 0 && !busy && !cannotUpload;
 
   const meta = (): BatchMeta => ({
     artistName: artistName.trim(),
@@ -492,7 +529,13 @@ const Studio = () => {
   };
 
   const submit = async () => {
-    if (!canSubmit) return;
+    if (busy || cannotUpload) return;
+    if (!canSubmit) {
+      setAttempted(true);
+      if (missing[0]) jumpTo(missing[0].id);
+      return;
+    }
+    setAttempted(false);
     try {
       await start(meta());
     } catch (err) {
@@ -650,17 +693,23 @@ const Studio = () => {
                 <label className="block">
                   <span className={FIELD_LABEL}>{kindLabel} title</span>
                   <input
+                    ref={refFor('releaseTitle')}
                     value={releaseTitle}
                     onChange={(e) => setReleaseTitle(e.target.value)}
                     disabled={busy}
                     maxLength={120}
                     placeholder={`The name of the ${kindLabel}`}
-                    aria-invalid={tracks.length > 0 && !releaseTitle.trim()}
-                    className={`${FIELD_INPUT} h-11`}
+                    aria-invalid={showBad('releaseTitle')}
+                    className={`${FIELD_INPUT} h-11${showBad('releaseTitle') ? FIELD_BAD : ''}`}
                   />
+                  {showBad('releaseTitle') && <span className="mt-1 block text-xs text-destructive">Give the {kindLabel} a title.</span>}
                 </label>
               )}
 
+              <div
+                ref={refFor('artwork')}
+                className={`rounded-xl transition-shadow ${showBad('artwork') ? 'ring-2 ring-destructive ring-offset-2 ring-offset-card' : ''}`}
+              >
               <ArtworkField
                 cover={cover}
                 disabled={busy}
@@ -675,25 +724,30 @@ const Studio = () => {
                       : 'Any photo, squared for you. Nothing goes live without artwork.'
                 }
               />
+              </div>
+              {showBad('artwork') && (
+                <p className="-mt-2 text-xs text-destructive">{missing.find((m) => m.id === 'artwork')?.text}</p>
+              )}
 
               <label className="block">
                 <span className={FIELD_LABEL}>{releaseType === 'catalog' ? 'Default genre' : 'Genre'}</span>
                 <select
+                  ref={refFor('genre')}
                   value={genre}
                   onChange={(e) => setGenre(e.target.value)}
                   disabled={busy}
                   required
                   aria-required="true"
-                  aria-invalid={queued.some(trackGenreMissing)}
-                  className={`${FIELD_INPUT} h-11 ${queued.some(trackGenreMissing) ? 'border-amber-500/60' : ''}`}
+                  aria-invalid={showBad('genre')}
+                  className={`${FIELD_INPUT} h-11${showBad('genre') ? FIELD_BAD : ''}`}
                 >
                   <option value="" disabled>Pick the closest one</option>
                   {GENRES.map((g) => (
                     <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
-                {queued.some(trackGenreMissing) ? (
-                  <span className="mt-1 block text-xs text-amber-500">
+                {showBad('genre') ? (
+                  <span className="mt-1 block text-xs text-destructive">
                     Pick a genre. A record cannot go out without one.
                   </span>
                 ) : (
@@ -731,14 +785,17 @@ const Studio = () => {
                   <label className="block">
                     <span className={FIELD_LABEL}>UPC <span className="normal-case font-normal">(optional)</span></span>
                     <input
+                      ref={refFor('upc')}
                       value={upc}
                       onChange={(e) => setUpc(e.target.value)}
                       disabled={busy}
                       inputMode="numeric"
                       maxLength={16}
                       placeholder="12 or 13 digits"
-                      className={`${FIELD_INPUT} h-11 font-mono`}
+                      aria-invalid={showBad('upc')}
+                      className={`${FIELD_INPUT} h-11 font-mono${showBad('upc') ? FIELD_BAD : ''}`}
                     />
+                    {showBad('upc') && <span className="mt-1 block text-xs text-destructive">A UPC is 12 or 13 digits. Leave it empty if you do not have one.</span>}
                   </label>
                   <label className="block sm:col-span-2">
                     <span className={FIELD_LABEL}>About the {kindLabel} <span className="normal-case font-normal">(optional)</span></span>
@@ -758,10 +815,11 @@ const Studio = () => {
 
             {/* ----------------------------------------------- the audio --- */}
             <div
+              ref={refFor('audio')}
               onDragOver={(e) => { if (!e.dataTransfer.types.includes('Files')) return; e.preventDefault(); if (!busy) setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={(e) => { if (!e.dataTransfer.files.length) return; e.preventDefault(); setDragging(false); if (!busy) addFiles(e.dataTransfer.files); }}
-              className={`mt-5 rounded-xl border border-dashed p-3 transition-colors ${dragging ? 'border-primary bg-primary/5' : 'border-border'}`}
+              className={`mt-5 rounded-xl border border-dashed p-3 transition-colors ${dragging ? 'border-primary bg-primary/5' : showBad('audio') ? 'border-destructive ring-2 ring-destructive/25' : 'border-border'}`}
             >
               <span className={FIELD_LABEL}>
                 {collection ? 'Tracklist' : releaseType === 'catalog' ? 'Songs' : 'Audio'}
@@ -797,6 +855,9 @@ const Studio = () => {
                     : 'It starts uploading the moment you pick it.'}
                 <span className="hidden sm:inline"> Or drop the files here.</span>
               </p>
+              {showBad('audio') && (
+                <p className="mt-1 text-xs text-destructive">Nothing to send yet. Add the audio first.</p>
+              )}
             </div>
 
             {advice && (
@@ -822,7 +883,11 @@ const Studio = () => {
             )}
 
             {tracks.length > 0 && (
-              <ul className="mt-4 space-y-2" aria-label={collection ? 'Tracklist' : 'Tracks to send'}>
+              <ul
+                ref={refFor('tracks')}
+                className={`mt-4 space-y-2 rounded-xl ${showBad('tracks') ? 'ring-2 ring-destructive ring-offset-2 ring-offset-card' : ''}`}
+                aria-label={collection ? 'Tracklist' : 'Tracks to send'}
+              >
                 {tracks.map((t, i) => (
                   <TracklistRow
                     key={t.key}
@@ -901,13 +966,16 @@ const Studio = () => {
               <label className="block">
                 <span className={FIELD_LABEL}>Artist name</span>
                 <input
+                  ref={refFor('artistName')}
                   value={artistName}
                   onChange={(e) => setArtistName(e.target.value)}
                   disabled={busy}
                   maxLength={120}
                   placeholder="How it should appear"
-                  className={`${FIELD_INPUT} h-11`}
+                  aria-invalid={showBad('artistName')}
+                  className={`${FIELD_INPUT} h-11${showBad('artistName') ? FIELD_BAD : ''}`}
                 />
+                {showBad('artistName') && <span className="mt-1 block text-xs text-destructive">Add the artist name, the way it should appear.</span>}
               </label>
 
               <DistributionChoice
@@ -917,7 +985,7 @@ const Studio = () => {
                 disabled={busy}
               />
 
-              <div className="rounded-xl border border-border">
+              <div ref={refFor('details')} className={`rounded-xl border border-border${showBad('details') ? FIELD_BAD : ''}`}>
                 <button
                   type="button"
                   onClick={() => setMoreOpen((v) => !v)}
@@ -956,8 +1024,28 @@ const Studio = () => {
               </div>
             </div>
 
-            {!busy && blocker && (
-              <p className="mt-4 text-xs text-amber-500" aria-live="polite">{blocker}</p>
+            {/* Every gap at once, each one a tap away from its field. */}
+            {attempted && !busy && missing.length > 0 && (
+              <div role="alert" className="mt-5 rounded-xl border border-destructive/50 bg-destructive/10 p-3">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
+                  {missing.length === 1 ? 'One thing left before you can send' : `${missing.length} things left before you can send`}
+                </p>
+                <ul className="mt-2 space-y-0.5">
+                  {missing.map((m, i) => (
+                    <li key={`${m.id}-${i}`}>
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(m.id)}
+                        className="flex min-h-10 w-full items-start gap-2 rounded-lg px-1.5 text-left text-sm text-foreground hover:bg-destructive/10"
+                      >
+                        <span className="mt-[0.9rem] h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+                        <span className="py-2">{m.text}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {busy && tracks.length > 1 && (
@@ -983,7 +1071,7 @@ const Studio = () => {
             <button
               type="button"
               onClick={submit}
-              disabled={!canSubmit}
+              disabled={busy || cannotUpload}
               className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}

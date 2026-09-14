@@ -1,8 +1,13 @@
-import { songPath } from '@/lib/slugRoutes';
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { songPath, artistPath } from '@/lib/slugRoutes';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Wallet as WalletIcon, ArrowLeft, ExternalLink, Coins, Loader2, Receipt } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { toast } from 'sonner';
+import {
+  Wallet as WalletIcon, ArrowLeft, ExternalLink, Coins, Receipt, Copy, Check, Eye, EyeOff,
+  QrCode, Wallet2, Music2, KeyRound, Image as ImageIcon, BadgeCheck, History, RefreshCw, ShoppingBag, ShieldCheck,
+} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -14,28 +19,28 @@ import { ARTIST_COINS } from '@/lib/artistCoins';
 import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { MyWalletsPanel } from '@/components/wallet/MyWalletsPanel';
-import { useMyWallets } from '@/hooks/useMyWallets';
+import { useMyWallets, WALLET_NAMES, shortAddress } from '@/hooks/useMyWallets';
 import { useWalletHoldings } from '@/hooks/useWalletHoldings';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { getWalletProvider, switchToBaseChain, BASE_CHAIN_ID_HEX } from '@/lib/baseWallet';
-import { artistPath } from '@/lib/slugRoutes';
 import { useMyDayOnes } from '@/lib/dayOnes';
 import { DayOneCard } from '@/components/dayones/DayOneCard';
+import { getEthUsdPrice } from '@/lib/ethPrice';
+import { cn } from '@/lib/utils';
 
 /**
- * What you actually hold, with SONGCHAINN's own things first.
+ * The wallet, built like a wallet.
  *
- * The ordering is the opinion. A wallet page that leads with an ETH balance is
- * a wallet page for a trader; this one leads with the music you own, because
- * that is what somebody came here for and it is the only holding this app
- * caused. ETH sits above it as a single line, since it is the fuel rather than
- * the point.
+ * One card up top says which wallet this is, what it is worth and whether it is
+ * on Base, with the four things people actually do from a wallet one tap away.
+ * Under it, everything SONGCHAINN put in that wallet sits in tabs, music first
+ * among the holdings, so nothing is a long scroll away.
  *
- * The suggestions at the bottom are deliberately quiet and deliberately few.
- * Nobody opened their wallet to be sold to, and a page that pushes three coins
- * at you the moment you look at your balance is the exact thing that makes
- * people stop opening it.
+ * The dollar figure is only ever ETH at a live price plus USDC. When the price
+ * cannot be had the card shows the ETH amount instead, never a guess, and
+ * artist coins and drops are counted, not priced.
  */
 interface PurchaseRow {
   id: string;
@@ -47,10 +52,7 @@ interface PurchaseRow {
   purchased_at: string;
 }
 
-/**
- * The receipts this person holds, newest first. Same table and client pattern
- * as useSongCopies; RLS scopes the rows to the signed-in user.
- */
+/** The receipts this person holds, newest first. RLS scopes the rows to the signed-in user. */
 function useMyPurchases(userId: string | undefined) {
   return useQuery({
     queryKey: ['my-purchases', userId],
@@ -67,17 +69,64 @@ function useMyPurchases(userId: string | undefined) {
   });
 }
 
+function useEthUsd() {
+  return useQuery({ queryKey: ['eth-usd'], staleTime: 5 * 60_000, queryFn: getEthUsdPrice });
+}
+
+const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+
+const HIDE_KEY = 'wallet-hide-balances';
+function readHidden(): boolean {
+  try {
+    return localStorage.getItem(HIDE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** A quiet mark made from the address, so two wallets never look alike. */
+function AddressMark({ address, className }: { address: string; className?: string }) {
+  const hue = (i: number) => parseInt(address.slice(2 + i * 6, 8 + i * 6) || '0', 16) % 360;
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('block shrink-0 rounded-full ring-1 ring-border', className)}
+      style={{
+        background: `conic-gradient(from ${hue(3)}deg, hsl(${hue(0)} 28% 52%), hsl(${hue(1)} 24% 40%), hsl(${hue(2)} 30% 58%), hsl(${hue(0)} 28% 52%))`,
+      }}
+    />
+  );
+}
+
+type TabId = 'tokens' | 'music' | 'keys' | 'art' | 'dayones' | 'activity';
+
 export default function Wallet() {
   const { user, walletAddress: sessionWallet } = useAuth();
   const { active } = useMyWallets();
   // The wallet that pays, then whatever this session connected.
   const walletAddress = active?.address ?? sessionWallet;
-  const { display: balanceDisplay, isLoading: balanceLoading } = useWalletBalance(walletAddress);
-  const { data: holdings, isLoading: holdingsLoading } = useWalletHoldings(walletAddress);
+  const walletName = active ? WALLET_NAMES[active.provider] : 'Connected wallet';
+
+  const { balance: ethBalance, display: ethDisplay, isLoading: balanceLoading, refetch: refetchBalance } = useWalletBalance(walletAddress);
+  const { data: holdings, isLoading: holdingsLoading, refetch: refetchHoldings, isFetching: holdingsFetching } = useWalletHoldings(walletAddress);
+  const { data: ethUsd } = useEthUsd();
   const { songs: publishedSongs } = usePublishedCatalog();
   const { data: dayOnes = [] } = useMyDayOnes();
-  const onChainDayOnes = dayOnes.filter((d) => d.attestation_uid);
+  const { ownedSongs, isLoading: ownedLoading } = useOwnedSongs();
+  const { data: purchases = [], isLoading: purchasesLoading } = useMyPurchases(user?.id);
+
   const [wrongNetwork, setWrongNetwork] = useState(false);
+  const [hidden, setHidden] = useState(readHidden);
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const walletsRef = useRef<HTMLDivElement>(null);
+  const [params, setParams] = useSearchParams();
+  const tab = (params.get('tab') as TabId | null) ?? 'tokens';
+  const setTab = (next: TabId) => {
+    const p = new URLSearchParams(params);
+    p.set('tab', next);
+    setParams(p, { replace: true });
+  };
 
   // Everything here is on Base. A wallet pointed at another network gets one clear way back.
   useEffect(() => {
@@ -97,22 +146,60 @@ export default function Wallet() {
       (provider as unknown as { removeListener?: (e: string, f: () => void) => void }).removeListener?.('chainChanged', onChain);
     };
   }, [walletAddress]);
-  const { ownedSongs, isLoading: ownedLoading } = useOwnedSongs();
-  const { data: purchases = [], isLoading: purchasesLoading } = useMyPurchases(user?.id);
+
+  const allSongs = useMemo(() => [...SONGS, ...publishedSongs], [publishedSongs]);
+  const songById = useMemo(() => new Map(allSongs.map((s) => [String(s.id), s])), [allSongs]);
 
   const ownedWithTitles = useMemo(
     () =>
       (ownedSongs ?? [])
         .filter((o) => o.balance > 0n)
-        .map((o) => ({ ...o, song: [...SONGS, ...publishedSongs].find((s) => s.id === o.songId) ?? null })),
-    [ownedSongs, publishedSongs],
+        .map((o) => ({ ...o, song: songById.get(String(o.songId)) ?? null })),
+    [ownedSongs, songById],
   );
+
+  const eth = Number(ethBalance ?? 0);
+  const usdc = holdings?.usdc ?? 0;
+  const ethValue = ethUsd ? eth * ethUsd : null;
+  const totalUsd = ethValue !== null ? ethValue + usdc : null;
+  const valueLoading = (balanceLoading && !ethDisplay) || holdingsLoading;
+
+  const toggleHidden = () => {
+    setHidden((h) => {
+      try {
+        localStorage.setItem(HIDE_KEY, h ? '0' : '1');
+      } catch {
+        /* the toggle still works for this visit */
+      }
+      return !h;
+    });
+  };
+
+  const copyAddress = async () => {
+    if (!walletAddress) return;
+    try {
+      await navigator.clipboard.writeText(walletAddress);
+      setCopied(true);
+      toast.success('Address copied');
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast('Could not copy', { description: walletAddress });
+    }
+  };
+
+  const refreshAll = () => {
+    void refetchBalance();
+    void refetchHoldings();
+  };
+
+  const mask = (s: string) => (hidden ? '••••' : s);
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background pb-28">
+      <div className="min-h-screen bg-background">
         <Navigation />
-        <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <div className="wallet-theme min-h-[calc(100dvh-3.5rem)] px-4 py-16 pb-28 text-center sm:min-h-[calc(100dvh-4rem)]">
+        <div className="mx-auto max-w-2xl">
           <WalletIcon className="mx-auto mb-4 h-10 w-10 text-primary" />
           <h1 className="mb-2 font-heading text-2xl font-bold">Your wallet</h1>
           <p className="mb-6 text-sm text-muted-foreground">Sign in to see what you hold.</p>
@@ -123,378 +210,639 @@ export default function Wallet() {
             Sign in
           </Link>
         </div>
+        </div>
         <AudioPlayer />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background pb-28">
-      <Navigation />
-      <div className="mx-auto max-w-2xl px-4 py-8">
-        <Link
-          to="/"
-          className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Link>
+  const tabs: Array<{ id: TabId; label: string; icon: typeof Coins; count?: number }> = [
+    { id: 'tokens', label: 'Tokens', icon: Coins },
+    { id: 'music', label: 'Music', icon: Music2, count: walletAddress ? ownedWithTitles.length : undefined },
+    { id: 'keys', label: 'Keys', icon: KeyRound, count: walletAddress ? holdings?.artistCoins.length : undefined },
+    { id: 'art', label: 'Art', icon: ImageIcon, count: walletAddress ? holdings?.drops.length : undefined },
+    { id: 'dayones', label: 'Day Ones', icon: BadgeCheck, count: dayOnes.length },
+    { id: 'activity', label: 'Activity', icon: History, count: purchases.length },
+  ];
 
-        <div className="mb-2 flex items-center gap-3">
-          <WalletIcon className="h-7 w-7 text-primary" />
-          <h1 className="font-heading text-3xl font-bold text-foreground">Your wallet</h1>
+  return (
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      <div className="wallet-theme min-h-[calc(100dvh-3.5rem)] pb-28 sm:min-h-[calc(100dvh-4rem)]">
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/"
+              aria-label="Back"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Wallet</h1>
+          </div>
+          {walletAddress && (
+            <button
+              type="button"
+              onClick={refreshAll}
+              aria-label="Refresh balances"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <RefreshCw className={cn('h-4 w-4', holdingsFetching && 'animate-spin')} />
+            </button>
+          )}
         </div>
 
-        {/* Which wallets are here, and which one pays. Shown either way:
-            somebody with none needs the same door as somebody with three. */}
-        <MyWalletsPanel className="mb-6 mt-6" />
+        {/* The card, in the blue of the logo's equaliser. */}
+        <section className="wallet-card relative overflow-hidden rounded-3xl p-5 shadow-sm sm:p-7" aria-label="Wallet summary">
+          <EqualiserBars />
 
-        {!walletAddress ? (
-          <div className="live-surface mt-6 rounded-2xl border border-border bg-card p-5">
-            <p className="text-sm font-medium text-foreground">No wallet connected.</p>
-            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-              You do not need one to listen, post, or release your own music. Connect one when
-              you want to own a song or back an artist.
-            </p>
-            <Button className="mt-4 gap-2" onClick={() => void requestWalletConnection()}>
-              <WalletIcon className="h-4 w-4" /> Connect a wallet
-            </Button>
-          </div>
-        ) : (
-          <>
-            {wrongNetwork && (
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
-                <p className="text-sm text-foreground">
-                  Your wallet is on another network. Everything on SONGCHAINN lives on Base.
-                </p>
-                <Button
-                  size="sm"
-                  className="h-10 rounded-full"
-                  onClick={() => {
-                    const provider = getWalletProvider();
-                    if (provider) void switchToBaseChain(provider).then((ok) => ok && setWrongNetwork(false));
-                  }}
-                >
-                  Switch to Base
-                </Button>
-              </div>
-            )}
-
-            {/* At a glance, all on Base. */}
-            <section className="mb-6 grid grid-cols-3 gap-2">
-              {[
-                { label: 'ETH', value: balanceLoading && !balanceDisplay ? '…' : balanceDisplay ?? '0' },
-                { label: 'USDC', value: holdingsLoading ? '…' : (holdings?.usdc ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) },
-                { label: '$WWAT', value: holdingsLoading ? '…' : Math.floor(holdings?.wwat ?? 0).toLocaleString() },
-              ].map((t) => (
-                <div key={t.label} className="rounded-xl border border-border bg-card p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{t.label}</p>
-                  <p className="mt-1 truncate font-mono text-base font-semibold tabular-nums text-foreground">{t.value}</p>
-                </div>
-              ))}
-              <p className="col-span-3 text-[11px] text-muted-foreground">On Base</p>
-            </section>
-
-            {/* The music comes first. */}
-            <section className="mb-6">
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Songs you own
-              </h2>
-              {ownedLoading ? (
-                <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Reading the chain
-                </div>
-              ) : ownedWithTitles.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                  Nothing yet. Owning a song gets you unlimited streaming of it, and you can sell
-                  it on whenever you like.
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {ownedWithTitles.map((o) => (
-                    <li
-                      key={o.songId}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
+          {!walletAddress ? (
+            <div className="relative">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
+                <Wallet2 className="h-6 w-6 text-white" />
+              </span>
+              <h2 className="mt-4 font-heading text-xl font-bold text-white sm:text-2xl">No wallet connected</h2>
+              <p className="mt-1 max-w-prose text-sm text-white/80">
+                You do not need one to listen, post or release your music. Connect one when you want to own a song,
+                hold an artist's key or back a side in a battle.
+              </p>
+              <button
+                type="button"
+                onClick={() => void requestWalletConnection()}
+                className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-[#0747B8] transition-transform active:scale-95"
+              >
+                <WalletIcon className="h-4 w-4" /> Connect a wallet
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <AddressMark address={walletAddress} className="h-11 w-11 ring-white/40" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{walletName}</p>
+                    <button
+                      type="button"
+                      onClick={() => void copyAddress()}
+                      className="inline-flex min-h-8 items-center gap-1.5 font-mono text-xs text-white/80 hover:text-white"
+                      aria-label="Copy wallet address"
                     >
-                      {o.song?.coverImage && (
-                        <img
-                          src={o.song.coverImage}
-                          alt=""
-                          className="h-11 w-11 rounded-lg object-cover"
-                          loading="lazy"
-                        />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-foreground">
-                          {o.song?.title ?? 'A song'}
-                        </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {o.song?.artist ?? ''}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+                      {shortAddress(walletAddress)}
+                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    </button>
+                  </div>
+                </div>
+                {wrongNetwork ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const provider = getWalletProvider();
+                      if (provider) void switchToBaseChain(provider).then((ok) => ok && setWrongNetwork(false));
+                    }}
+                    className="inline-flex min-h-9 items-center gap-2 rounded-full bg-amber-300 px-3 text-xs font-semibold text-black"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-black/70" /> Wrong network, switch to Base
+                  </button>
+                ) : (
+                  <span className="inline-flex h-8 items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 text-xs font-semibold text-white">
+                    <span className="h-2 w-2 rounded-full bg-emerald-300" /> Base
+                  </span>
+                )}
+              </div>
 
-            {/* Artist coins: a key to their world as much as a holding. */}
-            <section className="mb-6">
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Artist coins and world keys
-              </h2>
-              {holdingsLoading ? (
-                <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Reading the chain
+              <div className="mt-6">
+                <div className="flex items-center gap-1">
+                  <p className="text-xs font-medium uppercase tracking-wider text-white/75">
+                    {totalUsd !== null ? 'Estimated value' : 'Balance'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={toggleHidden}
+                    aria-label={hidden ? 'Show balances' : 'Hide balances'}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/75 hover:text-white"
+                  >
+                    {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-              ) : !holdings?.artistCoins.length ? (
-                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                  None yet. An artist's coin opens the doors to their world.
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {holdings.artistCoins.map((c) => (
-                    <li key={c.coinAddress} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Coins className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                {valueLoading ? (
+                  <div className="mt-1 h-11 w-48 animate-pulse rounded-lg bg-white/20" />
+                ) : (
+                  <p className="font-heading text-4xl font-bold tabular-nums tracking-tight text-white sm:text-5xl">
+                    {mask(totalUsd !== null ? usd.format(totalUsd) : `${ethDisplay ?? '0'} ETH`)}
+                  </p>
+                )}
+                <p className="mt-1 text-xs tabular-nums text-white/80">
+                  {mask(`${ethDisplay ?? '0'} ETH`)} · {mask(`${usdc.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`)}
+                  {totalUsd !== null && ' · ETH at a live price, coins not counted'}
+                </p>
+              </div>
+
+              <div className="mt-6 grid grid-cols-4 gap-2 sm:max-w-md">
+                <CardAction icon={QrCode} label="Receive" onClick={() => setReceiveOpen(true)} />
+                <CardAction icon={copied ? Check : Copy} label={copied ? 'Copied' : 'Copy'} onClick={() => void copyAddress()} />
+                <CardAction icon={ShoppingBag} label="Collect" to="/marketplace" />
+                <CardAction
+                  icon={Wallet2}
+                  label="Wallets"
+                  onClick={() => walletsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                />
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Said plainly, once, where the money is. */}
+        <p className="mt-3 flex items-start gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            <span className="font-semibold text-foreground">Your wallet stays yours.</span> $ongChainn is not a wallet and
+            never holds your money or your keys. This page simply shows what is in the wallet you connected, and nothing
+            ever moves unless you approve it yourself, in your own wallet.
+          </span>
+        </p>
+
+
+        {/* What is in it, at a glance. */}
+        <section className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Holdings">
+          <Stat label="Songs owned" value={walletAddress ? (ownedLoading ? null : ownedWithTitles.length) : 0} onClick={() => setTab('music')} />
+          <Stat label="Artist keys" value={walletAddress ? (holdingsLoading ? null : holdings?.artistCoins.length ?? 0) : 0} onClick={() => setTab('keys')} />
+          <Stat label="Art and drops" value={walletAddress ? (holdingsLoading ? null : holdings?.drops.length ?? 0) : 0} onClick={() => setTab('art')} />
+          <Stat label="Day Ones" value={dayOnes.length} onClick={() => setTab('dayones')} />
+        </section>
+
+        {/* The tabs. */}
+        <div className="sticky top-14 z-10 -mx-4 mt-6 border-b border-border bg-background px-4 sm:top-16 sm:mx-0 sm:px-0">
+          <div role="tablist" aria-label="Wallet sections" className="flex gap-1 overflow-x-auto scrollbar-hide">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                type="button"
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'relative inline-flex min-h-11 shrink-0 items-center gap-1.5 px-3 text-sm font-medium transition-colors',
+                  tab === t.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <t.icon className="h-4 w-4" />
+                {t.label}
+                {typeof t.count === 'number' && t.count > 0 && (
+                  <span className="rounded-full bg-muted px-1.5 text-[10px] font-semibold tabular-nums text-foreground">{t.count}</span>
+                )}
+                {tab === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-foreground" />}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-5 min-h-[12rem]" role="tabpanel">
+          {tab === 'tokens' && (
+            walletAddress ? (
+              <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                <TokenRow
+                  symbol="ETH"
+                  name="Ether on Base"
+                  amount={balanceLoading && !ethDisplay ? null : mask(ethDisplay ?? '0')}
+                  value={ethValue !== null ? mask(usd.format(ethValue)) : undefined}
+                  note="Pays for songs, keys and gas"
+                />
+                <TokenRow
+                  symbol="USDC"
+                  name="USD Coin on Base"
+                  amount={holdingsLoading ? null : mask(usdc.toLocaleString(undefined, { maximumFractionDigits: 2 }))}
+                  value={holdingsLoading ? undefined : mask(usd.format(usdc))}
+                />
+                {wwatIsLive() && (
+                  <TokenRow
+                    symbol="WWAT"
+                    name="WaveWarz Africa"
+                    amount={holdingsLoading ? null : mask(Math.floor(holdings?.wwat ?? 0).toLocaleString())}
+                    note="Hosts a battle. Watching and voting stay free."
+                    href={`https://zora.co/coin/base:${WWAT_TOKEN_ADDRESS}`}
+                  />
+                )}
+              </ul>
+            ) : (
+              <NeedsWallet what="Your ETH, USDC and $WWAT on Base show here." />
+            )
+          )}
+
+          {tab === 'music' && (
+            !walletAddress ? (
+              <NeedsWallet what="The songs you own show here, with unlimited streaming of each." />
+            ) : ownedLoading ? (
+              <GridSkeleton />
+            ) : ownedWithTitles.length === 0 ? (
+              <Empty
+                icon={Music2}
+                title="No songs owned yet"
+                body="Owning a song gets you unlimited streaming of it, and you can sell it on whenever you like."
+                cta={{ label: 'Find a song to own', to: '/marketplace' }}
+              />
+            ) : (
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {ownedWithTitles.map((o) => (
+                  <li key={o.songId}>
+                    <Link
+                      to={o.song ? songPath(o.song) : '/marketplace'}
+                      className="group block overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-foreground/30"
+                    >
+                      {o.song?.coverImage ? (
+                        <img src={o.song.coverImage} alt="" loading="lazy" className="aspect-square w-full object-cover" />
+                      ) : (
+                        <div className="flex aspect-square w-full items-center justify-center bg-muted">
+                          <Music2 className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="p-3">
+                        <p className="truncate text-sm font-semibold text-foreground">{o.song?.title ?? 'A song'}</p>
+                        <p className="truncate text-xs text-muted-foreground">{o.song?.artist ?? ''}</p>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
+
+          {tab === 'keys' && (
+            !walletAddress ? (
+              <NeedsWallet what="Artist coins open the doors to their worlds, and they show here." />
+            ) : holdingsLoading ? (
+              <ListSkeleton />
+            ) : !holdings?.artistCoins.length ? (
+              <Empty
+                icon={KeyRound}
+                title="No artist keys yet"
+                body={`Holding enough of an artist's coin opens their world. ${ARTIST_COINS.length} artists have one, and it pays them every time it trades.`}
+                cta={{ label: 'See the artists', to: '/marketplace' }}
+              />
+            ) : (
+              <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                {holdings.artistCoins.map((c) => (
+                  <li key={c.coinAddress} className="flex items-center gap-3 p-4">
+                    <AddressMark address={c.coinAddress} className="h-10 w-10" />
+                    <span className="min-w-0 flex-1">
+                      <Link to={artistPath(c.artistId)} className="block truncate text-sm font-semibold text-foreground hover:underline">
+                        {c.name}
+                      </Link>
+                      <span className="block truncate text-xs text-muted-foreground">@{c.zoraHandle}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block font-mono text-sm font-semibold tabular-nums text-foreground">
+                        {mask(c.amount >= 1 ? Math.floor(c.amount).toLocaleString() : c.amount.toFixed(4))}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <Link to={artistPath(c.artistId)} className="block truncate text-sm font-semibold text-foreground hover:text-primary">
-                          {c.name}
-                        </Link>
-                        <span className="block truncate text-xs text-muted-foreground">@{c.zoraHandle}</span>
-                      </span>
-                      <span className="shrink-0 text-right">
-                        <span className="block font-mono text-sm font-semibold tabular-nums text-foreground">
-                          {c.amount >= 1 ? Math.floor(c.amount).toLocaleString() : c.amount.toFixed(4)}
-                        </span>
+                      <a
+                        href={`https://zora.co/coin/base:${c.coinAddress}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-8 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      >
+                        Zora <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      </a>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
+
+          {tab === 'art' && (
+            !walletAddress ? (
+              <NeedsWallet what="Art and records you collect inside artist worlds show here." />
+            ) : holdingsLoading ? (
+              <GridSkeleton />
+            ) : !holdings?.drops.length ? (
+              <Empty
+                icon={ImageIcon}
+                title="Nothing collected yet"
+                body="Drops are minted inside artist worlds. Walk into one and see what is on the wall."
+                cta={{ label: 'Walk the worlds', to: '/worlds' }}
+              />
+            ) : (
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {holdings.drops.map((d) => (
+                  <li key={d.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+                    {d.imageUrl ? (
+                      <img src={d.imageUrl} alt="" className="aspect-square w-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="aspect-square w-full bg-muted" />
+                    )}
+                    <div className="p-3">
+                      <p className="truncate text-sm font-semibold text-foreground">{d.title}</p>
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span className="tabular-nums">x{d.amount}</span>
                         <a
-                          href={`https://zora.co/coin/base:${c.coinAddress}`}
+                          href={`https://zora.co/collect/base:${d.contract}/${d.tokenId}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          className="inline-flex min-h-8 items-center gap-1 font-medium hover:text-foreground"
                         >
                           Zora <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
-                      </span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
+
+          {tab === 'dayones' && (
+            dayOnes.length === 0 ? (
+              <Empty
+                icon={BadgeCheck}
+                title="No Day Ones yet"
+                body="Really listen to a song and like it, and you get its number for good. The earlier you are, the lower it is."
+                cta={{ label: 'What is a Day One?', to: '/day-ones' }}
+              />
+            ) : (
+              <>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    {dayOnes.filter((d) => d.attestation_uid).length} of {dayOnes.length} recorded on Base
+                  </p>
+                  <Link to="/day-ones" className="text-xs font-semibold text-foreground hover:underline">
+                    Open Day Ones
+                  </Link>
+                </div>
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {dayOnes.map((r) => (
+                    <li key={r.id}>
+                      <Link to="/day-ones" className="block">
+                        <DayOneCard receipt={r} size="sm" className="w-full" />
+                      </Link>
                     </li>
                   ))}
                 </ul>
-              )}
-            </section>
+              </>
+            )
+          )}
 
-            {/* Drops: the art and records minted inside artist worlds. */}
-            <section className="mb-6">
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Art and drops</h2>
-              {holdingsLoading ? null : !holdings?.drops.length ? (
-                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                  Nothing collected yet. Drops are minted inside artist worlds.
-                </div>
-              ) : (
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {holdings.drops.map((d) => (
-                    <li key={d.id} className="overflow-hidden rounded-xl border border-border bg-card">
-                      {d.imageUrl ? (
-                        <img src={d.imageUrl} alt="" className="aspect-square w-full object-cover" loading="lazy" />
+          {tab === 'activity' && (
+            purchasesLoading ? (
+              <ListSkeleton />
+            ) : purchases.length === 0 ? (
+              <Empty
+                icon={Receipt}
+                title="No purchases yet"
+                body="Every copy you buy shows up here with what you paid and a link to the transaction."
+              />
+            ) : (
+              <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                {purchases.map((p) => {
+                  const song = songById.get(String(p.song_id)) ?? null;
+                  const copies = Number(p.copies ?? 0);
+                  const paid = Number(p.usd_paid ?? 0);
+                  const when = p.purchased_at ? new Date(p.purchased_at) : null;
+                  return (
+                    <li key={p.id} className="flex items-center gap-3 p-4">
+                      {song?.coverImage ? (
+                        <img src={song.coverImage} alt="" className="h-11 w-11 rounded-xl object-cover" loading="lazy" />
                       ) : (
-                        <div className="aspect-square w-full bg-muted" />
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted">
+                          <Receipt className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        </div>
                       )}
-                      <div className="p-2.5">
-                        <p className="truncate text-sm font-semibold text-foreground">{d.title}</p>
-                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                          <span>x{d.amount}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-foreground">
+                          {song ? <Link to={songPath(song)} className="hover:underline">Bought {song.title}</Link> : 'Bought a song'}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {when && !Number.isNaN(when.getTime())
+                            ? when.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                            : ''}
+                          {song?.artist ? ` · ${song.artist}` : ''}
+                          {` · ${copies} ${copies === 1 ? 'copy' : 'copies'}`}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block text-sm font-semibold tabular-nums text-foreground">{mask(usd.format(paid))}</span>
+                        {p.tx_hash && (
                           <a
-                            href={`https://zora.co/collect/base:${d.contract}/${d.tokenId}`}
+                            href={`https://basescan.org/tx/${p.tx_hash}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                            className="inline-flex min-h-8 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                           >
-                            Zora <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                            Receipt <ExternalLink className="h-3 w-3" aria-hidden="true" />
                           </a>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </>
-        )}
-
-        {/* Day Ones: proof of getting there first, some of it on chain. */}
-        <section className="mb-8">
-          <div className="mb-3 flex items-end justify-between gap-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Day Ones</h2>
-            <Link to="/day-ones" className="text-xs font-semibold text-primary">
-              {dayOnes.length ? `All ${dayOnes.length}` : 'What is this?'}
-            </Link>
-          </div>
-          {dayOnes.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-              Listen to a song and like it, and you get its number for good.
-            </div>
-          ) : (
-            <>
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-hide">
-                {dayOnes.slice(0, 8).map((r) => (
-                  <Link key={r.id} to="/day-ones" className="shrink-0">
-                    <DayOneCard receipt={r} size="sm" className="w-32" />
-                  </Link>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {onChainDayOnes.length
-                  ? `${onChainDayOnes.length} recorded on Base.`
-                  : 'None recorded on Base yet. Record one from Day Ones, free.'}
-              </p>
-            </>
-          )}
-        </section>
-
-        {/* What was paid, and when. A receipt per purchase, newest first. */}
-        <section className="mb-8">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Your purchases
-          </h2>
-          {purchasesLoading ? (
-            <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Finding your receipts
-            </div>
-          ) : purchases.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-              No purchases yet. Every copy you buy shows up here with what you paid.
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {purchases.map((p) => {
-                const song = SONGS.find((s) => s.id === String(p.song_id)) ?? null;
-                const copies = Number(p.copies ?? 0);
-                const usd = Number(p.usd_paid ?? 0);
-                const when = p.purchased_at ? new Date(p.purchased_at) : null;
-                return (
-                  <li
-                    key={p.id}
-                    className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
-                  >
-                    {song?.coverImage ? (
-                      <img
-                        src={song.coverImage}
-                        alt=""
-                        className="h-11 w-11 rounded-lg object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted">
-                        <Receipt className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                      </div>
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-foreground">
-                        {song ? (
-                          <Link to={songPath(song)} className="hover:text-primary">{song.title}</Link>
-                        ) : (
-                          'A song'
                         )}
                       </span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {when && !Number.isNaN(when.getTime())
-                          ? when.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                          : ''}
-                        {song?.artist ? ` · ${song.artist}` : ''}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="block text-sm font-semibold tabular-nums text-foreground">
-                        ${usd.toFixed(2)}
-                      </span>
-                      <span className="block text-xs tabular-nums text-muted-foreground">
-                        {copies} {copies === 1 ? 'copy' : 'copies'}
-                      </span>
-                      {p.tx_hash && (
-                        <a
-                          href={`https://basescan.org/tx/${p.tx_hash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                        >
-                          On chain <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                        </a>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+            )
           )}
-        </section>
+        </div>
 
-        {/* Quiet, and only two. */}
-        <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Worth knowing
-          </h2>
-          <div className="space-y-2">
-            <SoftSuggestion
-              title="An artist coin is a key, not just a holding"
-              body={`Holding enough of an artist's coin opens their world, and there are ${ARTIST_COINS.length} artists with one. It also pays them every time it trades.`}
-              href="/marketplace"
-              cta="See the artists"
-            />
-            {wwatIsLive() && (
-              <SoftSuggestion
-                title="$WWAT is what hosts a battle"
-                body="You only need it if you want to run a battle yourself. Watching and voting are free, always."
-                href={`https://zora.co/coin/base:${WWAT_TOKEN_ADDRESS}`}
-                cta="Look at $WWAT"
-                external
-              />
-            )}
-          </div>
-        </section>
+        {/* Which wallets are here, and which one pays. */}
+        <div ref={walletsRef} className="mt-10 scroll-mt-24">
+          <MyWalletsPanel />
+        </div>
+
+        {walletAddress && (
+          <a
+            href={`https://basescan.org/address/${walletAddress}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex min-h-10 items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            See this wallet on Basescan <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
       </div>
+      </div>
+
+      {walletAddress && (
+        <Sheet open={receiveOpen} onOpenChange={setReceiveOpen}>
+          <SheetContent side="bottom" className="wallet-theme mx-auto max-w-md rounded-t-3xl">
+            <SheetHeader className="text-center">
+              <SheetTitle>Receive on Base</SheetTitle>
+              <SheetDescription>
+                Send ETH, USDC or any Base token to this address. Only use the Base network, or it will not arrive here.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-5 flex flex-col items-center gap-4 pb-4">
+              <div className="rounded-2xl bg-white p-4">
+                <QRCodeSVG value={walletAddress} size={184} level="M" />
+              </div>
+              <p className="max-w-full break-all px-2 text-center font-mono text-xs text-muted-foreground">{walletAddress}</p>
+              <Button className="h-11 w-full max-w-xs gap-2 rounded-full" onClick={() => void copyAddress()}>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied ? 'Copied' : 'Copy address'}
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
       <AudioPlayer />
     </div>
   );
 }
 
-function SoftSuggestion({
-  title,
-  body,
-  href,
-  cta,
-  external = false,
+function CardAction({
+  icon: Icon,
+  label,
+  onClick,
+  to,
 }: {
-  title: string;
-  body: string;
-  href: string;
-  cta: string;
-  external?: boolean;
+  icon: typeof Coins;
+  label: string;
+  onClick?: () => void;
+  to?: string;
 }) {
   const inner = (
     <>
-      <div className="flex items-start gap-3">
-        <Coins className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-        <div>
-          <p className="text-sm font-medium text-foreground">{title}</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{body}</p>
-          <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary">
-            {cta}
-            {external && <ExternalLink className="h-3 w-3" aria-hidden="true" />}
-          </span>
-        </div>
-      </div>
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#0747B8] transition-transform group-hover:scale-105 group-active:scale-95">
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="text-xs font-medium text-white">{label}</span>
     </>
   );
-
-  const className =
-    'block rounded-xl border border-border bg-card/60 p-4 transition-colors hover:bg-card';
-
-  return external ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
-      {inner}
-    </a>
+  const cls = 'group flex flex-col items-center gap-1.5';
+  return to ? (
+    <Link to={to} className={cls}>{inner}</Link>
   ) : (
-    <Link to={href} className={className}>
-      {inner}
-    </Link>
+    <button type="button" onClick={onClick} className={cls}>{inner}</button>
+  );
+}
+
+/** The logo's equaliser, faint, rising along the bottom of the card. */
+function EqualiserBars() {
+  const heights = [18, 30, 22, 44, 34, 58, 40, 70, 52, 82, 60, 48, 74, 38, 56, 28, 42, 20, 32, 16];
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute bottom-0 right-0 h-24 w-2/5 opacity-[0.16] sm:h-28 sm:w-1/3"
+      viewBox="0 0 200 90"
+      preserveAspectRatio="none"
+    >
+      {heights.map((h, i) => (
+        <rect key={i} x={i * 10 + 2} y={90 - h} width="6" height={h} rx="1.5" fill="white" />
+      ))}
+    </svg>
+  );
+}
+
+function Stat({ label, value, onClick }: { label: string; value: number | null; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:border-foreground/30"
+    >
+      {value === null ? (
+        <span className="block h-7 w-8 animate-pulse rounded bg-muted" />
+      ) : (
+        <span className="block font-heading text-2xl font-bold tabular-nums text-foreground">{value}</span>
+      )}
+      <span className="block text-xs text-muted-foreground">{label}</span>
+    </button>
+  );
+}
+
+function TokenRow({
+  symbol,
+  name,
+  amount,
+  value,
+  note,
+  href,
+}: {
+  symbol: string;
+  name: string;
+  amount: string | null;
+  value?: string;
+  note?: string;
+  href?: string;
+}) {
+  return (
+    <li className="flex items-center gap-3 p-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold tracking-tight text-foreground">
+        {symbol.slice(0, 4)}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+          {symbol === 'WWAT' ? '$WWAT' : symbol}
+          {href && (
+            <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`${symbol} on Zora`} className="text-muted-foreground hover:text-foreground">
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </span>
+        <span className="block truncate text-xs text-muted-foreground">{note ?? name}</span>
+      </span>
+      <span className="shrink-0 text-right">
+        {amount === null ? (
+          <span className="block h-4 w-16 animate-pulse rounded bg-muted" />
+        ) : (
+          <span className="block font-mono text-sm font-semibold tabular-nums text-foreground">{amount}</span>
+        )}
+        {value && <span className="block text-xs tabular-nums text-muted-foreground">{value}</span>}
+      </span>
+    </li>
+  );
+}
+
+function Empty({
+  icon: Icon,
+  title,
+  body,
+  cta,
+}: {
+  icon: typeof Coins;
+  title: string;
+  body: string;
+  cta?: { label: string; to: string };
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border px-5 py-10 text-center">
+      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <Icon className="h-5 w-5 text-muted-foreground" />
+      </span>
+      <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{body}</p>
+      {cta && (
+        <Button asChild variant="outline" size="sm" className="mt-4 h-10 rounded-full px-5">
+          <Link to={cta.to}>{cta.label}</Link>
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function NeedsWallet({ what }: { what: string }): ReactNode {
+  return (
+    <div className="rounded-2xl border border-dashed border-border px-5 py-10 text-center">
+      <p className="mx-auto max-w-sm text-sm text-muted-foreground">{what}</p>
+      <Button className="mt-4 h-10 gap-2 rounded-full px-5" onClick={() => void requestWalletConnection()}>
+        <WalletIcon className="h-4 w-4" /> Connect a wallet
+      </Button>
+    </div>
+  );
+}
+
+function GridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="aspect-[4/5] animate-pulse rounded-2xl bg-muted" />
+      ))}
+    </div>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div className="space-y-2">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="h-16 animate-pulse rounded-2xl bg-muted" />
+      ))}
+    </div>
   );
 }
