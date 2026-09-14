@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { thumb } from '@/lib/img';
+import { ScrollRail } from '@/components/ScrollRail';
 
 /**
  * The first thing on Home.
@@ -124,7 +125,7 @@ export const HomeHero = memo(function HomeHero({ feature, onPlay, faces = [] }: 
 
       {faces.length > 0 ? (
         <div className="mt-1 px-4 sm:px-6 lg:px-8">
-          <ul className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
+          <ScrollRail label="Artists" listClassName="gap-4 pb-1">
             {faces.map((f) => (
               <li key={f.id} className="w-16 shrink-0 text-center sm:w-[4.5rem]">
                 <Link to={artistPath(f.id)} className="group block focus-ring rounded-full">
@@ -147,7 +148,7 @@ export const HomeHero = memo(function HomeHero({ feature, onPlay, faces = [] }: 
                 </Link>
               </li>
             ))}
-          </ul>
+          </ScrollRail>
         </div>
       ) : null}
     </section>

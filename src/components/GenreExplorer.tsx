@@ -3,6 +3,7 @@ import { ArtistName } from '@/components/ArtistName';
 import { Lock, Play, Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Song } from '@/data/musicData';
+import { ScrollRail } from '@/components/ScrollRail';
 import { thumb } from '@/lib/img';
 
 /**
@@ -106,8 +107,7 @@ export function GenreExplorer({ songs, onPlay, isLocked }: GenreExplorerProps) {
       </div>
 
       {/* The way in. Sorted by how much of the catalog each sound actually is. */}
-      <div className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-hide">
-        <ul className="flex min-w-max gap-1.5">
+      <ScrollRail label="Sounds" className="-mx-1" listClassName="gap-1.5 px-1 pb-1">
           {genres.map((g) => (
             <li key={g.name}>
               <button
@@ -125,13 +125,11 @@ export function GenreExplorer({ songs, onPlay, isLocked }: GenreExplorerProps) {
               </button>
             </li>
           ))}
-        </ul>
-      </div>
+      </ScrollRail>
 
       {/* Bigger tiles than the old grid, and they scroll sideways: a shelf you
           run your eye along rather than a wall you scroll past. */}
-      <div className="-mx-1 mt-4 overflow-x-auto px-1 pb-2 scrollbar-hide">
-        <ul className="flex min-w-max gap-3">
+      <ScrollRail label={current ? current + " records" : "Records"} className="-mx-1 mt-4" listClassName="gap-3 px-1 pb-2">
           {shown.map((song) => {
             const locked = isLocked?.(song) ?? false;
             return (
@@ -172,8 +170,7 @@ export function GenreExplorer({ songs, onPlay, isLocked }: GenreExplorerProps) {
               </li>
             );
           })}
-        </ul>
-      </div>
+      </ScrollRail>
     </section>
   );
 }
