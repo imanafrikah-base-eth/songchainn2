@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Navigation } from '@/components/Navigation';
+import { BecomeArtistButton } from '@/components/BecomeArtistButton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { BLOCK_TYPES, BlockList, getBlockType, type BlockContext } from '@/worlds/blocks';
@@ -319,12 +320,16 @@ export default function WorldBuilder() {
           <p className="mt-2 text-sm text-muted-foreground">
             {isArtist
               ? 'The World Builder opens the moment one of your records is live.'
-              : 'Make music? Open your Studio, put your first song out, and the builder is yours.'}
+              : 'Make music? Become an artist, put your first song out, and the builder is yours.'}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
-            <Button asChild className="h-11 rounded-full px-6">
-              <Link to="/studio">Open the Studio</Link>
-            </Button>
+            {isArtist ? (
+              <Button asChild className="h-11 rounded-full px-6">
+                <Link to="/studio">Open the Studio</Link>
+              </Button>
+            ) : (
+              <BecomeArtistButton size="default" className="h-11 px-6" />
+            )}
             <Button asChild variant="outline" className="h-11 rounded-full px-6">
               <Link to="/worlds">Walk the worlds</Link>
             </Button>

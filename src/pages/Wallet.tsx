@@ -1,5 +1,5 @@
 import { songPath } from '@/lib/slugRoutes';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Wallet as WalletIcon, ArrowLeft, ExternalLink, Coins, Loader2, Receipt } from 'lucide-react';
@@ -15,6 +15,13 @@ import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { Button } from '@/components/ui/button';
 import { MyWalletsPanel } from '@/components/wallet/MyWalletsPanel';
+import { useMyWallets } from '@/hooks/useMyWallets';
+import { useWalletHoldings } from '@/hooks/useWalletHoldings';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+import { getWalletProvider, switchToBaseChain, BASE_CHAIN_ID_HEX } from '@/lib/baseWallet';
+import { artistPath } from '@/lib/slugRoutes';
+import { useMyDayOnes } from '@/lib/dayOnes';
+import { DayOneCard } from '@/components/dayones/DayOneCard';
 
 /**
  * What you actually hold, with SONGCHAINN's own things first.
@@ -61,8 +68,35 @@ function useMyPurchases(userId: string | undefined) {
 }
 
 export default function Wallet() {
-  const { user, walletAddress } = useAuth();
-  const { balance, isLoading: balanceLoading } = useWalletBalance(walletAddress);
+  const { user, walletAddress: sessionWallet } = useAuth();
+  const { active } = useMyWallets();
+  // The wallet that pays, then whatever this session connected.
+  const walletAddress = active?.address ?? sessionWallet;
+  const { display: balanceDisplay, isLoading: balanceLoading } = useWalletBalance(walletAddress);
+  const { data: holdings, isLoading: holdingsLoading } = useWalletHoldings(walletAddress);
+  const { songs: publishedSongs } = usePublishedCatalog();
+  const { data: dayOnes = [] } = useMyDayOnes();
+  const onChainDayOnes = dayOnes.filter((d) => d.attestation_uid);
+  const [wrongNetwork, setWrongNetwork] = useState(false);
+
+  // Everything here is on Base. A wallet pointed at another network gets one clear way back.
+  useEffect(() => {
+    const provider = getWalletProvider();
+    if (!provider || !walletAddress) return;
+    let cancelled = false;
+    const check = () =>
+      void provider
+        .request({ method: 'eth_chainId' })
+        .then((id: string) => { if (!cancelled) setWrongNetwork(String(id).toLowerCase() !== BASE_CHAIN_ID_HEX); })
+        .catch(() => undefined);
+    check();
+    const onChain = () => check();
+    (provider as unknown as { on?: (e: string, f: () => void) => void }).on?.('chainChanged', onChain);
+    return () => {
+      cancelled = true;
+      (provider as unknown as { removeListener?: (e: string, f: () => void) => void }).removeListener?.('chainChanged', onChain);
+    };
+  }, [walletAddress]);
   const { ownedSongs, isLoading: ownedLoading } = useOwnedSongs();
   const { data: purchases = [], isLoading: purchasesLoading } = useMyPurchases(user?.id);
 
@@ -70,8 +104,8 @@ export default function Wallet() {
     () =>
       (ownedSongs ?? [])
         .filter((o) => o.balance > 0n)
-        .map((o) => ({ ...o, song: SONGS.find((s) => s.id === o.songId) ?? null })),
-    [ownedSongs],
+        .map((o) => ({ ...o, song: [...SONGS, ...publishedSongs].find((s) => s.id === o.songId) ?? null })),
+    [ownedSongs, publishedSongs],
   );
 
   if (!user) {
@@ -127,7 +161,38 @@ export default function Wallet() {
           </div>
         ) : (
           <>
+            {wrongNetwork && (
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+                <p className="text-sm text-foreground">
+                  Your wallet is on another network. Everything on SONGCHAINN lives on Base.
+                </p>
+                <Button
+                  size="sm"
+                  className="h-10 rounded-full"
+                  onClick={() => {
+                    const provider = getWalletProvider();
+                    if (provider) void switchToBaseChain(provider).then((ok) => ok && setWrongNetwork(false));
+                  }}
+                >
+                  Switch to Base
+                </Button>
+              </div>
+            )}
 
+            {/* At a glance, all on Base. */}
+            <section className="mb-6 grid grid-cols-3 gap-2">
+              {[
+                { label: 'ETH', value: balanceLoading && !balanceDisplay ? '…' : balanceDisplay ?? '0' },
+                { label: 'USDC', value: holdingsLoading ? '…' : (holdings?.usdc ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) },
+                { label: '$WWAT', value: holdingsLoading ? '…' : Math.floor(holdings?.wwat ?? 0).toLocaleString() },
+              ].map((t) => (
+                <div key={t.label} className="rounded-xl border border-border bg-card p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{t.label}</p>
+                  <p className="mt-1 truncate font-mono text-base font-semibold tabular-nums text-foreground">{t.value}</p>
+                </div>
+              ))}
+              <p className="col-span-3 text-[11px] text-muted-foreground">On Base</p>
+            </section>
 
             {/* The music comes first. */}
             <section className="mb-6">
@@ -172,20 +237,118 @@ export default function Wallet() {
               )}
             </section>
 
-            {/* The fuel, one line, below the point. */}
-            <section className="mb-8">
+            {/* Artist coins: a key to their world as much as a holding. */}
+            <section className="mb-6">
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                For fees
+                Artist coins and world keys
               </h2>
-              <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
-                <span className="text-sm text-muted-foreground">ETH on Base</span>
-                <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                  {balanceLoading || balance == null ? '…' : Number(balance).toFixed(5)}
-                </span>
-              </div>
+              {holdingsLoading ? (
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Reading the chain
+                </div>
+              ) : !holdings?.artistCoins.length ? (
+                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                  None yet. An artist's coin opens the doors to their world.
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {holdings.artistCoins.map((c) => (
+                    <li key={c.coinAddress} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Coins className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <Link to={artistPath(c.artistId)} className="block truncate text-sm font-semibold text-foreground hover:text-primary">
+                          {c.name}
+                        </Link>
+                        <span className="block truncate text-xs text-muted-foreground">@{c.zoraHandle}</span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block font-mono text-sm font-semibold tabular-nums text-foreground">
+                          {c.amount >= 1 ? Math.floor(c.amount).toLocaleString() : c.amount.toFixed(4)}
+                        </span>
+                        <a
+                          href={`https://zora.co/coin/base:${c.coinAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          Zora <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {/* Drops: the art and records minted inside artist worlds. */}
+            <section className="mb-6">
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Art and drops</h2>
+              {holdingsLoading ? null : !holdings?.drops.length ? (
+                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                  Nothing collected yet. Drops are minted inside artist worlds.
+                </div>
+              ) : (
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {holdings.drops.map((d) => (
+                    <li key={d.id} className="overflow-hidden rounded-xl border border-border bg-card">
+                      {d.imageUrl ? (
+                        <img src={d.imageUrl} alt="" className="aspect-square w-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="aspect-square w-full bg-muted" />
+                      )}
+                      <div className="p-2.5">
+                        <p className="truncate text-sm font-semibold text-foreground">{d.title}</p>
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>x{d.amount}</span>
+                          <a
+                            href={`https://zora.co/collect/base:${d.contract}/${d.tokenId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                          >
+                            Zora <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          </a>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           </>
         )}
+
+        {/* Day Ones: proof of getting there first, some of it on chain. */}
+        <section className="mb-8">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Day Ones</h2>
+            <Link to="/day-ones" className="text-xs font-semibold text-primary">
+              {dayOnes.length ? `All ${dayOnes.length}` : 'What is this?'}
+            </Link>
+          </div>
+          {dayOnes.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+              Listen to a song and like it, and you get its number for good.
+            </div>
+          ) : (
+            <>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-hide">
+                {dayOnes.slice(0, 8).map((r) => (
+                  <Link key={r.id} to="/day-ones" className="shrink-0">
+                    <DayOneCard receipt={r} size="sm" className="w-32" />
+                  </Link>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {onChainDayOnes.length
+                  ? `${onChainDayOnes.length} recorded on Base.`
+                  : 'None recorded on Base yet. Record one from Day Ones, free.'}
+              </p>
+            </>
+          )}
+        </section>
 
         {/* What was paid, and when. A receipt per purchase, newest first. */}
         <section className="mb-8">

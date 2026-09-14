@@ -1,96 +1,71 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getWalletProvider } from '@/lib/baseWallet';
+import { createPublicClient, formatEther, http, type Address } from 'viem';
+import { base } from 'viem/chains';
 
 interface WalletBalanceState {
+  /** ETH on Base as a plain decimal string ("0.00005"), safe for Number(). */
   balance: string | null;
+  /** The same, short and readable for the screen ("<0.0001", "0.0421"). */
+  display: string | null;
   balanceWei: string | null;
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
 }
 
+const client = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') });
+
+/** Short and honest: never rounds a real balance down to "0". */
+export function formatEth(eth: number): string {
+  if (!Number.isFinite(eth) || eth <= 0) return '0';
+  if (eth < 0.0001) return '<0.0001';
+  if (eth < 1) return eth.toFixed(4);
+  return eth.toFixed(3);
+}
+
 /**
- * Hook to fetch and track wallet ETH balance on Base
+ * ETH on Base for an address.
+ *
+ * Read from Base itself, not through the wallet. Asking the wallet returned
+ * whatever network it happened to be on (Ethereum, say), and the balance came
+ * back as the string "<0.0001", which every Number() on screen turned into NaN
+ * (founder, 14 Sep 2026). `balance` is a real decimal now and `display` is the
+ * short form.
  */
 export function useWalletBalance(walletAddress: string | null): WalletBalanceState {
-  const [balance, setBalance] = useState<string | null>(null);
   const [balanceWei, setBalanceWei] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchBalance = useCallback(async () => {
-    if (!walletAddress) {
-      setBalance(null);
+    if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) {
       setBalanceWei(null);
       return;
     }
-
-    const provider = getWalletProvider();
-    if (!provider) {
-      setError('No wallet provider');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
-
     try {
-      // Get balance in Wei (hex)
-      const balanceHex = await provider.request({
-        method: 'eth_getBalance',
-        params: [walletAddress, 'latest'],
-      });
-
-      // Convert hex to Wei string
-      const weiValue = BigInt(balanceHex).toString();
-      setBalanceWei(weiValue);
-
-      // Convert Wei to ETH (divide by 10^18)
-      const ethValue = Number(weiValue) / 1e18;
-      
-      // Format to reasonable decimal places
-      let formatted: string;
-      if (ethValue === 0) {
-        formatted = '0';
-      } else if (ethValue < 0.0001) {
-        formatted = '<0.0001';
-      } else if (ethValue < 0.01) {
-        formatted = ethValue.toFixed(4);
-      } else if (ethValue < 1) {
-        formatted = ethValue.toFixed(3);
-      } else {
-        formatted = ethValue.toFixed(2);
-      }
-
-      setBalance(formatted);
-    } catch (err: any) {
-      if (import.meta.env.DEV) {
-        console.error('Failed to fetch balance:', err);
-      }
-      setError(err?.message || 'Failed to fetch balance');
+      const wei = await client.getBalance({ address: walletAddress as Address });
+      setBalanceWei(wei.toString());
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch balance');
     } finally {
       setIsLoading(false);
     }
   }, [walletAddress]);
 
-  // Fetch on mount and when address changes
   useEffect(() => {
-    fetchBalance();
+    void fetchBalance();
   }, [fetchBalance]);
 
-  // Auto-refresh every 30 seconds
   useEffect(() => {
     if (!walletAddress) return;
-
-    const interval = setInterval(fetchBalance, 30000);
+    const interval = setInterval(() => void fetchBalance(), 30000);
     return () => clearInterval(interval);
   }, [walletAddress, fetchBalance]);
 
-  return {
-    balance,
-    balanceWei,
-    isLoading,
-    error,
-    refetch: fetchBalance,
-  };
+  const balance = balanceWei == null ? null : formatEther(BigInt(balanceWei));
+  const display = balance == null ? null : formatEth(Number(balance));
+
+  return { balance, display, balanceWei, isLoading, error, refetch: fetchBalance };
 }

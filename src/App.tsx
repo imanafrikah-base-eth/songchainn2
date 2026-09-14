@@ -25,7 +25,8 @@ import { NotificationBanner } from "@/components/NotificationBanner";
 import { GlobalAmbientLayer } from "@/components/GlobalAmbientLayer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 const VibeAgent = lazyWithRecovery(() => import("@/components/VibeAgent").then(m => ({ default: m.VibeAgent })));
-const BehaviorCtaPopups = lazyWithRecovery(() => import("@/components/BehaviorCtaPopups").then(m => ({ default: m.BehaviorCtaPopups })));
+// The play-triggered follow/next-track cards are gone; earning a Day One is the one moment that shows a card.
+const DayOneMoment = lazyWithRecovery(() => import("@/components/dayones/DayOneMoment").then(m => ({ default: m.DayOneMoment })));
 import { useUserPresence } from "@/hooks/useUserPresence";
 import { FarcasterProvider, useFarcasterContext } from "@/context/FarcasterContext";
 import { FacebookProvider } from "@/context/FacebookContext";
@@ -55,6 +56,7 @@ const ResetPassword = lazyWithRecovery(() => import("./pages/ResetPassword"));
 const Room = lazyWithRecovery(() => import("./pages/Room"));
 const About = lazyWithRecovery(() => import("./pages/About"));
 const Leaderboard = lazyWithRecovery(() => import("./pages/Leaderboard"));
+const DayOnes = lazyWithRecovery(() => import("./pages/DayOnes"));
 const WaveWarzBattleZoneFeature = lazyWithRecovery(() => import("./pages/WaveWarzBattleZoneFeature"));
 const DjShuffle = lazyWithRecovery(() => import("./pages/DjShuffle"));
 const Inbox = lazyWithRecovery(() => import("./pages/Inbox"));
@@ -215,6 +217,7 @@ function AppShell() {
                 <Route path="/license" element={<Licensing />} />
                 <Route path="/keys" element={<Keys />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
+                <Route path="/day-ones" element={<DayOnes />} />
                 <Route path="/studio" element={<Studio />} />
                 <Route path="/launch" element={<Launch />} />
                 <Route path="/drops/:worldSlug" element={<NftLauncher />} />
@@ -243,7 +246,7 @@ function AppShell() {
         </Suspense>
       </div>
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><VibeAgent /></Suspense></ErrorBoundary>}
-      {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><BehaviorCtaPopups /></Suspense></ErrorBoundary>}
+      {!hideFloatingChrome && <ErrorBoundary fallback={null}><Suspense fallback={null}><DayOneMoment /></Suspense></ErrorBoundary>}
       {/* The Phase Two launch announcement has served its purpose. Nothing is
           in beta or in a phase any more; WhatsLive on Home says what is here. */}
       {!hideFloatingChrome && <ErrorBoundary fallback={null}><BottomTabBar /></ErrorBoundary>}
@@ -380,6 +383,7 @@ function AppContent() {
                   {/* Shared links used to fall through to a not-found page that
                       redirected itself away before anyone could read it. */}
                   <Route path="/leaderboard" element={<Auth />} />
+                  <Route path="/day-ones" element={<Auth />} />
                   <Route path="/studio" element={<Auth />} />
                   <Route path="/launch" element={<Auth />} />
                   <Route path="/drops/:worldSlug" element={<Auth />} />

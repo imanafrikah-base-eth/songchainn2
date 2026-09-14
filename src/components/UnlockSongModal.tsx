@@ -56,7 +56,7 @@ export function UnlockSongModal({
   const [connectedAddress, setConnectedAddress] = useState(walletAddress);
   const [processingStatus, setProcessingStatus] = useState<string>('Processing...');
   const submittingRef = useRef(false);
-  const { balance, isLoading: isBalanceLoading } = useWalletBalance(connectedAddress || null);
+  const { balance, display: balanceDisplay, isLoading: isBalanceLoading } = useWalletBalance(connectedAddress || null);
 
   const hasWallet = hasWalletProvider();
   const isConnected = !!connectedAddress;
@@ -463,7 +463,7 @@ export function UnlockSongModal({
                       <span className="text-sm font-medium">{truncateAddress(connectedAddress!)}</span>
                     </div>
                     <span className="text-sm font-semibold text-primary">
-                      {isBalanceLoading ? '...' : balance ? `${balance} ETH` : '0 ETH'}
+                      {isBalanceLoading ? '...' : balanceDisplay ? `${balanceDisplay} ETH` : '0 ETH'}
                     </span>
                   </div>
                 )}
@@ -564,7 +564,7 @@ export function UnlockSongModal({
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-primary">
-                          {isBalanceLoading ? '...' : balance ? `${balance} ETH` : '0 ETH'}
+                          {isBalanceLoading ? '...' : balanceDisplay ? `${balanceDisplay} ETH` : '0 ETH'}
                         </p>
                       </div>
                     </div>

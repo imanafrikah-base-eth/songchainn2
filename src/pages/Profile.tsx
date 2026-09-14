@@ -52,6 +52,7 @@ import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 const logo = '/songchainn-logo.webp';
 import { uploadPublicImage } from '../lib/storage';
+import { BecomeArtistButton } from '@/components/BecomeArtistButton';
 import { fcViewProfile } from '@/lib/farcasterActions';
 
 const first = <T,>(arr: T[] | null | undefined): T | undefined =>
@@ -1561,9 +1562,13 @@ export default function Profile() {
                   : 'Make music? Switch and your Studio opens right now: no review, no fee, no wallet needed.'}
               </p>
             </div>
-            <Button asChild size="sm" variant={isArtist ? 'outline' : 'default'}>
-              <Link to="/studio">{isArtist ? 'Open the Studio' : 'Switch to artist account'}</Link>
-            </Button>
+            {isArtist ? (
+              <Button asChild size="sm" variant="outline">
+                <Link to="/studio">Open the Studio</Link>
+              </Button>
+            ) : (
+              <BecomeArtistButton label="Become an artist" />
+            )}
           </div>
           <ChangePassword />
           <ChangeEmail />

@@ -34,6 +34,8 @@ export interface NavLeaf {
   description: string;
   /** Only render for a signed-in artist. */
   artistOnly?: boolean;
+  /** Only render for someone who is not an artist yet. */
+  fanOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -80,10 +82,11 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: User,
     items: [
       { path: '/profile', label: 'Profile', icon: User, description: 'Your page, your music, your points' },
-      // Not artist-only. Studio already works for any signed-in user and the server
-      // mints them an artist id on first publish, so gating the door on `isArtist`
-      // only hid Studio from the exact people who had just used it.
-      { path: '/studio', label: 'Studio', icon: Mic2, description: 'Upload a track and release it' },
+      // Artists get their tools; a fan gets the one door toward them. /studio shows a
+      // fan the become-an-artist screen, and becoming an artist flips isArtist at
+      // once, so the Studio entry appears the moment it is theirs (founder, 15 Sep).
+      { path: '/studio', label: 'Studio', icon: Mic2, description: 'Upload a track and release it', artistOnly: true },
+      { path: '/studio', label: 'Become an artist', icon: Mic2, description: 'Make music? Open your artist account', fanOnly: true },
       { path: '/install', label: 'Install App', icon: Download, description: 'Put $ongChainn on your home screen' },
       { path: '/about', label: 'About $ongChainn', icon: Sparkles, description: 'What this is and where it is going' },
     ],
@@ -98,7 +101,7 @@ export function resolveNavGroups(profilePath: string, isArtist: boolean): NavGro
   return NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items
-      .filter((item) => !item.artistOnly || isArtist)
+      .filter((item) => (isArtist ? !item.fanOnly : !item.artistOnly))
       .map((item) => (item.path === '/profile' ? { ...item, path: profilePath } : item)),
   }));
 }

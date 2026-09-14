@@ -1,35 +1,59 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Wallet, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { requestWalletConnection } from '@/lib/walletGate';
-import { useMyWallets, WALLET_NAMES, shortAddress } from '@/hooks/useMyWallets';
+import { getConnectedAccounts, getWalletProvider, toChecksumAddress } from '@/lib/baseWallet';
+import { useMyWallets, WALLET_NAMES, providerFromRdns, rememberWallet, shortAddress } from '@/hooks/useMyWallets';
 
 /**
- * The wallet, in the top bar, the way every app that handles money does it.
+ * The wallet, in the top bar.
  *
- * Connected, it says which wallet and what is in it, and opens the wallet
- * page. Not connected, it is a one tap connect and nothing more. It never
- * nags: somebody listening to music has no reason to connect anything, and
- * the whole product works without a wallet.
+ * Connected, it shows the wallet and its ETH on Base, and opens the wallet
+ * page. Not connected, it is one tap to connect. It never nags.
  *
- * It used to ask to connect a wallet that was already connected, because a
- * connection lived only in the tab it happened in. The account remembers now,
- * so this shows the real state from the first paint.
- *
- * Balance is shown to four decimals. ETH on Base is usually a fraction, and
- * rounding it to two turns most real balances into "0.00", which reads as
- * empty when it is not.
+ * A wallet connected in the browser used to show up here while the wallet page
+ * said "None yet", because the connection lived only in this tab and never
+ * reached the account (founder, 14 Sep 2026). Whatever wallet this browser is
+ * already connected with is now kept on the account, quietly, with no popup:
+ * the person already approved it for this site.
  */
 export function WalletChip() {
   const navigate = useNavigate();
   const { walletAddress, user } = useAuth();
-  const { active, wallets } = useMyWallets();
-  const address = active?.address ?? walletAddress;
-  const { balance, isLoading } = useWalletBalance(address);
+  const { active, wallets, isLoading: walletsLoading, refresh } = useMyWallets();
+  const [browserAddress, setBrowserAddress] = useState<string | null>(null);
+  const address = active?.address ?? walletAddress ?? browserAddress;
+  const { display, isLoading } = useWalletBalance(address);
   const [connecting, setConnecting] = useState(false);
+  const saving = useRef(new Set<string>());
+
+  // A wallet this browser already approved for SONGCHAINN. eth_accounts never opens a popup.
+  useEffect(() => {
+    if (!user?.id || active) return;
+    let cancelled = false;
+    void getConnectedAccounts().then((accounts) => {
+      if (!cancelled && accounts[0]) setBrowserAddress(toChecksumAddress(accounts[0]));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, active]);
+
+  // Keep it on the account, once, so every page (and the wallet page) knows it.
+  useEffect(() => {
+    if (!user?.id || walletsLoading) return;
+    const candidate = walletAddress ?? browserAddress;
+    if (!candidate || !/^0x[0-9a-fA-F]{40}$/.test(candidate)) return;
+    const known = wallets.some((w) => w.address.toLowerCase() === candidate.toLowerCase());
+    if (known || saving.current.has(candidate.toLowerCase())) return;
+    saving.current.add(candidate.toLowerCase());
+    const info = (getWalletProvider() as { isMetaMask?: boolean; isCoinbaseWallet?: boolean } | null) ?? null;
+    const provider = providerFromRdns(info?.isMetaMask ? 'io.metamask' : info?.isCoinbaseWallet ? 'com.coinbase.wallet' : null);
+    void rememberWallet(candidate, provider).then(() => refresh());
+  }, [user?.id, walletsLoading, walletAddress, browserAddress, wallets, refresh]);
 
   // No wallet control for somebody who is not even signed in.
   if (!user) return null;
@@ -38,7 +62,11 @@ export function WalletChip() {
     setConnecting(true);
     try {
       const got = await requestWalletConnection();
-      if (got) toast.success('Wallet connected', { description: 'It is on your account now.' });
+      if (got) {
+        await rememberWallet(got, 'other');
+        await refresh();
+        toast.success('Wallet connected on Base', { description: 'It is on your account now.' });
+      }
     } catch (err) {
       toast.error('Could not connect that wallet', {
         description: err instanceof Error ? err.message : undefined,
@@ -53,7 +81,7 @@ export function WalletChip() {
       <button
         onClick={() => void connect()}
         disabled={connecting}
-        aria-label="Connect a wallet"
+        aria-label="Connect a wallet on Base"
         className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
       >
         {connecting ? (
@@ -66,21 +94,15 @@ export function WalletChip() {
     );
   }
 
-  const shown =
-    isLoading || balance == null
-      ? '...'
-      : Number(balance).toLocaleString(undefined, {
-          minimumFractionDigits: 4,
-          maximumFractionDigits: 4,
-        });
+  const shown = isLoading && display == null ? '...' : display ?? '0';
   const which = active ? WALLET_NAMES[active.provider] : 'Wallet';
   const more = wallets.length > 1 ? ` and ${wallets.length - 1} more` : '';
 
   return (
     <button
       onClick={() => navigate('/wallet')}
-      aria-label={`${which} connected, ${shortAddress(address)}${more}. Open your wallet.`}
-      title={`${which} · ${shortAddress(address)}`}
+      aria-label={`${which} connected, ${shortAddress(address)}${more}, ${shown} ETH on Base. Open your wallet.`}
+      title={`${which} · ${shortAddress(address)} · Base`}
       className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-primary/20"
     >
       <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
@@ -88,7 +110,8 @@ export function WalletChip() {
         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
       </span>
       <span className="tabular-nums">{shown}</span>
-      <span className="hidden text-[10px] font-medium text-muted-foreground xs:inline">ETH</span>
+      <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">ETH</span>
+      <span className="hidden text-[10px] text-muted-foreground md:inline">{shortAddress(address)}</span>
       {wallets.length > 1 && (
         <span className="rounded-full bg-primary/20 px-1 text-[9px] font-bold text-primary">{wallets.length}</span>
       )}

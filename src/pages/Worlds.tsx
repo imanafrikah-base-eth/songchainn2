@@ -9,6 +9,7 @@ import { usePublishedWorlds, worldPath } from '@/hooks/usePublishedWorlds';
 import { useAuth } from '@/context/AuthContext';
 import { WORLD_BUILDER_ENABLED } from '@/lib/features';
 import { useHasWorld } from '@/worlds/builder/useHasWorld';
+import { BecomeArtistButton } from '@/components/BecomeArtistButton';
 import { useHasLiveSong } from '@/hooks/useHasLiveSong';
 
 /**
@@ -108,16 +109,20 @@ const Worlds = () => {
                   ? 'Name it, lay out the streets, dress it, set the key. Six screens, one afternoon.'
                   : isArtist
                     ? 'Put your first song out and your world opens.'
-                    : 'Worlds are for musicians with a song out on $ongChainn. Make music? Open your Studio and put your first song out.'}
+                    : 'Worlds are for musicians with a song out on $ongChainn. Make music? Become an artist and put your first song out.'}
               </p>
             </div>
-            <Link
-              to={canBuild ? '/world-builder' : '/studio'}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
-            >
-              {canBuild ? 'Start building' : 'Open the Studio'}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            {isArtist ? (
+              <Link
+                to={canBuild ? '/world-builder' : '/studio'}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+              >
+                {canBuild ? 'Start building' : 'Open the Studio'}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <BecomeArtistButton size="default" className="h-11 px-5" />
+            )}
           </div>
         )}
       </div>

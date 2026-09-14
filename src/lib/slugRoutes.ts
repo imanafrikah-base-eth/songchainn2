@@ -22,7 +22,7 @@ export function toSlug(str: string): string {
 // these can never be an artist address, or the artist would hide the page.
 const RESERVED: Set<string> = new Set([
   'about', 'admin', 'api', 'artist', 'artists', 'assets', 'audience', 'auth', 'bettercallzaal', 'catalog',
-  'claim', 'community', 'console', 'delete-account', 'discover', 'dj-shuffle', 'drops', 'guidelines',
+  'claim', 'community', 'console', 'day-ones', 'delete-account', 'discover', 'dj-shuffle', 'drops', 'guidelines',
   'inbox', 'install', 'keys', 'launch', 'leaderboard', 'license', 'marketplace', 'node_modules', 'nft',
   'not-found', 'playlist', 'playlists', 'post', 'privacy', 'profile', 'reset-password', 'room', 'share',
   'social', 'song', 'studio', 'terms', 'w', 'wallet', 'wavewarz-africa', 'world', 'world-assets',

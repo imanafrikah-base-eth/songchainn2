@@ -83,7 +83,7 @@
       "destination": "/api/artist-og?id=:id"
     },
     {
-      "source": "/:slug((?!(?:about|admin|api|artist|artists|assets|audience|auth|bettercallzaal|catalog|claim|community|console|delete-account|discover|dj-shuffle|drops|guidelines|inbox|install|keys|launch|leaderboard|license|marketplace|node_modules|nft|not-found|playlist|playlists|post|privacy|profile|reset-password|room|share|social|song|studio|terms|w|wallet|wavewarz-africa|world|world-assets|world-builder|worlds)(?:/|$))[^/.]+)",
+      "source": "/:slug((?!(?:about|admin|api|artist|artists|assets|audience|auth|bettercallzaal|catalog|claim|community|console|delete-account|discover|day-ones|dj-shuffle|drops|guidelines|inbox|install|keys|launch|leaderboard|license|marketplace|node_modules|nft|not-found|playlist|playlists|post|privacy|profile|reset-password|room|share|social|song|studio|terms|w|wallet|wavewarz-africa|world|world-assets|world-builder|worlds)(?:/|$))[^/.]+)",
       "has": [
         {
           "type": "header",
@@ -94,7 +94,7 @@
       "destination": "/api/artist-og?slug=:slug"
     },
     {
-      "source": "/:artist((?!(?:about|admin|api|artist|artists|assets|audience|auth|bettercallzaal|catalog|claim|community|console|delete-account|discover|dj-shuffle|drops|guidelines|inbox|install|keys|launch|leaderboard|license|marketplace|node_modules|nft|not-found|playlist|playlists|post|privacy|profile|reset-password|room|share|social|song|studio|terms|w|wallet|wavewarz-africa|world|world-assets|world-builder|worlds)(?:/|$))[^/.]+)/:song([^/.]+)",
+      "source": "/:artist((?!(?:about|admin|api|artist|artists|assets|audience|auth|bettercallzaal|catalog|claim|community|console|delete-account|discover|day-ones|dj-shuffle|drops|guidelines|inbox|install|keys|launch|leaderboard|license|marketplace|node_modules|nft|not-found|playlist|playlists|post|privacy|profile|reset-password|room|share|social|song|studio|terms|w|wallet|wavewarz-africa|world|world-assets|world-builder|worlds)(?:/|$))[^/.]+)/:song([^/.]+)",
       "has": [
         {
           "type": "header",

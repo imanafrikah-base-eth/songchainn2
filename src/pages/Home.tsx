@@ -45,6 +45,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DayOnesPanel } from '@/components/dayones/DayOnesPanel';
 import { SearchModal } from '@/components/SearchModal';
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -1167,32 +1168,9 @@ export default function Home() {
               </div>
             </Link>
 
-            {/* What is live */}
-            <div className="relative">
-              <h3 className="font-heading font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Live now</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-5 leading-relaxed">
-                Songs are now real, tradeable coins on Base. Buy them, sell them,
-                and back the artists you love directly, on-chain.
-              </p>
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full gradient-primary shadow-glow" />
-                  <span className="text-foreground">Music you have not heard yet</span>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full gradient-primary shadow-glow" />
-                  <span className="text-foreground">Rooms, the feed and live battles</span>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full gradient-primary shadow-glow" />
-                  <span className="text-foreground">Own songs, and sell them on</span>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-muted" />
-                  <span className="text-muted-foreground">Points and the leaderboard</span>
-                </div>
-              </div>
-            </div>
+            {/* Day Ones: a fan's own cards, or an artist's first fans. It replaced a
+                "Live now" list of four slogans that told nobody anything. */}
+            <DayOnesPanel />
           </motion.aside>
         </div>
 

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useMyWallets } from '@/hooks/useMyWallets';
 import { useSongCoins } from '@/hooks/useSongCoins';
 import { getOwnedCoinBalances } from '@/lib/zoraTrading';
 import type { Address } from 'viem';
@@ -16,9 +17,13 @@ export interface OwnedSong {
  * wallet is connected.
  */
 export function useOwnedSongs() {
-  const { user } = useAuth();
+  const { user, walletAddress: authWallet } = useAuth();
+  const { active } = useMyWallets();
   const { data: songCoins } = useSongCoins();
-  const walletAddress = user?.user_metadata?.wallet_address as string | undefined;
+  // The wallet that pays, then the one this session connected. It used to read
+  // user_metadata.wallet_address, which is empty for almost everyone, so the
+  // wallet page said you owned nothing while you held songs.
+  const walletAddress = (active?.address ?? authWallet ?? (user?.user_metadata?.wallet_address as string | undefined)) || undefined;
 
   const query = useQuery<OwnedSong[]>({
     queryKey: ['owned-songs', walletAddress, songCoins?.length ?? 0],

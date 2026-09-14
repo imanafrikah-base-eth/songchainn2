@@ -14,7 +14,7 @@ import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { cn } from '@/lib/utils';
 const logo = '/songchainn-logo.webp';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
-import { useInboxUnread } from '@/hooks/useInboxUnread';
+import { useInboxUnread, useMarkInboxSeen } from '@/hooks/useInboxUnread';
 import { NavRail } from '@/components/NavRail';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { InviteFriends } from '@/components/InviteFriends';
@@ -34,8 +34,9 @@ export function Navigation() {
   const navigate = useNavigate();
   const { lifetimePoints, streak } = useUserPoints();
   const { signOut, walletAddress, user, isArtist } = useAuth();
+  const { display: balanceDisplay, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
   const inboxUnread = useInboxUnread();
-  const { balance, isLoading: isBalanceLoading } = useWalletBalance(walletAddress);
+  const markInboxSeen = useMarkInboxSeen();
   const [showInvite, setShowInvite] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showSuggestionDialog, setShowSuggestionDialog] = useState(false);
@@ -209,26 +210,7 @@ export function Navigation() {
                   </span>
                 </motion.button>
               )}
-              {/* Wallet Balance - shown when connected */}
-              {walletAddress && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ scale: 1.05 }}
-                  className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl glass text-xs sm:text-sm cursor-pointer"
-                  onClick={() => navigate(profilePath)}
-                  title={walletAddress}
-                >
-                  <Wallet className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-foreground font-medium">
-                    {isBalanceLoading ? '...' : balance ? `${balance} ETH` : '0 ETH'}
-                  </span>
-                  <span className="text-muted-foreground text-xs hidden md:inline">
-                    ({truncateAddress(walletAddress)})
-                  </span>
-                </motion.div>
-              )}
-
+              {/* The wallet lives in WalletChip below: one chip, not two. */}
               {/* Streak and points, the two numbers worth carrying in the bar */}
               {/* A shared song is the most passed-around surface in the product,
                   and this bar is what renders above it. Without this there was
@@ -271,7 +253,8 @@ export function Navigation() {
               {user && (
                 <Link
                   to="/inbox"
-                  aria-label={inboxUnread > 0 ? `Messages, ${inboxUnread} unread` : 'Messages'}
+                  onClick={markInboxSeen}
+                  aria-label={inboxUnread > 0 ? `Messages, ${inboxUnread} new` : 'Messages'}
                   className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
                 >
                   <MessageSquare className="w-5 h-5" />
@@ -514,7 +497,7 @@ export function Navigation() {
                         {truncateAddress(walletAddress)}
                       </p>
                       <p className="text-xs text-primary font-semibold">
-                        {isBalanceLoading ? 'Loading...' : balance ? `${balance} ETH` : '0 ETH'}
+                        {isBalanceLoading ? 'Loading...' : `${balanceDisplay ?? '0'} ETH on Base`}
                       </p>
                     </div>
                   </div>

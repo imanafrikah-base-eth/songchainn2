@@ -13,6 +13,7 @@ import { ZABAL_GAMEZ_ENABLED } from '@/lib/features';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { usePublishedWorlds } from '@/hooks/usePublishedWorlds';
 import { ARTISTS } from '@/data/musicData';
+import { BecomeArtistButton } from '@/components/BecomeArtistButton';
 import { useAuth } from '@/context/AuthContext';
 
 /**
@@ -108,10 +109,16 @@ const About = () => {
             <h2 className="font-heading text-2xl font-bold text-foreground">If you make music</h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <PictureCard image={`${W}/room-studio.jpg`} title="Release today" line="Send a record, or a whole EP. Live the same minute. No fee, no middleman." to={isArtist ? '/studio' : '/studio'} cta="Open the Studio" />
-            <PictureCard image={`${W}/square-hero.jpg`} video={`${W}/square-hero.mp4`} title="A world, not a page" line="Your own streets and rooms. Ask Mo$ha and it builds it with you." to="/world-builder" cta="Build" />
+            {/* The tools open only for artists; a fan gets the one door below. */}
+            <PictureCard image={`${W}/room-studio.jpg`} title="Release today" line="Send a record, or a whole EP. Live the same minute. No fee, no middleman." to={isArtist ? '/studio' : '/keys'} cta={isArtist ? 'Open the Studio' : 'How releasing works'} />
+            <PictureCard image={`${W}/square-hero.jpg`} video={`${W}/square-hero.mp4`} title="A world, not a page" line="Your own streets and rooms. Ask Mo$ha and it builds it with you." to={isArtist ? '/world-builder' : '/worlds'} cta={isArtist ? 'Build' : 'See the worlds'} />
             <PictureCard image={`${W}/room-request.jpg`} title="Paid to your wallet" line="Coin a record and every trade pays you by the coin's own rule." to="/keys" cta="How the money works" />
           </div>
+          {user && !isArtist && (
+            <div className="mt-4">
+              <BecomeArtistButton />
+            </div>
+          )}
           <p className="mt-3 text-xs text-muted-foreground">
             Keep your distributor for the stores. This is the place your fans can hold your records and reach you directly.
           </p>
@@ -168,7 +175,11 @@ const About = () => {
           <h2 className="font-heading text-2xl font-bold sm:text-3xl">Release here first, then everywhere.</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm opacity-90">Built for every artist and every listener, wherever you are. It started with a handful of artists in Zambia, and the doors are open to the whole world.</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <Button asChild variant="secondary" className="h-11 rounded-full px-6"><Link to={user ? '/studio' : '/?auth=signup'}>{user ? 'Open the Studio' : 'Sign up free'}</Link></Button>
+            {user && !isArtist ? (
+              <BecomeArtistButton variant="secondary" size="default" className="h-11 px-6" />
+            ) : (
+              <Button asChild variant="secondary" className="h-11 rounded-full px-6"><Link to={user ? '/studio' : '/?auth=signup'}>{user ? 'Open the Studio' : 'Sign up free'}</Link></Button>
+            )}
             <Button asChild variant="ghost" className="h-11 rounded-full px-6 text-primary-foreground hover:bg-white/10"><Link to="/worlds">See the worlds</Link></Button>
           </div>
         </section>

@@ -300,7 +300,7 @@ export function generateNonce(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
 
-async function switchToBaseChain(provider: EIP1193Provider): Promise<boolean> {
+export async function switchToBaseChain(provider: EIP1193Provider): Promise<boolean> {
   try {
     await provider.request({
       method: "wallet_switchEthereumChain",

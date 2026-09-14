@@ -43,19 +43,20 @@ import { getWorldByArtistId } from '@/worlds/registry';
  * who makes music stays, once, at the end. An artist account gets its own set.
  */
 const LISTENER_STARTERS = [
-  'What is this place?',
   'What should I listen to first?',
-  'Is it really free to stream?',
+  'Who is new and worth finding?',
+  'How do I become a Day One?',
+  'What is live right now?',
   'How do I get closer to an artist?',
   'I make music. Where do I start?',
 ];
 
 const ARTIST_STARTERS = [
-  'How do I put my music out?',
+  'What should I do next for my music?',
+  'Who are my Day Ones?',
   'How do I get paid for my music?',
-  'Who is listening to my songs?',
+  'How do I put my next release out?',
   'How do I build my world?',
-  'What can my fans do here?',
 ];
 
 /**
@@ -305,17 +306,19 @@ export function MoshaChat({
       const choose = moshaAction?.type === 'choose' ? moshaAction : undefined;
       // A page Mo$ha points at gets a button; the old keyword door stays as a
       // fallback for the account questions when the model gave no action.
+      const accountAsk = !go && !flow && !choose && ARTIST_ACCOUNT_ASK.test(clean);
       const action = go
         ? { label: 'Take me there', to: go.path }
-        : !flow && !choose && ARTIST_ACCOUNT_ASK.test(clean)
-          ? isArtist
-            ? { label: 'Open the Studio', to: '/studio' }
-            : { label: 'Switch to artist account', to: '/claim' }
+        : accountAsk && isArtist
+          ? { label: 'Open the Studio', to: '/studio' }
           : undefined;
+      // A fan asking about making music gets the one-tap become-an-artist flow,
+      // never a link into artist tools or the claim form for existing pages.
+      const shownFlow = flow ?? (accountAsk && !isArtist ? ('become_artist' as const) : undefined);
       const doOp = moshaAction?.type === 'do' ? moshaAction.op : undefined;
       const doArg = moshaAction?.type === 'do' ? moshaAction.arg : undefined;
       const flowFiles = moshaAction?.type === 'flow' && 'attachments' in moshaAction ? moshaAction.attachments : undefined;
-      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow, doOp, doArg, flowFiles, choice: choose ? { path: choose.path } : undefined, at: new Date().toISOString() }]);
+      setTurns((prev) => [...prev, { role: 'assistant', content: reply, action, flow: shownFlow, doOp, doArg, flowFiles, choice: choose ? { path: choose.path } : undefined, at: new Date().toISOString() }]);
       setBusy(false);
       input.current?.focus();
     },

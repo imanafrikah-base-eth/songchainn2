@@ -8,6 +8,8 @@ import { IMAN_AFRIKAH_WORLD } from '@/worlds/registry';
 import { useHasWorld } from '@/worlds/builder/useHasWorld';
 import { useHasLiveSong } from '@/hooks/useHasLiveSong';
 import { WorldArt } from '@/worlds/components/WorldArt';
+import { BecomeArtistButton } from '@/components/BecomeArtistButton';
+import { useAuth } from '@/context/AuthContext';
 import { thumb } from '@/lib/img';
 
 /**
@@ -80,6 +82,8 @@ export function WorldsPhase3({
   // Worlds are for musicians with a song out: only they are offered the builder.
   const { hasLiveSong } = useHasLiveSong();
   const canBuild = !isGuest && hasLiveSong;
+  // A fan is never handed the builder or the Studio, only the door to becoming an artist.
+  const { isArtist } = useAuth();
 
   return (
     <section className={`relative ${className}`}>
@@ -187,12 +191,16 @@ export function WorldsPhase3({
               </>
             ) : (
               <>
+                {!isArtist && !ownsWorld ? (
+                  <BecomeArtistButton size="default" className="h-11 px-6 text-sm font-semibold" />
+                ) : (
                 <Button asChild className="h-11 rounded-full px-6 text-sm font-semibold">
                   <Link to={ownsWorld && myWorldPath ? myWorldPath : canBuild ? '/world-builder' : '/studio'}>
                     {ownsWorld ? 'Walk into your world' : canBuild ? 'Start building' : 'Put your first song out'}
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Link>
                 </Button>
+                )}
                 <Button
                   asChild
                   variant="outline"

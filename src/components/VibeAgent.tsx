@@ -464,38 +464,10 @@ export function VibeAgent() {
     signalRef.current.genreStarts[currentSong.genre] = (signalRef.current.genreStarts[currentSong.genre] || 0) + 1;
     signalRef.current.artistStarts[currentSong.artistId] = (signalRef.current.artistStarts[currentSong.artistId] || 0) + 1;
 
-    const distinctSongStarts = signalRef.current.playedSongIds.length;
-    const canShowRewardsNudge =
-      mode !== 'unset' &&
-      mode !== 'music' &&
-      !rewardsNudgeShownRef.current &&
-      distinctSongStarts >= 4 &&
-      Date.now() >= dismissedUntil &&
-      !step;
-    if (canShowRewardsNudge) {
-      rewardsNudgeShownRef.current = true;
-      setExternalPrompt({
-        text:
-          `You are on fire, ${displayName}. Song #${distinctSongStarts} just started and your momentum is building. ` +
-          `Your points and streaks keep rising as you play music, chat in The Room, invite new users, and share songs to Feed. ` +
-          `Right now you are on a ${ledgerStreak} day streak with ${ledgerPoints.toLocaleString()} points. ` +
-          `Keep it going and you climb the leaderboard.`,
-        ctaLabel: 'Show My Progress',
-        ctaPath: '/profile',
-      });
-      if (claimInterruption('mosha-prompt', { priority: 'promo' })) {
-        setStep('external-prompt');
-      }
-    }
-
-    if (!seenArtistsRef.current.has(currentSong.artistId)) {
-      seenArtistsRef.current.add(currentSong.artistId);
-      const artist = ARTISTS.find((entry) => entry.id === currentSong.artistId);
-      if (artist && mode !== 'music') {
-        setDiscoveryArtistName(artist.name);
-        openStep('discovery');
-      }
-    }
+    // Nothing pops up because a song started. The "rising artist" and "you are on
+    // fire" cards interrupted the music to hype it, and read as corny (founder,
+    // 15 Sep 2026). The moment worth a card is earning a Day One: DayOneMoment.
+    seenArtistsRef.current.add(currentSong.artistId);
 
     prevSongIdRef.current = currentSong.id;
     prevSongTimeRef.current = currentTime;

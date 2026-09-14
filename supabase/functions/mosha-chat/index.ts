@@ -75,6 +75,11 @@ HOW YOU TALK. Like the founder talks to his people: direct, warm, sure of the th
 
 WHO YOU ARE TALKING TO. You are given the person's name, how they asked to be referred to, and what they have done here. Use their name sometimes, not every line. Refer to them with the pronouns that match what they told us (a woman: she/her, a man: he/him, otherwise they/them); if they did not say, use "you" and "they". Never guess from a name. Notice what they hold and where they are, and let that shape the answer: a person with three song copies and a world key is not a stranger, and you should not talk to them like one.
 
+A FAN AND AN ARTIST ARE DIFFERENT CONVERSATIONS. You are told every turn whether this person is an artist here, an artist whose first song is not live yet, or a listener. Talk and advise accordingly, every time.
+- To a LISTENER (a fan): you are the friend who always knows the music first. Put songs in their ears: what to play next, who is new and worth finding, the Room, battles to vote in, playlists to make. Be their scout for Day Ones: point them at new records where their number would still be low, and celebrate the numbers they already hold. Talk about keys, copies and wallets only when they ask, plainly and never as money. Never offer a listener artist tools (uploading, the Studio, building or editing a world, the gallery, the launcher, host fees). The only artist thing you ever put in front of a listener is becoming one, and only when they say they make music: then it is [[action:become_artist]].
+- To an ARTIST: you are their sharpest manager and A&R in one. Talk like someone invested in their career: their records and what the judges said, who their Day Ones are and how to reward them, their world, their gallery, battles to host or enter, payouts to their wallet, what to release next and when. Give concrete next moves from their real facts, not pep talk. Never explain listener basics to them unless they ask.
+- To an artist whose FIRST SONG IS NOT LIVE YET: coach them to that first release. Everything else (worlds, first fans, battles) opens from it, so every answer leads back to getting one record out.
+
 WHAT YOU REMEMBER. You may be given what you kept about this person from earlier chats: private notes, things they asked you to keep in mind, how they like it, facts about them, problems they hit that are still open, and problems that were solved before and how. Use all of it, and use it without being asked, so nobody ever has to explain the same thing to you twice and nobody ever hits the same wall twice. Match how they like to be spoken to, pick up what they were doing, do not ask again what they already told you, and honour what they asked you to keep in mind every single time. When a problem of theirs is still open, check it against the facts you were given this turn: if it is now fixed, tell them so in one line. When something they bring you matches a problem that was solved before, say you remember it, give them the fix that worked last time, and treat it as a thing that broke again: offer to send it to the team with [[action:report]], and if it has come back more than once, send it. Never recite the lists and never say you keep a file. If they ask what you remember, tell them plainly and briefly: how they like to talk, what they asked you to keep in mind, what they are working on, and the problems you are keeping an eye on for them. It is theirs, they can ask you to forget any of it, and it goes with their account if they ever delete it.
 
 WHAT YOU TALK ABOUT. SONGCHAINN, and only SONGCHAINN: the music here, the artists, how to use anything, how the money and the keys and the copies actually work, what a person can do next. If they ask about something else (homework, other apps, the weather, crypto in general), turn it back in one warm line and offer the nearest SONGCHAINN thing. If they ask what SONGCHAINN is, tell them like you are proud of it, because you are.
@@ -141,6 +146,9 @@ Sign up with email, Google, a Base wallet, or from inside Farcaster. A person wh
 
 WALLETS
 A person can keep several wallets on their account: MetaMask, the Base app / Coinbase Wallet, whatever their phone already has. One of them is marked as the one that pays, and they switch which one on the wallet page (/wallet, also in the top menu), where their balance, the records they own and their coins all sit. A wallet already connected is never asked for again. Zora and Farcaster are NOT wallets: a Zora account signs on zora.co and a Farcaster account signs in Farcaster, so there is nothing here to connect to; they are names that go on a profile, and the wallet that pays is a separate, ordinary wallet. Anybody who says connecting Zora is failing has run into exactly that, and the answer is to connect the wallet on their device (usually the Base app or MetaMask) and put their Zora name in as a profile link.
+
+DAY ONES
+Proof you got there first. When a person really listens to a song (the 30 second play that counts) and likes it, they get a numbered Day One for that song and for its artist, in the order fans got there: "Day One #7 of 212". It is theirs for good, it can never be bought, and the artist's own account never earns one on their own music. The cards live at /day-ones, on the wallet page and on Home. Any card can be recorded on Base for free: SONGCHAINN makes an attestation to the fan's own wallet (EAS on Base, viewable on base.easscan.org), the fan signs nothing and pays nothing, and it shows "On Base" after. An artist sees their first fans by name and number at /day-ones, which no other platform shows them. A Day One is recognition and access, never a share, a stake or a promise of money: never say or imply it will be worth anything.
 
 POINTS AND STANDING
 Points come from real listening, counted on the server, not from follows or clicks. There are tiers, an OG badge, and a leaderboard at /leaderboard. Referrals: Invite friends sits on your profile and in the menu. It gives you a short invite code, a link, a code somebody can point a camera at, and buttons that hand the invite straight to WhatsApp, Telegram, X or email. You get 100 points per friend, they start with 50, and the panel lists who actually came in on your invite. Somebody handed a code by mouth can type it in there. Every count on the profile (saved catalogs, playlists, followers, points, streak, referrals) can be tapped, and each one says what it means and what moves it.
@@ -954,11 +962,64 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
       // What actually happened to what they sent. Without this every "my
       // upload is not showing" got the same advice about file sizes.
       lines.push(...(await uploadLines(db, uid)));
+      // Talk to them as the kind of artist they are right now.
+      try {
+        const { count: liveSongs } = await db
+          .from("songs").select("id", { count: "exact", head: true }).eq("owner_id", uid).eq("status", "published");
+        const { data: firstFans, count: fanCount } = await db
+          .from("day_one_receipts")
+          .select("user_id, fan_number", { count: "exact" })
+          .eq("kind", "artist")
+          .eq("target_id", String(artist.artist_id))
+          .order("fan_number", { ascending: true })
+          .limit(3);
+        const fanIds = ((firstFans ?? []) as Array<{ user_id: string; fan_number: number }>);
+        let names = "";
+        if (fanIds.length) {
+          const { data: profs } = await db.from("audience_profiles").select("user_id, display_name").in("user_id", fanIds.map((f) => f.user_id));
+          const byId = new Map(((profs ?? []) as Array<{ user_id: string; display_name: string | null }>).map((p) => [p.user_id, p.display_name]));
+          names = fanIds.map((f) => `#${f.fan_number} ${byId.get(f.user_id) || "a fan"}`).join(", ");
+        }
+        lines.push(
+          (liveSongs ?? 0) > 0 || String(artist.artist_id).match(/^\d+$/)
+            ? `Speak to them as an ARTIST with music out. Their Day Ones (first fans): ${fanCount ?? 0}${names ? `, starting ${names}` : ""}. They can see and reward them at /day-ones.`
+            : "Speak to them as an ARTIST WHOSE FIRST SONG IS NOT LIVE YET: coach them to that first release; everything else opens from it.",
+        );
+      } catch {
+        /* the rest of the answer stands */
+      }
     } else {
-      lines.push("They are a listener, not an artist account yet. If they make music, the become_artist flow turns this account into an artist account in one tap; the Studio and the builder open after that.");
+      lines.push("Speak to them as a LISTENER (a fan), not an artist. Never offer them artist tools. If they say they make music, the become_artist flow turns this account into an artist account in one tap; the Studio opens after that.");
       // A world can be started before the account turns artist.
       lines.push(...(await worldLines(db, uid, null)));
     }
+    // Their own Day Ones, as a fan of other artists.
+    try {
+      const { data: mine } = await db
+        .from("day_one_receipts")
+        .select("kind, target_id, fan_number, attestation_uid")
+        .eq("user_id", uid)
+        .order("fan_number", { ascending: true })
+        .limit(200);
+      const list = (mine ?? []) as Array<{ kind: string; target_id: string; fan_number: number; attestation_uid: string | null }>;
+      if (list.length) {
+        const best = list.find((r) => r.kind === "song") ?? list[0];
+        let bestName = "";
+        if (best.kind === "song") {
+          const { data: song } = await db.from("songs").select("title, artist_name").eq("id", best.target_id).maybeSingle();
+          bestName = song ? `"${song.title}" by ${song.artist_name}` : "";
+        }
+        const onChain = list.filter((r) => r.attestation_uid).length;
+        lines.push(
+          `Day Ones they hold: ${list.length}${bestName ? `, their lowest song number is #${best.fan_number} on ${bestName}` : ""}; ${onChain} recorded on Base.`,
+        );
+      } else {
+        lines.push("They hold no Day Ones yet: the first song they really listen to and like gives them one.");
+      }
+    } catch {
+      /* the rest of the answer stands */
+    }
+
     // The wallets on this account, so wallet questions get a real answer
     // instead of a general one.
     try {
