@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { NewBadge } from '@/components/NewBadge';
 import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { Music } from 'lucide-react';
@@ -42,9 +43,7 @@ export function CatalogCard({ catalog, isNew, className }: CatalogCardProps) {
           )}
           <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
           {isNew && (
-            <span className="absolute top-2 right-2 rounded-full bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground shadow-glow">
-              NEW
-            </span>
+            <NewBadge className="absolute right-2 top-2" />
           )}
         </div>
         <div className="relative p-3 sm:p-4">

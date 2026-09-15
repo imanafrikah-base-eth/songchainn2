@@ -1,4 +1,5 @@
 import { artistPath } from '@/lib/slugRoutes';
+import { NewBadge } from '@/components/NewBadge';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
@@ -250,11 +251,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               )}>
                 {song.title}
               </p>
-              {isNewSong && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide">
-                  New
-                </span>
-              )}
+              {isNewSong && <NewBadge />}
               {isTokenGated && (
                 <Link
                   to="/marketplace"
@@ -442,11 +439,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               <h3 className="text-base font-heading font-semibold text-foreground truncate flex items-center gap-2">
                 {isCurrentSong && isPlaying && <NowPlayingDot />}
                 <span className="truncate">{song.title}</span>
-                {isNewSong && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide flex-shrink-0">
-                    New
-                  </span>
-                )}
+                {isNewSong && <NewBadge />}
               </h3>
               <button
                 type="button"
@@ -581,11 +574,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           )}>
             {isCurrentSong && isPlaying && <NowPlayingDot />}
             <span className="truncate">{song.title}</span>
-            {isNewSong && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase tracking-wide flex-shrink-0">
-                New
-              </span>
-            )}
+            {isNewSong && <NewBadge />}
           </h3>
           {isTokenGated && (
             <Link

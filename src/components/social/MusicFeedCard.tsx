@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SocialPostWithProfile } from '@/types/social';
-import { SONGS, ARTISTS } from '@/data/musicData';
+import { useFeedCatalog } from '@/lib/feedPosts';
 import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -206,10 +206,13 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
   const [reporting, setReporting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const song       = post.song_id    ? SONGS.find(s => s.id === post.song_id)      : null;
-  const artist     = song            ? ARTISTS.find(a => a.id === song.artistId)    : null;
-  const postArtist = post.artist_id  ? ARTISTS.find(a => a.id === post.artist_id)   : null;
-  const artistSong = postArtist      ? (SONGS.filter(s => s.artistId === postArtist.id).sort((a,b)=>b.plays-a.plays)[0] ?? null) : null;
+  /* The whole catalogue, uploads included. Looking only at the founding list is
+     what drew a grey music note on every post about an uploaded record. */
+  const catalog    = useFeedCatalog();
+  const song       = post.song_id    ? catalog.songById.get(String(post.song_id)) ?? null : null;
+  const artist     = song            ? catalog.artistById.get(String(song.artistId)) ?? null : null;
+  const postArtist = post.artist_id  ? catalog.artistById.get(String(post.artist_id)) ?? null : null;
+  const artistSong = postArtist      ? ([...(catalog.songsByArtist.get(String(postArtist.id)) ?? [])].sort((a,b)=>(b.plays ?? 0)-(a.plays ?? 0))[0] ?? null) : null;
   const activeSong = song ?? artistSong;
 
   const isOwnPost          = user?.id === post.user_id;
@@ -272,7 +275,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
 
   const goToProfile = () => {
     if (post.artist_id) {
-      const a = ARTISTS.find(x => x.id === post.artist_id);
+      const a = catalog.artistById.get(String(post.artist_id));
       if (a) { navigate(getArtistSlugUrl(a)); return; }
     }
     navigate(`/audience/${post.user_id}`);

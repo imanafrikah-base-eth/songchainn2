@@ -7,8 +7,9 @@ import {
   Plus,
   Compass,
   Search,
-  Sparkles,
   ArrowLeft,
+  Clapperboard,
+  Images,
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PostComposer } from '@/components/social/PostComposer';
@@ -26,7 +27,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { supabase } from '@/integrations/supabase/client';
 import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
-import { SONGS } from '@/data/musicData';
+import { FeedPostCard } from '@/components/social/FeedPostCard';
+import { useFeedCatalog, isShowablePost, postInSection, resolvePostSong as songOfPost, type FeedSection } from '@/lib/feedPosts';
 import { useCommentPreviews } from '@/hooks/useCommentPreviews';
 import { useMentions } from '@/hooks/useMentions';
 import { useFeedReactions } from '@/hooks/useFeedReactions';
@@ -62,7 +64,10 @@ export default function Social() {
   playSongRef.current = playSong;
   const postsToRenderRef = useRef<SocialPostWithProfile[]>([]);
 
-  const [feedType, setFeedType] = useState<'foryou' | 'following'>('foryou');
+  /* For you and Following swipe full screen like TikTok, Videos is clips only,
+     Photos scrolls like Instagram and Facebook (founder, 15 Sep 2026). */
+  const [feedType, setFeedType] = useState<FeedSection>('foryou');
+  const catalog = useFeedCatalog();
   const [suggestedUsers, setSuggestedUsers] = useState<AudienceProfile[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [showComposer, setShowComposer] = useState(false);
@@ -175,12 +180,15 @@ export default function Social() {
     };
   }, [posts, sharedPostId, isLoading, fetchPostById, navigate]);
 
-  const filteredPosts = feedType === 'following'
+  const filteredPosts = (feedType === 'following'
     ? posts.filter((p) =>
         following.includes(p.user_id)
         || p.user_id === user?.id
         || (!!p.artist_id && likedArtistIds.includes(p.artist_id)))
-    : posts;
+    : posts)
+    // Nothing is drawn as a placeholder: a post with nothing to look at stays out.
+    .filter((p) => isShowablePost(p, catalog) && postInSection(p, feedType));
+  const isPhotos = feedType === 'photos' && !sharedPost;
 
   const postsToRender = sharedPost
     ? [sharedPost, ...filteredPosts.filter((p) => p.id !== sharedPost.id)]
@@ -260,14 +268,7 @@ export default function Social() {
   const visibleRatiosRef = useRef(new Map<string, number>());
   const activePostIdRef = useRef<string | null>(null);
 
-  const resolvePostSong = useCallback((post: SocialPostWithProfile) => {
-    let songToPlay = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
-    if (!songToPlay && post.post_type === 'artist_follow' && post.artist_id) {
-      const artistSongs = SONGS.filter(s => s.artistId === post.artist_id).sort((a, b) => b.plays - a.plays);
-      songToPlay = artistSongs[0] ?? null;
-    }
-    return songToPlay;
-  }, []);
+  const resolvePostSong = useCallback((post: SocialPostWithProfile) => songOfPost(post, catalog), [catalog]);
 
   const decideActiveCard = useCallback(() => {
     let bestId: string | null = null;
@@ -403,7 +404,9 @@ export default function Social() {
       {/* ── Scrollable feed ── */}
       <div
         ref={feedRef}
-        className="absolute inset-0 overflow-y-scroll overscroll-none snap-y snap-mandatory"
+        className={isPhotos
+          ? 'absolute inset-0 overflow-y-auto overscroll-contain bg-background pb-28 pt-16'
+          : 'absolute inset-0 overflow-y-scroll overscroll-none snap-y snap-mandatory'}
       >
         {effectiveIsLoading && postsToRender.length === 0 ? (
           /* Skeleton cards — render 3 immediately so the screen isn't blank */
@@ -431,13 +434,23 @@ export default function Social() {
                   ? <Users className="w-10 h-10 text-white/70" />
                   : <Compass className="w-10 h-10 text-white/70" />}
               </div>
-              <h3 className="font-bold text-xl text-white mb-2">
-                {feedType === 'following' ? 'Follow music fans' : 'Be the first!'}
-              </h3>
-              <p className="text-white/60 mb-6">
+              <h3 className={`font-bold text-xl mb-2 ${isPhotos ? 'text-foreground' : 'text-white'}`}>
                 {feedType === 'following'
-                  ? 'Follow people to see their music shares here'
-                  : "Share what you're listening to and start the conversation"}
+                  ? 'Follow music fans'
+                  : feedType === 'videos'
+                    ? 'No clips yet'
+                    : feedType === 'photos'
+                      ? 'No posts yet'
+                      : 'Be the first'}
+              </h3>
+              <p className={`mb-6 ${isPhotos ? 'text-muted-foreground' : 'text-white/60'}`}>
+                {feedType === 'following'
+                  ? 'Follow people and their posts show up here.'
+                  : feedType === 'videos'
+                    ? 'Post a clip with a song on it and it lands here.'
+                    : feedType === 'photos'
+                      ? 'Post a picture or a song and it lands here.'
+                      : 'Share what you are listening to and start the conversation.'}
               </p>
               <div className="flex gap-3 justify-center">
                 {feedType === 'following' ? (
@@ -455,7 +468,22 @@ export default function Social() {
             </motion.div>
           </div>
         ) : (
-          postsToRender.map((post) => (
+          isPhotos ? (
+            <div className="mx-auto w-full max-w-xl sm:px-2">
+              {postsToRender.map((post) => (
+                <FeedPostCard
+                  key={post.id}
+                  post={post}
+                  catalog={catalog}
+                  previewComments={previews[post.id]}
+                  onLike={toggleLikePost}
+                  onComment={() => handleOpenComments(post.id)}
+                  onFollow={followUser}
+                  isFollowing={isFollowing(post.user_id) || post.user_id === user?.id}
+                />
+              ))}
+            </div>
+          ) : postsToRender.map((post) => (
             <div
               key={post.id}
               data-post-id={post.id}
@@ -482,74 +510,81 @@ export default function Social() {
         )}
       </div>
 
-      {/* ── Overlay header ── */}
-      <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
-        <div className="bg-gradient-to-b from-black/70 to-transparent">
-          {/* The cards are full bleed, so a 512px strip floating over them read
-              as a different page sitting on top of the feed. */}
-          <div className="max-w-3xl mx-auto px-4 pt-3 pb-8">
-            <div className="flex items-center justify-between pointer-events-auto">
-              {/* Back + title */}
-              <div className="flex items-center gap-2">
-                {sharedPost ? (
-                  /* Arrived on one post from a link. The way out is the feed,
-                     not the browser history, which may be another site. */
-                  <button
-                    type="button"
-                    onClick={backToFeed}
-                    className="h-10 pl-2 pr-3 rounded-full bg-white/10 backdrop-blur-sm flex items-center gap-1.5 text-sm font-medium text-white"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to feed
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => navigate(-1)}
-                      aria-label="Go back"
-                      className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
-                    >
-                      <ArrowLeft className="w-4 h-4 text-white" />
-                    </button>
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-white/80" />
-                      <span className="font-semibold text-white">Feed</span>
-                    </div>
-                  </>
-                )}
-              </div>
+      {/* ── Top bar ──
+          One line at every width: the sections as text tabs, search and create
+          on the right. No title, no pills: "Feed" and "For You" used to wrap onto
+          two lines on a phone. Over the full screen sections it floats on a
+          shade; over Photos it is solid, like any list app. */}
+      <div className={`absolute top-0 left-0 right-0 z-30 ${isPhotos ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+        <div className={isPhotos ? 'border-b border-border/60 bg-background/95 backdrop-blur-md' : 'bg-gradient-to-b from-black/75 via-black/35 to-transparent'}>
+          <div className="mx-auto max-w-3xl px-3 pt-3 pb-3 sm:px-4">
+            <div className="flex items-center gap-2 pointer-events-auto">
+              {sharedPost ? (
+                <button
+                  type="button"
+                  onClick={backToFeed}
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-white/10 pl-2 pr-3 text-sm font-semibold text-white backdrop-blur-sm"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </button>
+              ) : null}
 
-              {/* Feed tabs + discover */}
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-white/10 backdrop-blur-sm rounded-full p-0.5">
-                  {/* px-3 py-1 padded these for about 24px and then min-h-10
-                      forced them to 40, so the label floated in an oversized
-                      pill. One height, stated once. */}
-                  <button
-                    onClick={() => setFeedType('foryou')}
-                    className={`inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors ${
-                      feedType === 'foryou' ? 'bg-white text-black' : 'text-white/70 hover:text-white'
-                    }`}
-                  >
-                    For You
-                  </button>
-                  <button
-                    onClick={() => setFeedType('following')}
-                    className={`inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors ${
-                      feedType === 'following' ? 'bg-white text-black' : 'text-white/70 hover:text-white'
-                    }`}
-                  >
-                    Following
-                  </button>
+              <nav aria-label="Feed sections" className="min-w-0 flex-1 overflow-x-auto scrollbar-hide">
+                <div className="flex w-max items-center gap-3.5 px-0.5 sm:gap-5">
+                  {([
+                    { key: 'foryou', label: 'For you' },
+                    { key: 'following', label: 'Following' },
+                    { key: 'videos', label: 'Videos', icon: Clapperboard },
+                    { key: 'photos', label: 'Posts', icon: Images },
+                  ] as Array<{ key: FeedSection; label: string; icon?: typeof Images }>).map((tab) => {
+                    const on = feedType === tab.key && !sharedPost;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => {
+                          if (sharedPost) backToFeed();
+                          setFeedType(tab.key);
+                          feedRef.current?.scrollTo({ top: 0 });
+                        }}
+                        aria-pressed={on}
+                        className={`relative inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap text-[14px] transition-colors sm:text-[15px] ${
+                          on
+                            ? isPhotos ? 'font-bold text-foreground' : 'font-bold text-white'
+                            : isPhotos ? 'font-semibold text-muted-foreground hover:text-foreground' : 'font-semibold text-white/60 hover:text-white'
+                        }`}
+                      >
+                        {tab.icon && <tab.icon className="hidden h-4 w-4 sm:block" />}
+                        {tab.label}
+                        {on && (
+                          <span className={`absolute -bottom-0.5 left-1/2 h-[3px] w-6 -translate-x-1/2 rounded-full ${isPhotos ? 'bg-foreground' : 'bg-white'}`} />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+              </nav>
 
-                {/* Discover */}
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <button className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                      <Search className="w-4 h-4 text-white" />
-                    </button>
-                  </SheetTrigger>
+              <button
+                type="button"
+                aria-label="Create a post"
+                onClick={() => setShowComposer(true)}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isPhotos ? 'bg-primary text-primary-foreground' : 'bg-white text-black'}`}
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+
+              {/* Discover */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <button
+                    aria-label="Find people"
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isPhotos ? 'bg-muted text-foreground' : 'bg-white/10 text-white backdrop-blur-sm'}`}
+                  >
+                    <Search className="h-4 w-4" />
+                  </button>
+                </SheetTrigger>
                   <SheetContent side="right" className="w-80">
                     <SheetHeader>
                       <SheetTitle>Discover People</SheetTitle>
@@ -608,7 +643,6 @@ export default function Social() {
                     </ScrollArea>
                   </SheetContent>
                 </Sheet>
-              </div>
             </div>
 
             {/* Room banner */}
@@ -638,21 +672,6 @@ export default function Social() {
           </div>
         </div>
       </div>
-
-      {/* ── Floating create button ──
-          Under the header rather than in a bottom corner. The right corner is
-          the action rail and the left one is the caption, which grows with the
-          post, so anything measured up from the bottom eventually lands on one
-          of them. The band under the header is empty at every screen size. */}
-      <motion.button
-        aria-label="Create a post"
-        className="absolute right-4 top-24 md:top-auto md:bottom-24 w-12 h-12 rounded-full bg-primary text-white shadow-xl flex items-center justify-center z-30"
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.93 }}
-        onClick={() => setShowComposer(true)}
-      >
-        <Plus className="w-5 h-5" />
-      </motion.button>
 
       {/* ── Post composer sheet ── */}
       <AnimatePresence>
