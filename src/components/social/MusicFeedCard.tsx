@@ -39,6 +39,9 @@ import { MentionText } from '@/components/social/MentionText';
 import { Reactable, ReactionPicker, ReactionChips } from '@/components/social/FeedReactions';
 import type { MentionLink, MentionPerson } from '@/lib/mentions';
 import type { ReactionSummary } from '@/hooks/useFeedReactions';
+import {
+  BattleFeedVisual, RoomFeedVisual, TextFeedVisual, battleIdFromPost, battleLine, useFeedBattle, MOSHA_POST_USER_ID,
+} from '@/components/social/FeedVisuals';
 
 function formatPulseTime(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -227,6 +230,16 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
     : null;
 
   const battleMatch = post.content?.match(/BATTLE_LIVE::([a-zA-Z0-9-]+)::(.*)/);
+  /* A battle post is drawn as the battle, not as a line of text with a room id in it. */
+  const battleId = !post.media_url && !post.song_id ? battleIdFromPost(post) : null;
+  const isBattlePost = !!battleId;
+  const { data: feedBattle } = useFeedBattle(battleId);
+  const battleInfo = isBattlePost ? battleLine(feedBattle, post.content) : null;
+  /* The name people know, never "Anonymous": display name first, and Mo$ha as Mo$ha. */
+  const authorName =
+    post.user_id === MOSHA_POST_USER_ID
+      ? 'Mo$ha'
+      : (post.profile as { display_name?: string | null } | undefined)?.display_name || post.profile?.profile_name || 'A listener';
   /** Something the person uploaded, as opposed to artwork we already had. */
   const hasOwnMedia = !!post.media_url;
   const tagged = post.tagged ?? [];
@@ -235,6 +248,10 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
   const songCard = normaliseSongCard(post.songcard);
   const totalPulses = pulseCounts && song ? (pulseCounts.find(p => p.song_id === song.id)?.pulse_count ?? 0) : 0;
   const coverUrl    = isArtistFollowPost ? (postArtist?.profileImage ?? artistSong?.coverImage) : activeSong?.coverImage;
+  /* Words and nothing else: set as a poster over real artwork instead of a grey music note. */
+  const isTextOnlyPost =
+    !songCard && !post.media_url && !coverUrl && !isBattlePost && !!post.content?.trim()
+    && post.post_type !== 'welcome' && post.post_type !== 'artist_follow' && !isPlaylistCreatedPost && !isRoomEnteredPost;
 
   const handleImgError = (e: SyntheticEvent<HTMLImageElement>) => {
     if ((e.currentTarget as any).dataset.fb === 'true') return;
@@ -333,16 +350,13 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
           )}
 
           {/* ROOM ENTERED */}
-          {isRoomEnteredPost && (
-            <motion.div className="text-center px-8" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-              <motion.div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4"
-                animate={{ scale: [1, 1.06, 1] }} transition={{ duration: 2, repeat: Infinity }}>
-                <Headphones className="w-12 h-12 text-primary" />
-              </motion.div>
-              <h2 className="text-2xl font-bold text-white mb-1">The Room</h2>
-              <p className="text-white/80">Live listening session</p>
-            </motion.div>
-          )}
+          {isRoomEnteredPost && <RoomFeedVisual />}
+
+          {/* BATTLE: both records facing off, live or with its result. */}
+          {isBattlePost && battleId && <BattleFeedVisual battleId={battleId} />}
+
+          {/* WORDS ONLY: a poster, not a placeholder. */}
+          {isTextOnlyPost && <TextFeedVisual text={post.content!.trim()} seed={post.id.charCodeAt(0) + post.id.charCodeAt(1)} />}
 
           {/* ARTIST FOLLOW — large artist pfp */}
           {isArtistFollowPost && postArtist && (
@@ -407,7 +421,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
           )}
 
           {/* SONG — spinning disc artwork */}
-          {!hasOwnMedia && !songCard && !isWelcomePost && !isArtistFollowPost && !isPlaylistCreatedPost && !isRoomEnteredPost && (
+          {!hasOwnMedia && !songCard && !isWelcomePost && !isArtistFollowPost && !isPlaylistCreatedPost && !isRoomEnteredPost && !isBattlePost && !isTextOnlyPost && (
             <>
               {coverUrl && !imgErr ? (
                 <motion.div
@@ -612,8 +626,8 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
           does not exist. */}
       <div className="absolute bottom-0 left-0 right-20 p-4 pb-24 md:pb-4 z-10">
         <button onClick={goToProfile} className="flex items-center gap-2 mb-2">
-          <span className="font-bold text-white text-base truncate max-w-[220px]">
-            <ArtistName prefix="@" name={post.profile?.profile_name || 'Anonymous'} userId={post.user_id} size={14} />
+          <span className="font-extrabold text-white text-[17px] tracking-tight truncate max-w-[240px] drop-shadow">
+            <ArtistName name={authorName} userId={post.user_id} size={14} />
           </span>
           {isFollowing && <span className="text-[11px] text-white/70 bg-white/10 px-2 py-0.5 rounded-full shrink-0">Following</span>}
         </button>
@@ -660,13 +674,33 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
           <div className="mb-2">
             <p className="text-white/90 text-sm flex items-center gap-1.5">
               <Headphones className="w-3.5 h-3.5 text-primary shrink-0" />
-              just entered the room
+              just walked into The Room
             </p>
             <button onClick={(e) => { e.stopPropagation(); navigate('/room'); }}
-              className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors min-h-10">
+              className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.45)] transition-transform active:scale-95">
               <Headphones className="w-3.5 h-3.5" />
               Join the Room
             </button>
+          </div>
+        )}
+        {isBattlePost && battleInfo && (
+          <div className="mb-2">
+            <p className="text-white text-[15px] font-semibold leading-snug line-clamp-2">{battleInfo.text}</p>
+            {(battleInfo.path || (post.metadata as { cta_path?: string } | null)?.cta_path) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(battleInfo.path ?? String((post.metadata as { cta_path?: string }).cta_path));
+                }}
+                className={`mt-2 inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-bold transition-transform active:scale-95 ${
+                  feedBattle?.status === 'live'
+                    ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]'
+                    : 'bg-amber-400 text-black shadow-[0_0_20px_rgba(251,191,36,0.4)]'
+                }`}
+              >
+                <Flame className="h-4 w-4" /> {battleInfo.cta}
+              </button>
+            )}
           </div>
         )}
         {isSongCommentPost && song && (
@@ -692,7 +726,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
           </div>
         ) : (
           !isWelcomePost && !isArtistFollowPost && !isSongLikePost && !isSongPulsePost && !isSongCommentPost
-            && !isPlaylistCreatedPost && !isRoomEnteredPost && post.content && (
+            && !isPlaylistCreatedPost && !isRoomEnteredPost && !isBattlePost && !isTextOnlyPost && post.content && (
             <p className="text-white/90 text-sm mb-2 line-clamp-2 break-words">
               <MentionText text={post.content} mentions={mentions} emojiSize={16} />
               {post.edited_at ? <EditedMark at={post.edited_at} className="ml-2 text-white/60" /> : null}
