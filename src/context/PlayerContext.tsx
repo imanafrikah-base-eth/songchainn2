@@ -38,6 +38,8 @@ interface PlayerActionsContext {
   shuffleMode: boolean;
   toggleShuffle: () => void;
   enterRoomMode: (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => Promise<boolean>;
+  /** Re-line the Room's queue (song requests) without touching the song playing now. */
+  setRoomQueue: (songs: Song[]) => void;
   exitRoomMode: () => Promise<void>;
   hideRoom: () => void;
   showRoom: () => void;
@@ -895,6 +897,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return forceSetSong(playlist[startIndex], { shouldPlay: true, startTime });
   }, [forceSetSong]);
 
+  const setRoomQueue = useCallback((songs: Song[]) => {
+    if (!isRoomModeRef.current || songs.length === 0) return;
+    setQueue((prev) => {
+      if (prev.length === songs.length && prev.every((s, i) => s.id === songs[i].id)) return prev;
+      return songs;
+    });
+  }, []);
+
   const exitRoomMode = useCallback(async () => {
     const previousVolume = volumeRef.current;
     const audio = audioRef.current;
@@ -1019,11 +1029,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     shuffleMode,
     toggleShuffle,
     enterRoomMode,
+    setRoomQueue,
     exitRoomMode,
     hideRoom,
     showRoom,
     stop,
-  }), [addToQueue, enterRoomMode, exitRoomMode, hideRoom, showRoom, stop, jumpToIndex, pause, play, playNext, playPrevious, playQueue, playSong, removeFromQueue, reorderQueue, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
+  }), [addToQueue, enterRoomMode, setRoomQueue, exitRoomMode, hideRoom, showRoom, stop, jumpToIndex, pause, play, playNext, playPrevious, playQueue, playSong, removeFromQueue, reorderQueue, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
 
   return (
     <PlayerStateCtx.Provider value={stateValue}>

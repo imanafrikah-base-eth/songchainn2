@@ -2,7 +2,7 @@ import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronDown, ListMusic, LogOut, Share2, HardDrive, Bot, SendHorizontal, SmilePlus, UserPlus, UserRound } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ListMusic, ListPlus, LogOut, Share2, HardDrive, Bot, SendHorizontal, SmilePlus, UserPlus, UserRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
@@ -21,6 +21,14 @@ import { RoomPeople } from '@/components/room/RoomPeople';
 import { RoomChatMessage } from '@/components/room/RoomChatMessage';
 import { HdEmoji, isEmojiOnly, withHdEmoji } from '@/components/room/HdEmoji';
 import { toast } from 'sonner';
+import { useRoomRequests, roomSlotAt } from '@/hooks/useRoomRequests';
+import { RoomRequestSheet, Cover, type RoomLineEntry } from '@/components/room/RoomRequestSheet';
+
+/**
+ * Requests this device has already heard play. Kept outside the page so leaving
+ * the Room screen and coming back does not play a request a second time.
+ */
+const heardRequestIds = new Set<string>();
 
 type RoomMessage = {
   id: string;
@@ -288,7 +296,7 @@ export default function Room() {
   const navigate = useNavigate();
   const { user, isArtist, artistId } = useAuth();
   const { isPlaying, isRoomMode, currentSong, isRoomHidden } = usePlayerState();
-  const { enterRoomMode, exitRoomMode, setVolume, volume, play, hideRoom } = usePlayerActions();
+  const { enterRoomMode, setRoomQueue, exitRoomMode, setVolume, volume, play, hideRoom } = usePlayerActions();
   const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
 
   // Every record on SONGCHAINN, the founding catalogue and every published
@@ -332,6 +340,7 @@ export default function Room() {
   const [nameDraft, setNameDraft] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
   const [isIdentityPromptOpen, setIsIdentityPromptOpen] = useState(false);
+  const [isRequestOpen, setIsRequestOpen] = useState(false);
   const [identityDraft, setIdentityDraft] = useState<'artist' | 'incognito'>('incognito');
 
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
@@ -1500,18 +1509,119 @@ export default function Room() {
     return map;
   }, [messages]);
 
+  /* ── Song requests ──
+     Anyone in the Room can ask for a record (founder, 15 Sep 2026). The line
+     is shared and live; each listener's player plays it, in order, before it
+     goes back to the shuffle, and never plays the same request twice. */
+  const {
+    requests: roomRequests,
+    isLoading: isRequestsLoading,
+    request: requestRoomSong,
+    cancel: cancelRoomRequest,
+    pending: isRequestPending,
+  } = useRoomRequests(Boolean(user));
+  const roomSongById = useMemo(() => new Map(roomSongs.map((s) => [s.id, s])), [roomSongs]);
+  const [heardTick, setHeardTick] = useState(0);
+  const rotationIndexRef = useRef(-1);
+  const playingRequestSongRef = useRef<string | null>(null);
+
+  const requestLine = useMemo<RoomLineEntry[]>(() => {
+    const enterSlot = roomSlotAt(roomEnterAtRef.current || Date.now());
+    const line: RoomLineEntry[] = [];
+    for (const r of roomRequests) {
+      if (r.slot < enterSlot || heardRequestIds.has(r.id)) continue;
+      const song = roomSongById.get(r.song_id);
+      if (!song) continue;
+      line.push({ requestId: r.id, song, requesterId: r.requested_by, requesterName: r.requester_name || 'A listener' });
+    }
+    return line;
+    // heardTick re-reads the module-level set after a request plays.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomRequests, roomSongById, heardTick]);
+
+  // A request that starts playing has been heard; otherwise remember where the shuffle is.
+  useEffect(() => {
+    if (!isRoomMode || !currentSong) return;
+    const playingRequest = requestLine.find((entry) => entry.song.id === currentSong.id);
+    if (playingRequest) {
+      heardRequestIds.add(playingRequest.requestId);
+      playingRequestSongRef.current = currentSong.id;
+      setHeardTick((t) => t + 1);
+      return;
+    }
+    // A requested song is not a step in the shuffle: the shuffle resumes where it was.
+    if (playingRequestSongRef.current === currentSong.id) return;
+    playingRequestSongRef.current = null;
+    const index = playlist.findIndex((s) => s.id === currentSong.id);
+    if (index >= 0) rotationIndexRef.current = index;
+  }, [currentSong, isRoomMode, playlist, requestLine]);
+
+  // The player's queue: the song on now, the request line, then the shuffle from where it left off.
+  useEffect(() => {
+    if (!isRoomMode || !currentSong || playlist.length === 0) return;
+    const lineSongs = requestLine.map((entry) => entry.song).filter((s) => s.id !== currentSong.id);
+    const skip = new Set([currentSong.id, ...lineSongs.map((s) => s.id)]);
+    const start = rotationIndexRef.current;
+    const rotation = start >= 0 ? [...playlist.slice(start + 1), ...playlist.slice(0, start + 1)] : playlist;
+    setRoomQueue([currentSong, ...lineSongs, ...rotation.filter((s) => !skip.has(s.id))]);
+  }, [currentSong, isRoomMode, playlist, requestLine, setRoomQueue]);
+
+  // Mo$ha tells the room when somebody asks for a song.
+  const announcedRequestsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!user || isRequestsLoading) return;
+    if (announcedRequestsRef.current === null) {
+      announcedRequestsRef.current = new Set(roomRequests.map((r) => r.id));
+      return;
+    }
+    for (const r of roomRequests) {
+      if (announcedRequestsRef.current.has(r.id)) continue;
+      announcedRequestsRef.current.add(r.id);
+      const song = roomSongById.get(r.song_id);
+      if (!song) continue;
+      appendMoshaMessage(
+        r.requested_by === user.id
+          ? `Your request is in the line: ${song.title} by ${song.artist}.`
+          : `${r.requester_name || 'A listener'} asked for ${song.title} by ${song.artist}. It is in the line.`,
+      );
+    }
+  }, [appendMoshaMessage, isRequestsLoading, roomRequests, roomSongById, user]);
+
+  const handleRequestSong = useCallback(async (song: Song) => {
+    const result = await requestRoomSong(song.id, roomName || null);
+    if ('error' in result) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`${song.title} is in the line`, {
+      description: result.ahead === 0 ? 'It plays next.' : `${result.ahead} ${result.ahead === 1 ? 'song' : 'songs'} ahead of it.`,
+    });
+    setIsRequestOpen(false);
+  }, [requestRoomSong, roomName]);
+
+  const handleCancelRequest = useCallback(async (requestId: string) => {
+    const error = await cancelRoomRequest(requestId);
+    if (error) toast.error(error);
+    else toast.success('Request taken back');
+  }, [cancelRoomRequest]);
+
   const currentPlaylistIndex = useMemo(() => {
     if (!currentSong) return -1;
-    return playlist.findIndex(s => s.id === currentSong.id);
+    const index = playlist.findIndex(s => s.id === currentSong.id);
+    return index >= 0 ? index : rotationIndexRef.current;
   }, [currentSong, playlist]);
 
-  const upNextSongs = useMemo(() => {
+  const upNextSongs = useMemo<Array<{ song: Song; requestedBy?: string }>>(() => {
     if (playlist.length === 0) return [];
-    if (currentPlaylistIndex < 0) return playlist.slice(0, 6);
-    const after = playlist.slice(currentPlaylistIndex + 1);
-    const before = playlist.slice(0, currentPlaylistIndex + 1);
-    return [...after, ...before].slice(0, 6);
-  }, [currentPlaylistIndex, playlist]);
+    const requested = requestLine
+      .filter((entry) => entry.song.id !== currentSong?.id)
+      .map((entry) => ({ song: entry.song, requestedBy: entry.requesterName }));
+    const skip = new Set([currentSong?.id, ...requested.map((r) => r.song.id)]);
+    const rotation = currentPlaylistIndex < 0
+      ? playlist
+      : [...playlist.slice(currentPlaylistIndex + 1), ...playlist.slice(0, currentPlaylistIndex + 1)];
+    return [...requested, ...rotation.filter((s) => !skip.has(s.id)).map((song) => ({ song }))].slice(0, 6);
+  }, [currentPlaylistIndex, currentSong?.id, playlist, requestLine]);
 
   const currentArtist = useMemo(() => {
     if (!currentSong?.artistId) return null;
@@ -1742,8 +1852,51 @@ export default function Room() {
               </div>
             </div>
           </div>
+          {/* The request line, one tap from asking for a song. */}
+          <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 scrollbar-hide" aria-label="Song requests">
+            <button
+              type="button"
+              onClick={() => setIsRequestOpen(true)}
+              className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary pl-3.5 pr-4 text-sm font-bold text-primary-foreground"
+            >
+              <ListPlus className="h-4 w-4" />
+              Request a song
+            </button>
+            {requestLine.length === 0 ? (
+              <span className="whitespace-nowrap text-xs text-zinc-500">Nobody has asked for one yet.</span>
+            ) : (
+              requestLine.slice(0, 8).map((entry, index) => (
+                <div
+                  key={entry.requestId}
+                  className="flex h-11 max-w-[15rem] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] pl-1.5 pr-3.5"
+                  title={`${entry.song.title} by ${entry.song.artist}, asked for by ${entry.requesterName}`}
+                >
+                  <Cover song={entry.song} size={32} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-semibold text-zinc-100">
+                      {index === 0 ? <span className="text-primary">Next </span> : null}
+                      {entry.song.title}
+                    </span>
+                    <span className="block truncate text-[11px] text-zinc-400">for {entry.requesterName}</span>
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
+
+      <RoomRequestSheet
+        open={isRequestOpen}
+        onOpenChange={setIsRequestOpen}
+        songs={roomSongs}
+        line={requestLine}
+        selfId={user?.id ?? null}
+        currentSongId={currentSong?.id ?? null}
+        pending={isRequestPending}
+        onRequest={(song) => void handleRequestSong(song)}
+        onCancel={(id) => void handleCancelRequest(id)}
+      />
 
       <div className="min-h-0 flex-1">
         <div className="h-full max-w-3xl lg:max-w-5xl mx-auto px-4">
@@ -1823,8 +1976,8 @@ export default function Room() {
                   />
                 </div>
                 <div className="mt-3 space-y-2 overflow-y-auto pr-1">
-                  {upNextSongs.map(song => (
-                    <div key={song.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                  {upNextSongs.map(({ song, requestedBy }) => (
+                    <div key={song.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${requestedBy ? 'border-primary/30 bg-primary/10' : 'border-white/10 bg-black/20'}`}>
                       <div className="w-9 h-9 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
                         {song.coverImage ? (
                           <img
@@ -1838,6 +1991,7 @@ export default function Room() {
                       <div className="min-w-0">
                         <div className="text-sm text-zinc-100 truncate">{song.title}</div>
                         <div className="text-xs text-zinc-400 truncate"><ArtistName name={song.artist} artistId={song.artistId} size={12} /></div>
+                        {requestedBy && <div className="truncate text-[11px] font-medium text-primary">Asked for by {requestedBy}</div>}
                       </div>
                     </div>
                   ))}
