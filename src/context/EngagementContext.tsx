@@ -70,6 +70,8 @@ const STREAK_BONUS = 5;
 export const PLAY_THRESHOLD_SECONDS = 30;
 
 const PLAY_DEDUPE_WINDOW_MS = 30_000;
+/** A real account id. Farcaster and Facebook sign-ins use fc-/fb- ids that the database cannot store. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /**
  * One pulse every three seconds, per person.
  *
@@ -260,20 +262,37 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           : item
       );
     });
-    broadcastCountDelta('play', { songId });
-
     // Where the play came from and roughly where the listener is, for the
     // artist's activity board. Both are attached here, once, so no call site
     // has to remember; see src/lib/playSource.ts and src/lib/geo.ts.
     const geo = geoSync();
-    supabase.from('song_analytics').insert({
+    const row = {
       event_type: 'play',
       song_id: songId,
-      user_id: user?.id ?? null,
+      // Farcaster and Facebook sign-ins carry an fc-/fb- id that is not an
+      // account id, and the database refused every play they made. A listen is
+      // a listen: those are kept without a listener attached.
+      user_id: user?.id && UUID_RE.test(user.id) ? user.id : null,
       source: playSourceNow(),
       city: geo.city,
       country: geo.country,
-    } as any).then(({ error }) => {
+    };
+    const record = async () => {
+      const first = await supabase.from('song_analytics').insert(row as any);
+      // A session that lapsed mid-song is refused for naming its user; the
+      // listen still happened, so it is kept without the name.
+      if (first.error && row.user_id) {
+        return supabase.from('song_analytics').insert({ ...row, user_id: null } as any);
+      }
+      return first;
+    };
+    void record().then(({ error }) => {
+      if (!error) {
+        // Everybody else's screen counts it only once the server has it. This
+        // used to go out before the insert, so a refused play showed up on the
+        // artist's page and then vanished: N3M3SIS watched 1548 turn to 1546.
+        broadcastCountDelta('play', { songId });
+      }
       if (error) {
         if (import.meta.env.DEV) console.error('Failed to record play', error);
         // Roll back the optimistic increment so the count stays accurate
@@ -334,13 +353,20 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           .map((p) => ({
             event_type: 'play',
             song_id: p.songId,
-            user_id: user?.id ?? null,
+            user_id: user?.id && UUID_RE.test(user.id) ? user.id : null,
             source: 'offline',
             city: geoSync().city,
             country: geoSync().country,
           }));
         if (payload.length === 0) return;
-        await supabase.from('song_analytics').insert(payload as any);
+        // A refused insert comes back as an error, not a throw, so it used to
+        // drop the whole batch of offline listens silently. Try once without
+        // the listener's id, then keep the batch for the next sync.
+        let { error } = await supabase.from('song_analytics').insert(payload as any);
+        if (error && payload.some((p) => p.user_id)) {
+          ({ error } = await supabase.from('song_analytics').insert(payload.map((p) => ({ ...p, user_id: null })) as any));
+        }
+        if (error) throw error;
       } catch {
         offlinePlaysRef.current = batch;
         try {

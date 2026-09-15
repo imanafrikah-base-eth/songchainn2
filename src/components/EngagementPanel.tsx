@@ -5,12 +5,49 @@ import { useEngagement } from '@/context/EngagementContext';
 import { useAuth } from '@/context/AuthContext';
 import { useUserPoints } from '@/hooks/useUserPoints';
 import { TierBadge, OgBadge } from '@/components/TierBadge';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+
+/**
+ * What a signed-in person has really done, from the server. The panel used to
+ * read plays and the points breakdown from this browser's storage, so logging
+ * out or picking up another phone reset them to nothing (N3M3SIS, 13 Sep
+ * 2026: "I log out and lose my streak, streams and points").
+ */
+function useMyActivityTotals(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['my-activity-totals', userId],
+    enabled: !!userId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const [{ count: plays }, { data: daily }] = await Promise.all([
+        supabase.from('song_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId!).eq('event_type', 'play'),
+        supabase.from('user_points_daily' as never).select('kind, earned').eq('user_id' as never, userId! as never),
+      ]);
+      const byKind = new Map<string, number>();
+      for (const r of ((daily ?? []) as Array<{ kind: string; earned: number }>)) {
+        byKind.set(r.kind, (byKind.get(r.kind) ?? 0) + Number(r.earned || 0));
+      }
+      return {
+        plays: plays ?? 0,
+        listening: (byKind.get('play') ?? 0) + (byKind.get('pulse') ?? 0),
+        likes: byKind.get('like') ?? 0,
+        other: [...byKind.entries()].filter(([k]) => !['play', 'pulse', 'like'].includes(k)).reduce((s, [, v]) => s + v, 0),
+      };
+    },
+  });
+}
 
 export function EngagementPanel() {
-  const { engagementPoints, currentStreak, totalPlays, likedSongs, getPointsBreakdown } = useEngagement();
+  const { engagementPoints, currentStreak, totalPlays: localPlays, likedSongs, getPointsBreakdown } = useEngagement();
   const { user } = useAuth();
   const { lifetimePoints, tier, isOg, streak } = useUserPoints();
-  const breakdown = getPointsBreakdown();
+  const { data: server } = useMyActivityTotals(user?.id);
+  const local = getPointsBreakdown();
+  const totalPlays = user && server ? server.plays : localPlays;
+  const breakdown = user && server
+    ? { listening: server.listening, likes: server.likes, streak: server.other }
+    : local;
   // Signed-in users see the authoritative server balance; signed-out fall back
   // to the local estimate until they create an account and it is imported.
   const displayPoints = user ? lifetimePoints : engagementPoints;
@@ -77,7 +114,7 @@ export function EngagementPanel() {
           <span className="text-foreground">+{breakdown.likes}</span>
         </div>
         <div className="flex justify-between text-xs sm:text-sm">
-          <span className="text-muted-foreground">Streak Bonus</span>
+          <span className="text-muted-foreground">{user && server ? 'Votes and more' : 'Streak Bonus'}</span>
           <span className="text-foreground">+{breakdown.streak}</span>
         </div>
       </div>

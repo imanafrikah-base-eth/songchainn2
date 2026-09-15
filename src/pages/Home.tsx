@@ -88,6 +88,10 @@ function getPlaylistGradient(playlist: { id: string; name: string; mood?: string
   return `bg-gradient-to-br ${PLAYLIST_GRADIENTS[index]}`;
 }
 
+/** Founding catalogue artist ids, for the hero faces row. */
+const IMAN_ARTIST_ID = '3';
+const NEMESIS_ARTIST_ID = '11';
+
 export default function Home() {
   const { rankedArtists } = useRankedArtists();
   const { audienceProfile, refreshProfile, user } = useAuth();
@@ -179,12 +183,19 @@ export default function Home() {
   // Newest release first, then whatever is hottest, then anything at all: Home
   // must never open on an empty frame.
 
-  const heroFaces = useMemo(
-    () =>
-      // All of them. There are eleven artists; the row scrolls.
-      rankedArtists.map((a) => ({ id: a.id, name: a.name, image: a.profileImage })),
-    [rankedArtists],
-  );
+  const heroFaces = useMemo(() => {
+    // All of them. There are eleven artists; the row scrolls.
+    const faces = rankedArtists.map((a) => ({ id: a.id, name: a.name, image: a.profileImage }));
+    // N3M3SIS sits beside IMan Afrikah in this row, as she asked (13 Sep 2026).
+    // This row is faces, not a chart: the Top Artists section stays ranked.
+    const nemesis = faces.findIndex((f) => f.id === NEMESIS_ARTIST_ID);
+    const iman = faces.findIndex((f) => f.id === IMAN_ARTIST_ID);
+    if (nemesis >= 0 && iman >= 0 && Math.abs(nemesis - iman) !== 1) {
+      const [her] = faces.splice(nemesis, 1);
+      faces.splice(faces.findIndex((f) => f.id === IMAN_ARTIST_ID) + 1, 0, her);
+    }
+    return faces;
+  }, [rankedArtists]);
 
   const songsByCatalog = useMemo(
     () =>

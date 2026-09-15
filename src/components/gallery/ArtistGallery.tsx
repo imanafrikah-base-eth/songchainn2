@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { reallyBroken, thumb } from '@/lib/img';
 import { Link } from 'react-router-dom';
-import { X, Play, ChevronLeft, ChevronRight, Coins, ImageIcon, Clapperboard, Images, MoreHorizontal, Pencil, Eye, EyeOff, RefreshCw, Trash2, Loader2, Download, Lock } from 'lucide-react';
+import { X, Play, ChevronLeft, ChevronRight, Coins, ImageIcon, Clapperboard, Images, MoreHorizontal, Pencil, Eye, EyeOff, RefreshCw, Trash2, Loader2, Download, Lock, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { useArtistGallery, useMyMedia, useMediaActions, useMediaUpload, type ArtistMediaItem } from '@/hooks/useArtistMedia';
@@ -48,6 +48,9 @@ type SectionKey = 'video' | 'image';
  * heavy enough to stall while scrolling. A preview and a count says what is
  * there in one line; See all opens the rest when somebody actually wants it.
  */
+/** How many pieces an artist can lead their page with. */
+const FAVOURITE_LIMIT = 3;
+
 const SECTIONS: Array<{
   key: SectionKey; label: string; one: string; icon: typeof Clapperboard;
   grid: string; frame: string; preview: number;
@@ -116,6 +119,26 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
     return { sections, ordered };
   }, [items, broken, canManage]);
 
+  /*
+   * The three pieces the page leads with (N3M3SIS, 12 Sep 2026: "my page is too
+   * busy, show your fave three pieces"). An artist marks up to three as
+   * favourites from the tile menu; a favourite is simply a piece ordered before
+   * zero. With none marked, the first three in the artist's order stand in.
+   */
+  const favourites = useMemo(() => {
+    const live = ordered.filter((i) => i.is_published !== false);
+    const byOrder = [...live].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const marked = byOrder.filter((i) => (i.sort_order ?? 0) < 0).slice(0, FAVOURITE_LIMIT);
+    if (marked.length) return marked;
+    // Nothing picked yet: lead with what shows best at a glance, pictures and
+    // clips that have a poster, before clips that would be a blank frame.
+    const showsWell = (i: ArtistMediaItem) => i.kind !== 'video' || !!i.poster_url;
+    return [...byOrder.filter(showsWell), ...byOrder.filter((i) => !showsWell(i))].slice(0, FAVOURITE_LIMIT);
+  }, [ordered]);
+  const favouriteCount = useMemo(() => ordered.filter((i) => (i.sort_order ?? 0) < 0).length, [ordered]);
+  const [showAll, setShowAll] = useState(false);
+  const collapsed = !canManage && !showAll && ordered.length > favourites.length;
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -145,6 +168,66 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
   let offset = 0;
   return (
     <div ref={rootRef}>
+      {/* The three the artist leads with, big. */}
+      {favourites.length > 0 && (
+        <section aria-label="Favourites" className="mb-5">
+          <div className="mb-2 flex items-center gap-2">
+            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Favourites</h4>
+            {canManage && (
+              <span className="text-[11px] text-muted-foreground/80">
+                {favouriteCount ? `${favouriteCount} of ${FAVOURITE_LIMIT} picked` : 'Pick up to 3 from the menu on any piece'}
+              </span>
+            )}
+          </div>
+          <div className="grid max-w-2xl grid-cols-3 gap-2 sm:gap-3">
+            {favourites.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setOpenAt(ordered.findIndex((o) => o.id === item.id))}
+                className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-muted"
+                aria-label={item.title || (item.kind === 'video' ? 'Play clip' : 'Open picture')}
+              >
+                {near && (item.kind !== 'video' || item.poster_url) ? (
+                  <img
+                    src={thumb(item.kind === 'video' ? item.poster_url : item.public_url, 260)}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <span className="block h-full w-full bg-gradient-to-br from-primary/25 via-muted to-background" aria-hidden="true" />
+                )}
+                {item.kind === 'video' && (
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm">
+                      <Play className="ml-0.5 h-4 w-4 fill-white text-white" />
+                    </span>
+                  </span>
+                )}
+                {item.title && (
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 pb-1.5 pt-6 text-left text-[11px] font-semibold text-white">
+                    <span className="line-clamp-1">{item.title}</span>
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="min-h-11 w-full rounded-xl border border-border py-2.5 text-sm font-semibold text-foreground hover:bg-muted"
+        >
+          See the whole gallery ({ordered.length})
+        </button>
+      ) : (
+      <>
       {/* What is in here, said in one line before any of it has to load. */}
       <p className="mb-3 text-xs text-muted-foreground">
         {sections
@@ -200,6 +283,8 @@ export function ArtistGallery({ artistId, emptyMessage }: Props) {
           );
         })}
       </div>
+      </>
+      )}
 
       {openAt !== null && ordered[openAt] && (
         <Lightbox items={ordered} index={openAt} onIndex={setOpenAt} onClose={() => setOpenAt(null)} />
@@ -257,6 +342,11 @@ function Tile({ item, frame, manage, onOpen, onBroken }: { item: ArtistMediaItem
             <Coins className="h-3 w-3" /> Coined
           </span>
         )}
+        {manage && (item.sort_order ?? 0) < 0 && (
+          <span className="absolute bottom-2 right-2 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-black/65 backdrop-blur-sm" aria-label="Favourite">
+            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+          </span>
+        )}
         {manage && !item.is_published && (
           <span className="absolute left-2 bottom-2 flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-semibold text-black">
             <EyeOff className="h-3 w-3" /> Hidden
@@ -278,11 +368,33 @@ function Tile({ item, frame, manage, onOpen, onBroken }: { item: ArtistMediaItem
 function OwnerMenu({ item }: { item: ArtistMediaItem }) {
   const { update, remove } = useMediaActions();
   const upload = useMediaUpload();
+  const mine = useMyMedia();
   const replaceRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState({ title: item.title ?? '', caption: item.caption ?? '' });
   const [busy, setBusy] = useState<string | null>(null);
+  const isFavourite = (item.sort_order ?? 0) < 0;
+
+  /* A favourite is ordered before zero, in the order it was picked, so the page leads with it. */
+  const toggleFavourite = async () => {
+    const favs = (mine.data ?? []).filter((m) => (m.sort_order ?? 0) < 0 && m.id !== item.id);
+    if (!isFavourite && favs.length >= FAVOURITE_LIMIT) {
+      toast(`You already have ${FAVOURITE_LIMIT} favourites`, { description: 'Take one off first, then pick this one.' });
+      return;
+    }
+    setBusy('favourite');
+    try {
+      await update.mutateAsync({ id: item.id, sort_order: isFavourite ? 0 : -100 + favs.length });
+      toast(isFavourite ? 'Off your favourites' : 'Now one of your favourites', {
+        description: isFavourite ? undefined : 'Your page leads with it.',
+      });
+    } catch (e) {
+      toast.error((e as Error)?.message || 'That did not save.');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const toggleHidden = async () => {
     setBusy('hide');
@@ -378,6 +490,10 @@ function OwnerMenu({ item }: { item: ArtistMediaItem }) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem onClick={() => void toggleFavourite()} className="gap-2">
+            <Star className={`h-4 w-4 ${isFavourite ? 'fill-amber-400 text-amber-400' : ''}`} />
+            {isFavourite ? 'Not a favourite' : 'Make a favourite'}
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => { setDraft({ title: item.title ?? '', caption: item.caption ?? '' }); setEditing(true); }} className="gap-2">
             <Pencil className="h-4 w-4" /> Edit
           </DropdownMenuItem>
