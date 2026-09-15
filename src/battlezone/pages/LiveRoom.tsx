@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Mic, Hand, Send, Play, Pause, SkipForward,
   Square, UserPlus, Volume2, ExternalLink, Crown, Smile, Music, Heart,
-  Feather, Music2, Flame, Hourglass, type LucideIcon,
+  Feather, Music2, Flame, Hourglass, Users, MessageCircle, type LucideIcon,
 } from "lucide-react";
 import { VOICE_ENABLED } from "@/battlezone/config";
 import LiveBadge from "@/battlezone/components/LiveBadge";
@@ -739,29 +739,50 @@ const LiveRoom = () => {
       )}
       <EmbedTopBar title="Live Room" />
       {/* Header */}
-      <div className={`border-b border-border bg-card/60 backdrop-blur-xl ${isVerySmallMobile ? "px-2.5 py-2" : "px-4 py-3"}`}>
-        <div className="mx-auto max-w-7xl flex items-center justify-between">
-          <div className={`flex items-center ${isVerySmallMobile ? "gap-2 min-w-0" : "gap-3"}`}>
-            <button onClick={() => navigate("/wavewarz-africa")} className="text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className={isVerySmallMobile ? "h-4 w-4" : "h-5 w-5"} />
+      <div className={`relative isolate overflow-hidden border-b border-primary/20 bg-card/60 backdrop-blur-xl ${isVerySmallMobile ? "px-2.5 py-2" : "px-4 py-3"}`}>
+        {/* The arena lights: green from one side, cyan from the other. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+          style={{ background: "radial-gradient(50% 140% at 0% 0%, hsl(var(--neon-green) / 0.16), transparent 70%), radial-gradient(50% 140% at 100% 0%, hsl(var(--cyan) / 0.14), transparent 70%)" }}
+        />
+        <div className="mx-auto max-w-7xl flex items-center justify-between gap-2">
+          <div className={`flex min-w-0 items-center ${isVerySmallMobile ? "gap-2" : "gap-3"}`}>
+            <button
+              onClick={() => navigate("/wavewarz-africa")}
+              aria-label="Back to WaveWarz Africa"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background/60 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
             </button>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 {resultsOpen ? (
-                  <span className="rounded-full bg-neon-gold/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-neon-gold">Results</span>
+                  <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent shadow-[0_0_14px_hsl(var(--gold)/0.35)]">Results</span>
                 ) : (
-                  <LiveBadge />
+                  <LiveBadge className="shrink-0" />
                 )}
-                <h1 className={`font-bold text-foreground truncate ${isVerySmallMobile ? "text-xs max-w-[150px]" : "text-sm"}`}>{battle.title}</h1>
+                <h1 className={`truncate font-display font-black tracking-tight text-foreground ${isVerySmallMobile ? "text-sm" : "text-base sm:text-lg"}`}>{battle.title}</h1>
               </div>
-              <p className={`${isVerySmallMobile ? "text-[11px]" : "text-xs"} text-muted-foreground truncate`}>
-                {battle.listeners.toLocaleString()} listening - Round {round}/{battle.totalRounds}
+              <p className={`mt-0.5 flex items-center gap-2 truncate ${isVerySmallMobile ? "text-[11px]" : "text-xs"} text-muted-foreground`}>
+                <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" /> {battle.listeners.toLocaleString()} listening</span>
+                <span aria-hidden="true">·</span>
+                <span>Round {round}/{battle.totalRounds}</span>
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className={`rounded-lg border border-border bg-card text-foreground ${isVerySmallMobile ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
-              {myRole === "host" ? "Host" : myRole === "co-host" ? "Co-Host" : myRole === "speaker" ? "Speaker" : "Audience"}
+          <div className="flex shrink-0 items-center gap-2">
+            <div
+              className={`inline-flex items-center gap-1 rounded-full border font-bold ${isVerySmallMobile ? "px-2 py-1 text-[10px]" : "px-3 py-1.5 text-xs"} ${
+                myRole === "host"
+                  ? "border-accent/50 bg-accent/10 text-accent"
+                  : myRole === "audience"
+                    ? "border-border bg-card text-muted-foreground"
+                    : "border-primary/50 bg-primary/10 text-primary"
+              }`}
+            >
+              {myRole === "host" ? <Crown className="h-3 w-3" /> : myRole === "audience" ? null : <Mic className="h-3 w-3" />}
+              {myRole === "host" ? "Host" : myRole === "co-host" ? "Co-host" : myRole === "speaker" ? "Speaker" : "Listening"}
             </div>
           </div>
         </div>
@@ -865,19 +886,24 @@ const LiveRoom = () => {
           )}
 
           {/* Battle Panel */}
-          <div className={`rounded-2xl border border-border bg-card/60 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
+          <div className={`relative isolate overflow-hidden rounded-3xl border border-border bg-card/70 ${isVerySmallMobile ? "p-3.5" : "p-4 sm:p-6"} backdrop-blur`}>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 -z-10"
+              style={{ background: "radial-gradient(45% 70% at 12% 30%, hsl(var(--neon-green) / 0.14), transparent 70%), radial-gradient(45% 70% at 88% 30%, hsl(var(--cyan) / 0.14), transparent 70%)" }}
+            />
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-display text-muted-foreground">Round {round} of {battle.totalRounds}</span>
-              <span className="text-xs text-muted-foreground">{battle.battleType === "community" ? "Community battle" : "Quick battle"}</span>
+              <span className="rounded-full border border-border bg-background/60 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground">Round {round} of {battle.totalRounds}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{battle.battleType === "community" ? "Community battle" : "Quick battle"}</span>
             </div>
 
-            <div className={`${isVerySmallMobile ? "space-y-3" : "grid grid-cols-3 gap-4 items-center"} mb-6`}>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 mb-6">
               <div className="flex flex-col items-center gap-2 text-center">
                 {battle.artistA.image && (
                   <img
                     src={battle.artistA.image}
                     alt={battle.artistA.name}
-                    className={`${isVerySmallMobile ? "h-14 w-14" : "h-16 w-16"} rounded-full object-cover border-2 border-primary/50`}
+                    className={`${isVerySmallMobile ? "h-16 w-16" : "h-20 w-20 sm:h-24 sm:w-24"} rounded-full object-cover border-[3px] border-primary shadow-[0_0_26px_hsl(var(--neon-green)/0.45)]`}
                     onError={(event) => {
                       const target = event.currentTarget;
                       if (target.dataset.fallbackApplied === "true") return;
@@ -886,19 +912,19 @@ const LiveRoom = () => {
                     }}
                   />
                 )}
-                <span className="text-sm font-bold text-foreground">{battle.artistA.name}</span>
-                <span className="text-[10px] text-muted-foreground">{battle.songsA[round - 1]?.title || battle.songA}</span>
+                <span className="max-w-full truncate font-display text-sm font-black text-primary sm:text-base">{battle.artistA.name}</span>
+                <span className="max-w-full truncate text-[11px] text-muted-foreground">{battle.songsA[round - 1]?.title || battle.songA}</span>
                 <a href="https://www.songchainn.xyz" target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
                   $ongChainn <ExternalLink className="h-2.5 w-2.5" />
                 </a>
               </div>
-              <div className="text-center font-display font-bold text-muted-foreground text-lg">VS</div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-accent bg-background font-display text-base font-black text-accent shadow-[0_0_22px_hsl(var(--gold)/0.45)] sm:h-14 sm:w-14 sm:text-lg">VS</div>
               <div className="flex flex-col items-center gap-2 text-center">
                 {battle.artistB.image && (
                   <img
                     src={battle.artistB.image}
                     alt={battle.artistB.name}
-                    className={`${isVerySmallMobile ? "h-14 w-14" : "h-16 w-16"} rounded-full object-cover border-2 border-secondary/50`}
+                    className={`${isVerySmallMobile ? "h-16 w-16" : "h-20 w-20 sm:h-24 sm:w-24"} rounded-full object-cover border-[3px] border-secondary shadow-[0_0_26px_hsl(var(--cyan)/0.45)]`}
                     onError={(event) => {
                       const target = event.currentTarget;
                       if (target.dataset.fallbackApplied === "true") return;
@@ -907,8 +933,8 @@ const LiveRoom = () => {
                     }}
                   />
                 )}
-                <span className="text-sm font-bold text-foreground">{battle.artistB.name}</span>
-                <span className="text-[10px] text-muted-foreground">{battle.songsB[round - 1]?.title || battle.songB}</span>
+                <span className="max-w-full truncate font-display text-sm font-black text-secondary sm:text-base">{battle.artistB.name}</span>
+                <span className="max-w-full truncate text-[11px] text-muted-foreground">{battle.songsB[round - 1]?.title || battle.songB}</span>
                 <a href="https://www.songchainn.xyz" target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
                   $ongChainn <ExternalLink className="h-2.5 w-2.5" />
                 </a>
@@ -917,8 +943,8 @@ const LiveRoom = () => {
 
             {/* Voting Panel */}
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-foreground text-center">
-                {battleEnded ? "Final Score" : canVote ? "Cast Your Vote" : "Voting Is Closed"}
+              <h3 className="text-center font-display text-lg font-black uppercase tracking-wide text-foreground">
+                {battleEnded ? "Final score" : canVote ? "Cast your vote" : "Voting is closed"}
               </h3>
 
               {!battleEnded && battle.closesAt && (
@@ -983,11 +1009,11 @@ const LiveRoom = () => {
                 <span>{localVotesA.toLocaleString()} ({pctA}%)</span>
                 <span>{localVotesB.toLocaleString()} ({100 - pctA}%)</span>
               </div>
-              <div className="h-3 rounded-full bg-muted overflow-hidden flex">
-                <div className="bg-primary h-full rounded-l-full transition-all flex items-center justify-center" style={{ width: `${pctA}%` }}>
+              <div className="relative h-4 rounded-full bg-muted overflow-hidden flex">
+                <div className="bg-primary h-full transition-all duration-700 flex items-center justify-center shadow-[0_0_14px_hsl(var(--neon-green)/0.7)]" style={{ width: `${pctA}%` }}>
                   {pctA > 15 && <span className="text-[9px] font-bold text-primary-foreground">{pctA}%</span>}
                 </div>
-                <div className="bg-secondary h-full rounded-r-full transition-all flex items-center justify-center" style={{ width: `${100 - pctA}%` }}>
+                <div className="bg-secondary h-full transition-all duration-700 flex items-center justify-center shadow-[0_0_14px_hsl(var(--cyan)/0.7)]" style={{ width: `${100 - pctA}%` }}>
                   {100 - pctA > 15 && <span className="text-[9px] font-bold text-secondary-foreground">{100 - pctA}%</span>}
                 </div>
               </div>
@@ -1051,17 +1077,25 @@ const LiveRoom = () => {
 
           {/* Host Controls */}
           {myRole === "host" && !battleEnded && (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
+            <div className="relative overflow-hidden rounded-3xl border border-accent/30 bg-card/70 p-4 sm:p-5">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-24"
+                style={{ background: "radial-gradient(60% 100% at 50% 0%, hsl(var(--gold) / 0.14), transparent 70%)" }}
+              />
+              <p className="relative mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-accent">
+                <Crown className="h-4 w-4" /> Host console
+              </p>
+              <div className="relative grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <button
                   onClick={() => void setVotingOpen(!votingOpen)}
                   disabled={battleEnded || clockClosed}
                   title={clockClosed ? "The battle clock has run out, so voting cannot reopen." : undefined}
-                  className="w-full sm:w-auto rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="min-h-12 w-full rounded-2xl bg-primary/10 border border-primary/40 px-4 py-3 text-sm font-bold text-primary hover:bg-primary/20 hover:shadow-[0_0_18px_hsl(var(--neon-green)/0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {votingOpen ? <><Pause className="h-4 w-4" /> Close Voting</> : <><Play className="h-4 w-4" /> Open Voting</>}
                 </button>
-                <button onClick={advanceRound} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
+                <button onClick={advanceRound} className="min-h-12 w-full rounded-2xl bg-secondary/10 border border-secondary/40 px-4 py-3 text-sm font-bold text-secondary hover:bg-secondary/20 hover:shadow-[0_0_18px_hsl(var(--cyan)/0.3)] transition-all flex items-center justify-center gap-2">
                   <SkipForward className="h-4 w-4" /> Next Round
                 </button>
                 <button
@@ -1073,7 +1107,7 @@ const LiveRoom = () => {
                     setConfirming(null);
                     void endBattle();
                   }}
-                  className={`w-full sm:w-auto rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                  className={`min-h-12 w-full rounded-2xl border px-4 py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
                     confirming === "end"
                       ? "bg-live text-white border-live shadow-[0_0_18px_hsl(var(--live-red)/0.5)]"
                       : "bg-live/10 border-live/30 text-live hover:bg-live/20"
@@ -1083,7 +1117,7 @@ const LiveRoom = () => {
                 </button>
               </div>
               {clockClosed && (
-                <p className="text-xs text-muted-foreground">
+                <p className="relative mt-3 text-xs text-muted-foreground">
                   The clock has run out and voting is closed. The battle stays live until you end it.
                 </p>
               )}
@@ -1092,25 +1126,41 @@ const LiveRoom = () => {
           )}
 
           {/* Share Link */}
-          <button onClick={shareRoomLink} className="w-full sm:w-auto rounded-xl bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
+          <button onClick={shareRoomLink} className="min-h-12 w-full rounded-2xl border border-border bg-card/60 px-4 py-3 text-sm font-semibold text-foreground hover:border-primary/40 hover:text-primary transition-colors flex items-center justify-center gap-2">
             <ExternalLink className="h-4 w-4" /> Share Room
           </button>
         </div>
 
         {/* Sidebar */}
-        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-border bg-card/40 flex flex-col">
-          <div className="flex border-b border-border">
-            {sidebarTabs.map((tab: SidebarTab) => (
-              <button
-                key={tab}
-                onClick={() => setSidebarTab(tab)}
-                className={`flex-1 px-4 py-3 text-xs font-semibold capitalize transition-colors ${
-                  sidebarTab === tab ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+        <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border bg-card/40 flex flex-col">
+          <div className="flex gap-1 border-b border-border p-2">
+            {sidebarTabs.map((tab: SidebarTab) => {
+              const count =
+                tab === "audience"
+                  ? participants.length
+                  : tab === "requests"
+                    ? participants.filter((p) => p.requested_to_speak && p.role === "audience").length
+                    : chatMessages.length;
+              const Icon = tab === "audience" ? Users : tab === "requests" ? Hand : MessageCircle;
+              const on = sidebarTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setSidebarTab(tab)}
+                  className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold capitalize transition-all ${
+                    on
+                      ? "bg-primary text-primary-foreground shadow-[0_0_16px_hsl(var(--neon-green)/0.35)]"
+                      : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {tab === "audience" ? "People" : tab}
+                  {count > 0 && (
+                    <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${on ? "bg-primary-foreground/20" : "bg-muted text-foreground"}`}>{count}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">

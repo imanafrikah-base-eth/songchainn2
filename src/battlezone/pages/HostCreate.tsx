@@ -682,8 +682,14 @@ const HostCreate = () => {
   const inputClass = "w-full rounded-xl border border-border bg-card/80 backdrop-blur pl-14 pr-4 py-3.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/30 shadow-[0_2px_10px_rgba(0,0,0,0.2)] transition-all";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative isolate min-h-screen bg-background">
       {isEmbedded ? <EmbedTopBar title="Host a Battle" /> : <Navbar />}
+      {/* Arena lights behind the form's opening. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem]"
+        style={{ background: "radial-gradient(45% 80% at 20% 0%, hsl(var(--neon-green) / 0.16), transparent 70%), radial-gradient(45% 80% at 80% 0%, hsl(var(--cyan) / 0.14), transparent 70%)" }}
+      />
       <div className="mx-auto max-w-2xl px-4 py-8">
         <AppLink to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
           <ArrowLeft className="h-4 w-4" /> Back
@@ -691,8 +697,13 @@ const HostCreate = () => {
 
         <div className="space-y-8">
           <div className="text-center">
-            <h1 className="text-3xl font-display font-black text-foreground mb-2">Host a Battle</h1>
-            <p className="text-muted-foreground">Set up your battle room and go live</p>
+            <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-primary">
+              <Zap className="h-3.5 w-3.5" /> WaveWarz Africa
+            </span>
+            <h1 className="font-display text-4xl font-black leading-tight text-foreground sm:text-5xl">
+              Host a <span className="text-primary text-glow-green">battle</span>
+            </h1>
+            <p className="mt-2 text-muted-foreground">Two artists, one crowd, one verdict. Set the stage and go live.</p>
           </div>
 
           {/* Title */}
@@ -939,24 +950,31 @@ const HostCreate = () => {
           </div>
 
           {/* Submit */}
-          <div className="space-y-3">
-            {/* Everything needed to actually pay for the battle, at the moment
-                of paying for it. A host who reaches this point without $WWAT
-                should not have to go looking for it. */}
-            {/* Neither of these means anything on the Open Mic: it costs points,
-                not money, so showing a wallet purchase there would be noise. */}
+          <div className="relative space-y-4 overflow-hidden rounded-3xl border border-primary/30 bg-card/70 p-4 shadow-[0_0_40px_hsl(var(--neon-green)/0.08)] sm:p-6">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-32"
+              style={{ background: "radial-gradient(60% 100% at 50% 0%, hsl(var(--neon-green) / 0.14), transparent 70%)" }}
+            />
+            <div className="relative">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">Ready when you are</p>
+              <h2 className="font-display text-2xl font-black text-foreground">Launch the battle</h2>
+            </div>
+            {/* What it costs first, then a way to get the $WWAT if the host has
+                none. Neither means anything on the Open Mic: it costs points,
+                not money, so a wallet purchase there would be noise. */}
             {stage === "main_stage" && (
-              <>
-                <BuyWwat />
+              <div className="relative space-y-3">
                 <HostFeeNotice />
-              </>
+                <BuyWwat />
+              </div>
             )}
-            <p className="text-xs text-muted-foreground">
+            <p className="relative text-xs text-muted-foreground">
               {stage === "main_stage"
                 ? `In-app voice: once the battle is up, turn it on from the room for ${voiceFee.words} (${voiceFee.tokens.toLocaleString('en-US')} $WWAT). The songs, voting and chat run in the room either way.`
                 : "The Open Mic takes no money, so in-app voice is for Main Stage battles. An Open Mic room still plays the songs and runs the voting and chat."}
             </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+            <div className="relative grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <button
                 onClick={() => createBattle(false)}
                 disabled={isSubmitting || !form.schedule}
@@ -967,7 +985,7 @@ const HostCreate = () => {
               <button
                 onClick={() => createBattle(true)}
                 disabled={isSubmitting || liveBattlesCount >= 5}
-                className="w-full min-h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-5 py-3.5 font-bold text-primary-foreground text-base sm:text-lg hover:bg-primary/90 transition-all hover:shadow-[0_0_30px_hsl(var(--neon-green)/0.3)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full min-h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-5 py-3.5 font-display font-black uppercase tracking-wide text-primary-foreground text-base sm:text-lg shadow-[0_0_24px_hsl(var(--neon-green)/0.4)] hover:bg-primary/90 transition-all hover:shadow-[0_0_36px_hsl(var(--neon-green)/0.55)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Zap className="h-5 w-5 shrink-0" /> Launch Battle Now
               </button>
@@ -975,7 +993,7 @@ const HostCreate = () => {
             <button
               onClick={saveDraft}
               disabled={isSubmitting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm sm:text-base font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="relative w-full sm:w-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background/60 px-5 py-3 text-sm sm:text-base font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Save className="h-4 w-4 sm:h-5 sm:w-5" /> Save Draft
             </button>

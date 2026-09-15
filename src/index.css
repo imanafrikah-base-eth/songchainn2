@@ -705,6 +705,13 @@ body {
 .min-w-0 {
   min-width: 0;
 }
+/* A control that explicitly asks for min-w-0 (a card-sized button in a grid
+   whose text truncates) gets it; the floor above used to outrank the class and
+   push the second of two side-by-side cards off a phone screen. */
+.flex > .min-w-0,
+.grid > .min-w-0 {
+  min-width: 0;
+}
 
 /* Mo$ha versus the feed's action rail.
 
