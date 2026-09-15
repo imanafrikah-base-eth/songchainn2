@@ -43,6 +43,9 @@ import { BattleVoiceSwitch } from "@/battlezone/components/BattleVoiceSwitch";
 import { TradingGround } from "@/battlezone/components/TradingGround";
 import { useSongCoinAddresses } from "@/battlezone/hooks/useSongCoinAddresses";
 import { useAuth as useSongchainnAuth } from "@/context/AuthContext";
+import { RoomPeople } from "@/battlezone/components/RoomPeople";
+import { SpeakInvitePrompt } from "@/battlezone/components/SpeakInvitePrompt";
+import { RoomChatComposer, MentionText, mentionedIn, type MentionPerson } from "@/battlezone/components/RoomChatComposer";
 
 /* A counter, not a clock: two mounts in the same millisecond would share a
    channel name and therefore share one channel object. */
@@ -117,11 +120,17 @@ const LiveRoom = () => {
   // Use new role management system
   const {
     participants,
+    myParticipant,
     myRole,
     loading: rolesLoading,
     hasPermission,
     getParticipantsByRole,
     approveSpeakerRequest,
+    inviteToSpeak,
+    acceptInvite,
+    declineInvite,
+    removeSpeaker,
+    toggleParticipantMute,
   } = useBattleRoles(roomId || '');
   /* Profile pictures for everyone in the room, one cached query. */
   const avatars = useParticipantAvatars(participants.map((p) => p.user_id));
@@ -184,7 +193,14 @@ const LiveRoom = () => {
   // Real-time participant management is now handled by useBattleRoles hook
 
   const [chatInput, setChatInput] = useState("");
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  /* A second tap confirms ending the battle or closing the room, so a stray tap
+     never finishes a battle (founder, 15 Sep 2026). */
+  const [confirming, setConfirming] = useState<"end" | "close" | null>(null);
+  useEffect(() => {
+    if (!confirming) return;
+    const id = window.setTimeout(() => setConfirming(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [confirming]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const totalVotes = localVotesA + localVotesB;
@@ -224,21 +240,18 @@ const LiveRoom = () => {
      and after the clock has run out that has to be closed again rather than
      leaving a row that says open while every screen refuses to vote. */
   useEffect(() => {
-    if (!clockClosed || !roomId || battleEnded) return;
+    if (!clockClosed || !roomId || battleEnded || !votingOpen) return;
     if (myRole !== "host") return;
-    /* Awaited, not fired and forgotten. A Supabase query builder is lazy: it
-       only sends the request when something calls then on it, so "void query"
-       builds a request that never leaves the browser. */
-    /* The music has finished and the last call window with it, so the battle
-       is over. The host's screen writes it down for everyone, and the judges
-       are asked for their cards straight away. A host who wants to end it
-       sooner still has the button. */
+    /* The clock closes the POLL, never the battle (founder, 15 Sep 2026). This
+       used to end the battle, and it fired again whenever the host's screen
+       opened after the clock: a host who pressed back by accident came back to
+       a battle that was over. Only the host's End button ends a battle, and the
+       server closes a room nobody has been in for ten minutes
+       (end_stranded_battles).
+       Awaited, not fired and forgotten: a Supabase query builder is lazy and a
+       bare "void query" never leaves the browser. */
     void (async () => {
-      await supabase
-        .from("battles")
-        .update({ status: "ended", voting_open: false, ended_time: new Date().toISOString() })
-        .eq("id", roomId);
-      void requestHikuluVerdict(roomId);
+      await supabase.from("battles").update({ voting_open: false }).eq("id", roomId);
     })();
   }, [clockClosed, roomId, battleEnded, myRole, votingOpen]);
 
@@ -307,7 +320,6 @@ const LiveRoom = () => {
     if (!chatInput.trim() || !roomId || !user) return;
     const messageText = chatInput.trim();
     setChatInput("");
-    setShowEmojiPicker(false);
 
     const { error } = await supabase.from("room_messages").insert({
       room_id: battleChatScope(roomId),
@@ -319,6 +331,18 @@ const LiveRoom = () => {
     if (error) {
       setChatInput(messageText);
       return;
+    }
+
+    // Everybody tagged with @Name is told, except the AI judges, who answer below.
+    const tagged = mentionedIn(messageText, mentionPeopleRef.current)
+      .filter((m) => m.userId !== user.id && !JUDGE_BY_USER_ID.has(m.userId))
+      .map((m) => m.userId);
+    if (tagged.length) {
+      await supabase.rpc("notify_battle_mentions" as never, {
+        p_battle_id: roomId,
+        p_user_ids: tagged,
+        p_message: messageText,
+      } as never);
     }
 
     // Summon every judge addressed by name: the couple or any Council elder.
@@ -395,9 +419,6 @@ const LiveRoom = () => {
     toast({ title: open ? "Voting is open" : "Voting is closed" });
   };
 
-  const addEmoji = (emoji: string) => {
-    setChatInput((prev) => prev + emoji);
-  };
 
   // Votes are editable while the round is open: one row per user per round,
   // upserted so tapping the other artist switches the vote.
@@ -443,6 +464,11 @@ const LiveRoom = () => {
      belong to Artist Worlds. */
 
   const host = getParticipantsByRole('host')[0];
+  const mentionPeople: MentionPerson[] = participants
+    .filter((p) => p.display_name)
+    .map((p) => ({ userId: p.user_id, name: p.display_name }));
+  const mentionPeopleRef = useRef(mentionPeople);
+  mentionPeopleRef.current = mentionPeople;
   const coHosts = getParticipantsByRole('co-host');
   const speakers = getParticipantsByRole('speaker');
   const audience = getParticipantsByRole('audience');
@@ -968,6 +994,16 @@ const LiveRoom = () => {
             </div>
           </div>
 
+          {/* The host asked this person up. */}
+          {voiceOn && myRole === "audience" && myParticipant?.invited_to_speak_at && (
+            <SpeakInvitePrompt
+              invitedAt={myParticipant.invited_to_speak_at}
+              hostName={host?.display_name || "The host"}
+              onAccept={acceptInvite}
+              onDecline={declineInvite}
+            />
+          )}
+
           {/* Microphone Controls */}
           {voiceOn && (
             <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur">
@@ -996,11 +1032,18 @@ const LiveRoom = () => {
           {myRole === "host" && battleEnded && (
             <div className="space-y-2">
               <button
-                onClick={() => void closeRoom()}
+                onClick={() => {
+                  if (confirming !== "close") {
+                    setConfirming("close");
+                    return;
+                  }
+                  setConfirming(null);
+                  void closeRoom();
+                }}
                 disabled={closingRoom}
                 className="w-full sm:w-auto min-h-11 rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                <Square className="h-4 w-4" /> {closingRoom ? "Closing the room" : "Close the room"}
+                <Square className="h-4 w-4" /> {closingRoom ? "Closing the room" : confirming === "close" ? "Tap again to close the room" : "Close the room"}
               </button>
               <p className="text-xs text-muted-foreground">Everyone in the room is taken to the battle page when you close it.</p>
             </div>
@@ -1021,10 +1064,29 @@ const LiveRoom = () => {
                 <button onClick={advanceRound} className="w-full sm:w-auto rounded-xl bg-secondary/10 border border-secondary/30 px-4 py-2.5 text-sm font-semibold text-secondary hover:bg-secondary/20 transition-all flex items-center justify-center gap-2">
                   <SkipForward className="h-4 w-4" /> Next Round
                 </button>
-                <button onClick={endBattle} className="w-full sm:w-auto rounded-xl bg-live/10 border border-live/30 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 transition-all flex items-center justify-center gap-2">
-                  <Square className="h-4 w-4" /> End Battle
+                <button
+                  onClick={() => {
+                    if (confirming !== "end") {
+                      setConfirming("end");
+                      return;
+                    }
+                    setConfirming(null);
+                    void endBattle();
+                  }}
+                  className={`w-full sm:w-auto rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                    confirming === "end"
+                      ? "bg-live text-white border-live shadow-[0_0_18px_hsl(var(--live-red)/0.5)]"
+                      : "bg-live/10 border-live/30 text-live hover:bg-live/20"
+                  }`}
+                >
+                  <Square className="h-4 w-4" /> {confirming === "end" ? "Tap again to end the battle" : "End Battle"}
                 </button>
               </div>
+              {clockClosed && (
+                <p className="text-xs text-muted-foreground">
+                  The clock has run out and voting is closed. The battle stays live until you end it.
+                </p>
+              )}
 
             </div>
           )}
@@ -1053,35 +1115,17 @@ const LiveRoom = () => {
 
           <div className="flex-1 overflow-y-auto p-4">
             {sidebarTab === "audience" && (
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                  In Room ({participants.length})
-                </p>
-                {participants.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">No participants yet</p>
-                )}
-                {participants.map((p) => (
-                  <div key={p.user_id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-muted/30">
-                    <SpeakingAvatar
-                      store={speakingStore}
-                      userId={p.user_id}
-                      name={p.display_name}
-                      role={p.role}
-                      muted={p.is_muted}
-                      avatarUrl={avatars.get(p.user_id)}
-                      size="sm"
-                      showLabel={false}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">{p.display_name || "Anonymous"}</p>
-                      <p className="text-[10px] text-muted-foreground capitalize">{p.role}</p>
-                    </div>
-                    {voiceOn && (
-                      <SpeakingStatus store={speakingStore} userId={p.user_id} role={p.role} muted={p.is_muted} />
-                    )}
-                  </div>
-                ))}
-              </div>
+              <RoomPeople
+                participants={participants}
+                avatars={avatars}
+                speakingStore={speakingStore}
+                voiceOn={voiceOn}
+                canManage={myRole === "host" || myRole === "co-host"}
+                myUserId={user?.id ?? null}
+                onInvite={inviteToSpeak}
+                onBringDown={removeSpeaker}
+                onMute={toggleParticipantMute}
+              />
             )}
 
             {sidebarTab === "requests" && (
@@ -1139,7 +1183,7 @@ const LiveRoom = () => {
                               <span className="rounded border border-current/40 px-1 text-[9px] font-semibold uppercase tracking-wide opacity-80" title="An AI judge. This message was generated automatically.">AI</span>
                               <span className="text-[10px] font-normal text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
                             </span>
-                            <p className="text-foreground">{msg.text}</p>
+                            <p className="text-foreground"><MentionText text={msg.text} people={mentionPeople} meId={user?.id} /></p>
                           </div>
                         );
                       })()}
@@ -1147,7 +1191,7 @@ const LiveRoom = () => {
                         <>
                           <span className={`font-semibold ${msg.userName === (profile?.display_name || profile?.username || "You") ? "text-primary" : "text-foreground"}`}>{msg.userName}</span>
                           <span className="text-[10px] text-muted-foreground/50 ml-1">{formatTime(msg.timestamp)}</span>
-                          <p className="text-muted-foreground">{msg.text}</p>
+                          <p className="text-muted-foreground"><MentionText text={msg.text} people={mentionPeople} meId={user?.id} /></p>
                         </>
                       )}
                       {msg.type === "system" && <span>{msg.text}</span>}
@@ -1156,34 +1200,13 @@ const LiveRoom = () => {
                   <div ref={chatEndRef} />
                 </div>
 
-                <div className="flex gap-2 mt-auto">
-                  <div className="relative flex-1">
-                    <input
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                      placeholder="Say something..."
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
-                    />
-                    <button
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      <Smile className="h-4 w-4" />
-                    </button>
-                    {showEmojiPicker && (
-                      <div className="absolute bottom-full right-0 mb-2 flex gap-1 rounded-lg border border-border bg-card p-2">
-                        {["🔥", "💯", "👏", "❤️", "😮", "😂", "💪", "🎵"].map((e) => (
-                          <button key={e} onClick={() => addEmoji(e)} className="text-lg hover:scale-125 transition-transform">
-                            {e}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button onClick={sendMessage} className="rounded-lg bg-primary px-3 py-2 text-primary-foreground hover:bg-primary/90">
-                    <Send className="h-4 w-4" />
-                  </button>
+                <div className="mt-auto">
+                  <RoomChatComposer
+                    value={chatInput}
+                    onChange={setChatInput}
+                    onSend={() => void sendMessage()}
+                    people={mentionPeople.filter((m) => m.userId !== user?.id)}
+                  />
                 </div>
               </div>
             )}

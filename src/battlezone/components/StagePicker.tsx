@@ -1,6 +1,9 @@
 import { Mic, Trophy, Check } from 'lucide-react';
 import { STAGES, OPEN_MIC_LIMITS, type BattleStage } from '@/battlezone/lib/battleStages';
 import { useUserPoints } from '@/hooks/useUserPoints';
+import { useWwatFee } from '@/battlezone/hooks/useWwatFee';
+import { HOST_FEE_USD } from '@/battlezone/lib/battleMarket';
+import { HOST_FEE_MAX_TOKENS } from '@/battlezone/config';
 
 /**
  * Which room is this battle in.
@@ -20,6 +23,8 @@ export function StagePicker({
   // The spendable balance, not the lifetime total. The points are really taken
   // when the room opens, so this has to be the number that actually pays.
   const { points } = useUserPoints();
+  // The real price today, not the $1 it settles at once $WWAT is worth more.
+  const hostFee = useWwatFee(HOST_FEE_USD, HOST_FEE_MAX_TOKENS);
   const balance = points ?? 0;
   const openMic = STAGES.open_mic;
   const mainStage = STAGES.main_stage;
@@ -95,7 +100,7 @@ export function StagePicker({
           <span className="mt-1 block text-xs text-muted-foreground">{mainStage.tagline}</span>
 
           <span className="mt-3 block text-xs font-semibold text-foreground">
-            {mainStage.costLabel}
+            {`${hostFee.words[0].toUpperCase()}${hostFee.words.slice(1)} in $WWAT`}
           </span>
           <span className="mt-0.5 block text-[11px] text-muted-foreground">
             Paid from your own wallet when you launch.

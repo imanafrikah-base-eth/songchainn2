@@ -52,7 +52,7 @@ export const STAGES: Record<BattleStage, StageRules> = {
     key: 'main_stage',
     name: 'Main Stage',
     tagline: 'The real thing. Backers, payouts, and a verdict that pays artists.',
-    costLabel: '$1 in $WWAT',
+    costLabel: 'About a penny in $WWAT',
     tradingEnabled: true,
     realValue: true,
     communityBattles: true,

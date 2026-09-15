@@ -99,6 +99,9 @@ function routeFor(notification: Notification): string {
   const meta = notification.metadata ?? {};
   const postId = notification.post_id || (typeof meta.post_id === 'string' ? meta.post_id : null);
 
+  // A tag in a battle chat opens that battle room.
+  if (typeof meta.cta_path === 'string' && meta.cta_path.startsWith('/wavewarz-africa/')) return meta.cta_path;
+
   switch (notification.type) {
     case 'announcement':
       return typeof meta.cta_path === 'string' && meta.cta_path ? meta.cta_path : '/marketplace';

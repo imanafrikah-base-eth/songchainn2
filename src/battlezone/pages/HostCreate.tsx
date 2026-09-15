@@ -23,6 +23,7 @@ import { countryOf, useArtistRegions } from "@/battlezone/lib/regions";
 import { durationsFromUrls } from "@/battlezone/lib/songDuration";
 import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
 import { HOST_FEE_ENABLED, VOICE_FEE_MAX_TOKENS } from "@/battlezone/config";
+import { useWwatFee } from "@/battlezone/hooks/useWwatFee";
 import { quoteHostFee, payHostFee, confirmHostFee } from "@/battlezone/lib/hostFee";
 
 /* A counter, not a clock: two mounts in the same millisecond would share a
@@ -48,6 +49,8 @@ const SelectWrapper = ({ icon: Icon, children }: { icon: React.ElementType; chil
 );
 
 const HostCreate = () => {
+  // Voice is priced $3 but capped in tokens; say what it really costs today.
+  const voiceFee = useWwatFee(3, VOICE_FEE_MAX_TOKENS);
   const { isEmbedded, embedTo } = useEmbedMode();
   const navigate = useNavigate();
   const { user, profile, loading } = useAuth();
@@ -950,7 +953,7 @@ const HostCreate = () => {
             )}
             <p className="text-xs text-muted-foreground">
               {stage === "main_stage"
-                ? `In-app voice: once the battle is up, turn it on from the room. It costs $3 in $WWAT, and never more than ${VOICE_FEE_MAX_TOKENS.toLocaleString('en-US')} $WWAT, so while the coin is this cheap you pay the cap, which is a few cents. The songs, voting and chat run in the room either way.`
+                ? `In-app voice: once the battle is up, turn it on from the room for ${voiceFee.words} (${voiceFee.tokens.toLocaleString('en-US')} $WWAT). The songs, voting and chat run in the room either way.`
                 : "The Open Mic takes no money, so in-app voice is for Main Stage battles. An Open Mic room still plays the songs and runs the voting and chat."}
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">

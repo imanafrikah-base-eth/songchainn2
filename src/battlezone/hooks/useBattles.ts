@@ -111,8 +111,9 @@ export interface Battle {
 
 /**
  * The battle is over but its room is still open: the host is reading the
- * results to the people in it. Only the host closes it (founder, 14 Sep 2026),
- * so there is no timer here.
+ * results to the people in it. The host closes it, or the server does once
+ * nobody has been in it for ten minutes (end_stranded_battles, founder
+ * 15 Sep 2026), so there is no timer here.
  */
 export function isResultsRoomOpen(battle: Pick<Battle, "status" | "roomClosedAt"> | null | undefined): boolean {
   return !!battle && battle.status === "ended" && !battle.roomClosedAt;

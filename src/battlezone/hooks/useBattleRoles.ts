@@ -12,6 +12,8 @@ export interface BattleParticipant {
   is_muted: boolean;
   is_speaking: boolean;
   requested_to_speak: boolean;
+  /** Set when the host invites this person up to speak; cleared on accept or decline. */
+  invited_to_speak_at?: string | null;
   joined_at: string;
   last_seen_at: string;
 }
@@ -222,6 +224,41 @@ export const useBattleRoles = (battleId: string) => {
     return await updateParticipantRole(requesterUserId, 'speaker');
   };
 
+  /**
+   * The host invites someone up (founder, 15 Sep 2026: long-press a name).
+   * Only a host or co-host can set it; battle_rooms_guard_role enforces that.
+   */
+  const inviteToSpeak = async (userId: string) => {
+    if (!battleId) return false;
+    const { error } = await supabase
+      .from('battle_rooms')
+      .update({ invited_to_speak_at: new Date().toISOString() } as never)
+      .eq('battle_id', battleId)
+      .eq('user_id', userId);
+    return !error;
+  };
+
+  /** The invited person steps up. The server only allows it inside ten minutes of the invite. */
+  const acceptInvite = async () => {
+    if (!battleId || !user) return false;
+    const { error } = await supabase
+      .from('battle_rooms')
+      .update({ role: 'speaker', is_muted: false, is_speaking: true, requested_to_speak: false } as never)
+      .eq('battle_id', battleId)
+      .eq('user_id', user.id);
+    return !error;
+  };
+
+  const declineInvite = async () => {
+    if (!battleId || !user) return false;
+    const { error } = await supabase
+      .from('battle_rooms')
+      .update({ invited_to_speak_at: null } as never)
+      .eq('battle_id', battleId)
+      .eq('user_id', user.id);
+    return !error;
+  };
+
   // Remove speaker
   const removeSpeaker = async (speakerUserId: string) => {
     if (!battleId) return false;
@@ -344,6 +381,9 @@ export const useBattleRoles = (battleId: string) => {
     updateParticipantRole,
     requestToSpeak,
     approveSpeakerRequest,
+    inviteToSpeak,
+    acceptInvite,
+    declineInvite,
     removeSpeaker,
     toggleParticipantMute,
     getParticipantsByRole,
