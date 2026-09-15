@@ -399,7 +399,7 @@ export default function Social() {
   }, [location.pathname, location.search, navigate]);
 
   return (
-    <div className="h-dvh bg-black relative overflow-hidden">
+    <div className="screen-h bg-black relative overflow-hidden">
 
       {/* ── Scrollable feed ── */}
       <div
@@ -517,7 +517,7 @@ export default function Social() {
           shade; over Photos it is solid, like any list app. */}
       <div className={`absolute top-0 left-0 right-0 z-30 ${isPhotos ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <div className={isPhotos ? 'border-b border-border/60 bg-background/95 backdrop-blur-md' : 'bg-gradient-to-b from-black/75 via-black/35 to-transparent'}>
-          <div className="mx-auto max-w-3xl px-3 pt-3 pb-3 sm:px-4">
+          <div className="mx-auto max-w-3xl px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4">
             <div className="flex items-center gap-2 pointer-events-auto">
               {sharedPost ? (
                 <button

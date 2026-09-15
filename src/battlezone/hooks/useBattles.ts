@@ -253,6 +253,24 @@ async function fetchBattle(id: string): Promise<Battle | null> {
   return rowToBattle(row as unknown as BattleRow, votesA, votesB, listeners);
 }
 
+/**
+ * Every room a person can walk into right now: battles on air, then battles
+ * whose verdict is in but whose room the host still has open. A finished battle
+ * with people still talking in it used to vanish from the live lists, so nobody
+ * could find the room (founder, 15 Sep 2026).
+ */
+export function useLiveRooms() {
+  const live = useBattles("live");
+  const ended = useBattles("ended");
+  const openRooms = (ended.data ?? []).filter(isResultsRoomOpen);
+  return {
+    data: [...(live.data ?? []), ...openRooms],
+    live: live.data ?? [],
+    openRooms,
+    isLoading: live.isLoading || ended.isLoading,
+  };
+}
+
 // Polled, not one-shot: the live room reads round / status / winner / voting_open
 // off this row, so without a refetch the audience never sees the host advance a
 // round or end the battle -- they keep voting into a round that already closed.

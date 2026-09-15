@@ -247,34 +247,50 @@ export const AudioPlayer = memo(function AudioPlayer() {
         animate={{ y: 0, opacity: 1 }}
         className="fixed bottom-0 left-0 right-0 z-50 lg:left-auto lg:right-6 lg:bottom-6 lg:w-full lg:max-w-sm"
       >
+        {/* The Room keeps playing while you look around. This bar is the way
+            back: what is on, how many are in there, one clear button. */}
         <div className="glass-surface border-t border-border/50 pb-safe lg:rounded-2xl lg:border lg:border-border/50 lg:pb-0">
-          <div className="px-4 py-2.5 sm:py-3">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
+            <div className="relative h-11 w-11 shrink-0">
+              {currentSong.coverImage ? (
+                <img src={thumb(currentSong.coverImage, 96) ?? currentSong.coverImage} alt="" className="h-11 w-11 rounded-lg object-cover" />
+              ) : (
+                <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <Headphones className="h-5 w-5" />
+                </span>
+              )}
+              <span className="absolute -right-1 -top-1 flex h-3 w-3" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500/70" />
+                <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-background bg-red-500" />
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-red-500">
+                <span>Live in the Room</span>
+                <span className="font-medium normal-case tracking-normal text-muted-foreground tabular-nums">
+                  · {roomOnlineCount} listening
+                </span>
+              </p>
+              <p className="truncate text-sm font-semibold text-foreground">{currentSong.title}</p>
               <button
                 type="button"
-                onClick={() => {
-                  showRoom();
-                  navigate('/room');
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 text-primary text-xs px-3 py-1 font-semibold shadow-[0_0_0_1px_hsl(var(--primary)/0.3)] min-h-10"
+                onClick={(e) => { e.stopPropagation(); navigate(artistPath(currentSong.artistId)); }}
+                className="block max-w-full truncate text-left text-xs text-muted-foreground transition-colors hover:text-primary"
               >
-                <Headphones className="w-3.5 h-3.5" />
-                <span>Return to Room</span>
-                <span className="inline-flex items-center rounded-full bg-primary text-primary-foreground px-1.5 py-0.5 text-[10px] leading-none">
-                  {roomOnlineCount} live
-                </span>
+                <ArtistName name={currentSong.artist} artistId={currentSong.artistId} size={12} />
               </button>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-foreground truncate">{currentSong.title}</p>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); navigate(artistPath(currentSong.artistId)); }}
-                  className="text-[11px] text-muted-foreground truncate hover:text-primary transition-colors text-left"
-                >
-                  <ArtistName name={currentSong.artist} artistId={currentSong.artistId} size={12} />
-                </button>
-              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                showRoom();
+                navigate('/room');
+              }}
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground"
+            >
+              <Headphones className="h-4 w-4" />
+              Rejoin
+            </button>
           </div>
         </div>
       </motion.div>

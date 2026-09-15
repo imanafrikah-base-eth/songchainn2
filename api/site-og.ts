@@ -8,6 +8,8 @@
 // can quote. It says what the place does and what it is for. It does not say
 // how it is built or how the judging, the money rails or the ranking work.
 
+import { pageOg } from "./_page-og.js";
+
 const SITE = "https://www.songchainn.xyz";
 const NAME = "$ongChainn";
 const TAGLINE = "Free music streaming where artists keep everything and fans can own the songs they love.";
@@ -61,8 +63,11 @@ function esc(str: string): string {
   return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export default function handler(req: any, res: any) {
+export default async function handler(req: any, res: any) {
   const path = String(req.query?.path ?? "/");
+  // Every other place (the Room, the feed, worlds, battles) gets its own card.
+  // One function serves them all: the plan caps how many functions deploy.
+  if (path !== "/" && path !== "/about") return pageOg(req, res);
   const isAbout = path === "/about";
   const title = isAbout ? `About ${NAME}: free music streaming, artists paid direct` : `${NAME}: ${TAGLINE}`;
   const canonical = isAbout ? `${SITE}/about` : SITE;
@@ -125,12 +130,12 @@ export default function handler(req: any, res: any) {
 <meta property="og:title" content="${esc(title)}" />
 <meta property="og:description" content="${esc(TAGLINE)}" />
 <meta property="og:url" content="${canonical}" />
-<meta property="og:image" content="${SITE}/icon-512.png" />
+<meta property="og:image" content="${SITE}/og/home.jpg" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@songchainn" />
 <meta name="twitter:title" content="${esc(title)}" />
 <meta name="twitter:description" content="${esc(TAGLINE)}" />
-<meta name="twitter:image" content="${SITE}/icon-512.png" />
+<meta name="twitter:image" content="${SITE}/og/home.jpg" />
 <script type="application/ld+json">${JSON.stringify(ld)}</script>
 <style>body{font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:32px 20px;line-height:1.55;color:#111;background:#fff}h1{font-size:1.9rem;line-height:1.2}h2{margin-top:2rem}a{color:#0a58ca}</style>
 </head>

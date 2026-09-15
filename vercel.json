@@ -3,16 +3,36 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "images": {
-    "sizes": [96, 192, 384, 640, 828, 1080],
-    "qualities": [70],
-    "formats": ["image/webp"],
+    "sizes": [
+      96,
+      192,
+      384,
+      640,
+      828,
+      1080
+    ],
+    "qualities": [
+      70
+    ],
+    "formats": [
+      "image/webp"
+    ],
     "minimumCacheTTL": 2678400,
     "localPatterns": [
-      { "pathname": "^/(world-assets|lovable-uploads|images|img)/.*$" }
+      {
+        "pathname": "^/(world-assets|lovable-uploads|images|img)/.*$"
+      }
     ],
     "remotePatterns": [
-      { "protocol": "https", "hostname": "^pub-[a-z0-9]{32}\\.r2\\.dev$" },
-      { "protocol": "https", "hostname": "^wsjhbfmzbonxmxaaassu\\.supabase\\.co$", "pathname": "^/storage/v1/object/public/.*$" }
+      {
+        "protocol": "https",
+        "hostname": "^pub-[a-z0-9]{32}\\.r2\\.dev$"
+      },
+      {
+        "protocol": "https",
+        "hostname": "^wsjhbfmzbonxmxaaassu\\.supabase\\.co$",
+        "pathname": "^/storage/v1/object/public/.*$"
+      }
     ]
   },
   "rewrites": [
@@ -37,6 +57,182 @@
         }
       ],
       "destination": "/api/site-og?path=/about"
+    },
+    {
+      "source": "/room",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/room"
+    },
+    {
+      "source": "/room/:rest*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/room"
+    },
+    {
+      "source": "/social",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/social"
+    },
+    {
+      "source": "/post/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/post/:id"
+    },
+    {
+      "source": "/playlist/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/playlist/:id"
+    },
+    {
+      "source": "/playlists",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/playlists"
+    },
+    {
+      "source": "/discover",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/discover"
+    },
+    {
+      "source": "/artists",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/artists"
+    },
+    {
+      "source": "/studio",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/studio"
+    },
+    {
+      "source": "/leaderboard",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/leaderboard"
+    },
+    {
+      "source": "/worlds",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/worlds"
+    },
+    {
+      "source": "/wavewarz-africa",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/wavewarz-africa"
+    },
+    {
+      "source": "/wavewarz-africa/room/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/wavewarz-africa/room/:id"
+    },
+    {
+      "source": "/wavewarz-africa/battles/:rest*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/wavewarz-africa"
+    },
+    {
+      "source": "/wavewarz-africa/how-it-works",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/wavewarz-africa"
+    },
+    {
+      "source": "/wavewarz-africa/learn",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|farcaster|warpcast|pinterest|embedly|skypeuripreview|applebot|googlebot|bingbot|iframely|redditbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|google-extended|duckduckbot|yandexbot|baiduspider|bytespider|ccbot|amazonbot|petalbot|ia_archiver).*"
+        }
+      ],
+      "destination": "/api/site-og?path=/wavewarz-africa"
     },
     {
       "source": "/wavewarz-africa/battle/:id",

@@ -11,7 +11,7 @@ const Footer = () => (
         </div>
         <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
           <AppLink to="/" className="hover:text-foreground transition-colors">Home</AppLink>
-          <AppLink to="/battles/live" className="hover:text-foreground transition-colors">Live Battles</AppLink>
+          <AppLink to="/battles/live" className="hover:text-foreground transition-colors">Live Rooms</AppLink>
           <AppLink to="/battles/upcoming" className="hover:text-foreground transition-colors">Upcoming</AppLink>
           <AppLink to="/battles/results" className="hover:text-foreground transition-colors">Results</AppLink>
           <AppLink to="/how-it-works" className="hover:text-foreground transition-colors">How It Works</AppLink>

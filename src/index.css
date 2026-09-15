@@ -7,6 +7,17 @@
 .pt-safe {
   padding-top: env(safe-area-inset-top, 0px);
 }
+/* One screen tall on every device. 100dvh follows the phone's address bar as
+   it shows and hides; browsers and app webviews too old to know dvh get 100vh
+   instead of no height at all. */
+.screen-h {
+  height: 100vh;
+  height: 100dvh;
+}
+@supports not (height: 100dvh) {
+  .h-\[100dvh\] { height: 100vh; }
+  .min-h-\[calc\(100dvh-3\.5rem\)\] { min-height: calc(100vh - 3.5rem); }
+}
 /* Bottom chrome clearance: tab bar (64px) + 8px buffer + home indicator */
 .pb-chrome {
   padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));

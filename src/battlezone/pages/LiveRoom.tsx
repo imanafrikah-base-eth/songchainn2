@@ -43,6 +43,7 @@ import { BattleVoiceSwitch } from "@/battlezone/components/BattleVoiceSwitch";
 import { TradingGround } from "@/battlezone/components/TradingGround";
 import { useSongCoinAddresses } from "@/battlezone/hooks/useSongCoinAddresses";
 import { useAuth as useSongchainnAuth } from "@/context/AuthContext";
+import { useMyWallets } from "@/hooks/useMyWallets";
 import { RoomPeople } from "@/battlezone/components/RoomPeople";
 import { SpeakInvitePrompt } from "@/battlezone/components/SpeakInvitePrompt";
 import { RoomChatComposer, MentionText, mentionedIn, type MentionPerson } from "@/battlezone/components/RoomChatComposer";
@@ -111,7 +112,9 @@ const LiveRoom = () => {
 
   /* The wallet on the SONGCHAINN account, because backing a corner buys the
      song into that same wallet. */
-  const { walletAddress } = useSongchainnAuth();
+  const { walletAddress: signInWallet } = useSongchainnAuth();
+  const { active: activeWallet } = useMyWallets();
+  const walletAddress = activeWallet?.address ?? signInWallet;
   /* This round's two records, and whether either has a coin to back. */
   const roundSongA = battle?.songsA?.[round - 1] ?? battle?.songsA?.[0];
   const roundSongB = battle?.songsB?.[round - 1] ?? battle?.songsB?.[0];

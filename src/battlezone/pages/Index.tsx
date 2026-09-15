@@ -7,7 +7,7 @@ import BattleCard from "@/battlezone/components/BattleCard";
 import StatsRow from "@/battlezone/components/StatsRow";
 import CountryChips from "@/battlezone/components/CountryChips";
 import SectionHeader from "@/battlezone/components/SectionHeader";
-import { useBattles } from "@/battlezone/hooks/useBattles";
+import { useBattles, useLiveRooms, isResultsRoomOpen } from "@/battlezone/hooks/useBattles";
 import wavewarzLogo from "@/battlezone/assets/wavewarz-logo-2.webp";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
@@ -26,9 +26,11 @@ const UpcomingEmpty = () => (
 
 const Index = () => {
   const { isEmbedded } = useEmbedMode();
-  const { data: liveBattles = [] } = useBattles("live");
+  const { data: liveRooms } = useLiveRooms();
   const { data: upcomingBattles = [] } = useBattles("upcoming");
-  const { data: endedBattles = [] } = useBattles("ended");
+  const { data: ended = [] } = useBattles("ended");
+  // A battle with its room still open sits in Live Rooms, not twice.
+  const endedBattles = ended.filter((b) => !isResultsRoomOpen(b));
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,7 +62,7 @@ const Index = () => {
             </p>
             <div className="flex flex-wrap gap-4 justify-center md:justify-start">
               <AppLink to="/battles/live" className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-all hover:shadow-[0_0_25px_hsl(var(--neon-green)/0.3)]">
-                <Play className="h-4 w-4" /> Join Live Battle
+                <Play className="h-4 w-4" /> Join a live room
               </AppLink>
               <AppLink to="/host/create" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-bold text-foreground hover:bg-muted transition-colors">
                 <Zap className="h-4 w-4" /> Host a Battle
@@ -87,11 +89,11 @@ const Index = () => {
         <CountryChips />
 
         <section>
-          <SectionHeader title="🔴 Live Now" subtitle="Jump into a battle happening right now" linkTo="/battles/live" linkLabel="All Live" />
+          <SectionHeader title="🔴 Live Rooms" subtitle="Battles on air, and rooms still open after the verdict" linkTo="/battles/live" linkLabel="All rooms" />
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {liveBattles.map((b) => <BattleCard key={b.id} battle={b} />)}
+            {liveRooms.map((b) => <BattleCard key={b.id} battle={b} />)}
           </div>
-          {liveBattles.length === 0 && <p className="text-center text-muted-foreground py-6">No live battles right now.</p>}
+          {liveRooms.length === 0 && <p className="text-center text-muted-foreground py-6">No rooms open right now.</p>}
         </section>
 
         <section>

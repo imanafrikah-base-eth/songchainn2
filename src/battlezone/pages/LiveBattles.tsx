@@ -3,7 +3,7 @@ import { Search } from "lucide-react";
 import Navbar from "@/battlezone/components/Navbar";
 import Footer from "@/battlezone/components/Footer";
 import BattleCard from "@/battlezone/components/BattleCard";
-import { useBattles } from "@/battlezone/hooks/useBattles";
+import { useLiveRooms } from "@/battlezone/hooks/useBattles";
 import { useEmbedMode } from "@/battlezone/contexts/EmbedModeContext";
 import EmbedTopBar from "@/battlezone/components/EmbedTopBar";
 import { countryOf, useArtistRegions } from "@/battlezone/lib/regions";
@@ -12,7 +12,7 @@ const LiveBattles = () => {
   const { isEmbedded } = useEmbedMode();
   const [search, setSearch] = useState("");
   const [region, setRegion] = useState("All");
-  const { data: liveBattles = [], isLoading } = useBattles("live");
+  const { data: liveBattles, openRooms, isLoading } = useLiveRooms();
   /* Every country an artist here is from, plus any a live battle is set in. */
   const regions = ["All", ...useArtistRegions(liveBattles.map((b) => b.region))];
 
@@ -24,11 +24,15 @@ const LiveBattles = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {isEmbedded ? <EmbedTopBar title="Live Battles" /> : <Navbar />}
+      {isEmbedded ? <EmbedTopBar title="Live Rooms" /> : <Navbar />}
       <div className={`mx-auto max-w-7xl px-4 ${isEmbedded ? "py-6" : "py-12"} space-y-8`}>
         <div className="text-center">
-          <h1 className="text-3xl font-display font-black text-foreground mb-2">🔴 Live Battles</h1>
-          <p className="text-muted-foreground">Jump into a battle happening right now</p>
+          <h1 className="text-3xl font-display font-black text-foreground mb-2">🔴 Live Rooms</h1>
+          <p className="text-muted-foreground">
+            {openRooms.length > 0
+              ? "Battles on air, and rooms where the host is still reading the verdict"
+              : "Jump into a battle happening right now"}
+          </p>
         </div>
 
         <div className="relative max-w-md mx-auto">
@@ -36,7 +40,7 @@ const LiveBattles = () => {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search battles..."
+            placeholder="Search rooms"
             className="w-full rounded-lg border border-border bg-card pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
@@ -56,7 +60,7 @@ const LiveBattles = () => {
         </div>
 
         {isLoading ? (
-          <p className="text-center text-muted-foreground py-10">Loading battles...</p>
+          <p className="text-center text-muted-foreground py-10">Finding open rooms</p>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((b) => <BattleCard key={b.id} battle={b} />)}
@@ -64,7 +68,7 @@ const LiveBattles = () => {
         )}
 
         {!isLoading && filtered.length === 0 && (
-          <p className="text-center text-muted-foreground py-10">No live battles found.</p>
+          <p className="text-center text-muted-foreground py-10">No rooms open right now.</p>
         )}
       </div>
       {!isEmbedded && <Footer />}

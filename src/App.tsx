@@ -114,6 +114,10 @@ function AppShell() {
   // Artist Worlds are a full-screen immersive layer with their own chrome
   const isWorldRoute = location.pathname.startsWith('/world/');
   const hideFloatingChrome = hideChrome || isWaveWarzEmbedRoute || isWorldRoute;
+  /* The feed is exactly one screen tall and scrolls inside itself. Padding the
+     page under it made the document taller than the phone, so the page moved
+     and the feed's top bar slid off the top (founder, 15 Sep 2026). */
+  const isFullScreenFeed = location.pathname === '/social' || location.pathname.startsWith('/post/');
   /**
    * A live battle room is dense and every row has its own control on the right:
    * approve a speaker, close voting, end the battle. A floating button parked in
@@ -175,7 +179,7 @@ function AppShell() {
 
   return (
     <>
-      <div className={`${hideFloatingChrome ? '' : 'pb-chrome lg:pb-0'} ${rootPulseClass}`.trim()}>
+      <div className={`${hideFloatingChrome || isFullScreenFeed ? '' : 'pb-chrome lg:pb-0'} ${rootPulseClass}`.trim()}>
         <GlobalAmbientLayer isGlobalPulsing={isGlobalPulsing} prefersReducedMotion={prefersReducedMotion} />
         <RedirectHandler />
         <Suspense fallback={<PageLoader />}>

@@ -2,7 +2,7 @@ import { useProfilePath } from '@/hooks/useProfilePath';
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Flame, Gift, Menu, X, LogOut, Wallet, Headphones, Sparkles, Disc3, Bot, Lightbulb, Bug, Search, MoreHorizontal, ChevronDown, RefreshCw, MessageSquare, type LucideIcon , Globe2 } from 'lucide-react';
+import { Flame, Gift, Menu, X, LogOut, Wallet, Sparkles, Disc3, Bot, Lightbulb, Bug, Search, MoreHorizontal, ChevronDown, RefreshCw, MessageSquare, type LucideIcon , Globe2 } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { applyAppUpdate, subscribeAppUpdate, getAppUpdate } from '@/lib/appUpdate';
 import { useEngagement } from '@/context/EngagementContext';
@@ -180,7 +180,10 @@ export function Navigation() {
             </Link>
 
             {/* Right side actions */}
-            <div className="flex items-center gap-1 sm:gap-2">
+            {/* One line, always. Nothing here may wrap or shrink, so the menu
+                button can never be pushed off the right edge of a phone
+                (founder, 15 Sep 2026). */}
+            <div className="flex min-w-0 flex-nowrap items-center gap-1 sm:gap-2 [&>*]:shrink-0">
               {/* Search button — always visible */}
               <motion.button
                 type="button"
@@ -193,6 +196,8 @@ export function Navigation() {
                 <Search className="w-4 h-4" />
                 <span className="hidden sm:inline text-xs font-medium">Search</span>
               </motion.button>
+              {/* On a phone the player bar at the bottom already carries the way
+                  back to the Room, so the top bar keeps its room for the menu. */}
               {showReturnToRoom && (
                 <motion.button
                   onClick={() => {
@@ -201,12 +206,16 @@ export function Navigation() {
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-primary/15 text-primary text-xs sm:text-sm font-semibold shadow-[0_0_0_1px_hsl(var(--primary)/0.3)] min-h-10"
+                  aria-label={`Back to the Room, ${roomOnlineCount} listening`}
+                  className="hidden lg:inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-primary/15 pl-2.5 pr-2 text-sm font-semibold text-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
                 >
-                  <Headphones className="w-4 h-4" />
-                  <span>Return to Room</span>
-                  <span className="inline-flex items-center rounded-full bg-primary text-primary-foreground px-1.5 py-0.5 text-[10px] sm:text-xs leading-none">
-                    {`${roomOnlineCount} live`}
+                  <span className="relative flex h-2 w-2" aria-hidden="true">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500/70" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                  </span>
+                  <span>The Room</span>
+                  <span className="rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-bold leading-none text-primary-foreground tabular-nums">
+                    {roomOnlineCount}
                   </span>
                 </motion.button>
               )}
@@ -365,7 +374,7 @@ export function Navigation() {
               <motion.button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 whileTap={{ scale: 0.95 }}
-                className="lg:hidden p-2 rounded-xl glass text-foreground hover:bg-primary/10 transition-colors"
+                className="lg:hidden flex h-10 w-10 items-center justify-center rounded-xl glass text-foreground hover:bg-primary/10 transition-colors"
                 aria-label="Toggle menu"
               >
                 <AnimatePresence mode="wait">
@@ -725,7 +734,7 @@ function UpdateButton() {
       className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-glow disabled:opacity-70"
     >
       <RefreshCw className={`h-4 w-4 ${update.applying ? 'animate-spin' : ''}`} />
-      <span>{update.applying ? 'Updating' : 'Update'}</span>
+      <span className="hidden sm:inline">{update.applying ? 'Updating' : 'Update'}</span>
     </motion.button>
   );
 }

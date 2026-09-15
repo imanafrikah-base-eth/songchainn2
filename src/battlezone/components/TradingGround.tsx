@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TrendingUp, Users, X, Loader2, ShieldCheck, Zap, Music2, Lock } from 'lucide-react';
+import { TrendingUp, Users, X, Loader2, ShieldCheck, Zap, Music2, Lock, Wallet } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/battlezone/components/ui/sheet';
 import { useBattleStanding, useBackCorner } from '@/battlezone/hooks/useBattleMarket';
 import { battleMarketIsLive } from '@/battlezone/config';
@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { SONGS } from '@/data/musicData';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { getEthUsdPrice } from '@/lib/ethPrice';
+import { requestWalletConnection } from '@/lib/walletGate';
+import { useMyWallets, WALLET_NAMES, shortAddress } from '@/hooks/useMyWallets';
 
 /**
  * The Trading Ground, as it appears inside a live battle.
@@ -40,8 +42,19 @@ interface TradingGroundProps {
   isOpen: boolean;
 }
 
-/** The amounts offered. Small, so backing a corner stays a bit of fun. */
-const STAKES = ['0.001', '0.005', '0.01'] as const;
+/**
+ * Suggested stakes, in dollars. They are only suggestions: the trader can type
+ * any amount of their own (founder, 15 Sep 2026: "start the suggested at
+ * $0.50, $1, $5 then free for user to add their own"). The wallet settles in
+ * ETH, converted at the moment of the trade.
+ */
+const SUGGESTED_USD = [0.5, 1, 5] as const;
+/** Below this a buy costs more in gas than it puts behind the song. */
+const MIN_USD = 0.1;
+
+function usdLabel(usd: number): string {
+  return usd < 1 || !Number.isInteger(usd) ? `$${usd.toFixed(2)}` : `$${usd}`;
+}
 
 /** Corner A wears the zone's neon green, corner B its cyan. */
 const TONE = {
@@ -87,11 +100,16 @@ export function TradingGround({
 }: TradingGroundProps) {
   const [expanded, setExpanded] = useState(false);
   const [picked, setPicked] = useState<'a' | 'b' | null>(null);
-  const [stake, setStake] = useState<(typeof STAKES)[number]>('0.005');
+  const [stakeUsd, setStakeUsd] = useState<number>(1);
+  const [custom, setCustom] = useState('');
+  const [customOn, setCustomOn] = useState(false);
   const { data: standing } = useBattleStanding(battleId);
   const { backCorner, pending, status } = useBackCorner();
   const { songs: published } = usePublishedCatalog();
   const ethUsd = useEthUsdOnce();
+  // The wallet on the SONGCHAINN account is the wallet that trades here.
+  const { active } = useMyWallets();
+  const payingFrom = active?.address ?? walletAddress;
 
   const covers = useMemo(() => {
     const byId = new Map<string, string | undefined>();
@@ -111,13 +129,17 @@ export function TradingGround({
 
   const corners = [cornerA, cornerB];
   const chosen = picked ? (picked === 'a' ? cornerA : cornerB) : null;
-  const stakeUsd = ethUsd ? Number(stake) * ethUsd : null;
+  const customUsd = Number(custom);
+  const amountUsd = customOn ? (Number.isFinite(customUsd) ? customUsd : 0) : stakeUsd;
+  const amountOk = amountUsd >= MIN_USD;
 
-  const handleBack = async (corner: Corner, ethAmount: string) => {
-    if (!walletAddress || !userId) {
-      toast.error('Connect your wallet first', {
-        description: 'Backing a corner buys the song, so it goes to your own wallet.',
-      });
+  const handleBack = async (corner: Corner, usd: number) => {
+    if (!userId) {
+      toast.error('Sign in first', { description: 'Backing a corner buys the song into your own wallet.' });
+      return;
+    }
+    if (!(usd >= MIN_USD)) {
+      toast.error(`The smallest stake is ${usdLabel(MIN_USD)}`);
       return;
     }
     if (!corner.coinAddress) {
@@ -127,13 +149,27 @@ export function TradingGround({
       return;
     }
 
+    // Same wallet as the rest of SONGCHAINN: the active one on the account, and
+    // only asked to connect when this browser cannot reach it.
+    const address = await requestWalletConnection();
+    if (!address) {
+      toast.error('No wallet connected, so nothing was spent');
+      return;
+    }
+    const price = ethUsd ?? (await getEthUsdPrice());
+    if (!price) {
+      toast.error('Could not read the ETH price', { description: 'Nothing was spent. Try again in a moment.' });
+      return;
+    }
+    const ethAmount = (usd / price).toFixed(8);
+
     const result = await backCorner({
       battleId,
       side: corner.side,
       songId: corner.songId,
       coinAddress: corner.coinAddress,
       ethAmount,
-      walletAddress,
+      walletAddress: address,
       userId,
     });
 
@@ -331,34 +367,68 @@ export function TradingGround({
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   {chosen ? `Your stake on ${chosen.artistName}` : 'Tap a corner, then pick your stake'}
                 </p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {STAKES.map((amount) => {
-                    const on = stake === amount;
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  {SUGGESTED_USD.map((usd) => {
+                    const on = !customOn && stakeUsd === usd;
                     const tone = chosen ? TONE[chosen.side] : TONE.a;
                     return (
                       <button
-                        key={amount}
+                        key={usd}
                         type="button"
-                        onClick={() => setStake(amount)}
+                        onClick={() => {
+                          setStakeUsd(usd);
+                          setCustomOn(false);
+                        }}
                         aria-pressed={on}
-                        className={`min-h-14 rounded-xl border-2 px-2 text-center transition-all ${
+                        className={`min-h-14 min-w-0 rounded-xl border-2 px-1 text-center transition-all ${
                           on ? `${tone.ring} bg-background` : 'border-border bg-background/40 hover:border-muted-foreground/40'
                         }`}
                       >
-                        <span className="block font-mono text-sm font-bold text-foreground">{amount} ETH</span>
-                        {ethUsd && (
-                          <span className="block text-[10px] text-muted-foreground">
-                            about ${(Number(amount) * ethUsd).toFixed(Number(amount) * ethUsd < 10 ? 2 : 0)}
-                          </span>
-                        )}
+                        <span className="block font-display text-lg font-black tabular-nums text-foreground">{usdLabel(usd)}</span>
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    onClick={() => setCustomOn(true)}
+                    aria-pressed={customOn}
+                    className={`min-h-14 min-w-0 rounded-xl border-2 px-1 text-center text-sm font-bold leading-tight transition-all ${
+                      customOn
+                        ? `${(chosen ? TONE[chosen.side] : TONE.a).ring} bg-background text-foreground`
+                        : 'border-dashed border-border bg-background/40 text-muted-foreground hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    Your own
+                  </button>
                 </div>
+                {customOn && (
+                  <label className="mt-2 flex h-14 items-center gap-2 rounded-xl border-2 border-border bg-background px-3 focus-within:border-primary/60">
+                    <span className="font-display text-xl font-black text-muted-foreground">$</span>
+                    <input
+                      autoFocus
+                      inputMode="decimal"
+                      value={custom}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9.]/g, '');
+                        const [whole, ...rest] = v.split('.');
+                        setCustom(rest.length ? `${whole}.${rest.join('').slice(0, 2)}` : whole);
+                      }}
+                      placeholder="Any amount"
+                      aria-label="Your own stake in dollars"
+                      className="min-w-0 flex-1 bg-transparent font-display text-xl font-black tabular-nums text-foreground placeholder:text-base placeholder:font-medium placeholder:text-muted-foreground focus:outline-none"
+                    />
+                    {amountOk && ethUsd ? (
+                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{(amountUsd / ethUsd).toFixed(5)} ETH</span>
+                    ) : null}
+                  </label>
+                )}
+                {customOn && custom !== '' && !amountOk && (
+                  <p className="mt-1.5 text-xs text-destructive">The smallest stake is {usdLabel(MIN_USD)}.</p>
+                )}
                 <button
                   type="button"
-                  disabled={!chosen || pending}
-                  onClick={() => chosen && void handleBack(chosen, stake)}
+                  disabled={!chosen || pending || !amountOk}
+                  onClick={() => chosen && void handleBack(chosen, amountUsd)}
                   className={`mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl px-4 font-display text-base font-black uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                     chosen ? `${TONE[chosen.side].bg} ${TONE[chosen.side].fg} ${TONE[chosen.side].glow}` : 'bg-muted text-muted-foreground'
                   }`}
@@ -369,16 +439,26 @@ export function TradingGround({
                     </>
                   ) : chosen ? (
                     <>
-                      <Zap className="h-5 w-5 shrink-0" /> <span className="truncate">Back {chosen.artistName}</span>
-                      {stakeUsd ? <span className="hidden font-sans text-xs font-bold normal-case opacity-80 sm:inline">(about ${stakeUsd.toFixed(2)})</span> : null}
+                      <Zap className="h-5 w-5 shrink-0" />
+                      <span className="truncate">
+                        Back {chosen.artistName}
+                        {amountOk ? ` with ${usdLabel(amountUsd)}` : ''}
+                      </span>
                     </>
                   ) : (
                     'Pick a corner'
                   )}
                 </button>
-                {!walletAddress && (
-                  <p className="mt-2 text-center text-xs text-muted-foreground">You will be asked to connect your wallet.</p>
-                )}
+                <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+                  <Wallet className="h-3.5 w-3.5 shrink-0" />
+                  {payingFrom ? (
+                    <span className="truncate">
+                      Paid from your SONGCHAINN wallet{active ? `, ${WALLET_NAMES[active.provider]}` : ''} {shortAddress(payingFrom)}
+                    </span>
+                  ) : (
+                    <span>You connect a wallet once. SONGCHAINN keeps it for next time.</span>
+                  )}
+                </p>
               </div>
             )}
 

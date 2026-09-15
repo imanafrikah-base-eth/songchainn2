@@ -1,5 +1,5 @@
 import { Users, Music } from "lucide-react";
-import type { Battle } from "@/battlezone/hooks/useBattles";
+import { isResultsRoomOpen, type Battle } from "@/battlezone/hooks/useBattles";
 import LiveBadge from "./LiveBadge";
 import AppLink from "./AppLink";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
@@ -31,6 +31,8 @@ const ArtistAvatar = ({ name, image, side }: { name: string; image: string; side
 const BattleCard = ({ battle }: { battle: Battle }) => {
   const isLive = battle.status === "live";
   const isEnded = battle.status === "ended";
+  /* The verdict is in but the host still has the room open: it is joinable. */
+  const roomOpen = isResultsRoomOpen(battle);
   const totalVotes = battle.votesA + battle.votesB;
   const pctA = totalVotes ? Math.round((battle.votesA / totalVotes) * 100) : 50;
 
@@ -42,14 +44,19 @@ const BattleCard = ({ battle }: { battle: Battle }) => {
    * where the status genuinely is unknown.
    */
   return (
-    <AppLink to={isLive ? `/room/${battle.id}` : `/battle/${battle.id}`} className="group flex h-full flex-col rounded-2xl border border-border bg-card/80 p-5 backdrop-blur transition-all hover:border-primary/30 hover:shadow-[0_0_30px_hsl(var(--neon-green)/0.08)]">
+    <AppLink to={isLive || roomOpen ? `/room/${battle.id}` : `/battle/${battle.id}`} className="group flex h-full flex-col rounded-2xl border border-border bg-card/80 p-5 backdrop-blur transition-all hover:border-primary/30 hover:shadow-[0_0_30px_hsl(var(--neon-green)/0.08)]">
       <div className="mb-3 flex min-h-6 items-center justify-between">
         {isLive && <LiveBadge />}
-        {isEnded && (
+        {roomOpen ? (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-live/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-live">
+            <span className="h-2 w-2 rounded-full bg-live pulse-live" />
+            Room open
+          </span>
+        ) : isEnded ? (
           <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
             Ended
           </span>
-        )}
+        ) : null}
         <span className="ml-auto flex items-center gap-2">
           {/* Only the Open Mic is marked. Main Stage is the ordinary case, and
               badging every card with it would say nothing while making the list
@@ -106,7 +113,7 @@ const BattleCard = ({ battle }: { battle: Battle }) => {
 
       <div className="mt-auto border-t border-border/70 pt-3 text-center">
         <span className="inline-flex items-center justify-center text-sm font-semibold text-primary transition-all group-hover:text-glow-green">
-          {isLive ? "Join Room" : isEnded ? "View Results" : "View Battle"}
+          {isLive ? "Join the room" : roomOpen ? "Join the results room" : isEnded ? "See the results" : "See the battle"}
         </span>
       </div>
     </AppLink>
