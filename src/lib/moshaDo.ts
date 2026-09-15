@@ -28,6 +28,8 @@ export const MOSHA_DO_OPS = [
   'share_song',
   'invite_friends',
   'remove_failed_uploads',
+  'stop_release',
+  'move_release',
 ] as const;
 export type MoshaDoOp = (typeof MOSHA_DO_OPS)[number];
 
@@ -253,6 +255,111 @@ function failedUploads(uid: string) {
 }
 
 /* ---------------------------------------------------------------- ops --- */
+
+/* ------------------------------------------------------- release timing --- */
+
+interface OwnRecord {
+  id: string;
+  title: string | null;
+  status: string;
+  release_id: string | null;
+  release_at: string | null;
+}
+
+interface RecordGroup {
+  key: string;
+  label: string;
+  ids: string[];
+  scheduled: boolean;
+}
+
+/**
+ * The person's own records a release job acts on (founder, 15 Sep 2026: an
+ * artist asked Mo$ha to push her release and nothing could). Every track of a
+ * release whose title matches, or else the songs whose title matches, grouped
+ * so a question can offer each release as one choice. Nothing named means the
+ * releases still ahead.
+ */
+async function ownRecordsFor(uid: string, arg: string | undefined, statuses: string[]): Promise<RecordGroup[]> {
+  const want = norm(arg ?? '');
+  const { data } = await supabase
+    .from('songs')
+    .select('id, title, status, release_id, release_at')
+    .eq('owner_id', uid)
+    .in('status', statuses);
+  const rows = (data ?? []) as unknown as OwnRecord[];
+  if (!rows.length) return [];
+  const releaseIds = [...new Set(rows.map((r) => r.release_id).filter(Boolean))] as string[];
+  const { data: rel } = releaseIds.length
+    ? await supabase.from('releases' as never).select('id, title').in('id' as never, releaseIds as never)
+    : { data: [] };
+  const relTitle = new Map(((rel ?? []) as Array<{ id: string; title: string }>).map((r) => [r.id, r.title]));
+  const future = (r: OwnRecord) => !!r.release_at && Date.parse(r.release_at) > Date.now();
+
+  const groups: RecordGroup[] = [];
+  for (const [rid, title] of relTitle) {
+    if (want && !norm(title).includes(want)) continue;
+    const tracks = rows.filter((r) => r.release_id === rid);
+    groups.push({ key: `r:${rid}`, label: `${title} (${plural(tracks.length, 'track')})`, ids: tracks.map((t) => t.id), scheduled: tracks.some(future) });
+  }
+  if (want && !groups.length) {
+    for (const r of rows) {
+      if (!norm(r.title ?? '').includes(want)) continue;
+      groups.push({ key: `s:${r.id}`, label: r.title || 'Untitled', ids: [r.id], scheduled: future(r) });
+    }
+  }
+  if (!want) {
+    const ahead = groups.filter((g) => g.scheduled);
+    for (const r of rows) {
+      if (!r.release_id && future(r)) ahead.push({ key: `s:${r.id}`, label: r.title || 'Untitled', ids: [r.id], scheduled: true });
+    }
+    return ahead.slice(0, 5);
+  }
+  return groups.slice(0, 5);
+}
+
+/** "23:00", "11pm", "2026-09-16 23:00": a moment on the person's own clock. A time of day already past means tomorrow. */
+function parseWhen(raw: string | undefined): Date | null {
+  const t = (raw ?? '').trim().toLowerCase().replace(/\s*today$/, '');
+  if (!t) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) {
+    const full = new Date(t.replace(' ', 'T'));
+    return Number.isNaN(full.getTime()) ? null : full;
+  }
+  const m = t.match(/^(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?$/);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = Number(m[2] ?? 0);
+  if (m[3] === 'pm' && h < 12) h += 12;
+  if (m[3] === 'am' && h === 12) h = 0;
+  if (h > 23 || min > 59) return null;
+  const d = new Date();
+  d.setHours(h, min, 0, 0);
+  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+const whenLabel = (d: Date) =>
+  d.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** "Mind of a menace|11pm": what, then when. A bare time moves whatever is scheduled. */
+function splitMoveArg(arg?: string): { what: string; when: string } {
+  const a = (arg ?? '').trim();
+  const cut = a.lastIndexOf('|');
+  return cut >= 0 ? { what: a.slice(0, cut).trim(), when: a.slice(cut + 1).trim() } : { what: '', when: a };
+}
+
+async function stopIds(ids: string[]): Promise<number> {
+  const { data, error } = await supabase.rpc('stop_release' as never, { p_song_ids: ids } as never);
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}
+
+async function releaseIds(ids: string[], at: Date | null): Promise<number> {
+  const { data, error } = await supabase.rpc('release_held' as never, { p_song_ids: ids, p_release_at: at ? at.toISOString() : null } as never);
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}
 
 const OPS: Record<MoshaDoOp, DoOp> = {
   delete_duplicate_media: {
@@ -559,6 +666,71 @@ const OPS: Record<MoshaDoOp, DoOp> = {
     },
     working: 'Removing them',
     refresh: [['artist_releases']],
+  },
+
+  stop_release: {
+    check: async (_ctx, arg) => {
+      const uid = await sessionUserId();
+      if (!uid) return SIGN_IN;
+      const groups = await ownRecordsFor(uid, arg, ['published']);
+      if (!groups.length) {
+        return { nothing: arg ? `I could not find a live or scheduled release of yours called "${clip(arg)}".` : 'You have nothing scheduled right now.' };
+      }
+      if (groups.length > 1) return { question: 'Which one do you want to stop?', choices: groups.map((g) => ({ value: g.key, label: g.label })) };
+      const g = groups[0];
+      return {
+        question: g.scheduled ? `Stop "${g.label}" from going out?` : `Take "${g.label}" down?`,
+        confirm: g.scheduled ? 'Stop the release' : 'Take it down',
+        note: 'It stays in your Studio with everything on it, and you can release it again whenever you like.',
+      };
+    },
+    run: async (_ctx, arg, choice) => {
+      const uid = await sessionUserId();
+      if (!uid) throw new Error('Sign in first.');
+      const groups = await ownRecordsFor(uid, arg, ['published']);
+      const g = (choice ? groups.find((x) => x.key === choice) : groups[0]) ?? null;
+      if (!g) throw new Error('That release is not live or scheduled any more.');
+      const n = await stopIds(g.ids);
+      return `Done. "${g.label}" is held back (${plural(n, 'track')}). Nothing goes out until you release it again from your Studio, or ask me.`;
+    },
+    working: 'Stopping the release',
+    refresh: [['artist_releases'], ['published-catalog']],
+  },
+
+  move_release: {
+    check: async (_ctx, arg) => {
+      const uid = await sessionUserId();
+      if (!uid) return SIGN_IN;
+      const { what, when } = splitMoveArg(arg);
+      const at = parseWhen(when);
+      if (!at) return { nothing: 'Tell me the new time, like 11pm or 2026-09-16 21:00.' };
+      const groups = await ownRecordsFor(uid, what || undefined, ['published', 'held']);
+      if (!groups.length) return { nothing: what ? `I could not find a release of yours called "${clip(what)}".` : 'You have nothing scheduled to move.' };
+      if (groups.length > 1) return { question: `Which one goes out ${whenLabel(at)}?`, choices: groups.map((g) => ({ value: g.key, label: g.label })) };
+      return {
+        question: `Move "${groups[0].label}" to ${whenLabel(at)}?`,
+        confirm: 'Move it',
+        note: 'Only you can see it until then, and your followers hear about it at that moment.',
+      };
+    },
+    run: async (_ctx, arg, choice) => {
+      const uid = await sessionUserId();
+      if (!uid) throw new Error('Sign in first.');
+      const { what, when } = splitMoveArg(arg);
+      const at = parseWhen(when);
+      if (!at) throw new Error('That time did not make sense. Tell me again, like 11pm.');
+      const groups = await ownRecordsFor(uid, what || undefined, ['published', 'held']);
+      const g = (choice ? groups.find((x) => x.key === choice) : groups[0]) ?? null;
+      if (!g) throw new Error('That release could not be found any more.');
+      // Held first, so nothing is public in between, then out at the new time.
+      const { data: live } = await supabase.from('songs').select('id').in('id', g.ids).eq('status', 'published');
+      const liveIds = ((live ?? []) as Array<{ id: string }>).map((r) => r.id);
+      if (liveIds.length) await stopIds(liveIds);
+      const n = await releaseIds(g.ids, at);
+      return `Done. "${g.label}" now goes out ${whenLabel(at)} (${plural(n, 'track')}).`;
+    },
+    working: 'Moving the release',
+    refresh: [['artist_releases'], ['published-catalog']],
   },
 };
 

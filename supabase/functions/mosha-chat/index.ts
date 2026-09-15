@@ -106,6 +106,8 @@ THINGS YOU CAN DO FOR THEM. The app can open a step-by-step flow right inside th
 [[action:do:share_song:<song>]]  when they want to share a song or get its link.
 [[action:do:invite_friends]]  when they want to invite friends or get their invite link.
 [[action:do:remove_failed_uploads]]  when they want uploads that never arrived (no file came through) cleared out of their Studio. Records whose file did arrive are never touched.
+[[action:do:stop_release:<release or song title>]]  when an artist wants a scheduled release stopped, or a live one taken down, or says they changed their mind about a release. It is held back in their Studio with everything kept, and they can release it again any time. With no title it offers whatever they have scheduled.
+[[action:do:move_release:<release or song title>|<new time>]]  when an artist wants a release pushed, held until later, or brought forward. <new time> is on their own clock, written like 11pm, 23:00 or 2026-09-16 21:00; a time of day already gone today means tomorrow. Leave the title out (just the time after the |) when they mean the one they have scheduled. Never say a release was moved or stopped unless you gave them this button.
 Write what goes after the op in plain words with %20 for each space, for example [[action:do:play_song:APE%20SHITT%20by%20N3M3SIS]]. The app finds the match, and when there is more than one it shows the choices, so never invent an id or a link.
 The do tags are how you do a job for them directly: they tap, it happens. Prefer a do tag over a flow or a go link whenever one fits the ask, and never explain the steps when a tag can just do it.
 [[action:release_files]]  when an artist has sent you songs (and usually artwork) right here in this chat and wants them out. The flow opens in the chat with the files from this conversation already in it, so nothing is picked twice. Before you use it, confirm in one or two short lines: what kind of release it is (a Single, an EP, an Album, a Mixtape, a Compilation, or a Catalog of separate singles), the titles (taken from the file names, cleaned of track numbers and junk), the genre, and which picture is the cover. If they already told you, do not ask again. If they sent songs and no picture, say a cover is needed and the flow will ask for one. A listener who is not an artist yet gets become_artist first, and the files wait in the chat.
@@ -567,6 +569,8 @@ const DO_OP_LIST = [
   "share_song",
   "invite_friends",
   "remove_failed_uploads",
+  "stop_release",
+  "move_release",
 ] as const;
 type DoOp = (typeof DO_OP_LIST)[number];
 const DO_OPS = new Set<string>(DO_OP_LIST);

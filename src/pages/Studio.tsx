@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { ChevronDown, Pencil } from 'lucide-react';
 import { SongDetailsFields, DistributionChoice } from '@/components/studio/SongDetailsFields';
 import { SongDetailsDialog } from '@/components/studio/SongDetailsDialog';
+import { StopReleaseControl, HeldReleaseControl } from '@/components/studio/ReleaseTiming';
 import { ActivityBoard } from '@/components/studio/ActivityBoard';
 import { VerificationCard } from '@/components/studio/VerificationCard';
 import { EMPTY_DETAILS, detailProblems, requestOnchain, type SongDetails } from '@/lib/songDetails';
@@ -87,6 +88,7 @@ const STATUS_LABEL: Record<string, string> = {
   published: 'Live',
   workshop: 'In the workshop',
   scheduled: 'Scheduled',
+  held: 'Held back',
 };
 
 function prettyDate(iso: string): string {
@@ -264,7 +266,8 @@ const Studio = () => {
     setDefaults({ artistName: artistName.trim() || profile?.display_name || profile?.username || '' });
   }, [artistName, profile, setDefaults]);
 
-  const { live, workshop, pending, scheduled } = useMemo(() => ({
+  const { live, workshop, pending, scheduled, held } = useMemo(() => ({
+    held: releases.filter((r) => r.status === 'held'),
     live: releases.filter((r) => r.status === 'published' && !isScheduled(r)),
     scheduled: releases.filter((r) => isScheduled(r)),
     workshop: releases.filter((r) => r.status === 'workshop'),
@@ -1176,22 +1179,34 @@ const Studio = () => {
           </p>
         ) : (
           <div className="space-y-8">
-            {pending.length > 0 && <ReleaseGroup title="In progress" items={pending} hasWallet={hasWallet} artistId={artistId} />}
+            {pending.length > 0 && <ReleaseGroup title="In progress" items={pending} all={releases} hasWallet={hasWallet} artistId={artistId} />}
             {scheduled.length > 0 && (
               <ReleaseGroup
                 title="Scheduled"
-                note="Only you can see these until their day. They go public at midnight and your followers hear about it then."
+                note="Only you can see these until their time comes. They go public at the moment you set and your followers hear about it then. Changed your mind? Stop the release."
                 items={scheduled}
+                all={releases}
                 hasWallet={hasWallet}
                 artistId={artistId}
               />
             )}
-            {live.length > 0 && <ReleaseGroup title="Live on SONGCHAINN" items={live} hasWallet={hasWallet} artistId={artistId} />}
+            {held.length > 0 && (
+              <ReleaseGroup
+                title="Held back"
+                note="You stopped these. Only you can see them, and everything on them is kept. Release them now or pick a new time."
+                items={held}
+                all={releases}
+                hasWallet={hasWallet}
+                artistId={artistId}
+              />
+            )}
+            {live.length > 0 && <ReleaseGroup title="Live on SONGCHAINN" items={live} all={releases} hasWallet={hasWallet} artistId={artistId} />}
             {workshop.length > 0 && (
               <ReleaseGroup
                 title="Your workshop"
                 note="Only you can see this. Nothing lands here unless something on the file is actually broken, and there is no limit on sending a track back once you have fixed it."
                 items={workshop}
+                all={releases}
                 hasWallet={hasWallet}
                 artistId={artistId}
               />
@@ -1295,19 +1310,27 @@ function ResultCard({ track: t, many, releaseDate, releaseAt, onAskAgain }: { tr
   );
 }
 
-function ReleaseGroup({ title, note, items, hasWallet, artistId }: { title: string; note?: string; items: ArtistRelease[]; hasWallet: boolean; artistId: string | null }) {
+function ReleaseGroup({ title, note, items, all, hasWallet, artistId }: { title: string; note?: string; items: ArtistRelease[]; all: ArtistRelease[]; hasWallet: boolean; artistId: string | null }) {
   return (
     <section>
       <h2 className="font-heading text-lg font-bold text-foreground">{title}</h2>
       {note && <p className="mt-1 mb-3 text-xs text-muted-foreground">{note}</p>}
       <div className={`space-y-3 ${note ? '' : 'mt-3'}`}>
-        {items.map((r) => <ReleaseCard key={r.id} release={r} hasWallet={hasWallet} artistId={artistId} />)}
+        {items.map((r) => (
+          <ReleaseCard
+            key={r.id}
+            release={r}
+            siblings={r.release_id ? all.filter((o) => o.release_id === r.release_id) : [r]}
+            hasWallet={hasWallet}
+            artistId={artistId}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
-function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease; hasWallet: boolean; artistId: string | null }) {
+function ReleaseCard({ release, siblings, hasWallet, artistId }: { release: ArtistRelease; siblings: ArtistRelease[]; hasWallet: boolean; artistId: string | null }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -1328,7 +1351,9 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
   const stuck =
     (release.status === 'auditioning' || release.status === 'uploading')
     && Date.now() - new Date(release.created_at).getTime() > AUDITION_STALE_MS;
-  const canDelete = release.status !== 'published';
+  // A held record was live once and may sit in people's playlists, so it is
+  // released again or kept, not thrown away from here.
+  const canDelete = release.status !== 'published' && release.status !== 'held';
 
   const remove = async () => {
     setWorking(true);
@@ -1434,7 +1459,7 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
             statusKey === 'published' ? 'bg-primary/15 text-primary'
               : statusKey === 'scheduled' ? 'bg-primary/10 text-primary'
-              : statusKey === 'workshop' ? 'bg-amber-500/15 text-amber-500'
+              : statusKey === 'workshop' || statusKey === 'held' ? 'bg-amber-500/15 text-amber-500'
               : 'bg-muted text-muted-foreground'
           }`}>
             {STATUS_LABEL[statusKey] ?? statusKey}
@@ -1489,6 +1514,8 @@ function ReleaseCard({ release, hasWallet, artistId }: { release: ArtistRelease;
             <Coins className="h-3.5 w-3.5" /> Take it onchain
           </button>
         ) : null}
+        {release.status === 'published' && !minted && <StopReleaseControl release={release} siblings={siblings} />}
+        {release.status === 'held' && <HeldReleaseControl release={release} siblings={siblings} />}
         {stuck && (
           <button
             type="button"

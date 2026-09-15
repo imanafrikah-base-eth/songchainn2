@@ -19,7 +19,8 @@ import { fileMatchesRow, type DraftTrack, type UploadedRow } from '@/lib/studioD
  * track, never to release one.
  */
 
-export type ReleaseStatus = 'uploading' | 'auditioning' | 'published' | 'workshop';
+/** 'held': the artist stopped the release; hidden from everyone, still in their Studio. */
+export type ReleaseStatus = 'uploading' | 'auditioning' | 'published' | 'workshop' | 'held';
 
 /**
  * Which rung of the standard a released track landed on.
@@ -184,7 +185,36 @@ export function useReleaseActions() {
     [refresh],
   );
 
-  return { deleteRelease, reaudition };
+  /**
+   * Stop a release (founder, 15 Sep 2026): scheduled or already live, the records
+   * come off SONGCHAINN and wait in the Studio as held. The server refuses a
+   * record somebody has bought or whose coin is minted.
+   */
+  const stopRelease = useCallback(
+    async (songIds: string[]) => {
+      const { data, error } = await supabase.rpc('stop_release' as never, { p_song_ids: songIds } as never);
+      if (error) throw new Error(error.message);
+      await refresh();
+      return Number(data ?? 0);
+    },
+    [refresh],
+  );
+
+  /** Put held records back out: now, or at a moment ahead. */
+  const releaseHeld = useCallback(
+    async (songIds: string[], at: Date | null) => {
+      const { data, error } = await supabase.rpc('release_held' as never, {
+        p_song_ids: songIds,
+        p_release_at: at ? at.toISOString() : null,
+      } as never);
+      if (error) throw new Error(error.message);
+      await refresh();
+      return Number(data ?? 0);
+    },
+    [refresh],
+  );
+
+  return { deleteRelease, reaudition, stopRelease, releaseHeld };
 }
 
 function shapeResult(result: Record<string, unknown>, warnings: string[] = []): AuditionResult {
