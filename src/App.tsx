@@ -21,6 +21,8 @@ import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { LiveCelebrationHost } from "@/components/studio/LiveCelebration";
 import { PointsMilestones } from "@/components/PointsMilestones";
 import { RoomPresenceKeeper } from "@/components/RoomPresenceKeeper";
+import { RoomTimelineSync } from "@/components/RoomTimelineSync";
+import { RoomCues } from "@/components/RoomCues";
 import { NotificationBanner } from "@/components/NotificationBanner";
 import { GlobalAmbientLayer } from "@/components/GlobalAmbientLayer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -267,6 +269,8 @@ function AppShell() {
       <ErrorBoundary fallback={null}><ConnectWalletModal /></ErrorBoundary>
       <ErrorBoundary fallback={null}><PointsMilestones /></ErrorBoundary>
       <ErrorBoundary fallback={null}><RoomPresenceKeeper /></ErrorBoundary>
+      <ErrorBoundary fallback={null}><RoomTimelineSync /></ErrorBoundary>
+      <ErrorBoundary fallback={null}><RoomCues /></ErrorBoundary>
     </>
   );
 }

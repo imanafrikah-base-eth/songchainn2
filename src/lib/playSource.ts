@@ -24,7 +24,19 @@ export type PlaySource =
   | 'landing'
   | 'player';
 
+let inRoom = false;
+
+/**
+ * The Room is a place, not a page: hide it and the music plays on while the
+ * listener reads the feed. Those listens are still the Room's, so room mode
+ * says so here rather than letting the address bar name them.
+ */
+export function setRoomListening(on: boolean) {
+  inRoom = on;
+}
+
 export function playSourceNow(): PlaySource {
+  if (inRoom) return 'room';
   if (typeof window === 'undefined') return 'player';
   const { pathname, search } = window.location;
   const q = new URLSearchParams(search);

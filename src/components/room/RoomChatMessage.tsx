@@ -30,12 +30,23 @@ interface MenuPlace {
   left: number;
 }
 
+function roomTime(date: Date) {
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return time;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`;
+  return `${date.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${time}`;
+}
+
 export function RoomChatMessage({
   name,
   userId,
   body,
   copyText,
   parent,
+  sentAt,
   isMine = false,
   bigEmoji = false,
   reactions,
@@ -48,6 +59,8 @@ export function RoomChatMessage({
   body: ReactNode;
   copyText: string;
   parent?: { name: string; text: string } | null;
+  /** When it was sent, as the database keeps it. */
+  sentAt?: string | null;
   /** Your own words, tinted so the column is readable at a glance. */
   isMine?: boolean;
   /** Only emoji: shown big and without a bubble. */
@@ -180,6 +193,13 @@ export function RoomChatMessage({
     closeMenu();
   };
 
+  // The clock the reader keeps, in their own time zone. The Room holds a day
+  // of chat, so anything not from today says which day it was.
+  const sent = sentAt ? new Date(sentAt) : null;
+  const sentOk = sent && !Number.isNaN(sent.getTime()) ? sent : null;
+  const clock = sentOk ? roomTime(sentOk) : '';
+  const fullTime = sentOk ? sentOk.toLocaleString() : undefined;
+
   const chips = Object.entries(reactions ?? {})
     .filter(([, n]) => n > 0)
     .sort((a, b) => b[1] - a[1]);
@@ -239,8 +259,13 @@ export function RoomChatMessage({
                 {parent.name}: {parent.text}
               </div>
             )}
-            <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-zinc-100">
+            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] font-semibold text-zinc-100">
               <ArtistName name={name} userId={userId} size={14} />
+              {clock && (
+                <time dateTime={sentAt ?? undefined} title={fullTime} className="text-[11px] font-normal tabular-nums text-zinc-500">
+                  {clock}
+                </time>
+              )}
             </span>
             <div className={bigEmoji ? 'mt-0.5 leading-none' : 'text-zinc-200 break-words'}>{body}</div>
           </div>

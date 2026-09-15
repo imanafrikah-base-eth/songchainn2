@@ -208,6 +208,16 @@ export default function Social() {
     navigate('/social', { replace: true });
   }, [navigate]);
 
+  /* The feed plays a song as soon as a card shows, and the tab bar steps aside
+     whenever a song is playing. The feed mounts no mini player either, so on a
+     phone this button is the only way out (founder, 15 Sep 2026). It goes back
+     where the person came from, or Home when the feed was the first page. */
+  const leaveFeed = useCallback(() => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) navigate(-1);
+    else navigate('/', { replace: true });
+  }, [navigate]);
+
   const handleDeletePost = useCallback(async (postId: string) => {
     const ok = await deletePost(postId);
     if (ok && sharedLoadedRef.current === postId) backToFeed();
@@ -528,7 +538,17 @@ export default function Social() {
                   <ArrowLeft className="h-4 w-4" />
                   Back
                 </button>
-              ) : null}
+              ) : (
+                <button
+                  type="button"
+                  onClick={leaveFeed}
+                  aria-label="Leave the feed"
+                  title="Leave the feed"
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full lg:hidden ${isPhotos ? 'bg-secondary text-foreground' : 'bg-white/10 text-white backdrop-blur-sm'}`}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+              )}
 
               <nav aria-label="Feed sections" className="min-w-0 flex-1 overflow-x-auto scrollbar-hide">
                 <div className="flex w-max items-center gap-3.5 px-0.5 sm:gap-5">

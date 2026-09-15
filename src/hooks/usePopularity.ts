@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -103,6 +103,12 @@ export interface RankedProfile extends ProfilePopularity {
 
 export interface TodayHotSong {
   song: Song;
+  playsToday: number;
+}
+
+/** The day's counts as the database keeps them, before songs are attached. */
+interface TodayCount {
+  songId: string;
   playsToday: number;
 }
 
@@ -329,33 +335,50 @@ export function useProfilePopularity() {
   });
 }
 
+/** How often the day's counts are read again. Hot Today is a day's story, not a ticker. */
+const HOT_TODAY_REFRESH_MS = 5 * 60 * 1000;
+
+/**
+ * Hot Today: what the whole of SONGCHAINN has played since midnight CAT,
+ * including everything heard in the Room.
+ *
+ * It empties at midnight CAT and fills again through the day. In between it
+ * holds still: it keeps what it is showing while it reads the counts again,
+ * so it never blinks out and fills back in, and songs on the same number of
+ * plays keep the same order instead of trading places on every read.
+ */
 export function useTodayHotSongs(limit = 10) {
-  // Key by today's date in CAT (UTC+2) so the cache automatically invalidates at midnight CAT
-  // and the list resets cleanly with no rolling-window bleed from the previous day.
+  // Keyed by today's date in CAT (UTC+2), so the list resets itself at midnight
+  // CAT with no bleed from yesterday.
   const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
   const nowAsCat = new Date(Date.now() + CAT_OFFSET_MS);
   const todayCat = nowAsCat.toISOString().slice(0, 10); // "YYYY-MM-DD" in CAT
   const { songs } = useMergedCatalog();
+  // Read more than is shown, so songs this device has not loaded yet cannot
+  // leave the list short.
+  const readLimit = Math.max(limit * 3, 30);
 
-  return useQuery({
-    queryKey: ['today-hot-songs', limit, todayCat, songs.length],
-    queryFn: async () => {
+  const query = useQuery({
+    // The day is the only thing that resets this list. The catalogue used to be
+    // part of the key as well, so every time it finished loading the key
+    // changed, the list fell back to empty and Hot Today blinked out and filled
+    // again. The counts are matched to songs below instead.
+    queryKey: ['today-hot-songs', readLimit, todayCat],
+    queryFn: async (): Promise<TodayCount[]> => {
       maybeResetRpcFlags();
 
       // Primary path: omit p_since so the DB function computes midnight CAT itself.
       // The SECURITY DEFINER RPC bypasses RLS so anon users see global counts.
       if (canUseGetTodayHotSongsRpc !== false) {
         const { data, error } = await (supabase as any).rpc('get_today_hot_songs', {
-          p_limit: limit,
+          p_limit: readLimit,
         });
         if (!error) {
           canUseGetTodayHotSongsRpc = true;
-          return ((data as any[]) || [])
-            .map((row: any) => {
-              const song = songs.find(s => s.id === String(row.song_id));
-              return song ? { song, playsToday: Number(row.plays_today) } : null;
-            })
-            .filter(Boolean) as TodayHotSong[];
+          return ((data as any[]) || []).flatMap((row: any) => {
+            const songId = row?.song_id ? String(row.song_id) : '';
+            return songId ? [{ songId, playsToday: Number(row.plays_today) || 0 }] : [];
+          });
         }
         canUseGetTodayHotSongsRpc = false;
       }
@@ -368,24 +391,44 @@ export function useTodayHotSongs(limit = 10) {
         .eq('event_type', 'play')
         .gte('created_at', midnightCat);
 
-      if (!rows || rows.length === 0) return [] as TodayHotSong[];
+      if (!rows || rows.length === 0) return [];
 
       const counts = new Map<string, number>();
       (rows as any[]).forEach(r => {
-        if (r.song_id) counts.set(r.song_id, (counts.get(r.song_id) || 0) + 1);
+        if (r.song_id) counts.set(String(r.song_id), (counts.get(String(r.song_id)) || 0) + 1);
       });
-      return Array.from(counts.entries())
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, limit)
-        .flatMap(([songId, playsToday]) => {
-          const song = songs.find(s => s.id === songId);
-          return song ? [{ song, playsToday }] : [];
-        });
+      return Array.from(counts.entries()).map(([songId, playsToday]) => ({ songId, playsToday }));
     },
-    staleTime: 1000 * 60,
-    refetchInterval: 1000 * 60,
-    placeholderData: () => [] as TodayHotSong[],
+    staleTime: HOT_TODAY_REFRESH_MS,
+    refetchInterval: HOT_TODAY_REFRESH_MS,
+    // What is on screen stays on screen while the new counts arrive.
+    placeholderData: keepPreviousData,
   });
+
+  const data = useMemo(() => {
+    const byId = new Map(songs.map(s => [String(s.id), s]));
+    return (query.data ?? [])
+      .slice()
+      // Most played first, and the song id breaks a tie the same way every
+      // time, so an unchanged day is an unchanged list.
+      .sort((a, b) => b.playsToday - a.playsToday || a.songId.localeCompare(b.songId))
+      .flatMap(({ songId, playsToday }) => {
+        const song = byId.get(songId);
+        return song ? [{ song, playsToday }] : [];
+      })
+      .slice(0, limit) as TodayHotSong[];
+  }, [query.data, songs, limit]);
+
+  return {
+    data,
+    // Nothing has been read yet: the callers that wait for the counts before
+    // choosing what to feature still know to wait.
+    isPlaceholderData: query.data === undefined,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.error,
+    refetch: query.refetch,
+  };
 }
 
 export function usePulseCounts() {

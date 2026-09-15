@@ -307,8 +307,10 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       } else {
         // INSERT confirmed — now refetch so the merged seed+db count is canonical
         queryClient.invalidateQueries({ queryKey: ['song-popularity'] });
-        queryClient.invalidateQueries({ queryKey: ['today-hot-songs'] });
         queryClient.invalidateQueries({ queryKey: ['artist-stream-totals'] });
+        // Hot Today is deliberately left alone. It is the day's story, read
+        // every few minutes; asking for it again on every single play is what
+        // made it reshuffle under the founder's eyes while he listened.
       }
     });
   }, [user, queryClient]);

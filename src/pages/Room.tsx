@@ -2,16 +2,18 @@ import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronDown, ListMusic, ListPlus, LogOut, Share2, HardDrive, Bot, SendHorizontal, SmilePlus, UserPlus, UserRound } from 'lucide-react';
+import { Bell, BellOff, CheckCircle2, ChevronDown, ListMusic, ListPlus, LogOut, Share2, HardDrive, Bot, SendHorizontal, SmilePlus, UserPlus, UserRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
-import { ARTISTS, SONGS } from '@/data/musicData';
+import { ARTISTS } from '@/data/musicData';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import type { Song } from '@/data/musicData';
-import { roomOrderForDay } from '@/lib/roomOrder';
+import { useRoomSongs } from '@/hooks/useRoomSongs';
+import { roomClock, roomEntriesAt, useRoomTimeline } from '@/hooks/useRoomTimeline';
+import { useUserPoints } from '@/hooks/useUserPoints';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -21,14 +23,9 @@ import { RoomPeople } from '@/components/room/RoomPeople';
 import { RoomChatMessage } from '@/components/room/RoomChatMessage';
 import { HdEmoji, isEmojiOnly, withHdEmoji } from '@/components/room/HdEmoji';
 import { toast } from 'sonner';
-import { useRoomRequests, roomSlotAt } from '@/hooks/useRoomRequests';
+import { announceRoomName, playRoomCue, sendRoomCue, setRoomSoundsOn, useRoomSoundsOn } from '@/lib/roomCues';
+import { useRoomRequests, ROOM_REQUEST_MIN_POINTS } from '@/hooks/useRoomRequests';
 import { RoomRequestSheet, Cover, type RoomLineEntry } from '@/components/room/RoomRequestSheet';
-
-/**
- * Requests this device has already heard play. Kept outside the page so leaving
- * the Room screen and coming back does not play a request a second time.
- */
-const heardRequestIds = new Set<string>();
 
 type RoomMessage = {
   id: string;
@@ -73,7 +70,6 @@ const CUSTOM_EMOJI_URI_BY_TOKEN: Record<(typeof CUSTOM_EMOJI_TOKENS)[number], st
 const LOCAL_MESSAGES_KEY = 'room:local_messages:v1';
 const LOCAL_CHAT_CHANNEL = 'room:local_chat:v1';
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
-const ROOM_SEGMENT_SECONDS = 180;
 const TYPING_IDLE_MS = 1400;
 const LOCAL_IDENTITY_KEY = 'room:identity_mode:v1';
 const ROOM_ID = 'global';
@@ -296,28 +292,15 @@ export default function Room() {
   const navigate = useNavigate();
   const { user, isArtist, artistId } = useAuth();
   const { isPlaying, isRoomMode, currentSong, isRoomHidden } = usePlayerState();
-  const { enterRoomMode, setRoomQueue, exitRoomMode, setVolume, volume, play, hideRoom } = usePlayerActions();
+  const { enterRoomMode, exitRoomMode, setVolume, volume, play, hideRoom, showRoom } = usePlayerActions();
   const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
+  const { artists: publishedArtists } = usePublishedCatalog();
 
-  // Every record on SONGCHAINN, the founding catalogue and every published
-  // upload, on the same shuffle as everyone else in here. It waits for the
-  // uploads to load: entering with the founding list and then again with the
-  // full one would restart the song and put this listener on a different order.
-  const { songs: publishedSongs, isLoading: isCatalogLoading } = usePublishedCatalog();
-  const roomSongs = useMemo(() => {
-    if (isCatalogLoading) return [] as Song[];
-    const byId = new Map<string, Song>();
-    for (const song of [...SONGS, ...publishedSongs]) {
-      if (song.audioUrl && !byId.has(song.id)) byId.set(song.id, song);
-    }
-    return [...byId.values()];
-  }, [isCatalogLoading, publishedSongs]);
-  // The catalogue refetches in the background (tab focus, stale time). A new
-  // array with the same records must not rebuild the order, because entering
-  // the Room again restarts the song, so the order follows the set of ids only.
-  const roomSignature = useMemo(() => roomSongs.map((s) => s.id).sort().join('|'), [roomSongs]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const playlist = useMemo(() => roomOrderForDay(roomSongs), [roomSignature]);
+  // Every record the Room plays, and the Room's one schedule. The server keeps
+  // the schedule, so everybody in here hears the same second of the same song
+  // (RoomTimelineSync holds the player to it on every page).
+  const { songs: roomSongs, byId: roomSongById } = useRoomSongs();
+  const { data: timeline } = useRoomTimeline(Boolean(user));
 
   const [roomName, setRoomName] = useState<string>('');
   const [messages, setMessages] = useState<RoomMessage[]>([]);
@@ -365,9 +348,7 @@ export default function Room() {
   const typingTimeoutRef = useRef<number | null>(null);
   const typingSentRef = useRef(false);
   const typingSeenAtRef = useRef<Record<string, number>>({});
-  const beepCtxRef = useRef<AudioContext | null>(null);
-  const beepUnlockedRef = useRef(false);
-  const lastBeepAtRef = useRef(0);
+  const roomSounds = useRoomSoundsOn();
   const pulseBannerTimeoutRef = useRef<number | null>(null);
   const hasMoshaGreetedRef = useRef(false);
   const lastMoshaReplyToIdRef = useRef<string | null>(null);
@@ -388,57 +369,10 @@ export default function Room() {
     }
   }, [moshaMode]);
 
-  const unlockBeep = useCallback(async () => {
-    if (beepUnlockedRef.current) return;
-    try {
-      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!Ctx) return;
-      const ctx: AudioContext = beepCtxRef.current ?? new Ctx();
-      beepCtxRef.current = ctx;
-      if (ctx.state === 'suspended') await ctx.resume();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.01);
-      beepUnlockedRef.current = true;
-    } catch {
-      void 0;
-    }
-  }, []);
-
-  const playBeep = useCallback(async () => {
-    const now = Date.now();
-    if (now - lastBeepAtRef.current < 350) return;
-    lastBeepAtRef.current = now;
-    try {
-      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!Ctx) return;
-      const ctx: AudioContext = beepCtxRef.current ?? new Ctx();
-      beepCtxRef.current = ctx;
-      if (ctx.state === 'suspended') await ctx.resume();
-
-      const start = ctx.currentTime;
-
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.06, start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
-      gain.connect(ctx.destination);
-
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(980, start);
-      osc.frequency.linearRampToValueAtTime(780, start + 0.12);
-      osc.connect(gain);
-      osc.start(start);
-      osc.stop(start + 0.13);
-    } catch {
-      void 0;
-    }
-  }, []);
+  // Your name, for the "joined the Room" line everyone else sees.
+  useEffect(() => {
+    if (roomName) announceRoomName(roomName);
+  }, [roomName]);
 
   const broadcastRoomMessage = useCallback((message: RoomMessage) => {
     const channel = presenceChannel;
@@ -520,25 +454,36 @@ export default function Room() {
     return () => window.clearInterval(interval);
   }, []);
 
+  /** The song the room is on this moment and how far into it, ready to walk in. */
+  const roomStartPoint = useCallback(() => {
+    if (!timeline) return null;
+    const now = roomClock(timeline);
+    const { current, next } = roomEntriesAt(timeline, now);
+    const song = current ? roomSongById.get(current.songId) : undefined;
+    if (!current || !song) return null;
+    const nextSong = next ? roomSongById.get(next.songId) : undefined;
+    return { songs: nextSong ? [song, nextSong] : [song], startTime: Math.max(0, (now - current.startsAt) / 1000) };
+  }, [roomSongById, timeline]);
+
+  // Walk in on the song the room is playing, at the moment it is at. Once in,
+  // the schedule keeps this listener there, so coming back to this screen from
+  // a hidden Room changes nothing about what is playing.
+  const hasEnteredRef = useRef(false);
   useEffect(() => {
-    if (!user) return;
-    if (playlist.length === 0) return;
-
-    let isActive = true;
-    const nowSeconds = Date.now() / 1000;
-    const startIndex = Math.floor(nowSeconds / ROOM_SEGMENT_SECONDS) % playlist.length;
-    const startTime = nowSeconds % ROOM_SEGMENT_SECONDS;
+    if (!user || hasEnteredRef.current) return;
+    if (isRoomMode) {
+      hasEnteredRef.current = true;
+      showRoom();
+      return;
+    }
+    const start = roomStartPoint();
+    if (!start) return;
+    hasEnteredRef.current = true;
     roomEnterAtRef.current = Date.now();
-
-    void enterRoomMode(playlist, { startIndex, startTime }).then(ok => {
-      if (!isActive) return;
+    void enterRoomMode(start.songs, { startIndex: 0, startTime: start.startTime }).then(ok => {
       setAutoplayBlocked(!ok);
     });
-
-    return () => {
-      isActive = false;
-    };
-  }, [enterRoomMode, playlist, user]);
+  }, [enterRoomMode, isRoomMode, roomStartPoint, showRoom, user]);
 
   useEffect(() => {
     if (!isRoomMode) return;
@@ -764,9 +709,7 @@ export default function Room() {
         if (chatBackend === 'local') persistLocalMessages(updated);
         return updated;
       });
-      if (next.user_id !== user.id && document.visibilityState === 'visible') {
-        void playBeep();
-      }
+      // The sound for it is RoomCues' job, on every page, not only this one.
     });
 
     channel.on('broadcast', { event: 'reaction' }, payload => {
@@ -812,7 +755,7 @@ export default function Room() {
       setTypingUsersById({});
       supabase.removeChannel(channel);
     };
-  }, [applyReactionDelta, chatBackend, persistLocalMessages, playBeep, user]);
+  }, [applyReactionDelta, chatBackend, persistLocalMessages, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -999,9 +942,6 @@ export default function Room() {
         const next = coerceRoomMessage((payload as any)?.new);
         if (!next) return;
         mergeRecentMessages([next]);
-        if (next.user_id !== user.id && document.visibilityState === 'visible') {
-          void playBeep();
-        }
         return;
       }
       if (eventType === 'DELETE') {
@@ -1024,7 +964,7 @@ export default function Room() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatBackend, fetchRecentMessages, mergeRecentMessages, playBeep, user]);
+  }, [chatBackend, fetchRecentMessages, mergeRecentMessages, user]);
 
   const appendMoshaMessage = useCallback((text: string) => {
     if (!text.trim()) return;
@@ -1264,6 +1204,7 @@ export default function Room() {
     });
     broadcastRef.current?.postMessage({ type: 'message', message: optimistic });
     broadcastRoomMessage(optimistic);
+    sendRoomCue({ event: 'message' });
     setDraft('');
     setReplyTo(null);
     shouldAutoScrollRef.current = true;
@@ -1334,6 +1275,8 @@ export default function Room() {
 
     const payload = { message_id: messageId, emoji, delta, user_id: user.id };
     broadcastRoomReaction(payload);
+    // Taking a reaction back is quiet; adding one is heard by the Room.
+    if (delta > 0) sendRoomCue({ event: 'reaction', emoji });
     if (chatBackend === 'local') {
       broadcastRef.current?.postMessage({ type: 'reaction', reaction: payload });
     } else {
@@ -1354,17 +1297,16 @@ export default function Room() {
   }, [sendMessage]);
 
   const handleRetryAutoplay = useCallback(() => {
-    if (playlist.length === 0) {
-      toast.error('The Room playlist is empty right now');
+    const start = roomStartPoint();
+    if (!start) {
+      toast.error('The Room is still loading. Try again in a moment.');
       return;
     }
-    const nowSeconds = Date.now() / 1000;
-    const startIndex = Math.floor(nowSeconds / ROOM_SEGMENT_SECONDS) % playlist.length;
-    const startTime = nowSeconds % ROOM_SEGMENT_SECONDS;
     // Called straight from the tap, and enterRoomMode now starts the audio
     // before it does anything that waits, so the gesture is still valid when
     // play() runs.
-    void enterRoomMode(playlist, { startIndex, startTime }).then(ok => {
+    roomEnterAtRef.current = Date.now();
+    void enterRoomMode(start.songs, { startIndex: 0, startTime: start.startTime }).then(ok => {
       setAutoplayBlocked(!ok);
       if (!ok) {
         toast.error('Your browser would not start the audio', {
@@ -1372,7 +1314,7 @@ export default function Room() {
         });
       }
     });
-  }, [enterRoomMode, playlist]);
+  }, [enterRoomMode, roomStartPoint]);
 
   const handleVolumeChange = useCallback(([v]: number[]) => {
     setVolume(v / 100);
@@ -1510,82 +1452,78 @@ export default function Room() {
   }, [messages]);
 
   /* ── Song requests ──
-     Anyone in the Room can ask for a record (founder, 15 Sep 2026). The line
-     is shared and live; each listener's player plays it, in order, before it
-     goes back to the shuffle, and never plays the same request twice. */
-  const {
-    requests: roomRequests,
-    isLoading: isRequestsLoading,
-    request: requestRoomSong,
-    cancel: cancelRoomRequest,
-    pending: isRequestPending,
-  } = useRoomRequests(Boolean(user));
-  const roomSongById = useMemo(() => new Map(roomSongs.map((s) => [s.id, s])), [roomSongs]);
-  const [heardTick, setHeardTick] = useState(0);
-  const rotationIndexRef = useRef(-1);
-  const playingRequestSongRef = useRef<string | null>(null);
+     Anybody with 100 SONGCHAINN points can ask the Room for a record (founder,
+     15 Sep 2026). A request is a place on the Room's one schedule, so it plays
+     next for the whole room, once. */
+  const { request: requestRoomSong, cancel: cancelRoomRequest, pending: isRequestPending } = useRoomRequests();
+  const { points: myPoints, isLoading: isPointsLoading } = useUserPoints();
+  // Everyone behind a record in the Room, with their picture, for the request picker.
+  const roomArtists = useMemo(() => {
+    const map = new Map<string, { name: string; image?: string }>();
+    for (const a of [...ARTISTS, ...publishedArtists]) {
+      if (!map.has(a.id)) map.set(a.id, { name: a.name, image: a.profileImage });
+    }
+    return map;
+  }, [publishedArtists]);
 
+  const roomNowEntries = useMemo(() => {
+    if (!timeline) return { current: null, next: null };
+    return roomEntriesAt(timeline, segmentNowMs + timeline.offsetMs);
+  }, [segmentNowMs, timeline]);
+  const { current: roomCurrent, next: roomNext } = roomNowEntries;
+  const currentEntryId = roomCurrent?.id ?? null;
+
+  // The line: requests already lined up after the song on now, then the ones waiting.
   const requestLine = useMemo<RoomLineEntry[]>(() => {
-    const enterSlot = roomSlotAt(roomEnterAtRef.current || Date.now());
+    if (!timeline) return [];
     const line: RoomLineEntry[] = [];
-    for (const r of roomRequests) {
-      if (r.slot < enterSlot || heardRequestIds.has(r.id)) continue;
-      const song = roomSongById.get(r.song_id);
-      if (!song) continue;
-      line.push({ requestId: r.id, song, requesterId: r.requested_by, requesterName: r.requester_name || 'A listener' });
+    for (const entry of timeline.entries) {
+      if (!entry.requestId || entry.id === currentEntryId || !entry.requestedBy) continue;
+      if (roomCurrent && entry.startsAt < roomCurrent.startsAt) continue;
+      const song = roomSongById.get(entry.songId);
+      if (song) line.push({ requestId: entry.requestId, song, requesterId: entry.requestedBy, requesterName: entry.requesterName || 'A listener' });
+    }
+    for (const waiting of timeline.waiting) {
+      const song = roomSongById.get(waiting.songId);
+      if (song) line.push({ requestId: waiting.id, song, requesterId: waiting.requestedBy, requesterName: waiting.requesterName || 'A listener' });
     }
     return line;
-    // heardTick re-reads the module-level set after a request plays.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomRequests, roomSongById, heardTick]);
+  }, [currentEntryId, roomCurrent, roomSongById, timeline]);
 
-  // A request that starts playing has been heard; otherwise remember where the shuffle is.
-  useEffect(() => {
-    if (!isRoomMode || !currentSong) return;
-    const playingRequest = requestLine.find((entry) => entry.song.id === currentSong.id);
-    if (playingRequest) {
-      heardRequestIds.add(playingRequest.requestId);
-      playingRequestSongRef.current = currentSong.id;
-      setHeardTick((t) => t + 1);
-      return;
-    }
-    // A requested song is not a step in the shuffle: the shuffle resumes where it was.
-    if (playingRequestSongRef.current === currentSong.id) return;
-    playingRequestSongRef.current = null;
-    const index = playlist.findIndex((s) => s.id === currentSong.id);
-    if (index >= 0) rotationIndexRef.current = index;
-  }, [currentSong, isRoomMode, playlist, requestLine]);
-
-  // The player's queue: the song on now, the request line, then the shuffle from where it left off.
-  useEffect(() => {
-    if (!isRoomMode || !currentSong || playlist.length === 0) return;
-    const lineSongs = requestLine.map((entry) => entry.song).filter((s) => s.id !== currentSong.id);
-    const skip = new Set([currentSong.id, ...lineSongs.map((s) => s.id)]);
-    const start = rotationIndexRef.current;
-    const rotation = start >= 0 ? [...playlist.slice(start + 1), ...playlist.slice(0, start + 1)] : playlist;
-    setRoomQueue([currentSong, ...lineSongs, ...rotation.filter((s) => !skip.has(s.id))]);
-  }, [currentSong, isRoomMode, playlist, requestLine, setRoomQueue]);
-
-  // Mo$ha tells the room when somebody asks for a song.
+  // Mo$ha tells the room when somebody asks for a song, and whose song is on.
   const announcedRequestsRef = useRef<Set<string> | null>(null);
+  const announcedPlayingRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!user || isRequestsLoading) return;
+    if (!user || !timeline || roomSongById.size === 0) return;
+    const ids = [...timeline.waiting.map((w) => w.id), ...timeline.entries.flatMap((e) => (e.requestId ? [e.requestId] : []))];
     if (announcedRequestsRef.current === null) {
-      announcedRequestsRef.current = new Set(roomRequests.map((r) => r.id));
+      announcedRequestsRef.current = new Set(ids);
+      announcedPlayingRef.current = currentEntryId;
       return;
     }
-    for (const r of roomRequests) {
-      if (announcedRequestsRef.current.has(r.id)) continue;
-      announcedRequestsRef.current.add(r.id);
-      const song = roomSongById.get(r.song_id);
-      if (!song) continue;
+    for (const r of requestLine) {
+      if (announcedRequestsRef.current.has(r.requestId)) continue;
+      announcedRequestsRef.current.add(r.requestId);
       appendMoshaMessage(
-        r.requested_by === user.id
-          ? `Your request is in the line: ${song.title} by ${song.artist}.`
-          : `${r.requester_name || 'A listener'} asked for ${song.title} by ${song.artist}. It is in the line.`,
+        r.requesterId === user.id
+          ? `Your request is in the line: ${r.song.title} by ${r.song.artist}.`
+          : `${r.requesterName} asked for ${r.song.title} by ${r.song.artist}. It is in the line.`,
       );
     }
-  }, [appendMoshaMessage, isRequestsLoading, roomRequests, roomSongById, user]);
+    const current = roomCurrent;
+    if (current && current.id !== announcedPlayingRef.current) {
+      announcedPlayingRef.current = current.id;
+      const song = roomSongById.get(current.songId);
+      if (current.requestId && song) {
+        announcedRequestsRef.current.add(current.requestId);
+        appendMoshaMessage(
+          current.requestedBy === user.id
+            ? `Your request is on for the whole room: ${song.title} by ${song.artist}.`
+            : `Now playing ${song.title} by ${song.artist}, asked for by ${current.requesterName || 'a listener'}.`,
+        );
+      }
+    }
+  }, [appendMoshaMessage, currentEntryId, requestLine, roomCurrent, roomSongById, timeline, user]);
 
   const handleRequestSong = useCallback(async (song: Song) => {
     const result = await requestRoomSong(song.id, roomName || null);
@@ -1594,7 +1532,7 @@ export default function Room() {
       return;
     }
     toast.success(`${song.title} is in the line`, {
-      description: result.ahead === 0 ? 'It plays next.' : `${result.ahead} ${result.ahead === 1 ? 'song' : 'songs'} ahead of it.`,
+      description: result.ahead === 0 ? 'It plays next, for everyone in the Room.' : `${result.ahead} ${result.ahead === 1 ? 'song' : 'songs'} ahead of it.`,
     });
     setIsRequestOpen(false);
   }, [requestRoomSong, roomName]);
@@ -1605,23 +1543,18 @@ export default function Room() {
     else toast.success('Request taken back');
   }, [cancelRoomRequest]);
 
-  const currentPlaylistIndex = useMemo(() => {
-    if (!currentSong) return -1;
-    const index = playlist.findIndex(s => s.id === currentSong.id);
-    return index >= 0 ? index : rotationIndexRef.current;
-  }, [currentSong, playlist]);
-
+  // What comes up: the next song on the schedule, then the rest of the request line.
   const upNextSongs = useMemo<Array<{ song: Song; requestedBy?: string }>>(() => {
-    if (playlist.length === 0) return [];
-    const requested = requestLine
-      .filter((entry) => entry.song.id !== currentSong?.id)
-      .map((entry) => ({ song: entry.song, requestedBy: entry.requesterName }));
-    const skip = new Set([currentSong?.id, ...requested.map((r) => r.song.id)]);
-    const rotation = currentPlaylistIndex < 0
-      ? playlist
-      : [...playlist.slice(currentPlaylistIndex + 1), ...playlist.slice(0, currentPlaylistIndex + 1)];
-    return [...requested, ...rotation.filter((s) => !skip.has(s.id)).map((song) => ({ song }))].slice(0, 6);
-  }, [currentPlaylistIndex, currentSong?.id, playlist, requestLine]);
+    const out: Array<{ song: Song; requestedBy?: string }> = [];
+    const next = roomNext;
+    const nextSong = next ? roomSongById.get(next.songId) : undefined;
+    if (next && nextSong) out.push({ song: nextSong, requestedBy: next.requestId ? next.requesterName || 'A listener' : undefined });
+    for (const entry of requestLine) {
+      if (next?.requestId === entry.requestId) continue;
+      out.push({ song: entry.song, requestedBy: entry.requesterName });
+    }
+    return out.slice(0, 6);
+  }, [requestLine, roomNext, roomSongById]);
 
   const currentArtist = useMemo(() => {
     if (!currentSong?.artistId) return null;
@@ -1633,16 +1566,15 @@ export default function Room() {
     return isArtistLiked(currentArtist.id);
   }, [currentArtist?.id, isArtistLiked]);
 
+  // How far the room is through the song on now, by the schedule's clock.
   const segmentProgress = useMemo(() => {
-    const nowSeconds = segmentNowMs / 1000;
-    const elapsed = nowSeconds % ROOM_SEGMENT_SECONDS;
-    const remaining = ROOM_SEGMENT_SECONDS - elapsed;
-    return {
-      elapsed,
-      remaining,
-      progress: ROOM_SEGMENT_SECONDS > 0 ? elapsed / ROOM_SEGMENT_SECONDS : 0,
-    };
-  }, [segmentNowMs]);
+    const current = roomCurrent;
+    if (!current || !timeline) return { elapsed: 0, remaining: 0, progress: 0 };
+    const now = segmentNowMs + timeline.offsetMs;
+    const total = Math.max(1, (current.endsAt - current.startsAt) / 1000);
+    const elapsed = Math.min(total, Math.max(0, (now - current.startsAt) / 1000));
+    return { elapsed, remaining: total - elapsed, progress: elapsed / total };
+  }, [roomCurrent, segmentNowMs, timeline]);
 
   if (!user) return null;
 
@@ -1675,7 +1607,23 @@ export default function Room() {
               <ChevronDown className="h-4 w-4" />
               <span>Hide</span>
             </button>
-            <div className="min-w-0 truncate text-center text-base font-semibold text-zinc-50">The Room</div>
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="min-w-0 truncate text-center text-base font-semibold text-zinc-50">The Room</div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !roomSounds;
+                  setRoomSoundsOn(next);
+                  if (next) playRoomCue('message');
+                }}
+                aria-pressed={roomSounds}
+                aria-label={roomSounds ? 'Room sounds are on. Tap to turn them off' : 'Room sounds are off. Tap to turn them on'}
+                title={roomSounds ? 'Sounds when people join, message or react' : 'Room sounds are off'}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 active:bg-white/15"
+              >
+                {roomSounds ? <Bell className="h-[18px] w-[18px]" /> : <BellOff className="h-[18px] w-[18px] text-zinc-500" />}
+              </button>
+            </div>
             <button
               type="button"
               onClick={async () => {
@@ -1764,7 +1712,7 @@ export default function Room() {
                 <span>Live room</span>
               </span>
               <span className="hidden sm:inline text-zinc-500">
-                One shared playlist, on shuffle.
+                Everyone hears the same song.
               </span>
             </div>
             <RoomPeople
@@ -1817,7 +1765,7 @@ export default function Room() {
                 </span>
               </div>
               <div className="text-sm text-zinc-100 truncate">
-                {currentSong ? currentSong.title : 'Syncing playlist…'}
+                {currentSong ? currentSong.title : 'Joining the room…'}
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400 min-w-0">
                 {currentArtist ? (
@@ -1890,6 +1838,10 @@ export default function Room() {
         open={isRequestOpen}
         onOpenChange={setIsRequestOpen}
         songs={roomSongs}
+        artists={roomArtists}
+        points={myPoints}
+        pointsLoading={isPointsLoading}
+        minPoints={ROOM_REQUEST_MIN_POINTS}
         line={requestLine}
         selfId={user?.id ?? null}
         currentSongId={currentSong?.id ?? null}
@@ -1920,6 +1872,7 @@ export default function Room() {
                       copyText={text}
                       bigEmoji={big}
                       parent={parent ? { name: parent.room_name, text: parent.content || parent.message || '' } : null}
+                      sentAt={m.created_at}
                       onReply={() => setReplyTo(m)}
                       reactions={reactionsByMessageId[m.id]}
                       myReactions={myReactionsByMessageId[m.id]}
@@ -1996,7 +1949,7 @@ export default function Room() {
                     </div>
                   ))}
                   {upNextSongs.length === 0 ? (
-                    <div className="text-sm text-zinc-400">Cannot load what is playing next.</div>
+                    <div className="text-sm text-zinc-400">Lining up the next song.</div>
                   ) : null}
                 </div>
               </div>
@@ -2105,8 +2058,6 @@ export default function Room() {
                       setMentionState(null);
                     }
                   }}
-                  onFocus={() => void unlockBeep()}
-                  onPointerDown={() => void unlockBeep()}
                   placeholder="Say something..."
                   className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-white/20"
                   disabled={isSending}

@@ -1,6 +1,17 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode, useMemo } from 'react';
 import { Song, SONGS } from '@/data/musicData';
 import { supabase } from '@/integrations/supabase/client';
+import { setRoomListening } from '@/lib/playSource';
+
+/** Where the Room's schedule says every listener should be right now. */
+export interface RoomSyncTarget {
+  song: Song;
+  /** Seconds into `song`. */
+  position: number;
+  next: Song | null;
+  /** When `next` starts, on this device's clock. */
+  nextStartsAtMs: number | null;
+}
 
 // Split context for better performance - components only re-render for what they need
 interface PlayerStateContext {
@@ -38,11 +49,13 @@ interface PlayerActionsContext {
   shuffleMode: boolean;
   toggleShuffle: () => void;
   enterRoomMode: (playlist: Song[], options?: { startIndex?: number; startTime?: number }) => Promise<boolean>;
-  /** Re-line the Room's queue (song requests) without touching the song playing now. */
-  setRoomQueue: (songs: Song[]) => void;
+  /** Hold the player to the Room's schedule: the song on now, where it is, and what comes next. */
+  syncRoom: (target: RoomSyncTarget) => void;
   exitRoomMode: () => Promise<void>;
   hideRoom: () => void;
   showRoom: () => void;
+  /** Dip the music for a moment so a Room sound can be heard over it, then bring it back. */
+  duckFor: (depth: number, holdMs: number) => void;
 }
 
 // The volume you set last time is the volume you get this time. Stored as a
@@ -176,6 +189,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const recoverAttemptsRef = useRef(0);
   const lastRecoverAtRef = useRef(0);
   const stallTimerRef = useRef<number | null>(null);
+  // The Room's next song and when it is due, set by syncRoom.
+  const roomNextRef = useRef<{ song: Song; startsAtMs: number } | null>(null);
   const roomRestoreRef = useRef<{
     queue: Song[];
     currentSong: Song | null;
@@ -235,6 +250,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     isRoomModeRef.current = isRoomMode;
+    // A listen in room mode is the Room's, on whatever page it is heard.
+    setRoomListening(isRoomMode);
   }, [isRoomMode]);
 
   useEffect(() => {
@@ -628,6 +645,45 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [isCrossfading]);
 
+  // A Room sound (someone joined, a message, a reaction) plays over the music.
+  // The music dips under it and comes straight back, the way a DJ talks over a
+  // record. It never changes the volume you set, only the element for a moment,
+  // and it stands aside during a crossfade, which owns the element then.
+  const duckTimerRef = useRef<number | null>(null);
+  const duckFor = useCallback((depth: number, holdMs: number) => {
+    const audio = audioRef.current;
+    if (!audio || audio.paused || isCrossfadingRef.current || volumeRef.current <= 0) return;
+    if (duckTimerRef.current) window.clearInterval(duckTimerRef.current);
+    const floor = Math.max(0, Math.min(1, depth));
+    // A second sound while the first is still dipped starts from where it is.
+    const from = Math.min(1, audio.volume / volumeRef.current);
+    const startedAt = performance.now();
+    const attack = 90;
+    const release = 520;
+    const finish = () => {
+      if (duckTimerRef.current) window.clearInterval(duckTimerRef.current);
+      duckTimerRef.current = null;
+    };
+    duckTimerRef.current = window.setInterval(() => {
+      const el = audioRef.current;
+      if (!el || isCrossfadingRef.current) {
+        finish();
+        return;
+      }
+      const t = performance.now() - startedAt;
+      let level = 1;
+      if (t < attack) level = from + (floor - from) * (t / attack);
+      else if (t < attack + holdMs) level = floor;
+      else if (t < attack + holdMs + release) level = floor + (1 - floor) * ((t - attack - holdMs) / release);
+      else finish();
+      el.volume = Math.max(0, Math.min(1, volumeRef.current * level));
+    }, 30);
+  }, []);
+
+  useEffect(() => () => {
+    if (duckTimerRef.current) window.clearInterval(duckTimerRef.current);
+  }, []);
+
   // Global keyboard shortcuts: Space toggles play, ArrowLeft/ArrowRight seek
   // ten seconds, M mutes. Nothing fires while you are typing, while a dialog
   // is open, or with a modifier held (so browser shortcuts keep working).
@@ -727,6 +783,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const advanceToNext = useCallback(() => {
+    if (isRoomMode) {
+      // In the Room the schedule decides. The next song starts when it is due
+      // (a crossfade begins a few seconds early), never because this device's
+      // copy of a song ran out first. Looping back or skipping ahead is how
+      // listeners used to drift apart and hear songs twice.
+      const upcoming = roomNextRef.current;
+      if (!upcoming || upcoming.song.id === currentSong?.id || upcoming.startsAtMs - Date.now() > 4000) return;
+      if (isPlaying) crossfadeToSong(upcoming.song);
+      else playSong(upcoming.song, { force: true });
+      return;
+    }
+
     if (!currentSong || queue.length === 0) return;
 
     if (repeatMode === 'one') {
@@ -773,6 +841,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [advanceToNext]);
 
   const advanceToPrevious = useCallback(() => {
+    if (isRoomMode) return;
     if (currentSong && queue.length > 0) {
       const currentIndex = queue.findIndex(s => s.id === currentSong.id);
       const prevIndex = currentIndex === 0 ? queue.length - 1 : currentIndex - 1;
@@ -815,6 +884,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [crossfadeToSong, currentSong, forceSetSong, isPlaying]);
 
   const jumpToIndex = useCallback((index: number) => {
+    if (isRoomMode) return;
     const song = queue[index];
     if (!song) return;
     if (isPlaying) {
@@ -897,13 +967,33 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return forceSetSong(playlist[startIndex], { shouldPlay: true, startTime });
   }, [forceSetSong]);
 
-  const setRoomQueue = useCallback((songs: Song[]) => {
-    if (!isRoomModeRef.current || songs.length === 0) return;
-    setQueue((prev) => {
-      if (prev.length === songs.length && prev.every((s, i) => s.id === songs[i].id)) return prev;
-      return songs;
-    });
-  }, []);
+  const syncRoom = useCallback(({ song, position, next, nextStartsAtMs }: RoomSyncTarget) => {
+    if (!isRoomModeRef.current) return;
+    roomNextRef.current = next && nextStartsAtMs !== null ? { song: next, startsAtMs: nextStartsAtMs } : null;
+    const lineUp = next ? [song, next] : [song];
+    setQueue((prev) => (prev.length === lineUp.length && prev.every((s, i) => s.id === lineUp[i].id) ? prev : lineUp));
+
+    if (isCrossfadingRef.current) return;
+    const audio = audioRef.current;
+    const playing = currentSongRef.current;
+
+    if (!playing || playing.id !== song.id) {
+      // The room has moved on. Right at the start of a song, fade into it the
+      // way a song change always sounds; later than that, join it where it is.
+      if (isPlayingRef.current && position < 5) crossfadeToSong(song);
+      else void forceSetSong(song, { shouldPlay: isPlayingRef.current, startTime: position });
+      return;
+    }
+
+    // Same song: only a listener who has drifted is moved, and only while the
+    // audio is actually running.
+    if (!audio || audio.paused || audio.ended || audio.readyState < 2) return;
+    if (!Number.isFinite(audio.duration) || position >= audio.duration - 1) return;
+    if (Math.abs(audio.currentTime - position) > 4) {
+      audio.currentTime = position;
+      setCurrentTime(position);
+    }
+  }, [crossfadeToSong, forceSetSong]);
 
   const exitRoomMode = useCallback(async () => {
     const previousVolume = volumeRef.current;
@@ -1029,12 +1119,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     shuffleMode,
     toggleShuffle,
     enterRoomMode,
-    setRoomQueue,
+    syncRoom,
     exitRoomMode,
     hideRoom,
     showRoom,
     stop,
-  }), [addToQueue, enterRoomMode, setRoomQueue, exitRoomMode, hideRoom, showRoom, stop, jumpToIndex, pause, play, playNext, playPrevious, playQueue, playSong, removeFromQueue, reorderQueue, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
+    duckFor,
+  }), [addToQueue, duckFor, enterRoomMode, syncRoom, exitRoomMode, hideRoom, showRoom, stop, jumpToIndex, pause, play, playNext, playPrevious, playQueue, playSong, removeFromQueue, reorderQueue, repeatMode, seekTo, setRepeatMode, setVolume, shuffleMode, togglePlay, toggleShuffle, volume]);
 
   return (
     <PlayerStateCtx.Provider value={stateValue}>
