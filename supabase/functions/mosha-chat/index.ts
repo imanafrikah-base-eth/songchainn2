@@ -893,6 +893,53 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
     /* the account above still stands */
   }
 
+  /*
+   * WHO THESE ARTISTS ACTUALLY ARE.
+   *
+   * Asked who IMan Afrikah is, Mosha used to answer like a press release for
+   * somebody it had never heard of: "a rising star from Africa". These are
+   * real people with public records, and inventing their story in front of
+   * their own fans is worse than saying nothing (founder, 16 Sep 2026).
+   * Every line here is sourced; see public.artist_facts.
+   */
+  try {
+    const { data: facts } = await db
+      .from("artist_facts")
+      .select("artist_id, real_name, based_in, facts, genres, works")
+      .limit(40);
+    const rows = (facts ?? []) as Array<{
+      artist_id: string;
+      real_name: string | null;
+      based_in: string | null;
+      facts: string[] | null;
+      genres: string[] | null;
+      works: string[] | null;
+    }>;
+    if (rows.length) {
+      const named = new Map<string, string>();
+      const { data: roster } = await db.from("artist_coins").select("artist_id, name");
+      for (const a of (roster ?? []) as Array<{ artist_id: string; name: string | null }>) {
+        if (a.name) named.set(a.artist_id, a.name);
+      }
+      const written = rows.map((r) => {
+        const who = named.get(r.artist_id) ?? `artist ${r.artist_id}`;
+        const bits = [
+          r.real_name ? `real name ${r.real_name}` : null,
+          r.based_in ? `based in ${r.based_in}` : null,
+          r.genres?.length ? `plays ${r.genres.join(", ")}` : null,
+          r.works?.length ? `projects: ${r.works.join(", ")}` : null,
+        ].filter(Boolean).join("; ");
+        return `- ${who}: ${(r.facts ?? []).join(" ")} ${bits}`.trim();
+      });
+      lines.push(
+        "WHO THESE ARTISTS ARE. Answer from these and from nothing else. If somebody asks about an artist who is not listed here, say plainly that you know their music on SONGCHAINN but not their story, and offer to play them. Never invent a biography, a home town, an award, a label or a chart position.",
+        ...written,
+      );
+    }
+  } catch {
+    /* knowing nothing beats making it up */
+  }
+
   if (!token) {
     lines.push("The person is not signed in. You do not know their name. Invite them to sign up free when it fits, never as a wall. Flows need a signed-in person: if they want to upload or build, say sign up first and use [[action:go:/?auth=signup]].");
     return { text: lines.join("\n"), uid: null };
