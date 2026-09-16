@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Hint } from '@/components/Hint';
 import { Check, ChevronDown, ListPlus, Loader2, Lock, Search, X, Radio } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { buildCatalogs, type Catalog, type Song } from '@/data/musicData';
@@ -160,7 +161,14 @@ export function RoomRequestSheet({
           <div className="mx-4 mb-3 flex shrink-0 items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3 sm:mx-5">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-zinc-300" />
             <div className="min-w-0 text-sm">
-              <p className="font-semibold text-zinc-100">Requests open at {minPoints} points</p>
+              <p className="flex items-center gap-1 font-semibold text-zinc-100">
+                Requests open at {minPoints} points
+                <Hint label="What points are" side="bottom">
+                  Points are what listening earns you. They are not money and cannot be bought:
+                  they come from playing songs, liking them and voting in battles, and they are what
+                  lets you put a record on for the whole Room.
+                </Hint>
+              </p>
               <p className="mt-0.5 text-zinc-400">
                 You have {points.toLocaleString()}. Points come from listening, likes and battle votes.{' '}
                 <Link to="/leaderboard" onClick={() => onOpenChange(false)} className="font-medium text-primary underline-offset-2 hover:underline">

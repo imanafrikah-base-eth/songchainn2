@@ -5,6 +5,7 @@ import { getWorldBySlug } from '@/worlds/registry';
 import { useWorldMusicDrops, type WorldTrack } from '@/hooks/useWorldTracks';
 import { useWorldTrackPlay, type WorldTrackAnswer } from '@/hooks/useWorldTrackPlay';
 import { WorldTrackLock } from '@/components/worlds/WorldTrackLock';
+import { Hint } from '@/components/Hint';
 import { usePlayerActions } from '@/context/PlayerContext';
 import type { Song } from '@/data/musicData';
 
@@ -165,6 +166,11 @@ export function WorldMusicRow() {
           <h2 className="font-heading text-xl font-semibold text-foreground sm:text-2xl">
             Straight from the worlds
           </h2>
+          <Hint label="What music in a world means">
+            Some artists keep a record inside their own world. Anybody can watch the preview. To
+            play the record itself you hold a little of that artist's coin, which is what the price
+            on the card means.
+          </Hint>
         </div>
         {/* Room on the right for the floating Mo$ha button, which used to sit
             on top of the end of this line. */}

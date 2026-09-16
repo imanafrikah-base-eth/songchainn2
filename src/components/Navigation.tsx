@@ -192,6 +192,7 @@ export function Navigation() {
                 whileTap={{ scale: 0.95 }}
                 className="inline-flex items-center gap-1.5 h-10 sm:h-10 px-2.5 rounded-xl glass text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
                 aria-label="Search"
+                title="Search songs, artists and catalogues"
               >
                 <Search className="w-4 h-4" />
                 <span className="hidden sm:inline text-xs font-medium">Search</span>
@@ -268,6 +269,7 @@ export function Navigation() {
                   to="/inbox"
                   onClick={markInboxSeen}
                   aria-label={inboxUnread > 0 ? `Messages, ${inboxUnread} new` : 'Messages'}
+                  title={inboxUnread > 0 ? `Messages, ${inboxUnread} new` : 'Messages'}
                   className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
                 >
                   <MessageSquare className="w-5 h-5" />
@@ -380,6 +382,7 @@ export function Navigation() {
                 whileTap={{ scale: 0.95 }}
                 className="lg:hidden flex h-10 w-10 items-center justify-center rounded-xl glass text-foreground hover:bg-primary/10 transition-colors"
                 aria-label="Toggle menu"
+                title="Menu"
               >
                 <AnimatePresence mode="wait">
                   {mobileMenuOpen ? (
@@ -735,10 +738,13 @@ function UpdateButton() {
       onClick={() => void applyAppUpdate()}
       disabled={update.applying}
       aria-label="Update the app"
+      title="A newer version is ready. Tap to load it."
       className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-glow disabled:opacity-70"
     >
       <RefreshCw className={`h-4 w-4 ${update.applying ? 'animate-spin' : ''}`} />
-      <span className="hidden sm:inline">{update.applying ? 'Updating' : 'Update'}</span>
+      {/* The word stays at every size. A lone blue circle in the top bar is
+          not something anybody should have to guess (founder, 16 Sep 2026). */}
+      <span>{update.applying ? 'Updating' : 'Update'}</span>
     </motion.button>
   );
 }

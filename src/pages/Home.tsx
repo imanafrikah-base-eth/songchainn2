@@ -27,6 +27,7 @@ import { WhatsLive } from '@/components/WhatsLive';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { WorldMusicRow } from '@/components/WorldMusicRow';
+import { Hint } from '@/components/Hint';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
@@ -644,6 +645,11 @@ export default function Home() {
                           <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
                             Hot Today
                           </h2>
+                          <Hint label="What Hot Today means">
+                            The songs played most across SONGCHAINN since midnight. It starts empty
+                            every night and fills through the day, so a record released this morning
+                            can be number one by evening.
+                          </Hint>
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                           Top 10 most streamed songs today on $ongChainn. Resets at midnight.

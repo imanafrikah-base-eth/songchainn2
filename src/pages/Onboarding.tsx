@@ -96,7 +96,10 @@ export default function Onboarding() {
   const [artistReady, setArtistReady] = useState(false);
 
   const [profileName, setProfileName] = useState(draft.profileName ?? '');
-  const [makesMusic, setMakesMusic] = useState(draft.makesMusic ?? false);
+  // No default. A listener finished onboarding as a musician because this
+  // question came pre-answered and neither answer said what it meant
+  // (founder, 16 Sep 2026). Nothing is chosen until they choose it.
+  const [makesMusic, setMakesMusic] = useState<boolean | null>(draft.makesMusic ?? null);
   const [bio, setBio] = useState(draft.bio ?? '');
   const [location, setLocation] = useState(draft.location ?? '');
   const [xProfileLink, setXProfileLink] = useState(draft.xProfileLink ?? '');
@@ -471,32 +474,43 @@ export default function Onboarding() {
                 <Music className="w-4 h-4" />
                 Do you make music?
               </Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setMakesMusic(false)}
-                  aria-pressed={!makesMusic}
+                  aria-pressed={makesMusic === false}
                   className={`min-h-11 rounded-xl border px-3 py-3 text-left transition-all duration-300 ${
-                    !makesMusic
-                      ? 'live-surface border-border bg-card -translate-y-0.5'
+                    makesMusic === false
+                      ? 'live-surface border-primary bg-card ring-1 ring-primary -translate-y-0.5'
                       : 'border-border/60 bg-transparent hover:bg-muted/50'
                   }`}
                 >
                   <span className="block text-sm font-semibold text-foreground">I am here to listen</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Play anything, follow artists, join The Room.
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setMakesMusic(true)}
-                  aria-pressed={makesMusic}
+                  aria-pressed={makesMusic === true}
                   className={`min-h-11 rounded-xl border px-3 py-3 text-left transition-all duration-300 ${
-                    makesMusic
-                      ? 'live-surface border-border bg-card -translate-y-0.5'
+                    makesMusic === true
+                      ? 'live-surface border-primary bg-card ring-1 ring-primary -translate-y-0.5'
                       : 'border-border/60 bg-transparent hover:bg-muted/50'
                   }`}
                 >
                   <span className="block text-sm font-semibold text-foreground">I make music</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Opens your Studio so you can release your own records. You can still listen.
+                  </span>
                 </button>
               </div>
+              {makesMusic === null && (
+                <p className="text-xs text-muted-foreground">
+                  Pick one to carry on. You can change it later either way.
+                </p>
+              )}
               {makesMusic && (
                 <p className="text-xs text-muted-foreground">
                   Your Studio opens when you finish. Records go live the same minute, no fee and no wallet needed.
@@ -504,7 +518,7 @@ export default function Onboarding() {
               )}
             </div>
 
-            <Button type="submit" className="w-full font-semibold h-12" disabled={isLoading}>
+            <Button type="submit" className="w-full font-semibold h-12" disabled={isLoading || makesMusic === null}>
               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Continue'}
             </Button>
 
