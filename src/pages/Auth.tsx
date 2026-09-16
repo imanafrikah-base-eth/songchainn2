@@ -1050,7 +1050,7 @@ export default function Auth() {
                   ? `From ${artistPlaces.slice(0, 4).join(', ')}${artistPlaces.length > 4 ? ' and more' : ''}. Any artist, anywhere, can release here.`
                   : 'Any artist, anywhere, can release here.'}
               </p>
-              <div className="max-h-[340px] overflow-y-auto pr-1 sm:pr-2">
+              <div>
               <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
                 {previewArtists.map((artist) => (
                   <button key={artist.id} type="button" onClick={handleBrowseWithoutAuthModal} className="text-center group">

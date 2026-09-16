@@ -695,7 +695,7 @@ export default function Discover() {
                     </div>
                   )}
 
-                  <div className="max-h-[520px] overflow-y-auto pr-2">
+                  <div>
                     <AnimatePresence mode="popLayout">
                       <CatalogGrid>
                         {sortedCatalogs.map((catalog) => (

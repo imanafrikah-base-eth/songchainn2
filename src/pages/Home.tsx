@@ -850,7 +850,7 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <div className="max-h-[520px] overflow-y-auto pr-2">
+                  <div>
                     <CatalogGrid>
                       {allCatalogs.map((catalog) => (
                         <CatalogCard key={catalog.id} catalog={catalog} />

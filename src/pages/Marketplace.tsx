@@ -750,7 +750,7 @@ export default function Marketplace() {
               <p className="text-sm text-muted-foreground mb-4">
                 You hold {ownedSongObjs.length} song coin{ownedSongObjs.length === 1 ? '' : 's'} on Base.
               </p>
-              <div className="max-h-[560px] overflow-y-auto pr-1 sm:pr-2">
+              <div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {ownedSongObjs.map((song) => (
                     <MarketplaceSongCard key={song.id} song={song} />
@@ -776,7 +776,7 @@ export default function Marketplace() {
                 Live signals from real listener activity in the app. Facts, not predictions, and
                 never financial advice.
               </p>
-              <div className="max-h-[560px] overflow-y-auto pr-1 sm:pr-2 space-y-3">
+              <div className="space-y-3">
                 {signalEntries.map((entry, index) => (
                   <div key={entry.song.id} className="glass-card rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
                     <span className="text-lg font-bold text-primary w-7 text-center shrink-0">#{index + 1}</span>
