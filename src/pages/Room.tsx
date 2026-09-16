@@ -375,6 +375,37 @@ export default function Room() {
     }
   }, [moshaMode]);
 
+  /**
+   * With the Room on screen, the ping is the whole notification.
+   *
+   * Mentions and reactions roll into one line in the bell for somebody who has
+   * hidden the Room and gone elsewhere. For somebody sitting here reading, that
+   * line is noise about things they watched happen, so it is marked seen while
+   * they are looking (founder, 16 Sep 2026).
+   */
+  useEffect(() => {
+    if (!user) return;
+    const clear = () => {
+      if (document.visibilityState !== 'visible') return;
+      void (supabase as any)
+        .from('notifications')
+        .update({ is_read: true, seen_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('type', 'room_activity')
+        .eq('is_read', false)
+        .then(({ error }: { error: unknown }) => {
+          if (error && import.meta.env.DEV) console.warn('[room] could not clear room notifications', error);
+        });
+    };
+    clear();
+    const timer = window.setInterval(clear, 10_000);
+    document.addEventListener('visibilitychange', clear);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', clear);
+    };
+  }, [user]);
+
   // Your name, for the "joined the Room" line everyone else sees.
   useEffect(() => {
     if (roomName) announceRoomName(roomName);
@@ -1158,20 +1189,23 @@ export default function Room() {
     const ids = [...mentionedUserIds];
     if (ids.length === 0) return;
 
-    const insertRes = await (supabase as any).from('notifications').insert(
-      ids.map(toUserId => ({
-        user_id: toUserId,
-        type: 'mention',
-        from_user_id: user.id,
-        post_id: null,
-        message: `${roomName || 'Someone'} mentioned you in The Room: ${cleanedMessage.slice(0, 140)}`,
-      }))
+    // One line in their bell that counts up, rather than a row per mention.
+    // Somebody who gets three mentions and two reactions should find one
+    // notification saying so, not five (founder, 16 Sep 2026).
+    const results = await Promise.all(
+      ids.map((toUserId) =>
+        (supabase as any).rpc('room_roll_notification', {
+          _user_id: toUserId,
+          _kind: 'mention',
+          _from: user.id,
+        }),
+      ),
     );
 
-    if (insertRes?.error) {
+    if (results.some((res) => res?.error)) {
       toast.error('Could not send those mentions', { description: 'Your message went out, the mentions did not.' });
     }
-  }, [chatBackend, roomName, user]);
+  }, [chatBackend, user]);
 
   const sendMessage = useCallback(async () => {
     if (!roomName) {
