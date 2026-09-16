@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import type { useWorldBuilder } from '@/worlds/builder/useWorldBuilder';
 
 type Builder = ReturnType<typeof useWorldBuilder>;
-type Step = 'name' | 'streets' | 'blocks' | 'art' | 'key' | 'drops' | 'walk' | 'publish';
+type Step = 'name' | 'streets' | 'blocks' | 'art' | 'key' | 'music' | 'drops' | 'walk' | 'publish';
 
 interface Suggestion {
   id: string;

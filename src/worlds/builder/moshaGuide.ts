@@ -16,7 +16,7 @@
  * guide that suggests a feature the app does not have is worse than no guide.
  */
 
-export type BuilderStep = 'name' | 'streets' | 'blocks' | 'art' | 'key' | 'drops' | 'walk' | 'publish';
+export type BuilderStep = 'name' | 'streets' | 'blocks' | 'art' | 'key' | 'music' | 'drops' | 'walk' | 'publish';
 
 export interface MoshaSuggestion {
   /** The shape being suggested, in the artist's language, not ours. */
@@ -61,6 +61,30 @@ export const MOSHA_BEATS: Record<BuilderStep, MoshaBeat> = {
     ],
     watchOut:
       'Big files slow the walk in. Keep stills under a couple of megabytes and loops short; the picture is the same, the wait is not.',
+  },
+  music: {
+    question: 'Is there a record that only lives in here?',
+    opener:
+      'Music you keep in your world is the reason somebody holds your coin rather than just hearing you. It plays for holders, and everybody else gets the preview you cut. Not every world needs one, and one record kept back is worth more than ten put everywhere.',
+    suggestions: [
+      {
+        label: 'Cut a preview worth watching',
+        detail:
+          'The preview is what the whole app sees. It plays without sound on the front page, so make the picture carry it: the moment, the faces, the place.',
+      },
+      {
+        label: 'Say what it is in one line',
+        detail:
+          'A sentence under the name on the card. Two young boys, two timelines, both village kids. That reads better than a paragraph nobody finishes.',
+      },
+      {
+        label: 'Price it so somebody can say yes',
+        detail:
+          'A dollar or two of your coin is a decision somebody makes in a second. Ten is a decision they put off.',
+      },
+    ],
+    watchOut:
+      'A drop stands on the front page for a fortnight, then it belongs to your world. Put it up when the preview is ready, not before.',
   },
   drops: {
     question: 'Is there something here worth owning?',

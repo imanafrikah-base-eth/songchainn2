@@ -35,6 +35,8 @@ interface Drop {
   unlockUsd: number;
   genres: string[];
   credit: string;
+  /** The artist's own line about the project. */
+  blurb: string | null;
   tracks: WorldTrack[];
 }
 
@@ -54,6 +56,7 @@ function toDrops(tracks: WorldTrack[]): Drop[] {
         unlockUsd: track.unlockUsd,
         genres: track.genre ? [track.genre] : [],
         credit: track.artistCredit ?? '',
+        blurb: track.blurb,
         tracks: [track],
       });
       continue;
@@ -64,6 +67,7 @@ function toDrops(tracks: WorldTrack[]): Drop[] {
     }
     if (!existing.artwork) existing.artwork = track.artworkUrl;
     if (track.genre && !existing.genres.includes(track.genre)) existing.genres.push(track.genre);
+    if (!existing.blurb) existing.blurb = track.blurb;
     existing.unlockUsd = Math.min(existing.unlockUsd, track.unlockUsd);
   }
   return [...byRelease.values()];
@@ -153,6 +157,11 @@ export function WorldMusicRow() {
                   <div className="truncate text-sm font-semibold text-zinc-100">{drop.title}</div>
                   <div className="truncate text-xs text-zinc-400">{artist}</div>
                   <div className="truncate text-[11px] text-zinc-500">{meta}</div>
+                  {/* What the artist says it is, in their own words. Two lines,
+                      so a card stays a card. */}
+                  {drop.blurb ? (
+                    <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-zinc-400">{drop.blurb}</p>
+                  ) : null}
                 </div>
                 <button
                   type="button"

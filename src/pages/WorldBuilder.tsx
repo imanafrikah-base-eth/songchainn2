@@ -17,6 +17,7 @@ import { MyWorldsList } from '@/worlds/builder/MyWorldsList';
 import { OtherWorlds } from '@/worlds/builder/OtherWorlds';
 import { StreetKey } from '@/worlds/builder/StreetKey';
 import { DropsPanel } from '@/worlds/builder/DropsPanel';
+import { WorldMusicPanel } from '@/worlds/builder/WorldMusicPanel';
 import { ArtPicker } from '@/worlds/builder/ArtPicker';
 import { MoshaPanel } from '@/worlds/builder/MoshaPanel';
 import { PublishBar, type Requirement } from '@/worlds/builder/PublishBar';
@@ -38,7 +39,7 @@ import type { WorldConfig, WorldRings } from '@/worlds/types';
  * exactly one thing and the language is access, never price.
  */
 
-type Step = 'name' | 'streets' | 'blocks' | 'art' | 'key' | 'drops' | 'walk' | 'publish';
+type Step = 'name' | 'streets' | 'blocks' | 'art' | 'key' | 'music' | 'drops' | 'walk' | 'publish';
 
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'name', label: 'Name' },
@@ -46,6 +47,7 @@ const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'blocks', label: 'Fill' },
   { id: 'art', label: 'Art' },
   { id: 'key', label: 'Key' },
+  { id: 'music', label: 'Music' },
   { id: 'drops', label: 'Drops' },
   { id: 'walk', label: 'Walk it' },
   { id: 'publish', label: 'Publish' },
@@ -1013,7 +1015,7 @@ export default function WorldBuilder() {
               </label>
             </div>
 
-            <Button onClick={() => setStep('drops')} size="lg" className="h-11 w-full rounded-full">
+            <Button onClick={() => setStep('music')} size="lg" className="h-11 w-full rounded-full">
               Drops
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -1021,6 +1023,24 @@ export default function WorldBuilder() {
         )}
 
         {/* 5 ------------------------------------------------------ drops */}
+        {step === 'music' && b.world && (
+          <section className="space-y-4">
+            <header>
+              <h1 className="font-heading text-2xl font-semibold text-foreground">Music in your world</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Records you keep in here play for the people holding enough of your coin. Everybody
+                else sees the preview you cut for it, and you decide whether the drop stands on the
+                front page of $ongChainn for its first fortnight.
+              </p>
+            </header>
+            <WorldMusicPanel worldSlug={b.world.slug} />
+            <Button onClick={() => setStep('drops')} size="lg" className="h-11 w-full rounded-full">
+              Drops
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </section>
+        )}
+
         {step === 'drops' && b.world && (
           <section className="space-y-4">
             <header>
