@@ -13,7 +13,7 @@ import { advanceTour, nextBeatFor, tourFinished, type TourSignal } from '@/lib/m
  * word. See src/lib/moshaTour.ts for why the old timer-based welcome went.
  */
 export function useMoshaTour() {
-  const { user, audienceProfile } = useAuth();
+  const { user, audienceProfile, isArtist } = useAuth();
   const location = useLocation();
   const player = useSafePlayerState();
   const firedRef = useRef<Set<string>>(new Set());
@@ -21,6 +21,7 @@ export function useMoshaTour() {
 
   const userId = user?.id ?? '';
   const displayName = audienceProfile?.display_name ?? undefined;
+  const makesMusic = Boolean(isArtist);
   const song = player?.currentSong;
 
   // One place that turns a signal into a beat, so every path is paced the same.
@@ -35,9 +36,9 @@ export function useMoshaTour() {
       window.dispatchEvent(
         new CustomEvent('songchainn:mosha-prompt', {
           detail: {
-            text: beat.line({ displayName, ...ctx }),
-            ctaLabel: beat.ctaLabel,
-            ctaPath: beat.ctaPath,
+            text: beat.line({ displayName, isArtist: makesMusic, ...ctx }),
+            ctaLabel: typeof beat.ctaLabel === 'function' ? beat.ctaLabel({ displayName, isArtist: makesMusic, ...ctx }) : beat.ctaLabel,
+            ctaPath: typeof beat.ctaPath === 'function' ? beat.ctaPath({ displayName, isArtist: makesMusic, ...ctx }) : beat.ctaPath,
           },
         }),
       );
@@ -48,6 +49,13 @@ export function useMoshaTour() {
     }, beat.delayMs ?? 4000);
     timersRef.current.push(timer);
   };
+
+  // Signal: they are in and looking at the place. The first thing Mo$ha says
+  // is what this is for, and a question about what they want to do first.
+  useEffect(() => {
+    if (!userId) return;
+    fire.current('arrived', {});
+  }, [userId]);
 
   // Signal: the first record they play.
   useEffect(() => {

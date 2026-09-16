@@ -23,6 +23,7 @@
  */
 
 export type TourSignal =
+  | 'arrived'
   | 'played-first-song'
   | 'opened-artist'
   | 'reached-feed'
@@ -34,20 +35,41 @@ export interface TourBeat {
   on: TourSignal;
   /** One sentence. If you need two, you need a shorter one. */
   line: (ctx: TourContext) => string;
-  ctaLabel?: string;
-  ctaPath?: string;
+  ctaLabel?: string | ((ctx: TourContext) => string);
+  ctaPath?: string | ((ctx: TourContext) => string);
   /** Wait this long after the signal, so it lands as a reaction, not a reflex. */
   delayMs?: number;
 }
 
 export interface TourContext {
   displayName?: string;
+  /** A musician hears about their Studio; a listener hears about the Room. */
+  isArtist?: boolean;
   songTitle?: string;
   artistName?: string;
 }
 
 /** Ordered. A beat only becomes eligible once the one before it is spent. */
 export const TOUR_BEATS: TourBeat[] = [
+  {
+    id: 'welcome',
+    on: 'arrived',
+    delayMs: 6_000,
+    /**
+     * The first thing Mo$ha ever says: what this place is for, in three
+     * things, and then a question rather than an instruction. A musician and
+     * a listener are not here for the same reason, so they are not told the
+     * same thing (founder, 16 Sep 2026).
+     */
+    line: ({ displayName, isArtist }) => {
+      const name = displayName ? `${displayName}, w` : 'W';
+      return isArtist
+        ? `${name}elcome in. Three things here are yours: your Studio, where a record goes live the same minute and you keep what it earns; a world you can build for the people who follow you; and the music itself, free to play like anybody else. What do you feel like doing first?`
+        : `${name}elcome in. Everything plays free, the artists are paid direct, and The Room is people hearing the same song at the same second. What do you feel like first? If you are not sure, the Room is the fastest way to hear a lot of artists at once.`;
+    },
+    ctaLabel: ({ isArtist }) => (isArtist ? 'Open my Studio' : 'Take me to The Room'),
+    ctaPath: ({ isArtist }) => (isArtist ? '/studio' : '/room'),
+  },
   {
     id: 'first-play',
     on: 'played-first-song',
