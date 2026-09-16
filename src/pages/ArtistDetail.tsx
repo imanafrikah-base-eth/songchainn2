@@ -1293,8 +1293,19 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
             showing an empty shelf on somebody's page. */}
         <ArtistGallerySection artistId={id} />
 
+        {/* Posts sit at the foot of the page, under the music and the pictures,
+            and read as a column rather than a wall: a post is the widest thing
+            here, so it is held to a comfortable measure instead of stretching
+            the whole way across a desktop. */}
         <section className="mb-10">
-          <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Timeline</h2>
+          <div className="mb-4 flex items-baseline gap-2">
+            <h2 className="font-heading text-xl font-semibold text-foreground">Posts</h2>
+            {timelinePosts.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {timelinePosts.length === 1 ? '1 post' : `${timelinePosts.length} posts`}
+              </span>
+            )}
+          </div>
           {isOwner && (
             <PostComposer
               onPost={async (content, type, songId, extras) => {
@@ -1305,14 +1316,21 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
               }}
             />
           )}
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 max-w-2xl space-y-4">
             {isTimelineLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : timelinePosts.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">
-                No posts yet.
+              <div className="rounded-2xl border border-dashed border-border/70 px-4 py-10 text-center">
+                <p className="text-sm font-medium text-foreground">
+                  {isOwner ? 'Nothing posted yet' : `${artist?.name ?? 'This artist'} has not posted yet`}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isOwner
+                    ? 'A line about a record, a photo from the session, whatever you want people to see.'
+                    : 'The music is above. Posts show up here when they write one.'}
+                </p>
               </div>
             ) : (
               timelinePosts.map((post) => (
