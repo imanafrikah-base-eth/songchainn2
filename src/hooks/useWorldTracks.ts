@@ -22,6 +22,8 @@ export interface WorldTrack {
   previewVideoUrl: string | null;
   unlockUsd: number;
   genre: string | null;
+  releaseSlug: string | null;
+  releaseTitle: string | null;
   publishedAt: string | null;
 }
 
@@ -37,20 +39,30 @@ const rowToTrack = (row: Record<string, unknown>): WorldTrack => ({
   previewVideoUrl: row.preview_video_url ? String(row.preview_video_url) : null,
   unlockUsd: Number(row.unlock_usd ?? 1),
   genre: row.genre ? String(row.genre) : null,
+  releaseSlug: row.release_slug ? String(row.release_slug) : null,
+  releaseTitle: row.release_title ? String(row.release_title) : null,
   publishedAt: row.published_at ? String(row.published_at) : null,
 });
 
-const SELECT = 'id, world_slug, street_slug, artist_id, title, part_label, artist_credit, artwork_url, preview_video_url, unlock_usd, genre, published_at';
+const SELECT = 'id, world_slug, street_slug, artist_id, title, part_label, artist_credit, artwork_url, preview_video_url, unlock_usd, genre, release_slug, release_title, published_at';
 
-/** The newest music from every world, for the row on Home. */
-export function useWorldMusicDrops(limit = 8) {
+/**
+ * How long a drop stands on Home. A new release is news for a fortnight; after
+ * that it belongs to the world it lives in, not to the front page.
+ */
+export const DROP_WINDOW_DAYS = 14;
+
+/** The music dropped in any world in the last fortnight, for the row on Home. */
+export function useWorldMusicDrops(limit = 60) {
   return useQuery({
     queryKey: ['world-music-drops', limit],
     queryFn: async (): Promise<WorldTrack[]> => {
+      const since = new Date(Date.now() - DROP_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await (supabase as any)
         .from('world_tracks')
         .select(SELECT)
         .not('published_at', 'is', null)
+        .gte('published_at', since)
         .order('published_at', { ascending: false })
         .order('sort_order', { ascending: true })
         .limit(limit);
