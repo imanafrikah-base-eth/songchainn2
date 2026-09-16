@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Globe, Loader2, Lock, Play } from 'lucide-react';
+import { Globe, Loader2, Lock, Play, Tag } from 'lucide-react';
 import { getWorldBySlug } from '@/worlds/registry';
 import { useWorldMusicDrops, type WorldTrack } from '@/hooks/useWorldTracks';
 import { useWorldTrackPlay, type WorldTrackAnswer } from '@/hooks/useWorldTrackPlay';
@@ -17,6 +17,9 @@ import type { Song } from '@/data/musicData';
  * answer comes from the artist's door, not from this screen: a holder hears
  * it, everybody else is told plainly what it would take.
  */
+/** "$1" rather than "$1.00" when a price is round, which is how a person says it. */
+const holdLabel = (usd: number) => (Number.isInteger(usd) ? `$${usd}` : `$${usd.toFixed(2)}`);
+
 export function WorldMusicRow() {
   const { data: tracks = [] } = useWorldMusicDrops(8);
   const navigate = useNavigate();
@@ -86,6 +89,7 @@ export function WorldMusicRow() {
                 videoUrl={track.previewVideoUrl}
                 poster={track.artworkUrl}
                 title={track.title}
+                priceTag={`Hold ${holdLabel(track.unlockUsd)} of ${world?.tokenSymbol ?? 'the coin'}`}
                 onOpen={() => navigate(track.streetSlug ? `/world/${track.worldSlug}/${track.streetSlug}` : `/world/${track.worldSlug}`)}
               />
               <div className="space-y-2 p-3">
@@ -94,7 +98,9 @@ export function WorldMusicRow() {
                     {track.title}
                     {track.partLabel ? <span className="text-zinc-400">{` ${track.partLabel.toLowerCase()}`}</span> : null}
                   </div>
-                  <div className="truncate text-xs text-zinc-400">{artist}</div>
+                  <div className="truncate text-xs text-zinc-400">
+                    {track.genre ? `${track.genre} · ` : ''}{artist}
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -137,11 +143,14 @@ function PreviewFilm({
   videoUrl,
   poster,
   title,
+  priceTag,
   onOpen,
 }: {
   videoUrl: string | null;
   poster: string | null;
   title: string;
+  /** What it takes to hear the record, said on the card itself. */
+  priceTag: string;
   onOpen: () => void;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
@@ -184,6 +193,10 @@ function PreviewFilm({
       <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-zinc-100">
         <Play className="h-2.5 w-2.5" />
         Preview
+      </span>
+      <span className="absolute bottom-2 left-2 right-2 inline-flex items-center justify-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-medium text-zinc-100 backdrop-blur-[2px]">
+        <Tag className="h-2.5 w-2.5 shrink-0 text-zinc-300" />
+        <span className="truncate">{priceTag}</span>
       </span>
     </button>
   );

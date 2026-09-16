@@ -21,6 +21,7 @@ export interface WorldTrack {
   artworkUrl: string | null;
   previewVideoUrl: string | null;
   unlockUsd: number;
+  genre: string | null;
   publishedAt: string | null;
 }
 
@@ -35,10 +36,11 @@ const rowToTrack = (row: Record<string, unknown>): WorldTrack => ({
   artworkUrl: row.artwork_url ? String(row.artwork_url) : null,
   previewVideoUrl: row.preview_video_url ? String(row.preview_video_url) : null,
   unlockUsd: Number(row.unlock_usd ?? 1),
+  genre: row.genre ? String(row.genre) : null,
   publishedAt: row.published_at ? String(row.published_at) : null,
 });
 
-const SELECT = 'id, world_slug, street_slug, artist_id, title, part_label, artist_credit, artwork_url, preview_video_url, unlock_usd, published_at';
+const SELECT = 'id, world_slug, street_slug, artist_id, title, part_label, artist_credit, artwork_url, preview_video_url, unlock_usd, genre, published_at';
 
 /** The newest music from every world, for the row on Home. */
 export function useWorldMusicDrops(limit = 8) {
