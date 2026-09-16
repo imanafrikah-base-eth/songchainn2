@@ -5,6 +5,7 @@ import { SONGS } from "@/data/musicData";
 import { buildClock } from "@/battlezone/lib/battleStages";
 import { durationFromUrl } from "@/battlezone/lib/songDuration";
 import { getBattleAudioElement, setBattleAudioBlocked } from "@/battlezone/lib/audioUnlock";
+import { battleListenGroup } from "@/lib/listenGroup";
 
 /**
  * The battle stage: the battle's songs play here for EVERYONE in the room, on
@@ -60,6 +61,8 @@ type Phase = "off" | "waiting" | "playing" | "closing";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DRIFT_SECONDS = 2;
+/** The same half minute the rest of the app counts a listen at. */
+const STREAM_AFTER_SECONDS = 30;
 
 interface BattleStageProps {
   songsA: Array<{ id: string; title: string }>;
@@ -70,6 +73,8 @@ interface BattleStageProps {
   launchedAt?: string | null;
   /** The battle is live and not ended. Music only plays while this is true. */
   live: boolean;
+  /** Which battle this is, so a song heard here counts as one stream for the room. */
+  battleId?: string | null;
   ended: boolean;
   compact?: boolean;
 }
@@ -118,12 +123,44 @@ const fmt = (s: number) => {
   return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 };
 
+/**
+ * A song the battle room has been playing for half a minute is a stream for
+ * the artist. Everyone in the room is hearing the same play, so every listener
+ * sends their own listen under one key and the count rises by one, not by the
+ * size of the crowd (src/lib/listenGroup.ts).
+ */
+function countBattleStream(track: ScheduledTrack, battleId: string, counted: Set<string>) {
+  if (counted.has(track.key)) return;
+  counted.add(track.key);
+  void supabase.auth.getUser().then(({ data }) => {
+    const userId = data?.user?.id ?? null;
+    void supabase
+      .from("song_analytics")
+      .insert({
+        event_type: "play",
+        song_id: track.id,
+        user_id: userId,
+        source: "battle",
+        group_key: battleListenGroup(battleId, track.key),
+      } as never)
+      .then(({ error }) => {
+        // A refused listen is not worth a word to the person watching a battle.
+        if (error) counted.delete(track.key);
+      });
+  });
+}
+
 const BattleStage = ({
-  songsA, songsB, artistAName, artistBName, musicEndsAt, launchedAt, live, ended, compact = false,
+  songsA, songsB, artistAName, artistBName, musicEndsAt, launchedAt, live, ended, battleId = null, compact = false,
 }: BattleStageProps) => {
   const [resolved, setResolved] = useState<ResolvedTrack[] | null>(null);
   const [pos, setPos] = useState<{ index: number; offset: number; phase: Phase }>({ index: -1, offset: 0, phase: "off" });
   const [trackError, setTrackError] = useState<string | null>(null);
+  /* Which songs this device has already counted in this battle. */
+  const countedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    countedRef.current = new Set();
+  }, [battleId]);
 
   /* The battle row is refetched every few seconds, so key on the songs, not the array. */
   const order = useMemo(
@@ -251,6 +288,13 @@ const BattleStage = ({
         }
       }
 
+      // A battle is a listening room too: once this song has been playing for
+      // half a minute it is a stream for the artist, counted once for the
+      // whole battle room however many people are watching.
+      if (!el.paused && offset >= STREAM_AFTER_SECONDS && battleId) {
+        countBattleStream(track, battleId, countedRef.current);
+      }
+
       if (el.paused && !el.ended) {
         el.play()
           .then(() => setBattleAudioBlocked(false))
@@ -267,7 +311,7 @@ const BattleStage = ({
       el.removeEventListener("error", onError);
       stop();
     };
-  }, [live, schedule]);
+  }, [live, schedule, battleId]);
 
   /* Leaving the room: silence, and forget the track so the next room starts clean. */
   useEffect(

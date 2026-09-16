@@ -5,6 +5,7 @@ import { usePlayerActions, useSafePlayerState } from '@/context/PlayerContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ROOM_TIMELINE_KEY, roomClock, roomEntriesAt, useRoomTimeline, type RoomEntry } from '@/hooks/useRoomTimeline';
 import { useRoomSongs } from '@/hooks/useRoomSongs';
+import { roomListenGroup, setListenGroupResolver } from '@/lib/listenGroup';
 import type { Song } from '@/data/musicData';
 
 /**
@@ -98,6 +99,28 @@ function RoomTimelineDriver({ currentSongId }: { currentSongId: string | null })
     const id = window.setInterval(run, 1000);
     return () => window.clearInterval(id);
   }, [byId, isCatalogLoading, queryClient, syncRoom, timeline]);
+
+  // The whole Room hears one play of one song, so all of those listens count
+  // as a single stream. A listen reaches its half minute after the play began,
+  // and by then the Room may already be lining up what comes next, so the song
+  // is looked up in the schedule rather than assumed to be the one on now.
+  useEffect(() => {
+    if (!timeline) return;
+    setListenGroupResolver((songId) => {
+      if (!songId) return null;
+      const now = roomClock(timeline);
+      const { current } = roomEntriesAt(timeline, now);
+      if (current?.songId === songId) return roomListenGroup(current.id);
+      // The play that has just finished, or the one about to start: within a
+      // couple of minutes either way, this is still that play.
+      const near = timeline.entries
+        .filter((e) => e.songId === songId && e.startsAt < now + 10_000 && e.endsAt > now - 120_000)
+        .sort((a, b) => b.startsAt - a.startsAt)[0];
+      return near ? roomListenGroup(near.id) : null;
+    });
+    // Out of the Room: a listen after this is this listener's own again.
+    return () => setListenGroupResolver(null);
+  }, [timeline]);
 
   // A record the server has no length for gets measured here, once, and the
   // schedule is corrected for everybody.

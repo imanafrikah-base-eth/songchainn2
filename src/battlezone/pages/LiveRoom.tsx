@@ -859,6 +859,7 @@ const LiveRoom = () => {
             launchedAt={battle.launchedAt ?? null}
             live={battleLiveNow}
             ended={battleEnded}
+            battleId={battle.id}
             compact={isVerySmallMobile}
           />
 

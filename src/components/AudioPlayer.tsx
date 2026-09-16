@@ -4,7 +4,6 @@ import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ChevronDown, ChevronUp, Headphones, X } from 'lucide-react';
 import { usePlayerState, usePlayerActions, usePlayerTime } from '@/context/PlayerContext';
-import { useEngagement, PLAY_THRESHOLD_SECONDS } from '@/context/EngagementContext';
 import { Slider } from '@/components/ui/slider';
 import { FullScreenPlayer } from './FullScreenPlayer';
 import { SpinningSongArt } from './SpinningSongArt';
@@ -119,13 +118,10 @@ export const AudioPlayer = memo(function AudioPlayer() {
     const i = queue.findIndex((q) => q.id === currentSong.id);
     return i >= 0 ? queue[(i + 1) % queue.length] : queue[0];
   })();
-  const { addPlay, addOfflinePlay } = useEngagement();
   const { user } = useAuth();
   const navigate = useNavigate();
   const roomOnlineCount = useRoomOnlineCount({ roomId: 'global', viewerUserId: user?.id, isListening: isRoomMode });
   
-  const hasCountedPlay = useRef(false);
-  const lastSongId = useRef<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | undefined>(user?.user_metadata?.wallet_address);
@@ -152,26 +148,10 @@ export const AudioPlayer = memo(function AudioPlayer() {
     return candidate;
   }, [currentSong, queue]);
 
-  // Reset tracking when song changes
-  useEffect(() => {
-    if (currentSong?.id !== lastSongId.current) {
-      hasCountedPlay.current = false;
-      lastSongId.current = currentSong?.id || null;
-    }
-  }, [currentSong?.id]);
-
-  // Count play when audio position reaches 3 seconds — uses actual audio time from PlayerContext,
-  // not a manual wall-clock timer, so it can't be fooled by pausing/resuming or effect re-runs.
-  useEffect(() => {
-    if (!currentSong || hasCountedPlay.current || !isPlaying) return;
-    if (currentTime >= PLAY_THRESHOLD_SECONDS) {
-      hasCountedPlay.current = true;
-      addPlay(currentSong.id);
-      if (!navigator.onLine) {
-        addOfflinePlay(currentSong.id, currentTime);
-      }
-    }
-  }, [currentTime, currentSong, isPlaying, addPlay, addOfflinePlay]);
+  // Counting a listen is not this bar's job any more. It lives beside the
+  // player itself (StreamCounter in EngagementContext), because this bar is
+  // only drawn on some pages: the Room and the feed never draw it, and a
+  // listen there used to count nothing at all.
 
   // Media Session API for background playback
   useEffect(() => {

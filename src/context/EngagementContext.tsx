@@ -5,6 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
 import { geoSync, prefetchGeo } from '@/lib/geo';
 import { playSourceNow } from '@/lib/playSource';
+import { listenGroupNow } from '@/lib/listenGroup';
+import { useSafePlayerState, useSafePlayerTime } from '@/context/PlayerContext';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // Subscribed broadcast channels keyed by channel name — reused across sendPulse calls.
@@ -276,6 +278,10 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       source: playSourceNow(),
       city: geo.city,
       country: geo.country,
+      // A listen in the Room or in a battle belongs to one shared play. Every
+      // listener still records their own, and the stream count counts the
+      // shared play once. See src/lib/listenGroup.ts.
+      group_key: listenGroupNow(songId),
     };
     const record = async () => {
       const first = await supabase.from('song_analytics').insert(row as any);
@@ -556,9 +562,42 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       getPointsBreakdown,
       sendPulse,
     }}>
+      <StreamCounter />
       {children}
     </EngagementContext.Provider>
   );
+}
+
+/**
+ * Every listen, wherever it happens, counted once.
+ *
+ * Counting used to live inside the player's own bar, so a song only counted on
+ * a page that drew that bar. The Room and the feed never draw it, so listening
+ * in the Room or scrolling the feed with a song on counted nothing at all.
+ * It lives here now, beside the player itself, so anywhere a song reaches half
+ * a minute it is a stream: the Room, a battle, the feed, a world, the landing
+ * page before anyone has signed in.
+ */
+function StreamCounter() {
+  const playerState = useSafePlayerState();
+  const playerTime = useSafePlayerTime();
+  const { addPlay, addOfflinePlay } = useEngagement();
+  const songId = playerState?.currentSong?.id ?? null;
+  const isPlaying = Boolean(playerState?.isPlaying);
+  const currentTime = playerTime?.currentTime ?? 0;
+
+  const countedSongRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!songId || !isPlaying) return;
+    if (countedSongRef.current === songId) return;
+    if (currentTime < PLAY_THRESHOLD_SECONDS) return;
+    countedSongRef.current = songId;
+    addPlay(songId);
+    if (!navigator.onLine) addOfflinePlay(songId, currentTime);
+  }, [songId, isPlaying, currentTime, addPlay, addOfflinePlay]);
+
+  return null;
 }
 
 export function useEngagement() {

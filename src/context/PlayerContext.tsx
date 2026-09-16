@@ -1161,6 +1161,11 @@ export function usePlayerTime() {
   return context;
 }
 
+/** Time updates when there may be no player above: undefined rather than a throw. */
+export function useSafePlayerTime() {
+  return useContext(PlayerTimeCtx);
+}
+
 // Hook for components that need player actions
 export function usePlayerActions() {
   const context = useContext(PlayerActionsCtx);
