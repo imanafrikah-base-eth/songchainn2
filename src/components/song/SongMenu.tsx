@@ -1,7 +1,7 @@
 import { artistPath } from '@/lib/slugRoutes';
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListMusic, ListPlus, MoreHorizontal, Share2, User } from 'lucide-react';
+import { Heart, ListMusic, ListPlus, MoreHorizontal, Share2, User } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import { AddToPlaylistDialog } from '@/components/song/AddToPlaylistDialog';
 import { usePlayerActions } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { useShare } from '@/hooks/useShare';
+import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Song } from '@/data/musicData';
@@ -36,6 +37,7 @@ export function SongMenu({
   const { addToQueue } = usePlayerActions();
   const { user } = useAuth();
   const { shareSong } = useShare();
+  const { isSongLiked, toggleLikeSong } = useAudienceInteractions();
   const [playlistOpen, setPlaylistOpen] = useState(false);
 
   const stop = useCallback((e: React.SyntheticEvent) => {
@@ -59,6 +61,15 @@ export function SongMenu({
     void shareSong(song.title, song.artist, song.id, song.coverImage);
   }, [shareSong, song]);
 
+  const liked = isSongLiked(song.id);
+  const handleLike = useCallback(() => {
+    if (!user) {
+      toast({ title: 'Sign in to like songs', variant: 'destructive' });
+      return;
+    }
+    void toggleLikeSong(song.id);
+  }, [song.id, toggleLikeSong, user]);
+
   const handleGoToArtist = useCallback(() => {
     navigate(artistPath(song.artistId));
   }, [navigate, song.artistId]);
@@ -79,6 +90,12 @@ export function SongMenu({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align={align} className="w-48" onClick={stop}>
+          {/* On a phone the heart is not beside the row any more, so liking a
+              song has to live here or it is gone. */}
+          <DropdownMenuItem onSelect={handleLike} className="sm:hidden">
+            <Heart className={cn('w-4 h-4 mr-2', liked && 'fill-current text-primary')} />
+            {liked ? 'Remove from liked' : 'Like this song'}
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={handleAddToQueue}>
             <ListPlus className="w-4 h-4 mr-2" />
             Add to queue

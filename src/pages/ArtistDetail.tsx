@@ -1180,51 +1180,6 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
           </div>
         </motion.section>
 
-        {/* Their visual work. Hidden entirely when there is none, rather than
-            showing an empty shelf on somebody's page. */}
-        <ArtistGallerySection artistId={id} />
-
-        <section className="mb-10">
-          <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Timeline</h2>
-          {isOwner && (
-            <PostComposer
-              onPost={async (content, type, songId, extras) => {
-                await createPost(content, type, songId, undefined, extras);
-                if (timelineUserId) {
-                  queryClient.invalidateQueries({ queryKey: ['artist-timeline-posts', timelineUserId] });
-                }
-              }}
-            />
-          )}
-          <div className="mt-4 space-y-4">
-            {isTimelineLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : timelinePosts.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">
-                No posts yet.
-              </div>
-            ) : (
-              timelinePosts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  onLike={toggleLikePost}
-                  onDelete={deletePost}
-                  onEdit={editPost}
-                  onEditComment={editComment}
-                  onFollow={followUser}
-                  isFollowing={timelineUserId ? isFollowingUser(timelineUserId) : false}
-                  onGetComments={getPostComments}
-                  onAddComment={addComment}
-                  onUntagSelf={untagSelf}
-                />
-              ))
-            )}
-          </div>
-        </section>
-
         <section id="artist-music" className="scroll-mt-24">
           <h2 className="font-heading text-xl font-semibold text-foreground mb-6">
             {isOwner ? 'My Music' : 'Discography'}
@@ -1270,42 +1225,113 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
                 return timeB - timeA;
               });
 
-            return sections.map((section) => (
-              <div
-                key={section.label}
-                className="relative overflow-hidden"
-              >
-                {/* glow removed */}
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <div>
-                      <h3 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
-                        <span>{section.label}</span>
-                        <span className="text-[11px] sm:text-xs text-muted-foreground">
-                          {section.songs.length} tracks
-                        </span>
-                      </h3>
-                    </div>
-                  </div>
-                  {isOwner ? (
-                    <div className="space-y-1.5 sm:space-y-2 max-h-[360px] sm:max-h-[420px] overflow-y-auto pr-1">
-                      {section.songs.map((song, index) => (
-                        <SongCard key={song.id} song={song} index={index} variant="compact" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="max-h-[420px] overflow-y-auto pr-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                        {section.songs.map((song, index) => (
-                          <SongCard key={song.id} song={song} index={index} />
-                        ))}
+            // A release is presented as a release: its cover, its name, what
+            // it is, and then the songs. The old version stacked bare headings
+            // over boxes that scrolled inside a page that also scrolled, which
+            // is the detail that made a catalogue look like a spreadsheet.
+            return (
+              <div className="space-y-10">
+                {sections.map((section) => {
+                  const cover = section.songs.find((s) => s.coverImage)?.coverImage;
+                  const year = (() => {
+                    const newest = section.songs
+                      .map((s) => (s.addedAt ? new Date(s.addedAt).getFullYear() : null))
+                      .filter((y): y is number => Boolean(y))
+                      .sort((a, b) => b - a)[0];
+                    return newest ?? null;
+                  })();
+                  return (
+                    <div key={section.label}>
+                      <div className="mb-4 flex items-center gap-3 sm:gap-4">
+                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 sm:h-16 sm:w-16">
+                          {cover ? (
+                            <img
+                              src={thumb(cover, 160)}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="truncate font-heading text-base font-semibold text-foreground sm:text-lg">
+                            {section.label}
+                          </h3>
+                          <p className="truncate text-xs text-muted-foreground sm:text-sm">
+                            {section.songs.length === 1 ? '1 song' : `${section.songs.length} songs`}
+                            {year ? ` · ${year}` : ''}
+                          </p>
+                        </div>
                       </div>
+                      {/* Every song on a release wears the same sleeve, so a
+                          grid of big covers is the same picture printed twenty
+                          times. A release reads as a track list under its own
+                          cover. Singles each have their own art, so those keep
+                          their cards. */}
+                      {section.label === 'Singles' ? (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+                          {section.songs.map((song, index) => (
+                            <SongCard key={song.id} song={song} index={index} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+                          {section.songs.map((song, index) => (
+                            <SongCard key={song.id} song={song} index={index} variant="compact" />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
-            ));
+            );
           })()}
+        </section>
+
+        {/* Their visual work. Hidden entirely when there is none, rather than
+            showing an empty shelf on somebody's page. */}
+        <ArtistGallerySection artistId={id} />
+
+        <section className="mb-10">
+          <h2 className="font-heading text-xl font-semibold text-foreground mb-6">Timeline</h2>
+          {isOwner && (
+            <PostComposer
+              onPost={async (content, type, songId, extras) => {
+                await createPost(content, type, songId, undefined, extras);
+                if (timelineUserId) {
+                  queryClient.invalidateQueries({ queryKey: ['artist-timeline-posts', timelineUserId] });
+                }
+              }}
+            />
+          )}
+          <div className="mt-4 space-y-4">
+            {isTimelineLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : timelinePosts.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                No posts yet.
+              </div>
+            ) : (
+              timelinePosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onLike={toggleLikePost}
+                  onDelete={deletePost}
+                  onEdit={editPost}
+                  onEditComment={editComment}
+                  onFollow={followUser}
+                  isFollowing={timelineUserId ? isFollowingUser(timelineUserId) : false}
+                  onGetComments={getPostComments}
+                  onAddComment={addComment}
+                  onUntagSelf={untagSelf}
+                />
+              ))
+            )}
+          </div>
         </section>
 
         {relatedArtists.length > 0 && (

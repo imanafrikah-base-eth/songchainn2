@@ -294,12 +294,18 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
                 ❤️‍🔥 {compactCount(totalPulses)}
               </span>
             )}
-            <ShareSongButton 
-              songId={song.id} 
-              songTitle={song.title} 
-              artistName={song.artist}
-              coverImage={song.coverImage}
-            />
+            {/* On a phone a track row is a name and one menu. Three icons
+                beside every title left no room for the title, so songs read
+                as "Bin Laden Fre...". Share and the heart are in the menu,
+                and they come back beside the row on a wider screen. */}
+            <span className="hidden sm:inline-flex">
+              <ShareSongButton
+                songId={song.id}
+                songTitle={song.title}
+                artistName={song.artist}
+                coverImage={song.coverImage}
+              />
+            </span>
             <motion.button
               type="button"
               aria-label={liked ? 'Unlike song' : 'Like song'}
@@ -307,7 +313,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               whileTap={{ scale: 0.9 }}
               onClick={handleLike}
               className={cn(
-                "p-1.5 sm:p-2 rounded-full transition-all min-h-11 min-w-11 inline-flex items-center justify-center",
+                "hidden p-1.5 sm:p-2 rounded-full transition-all min-h-11 min-w-11 sm:inline-flex items-center justify-center",
                 liked ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
               )}
             >
