@@ -26,6 +26,7 @@ import { ZoneShortcuts } from '@/components/ZoneShortcuts';
 import { WhatsLive } from '@/components/WhatsLive';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { WorldMusicRow } from '@/components/WorldMusicRow';
 import { AnimatedBackground } from '@/components/ui/animated-background';
 import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
@@ -689,6 +690,12 @@ export default function Home() {
                   </div>
                 </div>
               </motion.section>
+
+            {/* What artists have put inside their own worlds, shown as the
+                preview the artist made rather than an advert for it. */}
+            <motion.section variants={itemVariants}>
+              <WorldMusicRow />
+            </motion.section>
 
             {showCatalogSkeleton && (
               <motion.section variants={itemVariants} aria-busy="true" aria-label="Loading new releases">
