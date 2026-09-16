@@ -16,7 +16,7 @@ export default function Keys() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-6 sm:px-6">
-        <Link to="/" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/" className="mb-6 inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back
         </Link>
 

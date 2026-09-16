@@ -473,7 +473,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               whileTap={{ scale: 0.9 }}
               onClick={handleLike}
               className={cn(
-                "p-2 rounded-xl transition-all flex-shrink-0",
+                "inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 transition-all flex-shrink-0",
                 liked ? "bg-primary/20 text-primary" : "glass text-muted-foreground hover:text-foreground"
               )}
             >
@@ -657,7 +657,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
               whileTap={{ scale: 0.9 }}
               onClick={handleLike}
               className={cn(
-                "p-2 rounded-full transition-all",
+                "inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 transition-all",
                 liked ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
               )}
             >

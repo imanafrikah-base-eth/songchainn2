@@ -166,7 +166,7 @@ export function Navigation() {
         <div className="px-4 sm:px-5 max-w-[1400px] mx-auto">
           <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
             {/* Logo - always visible */}
-            <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
+            <Link to="/" className="flex min-h-11 items-center gap-2 flex-shrink-0 group">
               <motion.img
                 src={logo}
                 alt="$ongChainn"
