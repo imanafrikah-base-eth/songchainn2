@@ -74,10 +74,18 @@ export function isShowablePost(post: SocialPostWithProfile, catalog: FeedCatalog
 /** The sections of the feed. */
 export type FeedSection = 'foryou' | 'following' | 'videos' | 'photos';
 
+/** Anything that plays a record: a song card, a pulse, a listen. */
+export function hasPlayCard(post: SocialPostWithProfile): boolean {
+  return Boolean(post.songcard || post.song_id || post.post_type === 'song_pulse');
+}
+
 export function postInSection(post: SocialPostWithProfile, section: FeedSection): boolean {
-  if (section === 'videos') return post.media_kind === 'video' && !!post.media_url;
-  // Posts: the list view, like Instagram and Facebook. Every post with a real
-  // picture, a song card, or a song with artwork; clips stay in Videos.
-  if (section === 'photos') return (!!post.media_url && post.media_kind !== 'video') || !!post.songcard || !!post.song_id;
+  const isVideo = post.media_kind === 'video' && !!post.media_url;
+  const isRoom = post.post_type === 'activity' && post.activity_type === 'room_entered';
+  // Videos is where things play: clips, song cards, pulses, the Room. Posts is
+  // for posts, which is what the founder asked for on 16 Sep 2026 after
+  // watching somebody scroll past a wall of them hunting for the music.
+  if (section === 'videos') return isVideo || hasPlayCard(post) || isRoom;
+  if (section === 'photos') return !isVideo && !hasPlayCard(post) && !isRoom;
   return true;
 }

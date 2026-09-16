@@ -21,6 +21,48 @@ import type { Song } from '@/data/musicData';
  * lives in, and this row moves on to whatever is new.
  */
 
+/**
+ * The row moves on by itself, slowly.
+ *
+ * On a phone one card fills the screen, so a drop behind the first one was
+ * only ever seen by somebody who thought to swipe. Every eight seconds the
+ * rail walks to the next card and, at the end, drifts back to the start. A
+ * touch, a drag or a keypress hands it back to the person and it stays theirs
+ * for a while; it never fights a finger, and it does not move at all for
+ * anybody who has asked for less motion.
+ */
+function useAutoRail(count: number) {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const rail = ref.current;
+    if (!rail || count < 2) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+    let handBack = 0;
+    const theirs = () => { handBack = Date.now() + 20_000; };
+    const events: Array<keyof HTMLElementEventMap> = ['pointerdown', 'wheel', 'touchstart', 'keydown'];
+    events.forEach((e) => rail.addEventListener(e, theirs, { passive: true }));
+
+    const step = window.setInterval(() => {
+      if (Date.now() < handBack) return;
+      if (document.visibilityState === 'hidden') return;
+      const card = rail.firstElementChild as HTMLElement | null;
+      if (!card) return;
+      const stride = card.offsetWidth + 12;
+      const atEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 8;
+      rail.scrollTo({ left: atEnd ? 0 : rail.scrollLeft + stride, behavior: 'smooth' });
+    }, 8000);
+
+    return () => {
+      window.clearInterval(step);
+      events.forEach((e) => rail.removeEventListener(e, theirs));
+    };
+  }, [count]);
+
+  return ref;
+}
+
 /** "$1" rather than "$1.00" when a price is round, which is how a person says it. */
 const holdLabel = (usd: number) => (Number.isInteger(usd) ? `$${usd}` : `$${usd.toFixed(2)}`);
 
@@ -83,6 +125,7 @@ export function WorldMusicRow() {
 
   const drops = useMemo(() => toDrops(tracks), [tracks]);
   const worldOf = useCallback((slug: string) => getWorldBySlug(slug), []);
+  const railRef = useAutoRail(drops.length);
 
   const tryPlay = useCallback(async (track: WorldTrack) => {
     setLastAsked(track);
@@ -130,7 +173,10 @@ export function WorldMusicRow() {
         </p>
       </div>
 
-      <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 sm:gap-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={railRef}
+        className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 sm:gap-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {drops.map((drop) => {
           const world = worldOf(drop.worldSlug);
           const artist = world?.artistName || drop.credit;

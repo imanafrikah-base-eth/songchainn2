@@ -29,6 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSafePlayerState, usePlayerActions } from '@/context/PlayerContext';
 import { FeedPostCard } from '@/components/social/FeedPostCard';
 import { useFeedCatalog, isShowablePost, postInSection, resolvePostSong as songOfPost, type FeedSection } from '@/lib/feedPosts';
+import { ClipLooper } from '@/components/social/ClipLooper';
 import { useCommentPreviews } from '@/hooks/useCommentPreviews';
 import { useMentions } from '@/hooks/useMentions';
 import { useFeedReactions } from '@/hooks/useFeedReactions';
@@ -278,6 +279,9 @@ export default function Social() {
   const visibleRatiosRef = useRef(new Map<string, number>());
   const activePostIdRef = useRef<string | null>(null);
 
+  /** The window of the record the card in view is playing, if it plays a piece of one. */
+  const [clip, setClip] = useState<{ songId: string; startSeconds: number; windowSeconds: number } | null>(null);
+
   const resolvePostSong = useCallback((post: SocialPostWithProfile) => songOfPost(post, catalog), [catalog]);
 
   const decideActiveCard = useCallback(() => {
@@ -305,10 +309,21 @@ export default function Social() {
       return;
     }
 
-    const startTime = post.post_type === 'song_pulse' && typeof post.metadata?.position_seconds === 'number'
-      ? post.metadata.position_seconds
-      : undefined;
-    playSongRef.current(songToPlay, typeof startTime === 'number' ? { startTime } : undefined);
+    // A pulse is a moment, so the card plays that moment and loops ten seconds
+    // of it. The Room's card plays half a minute of what is on in there.
+    // Anything else plays from the top, as it always has.
+    const isPulse = post.post_type === 'song_pulse';
+    const isRoom = post.post_type === 'activity' && post.activity_type === 'room_entered';
+    const pulsedAt = typeof post.metadata?.position_seconds === 'number' ? post.metadata.position_seconds : 0;
+    const clipStart = Math.max(0, pulsedAt - 2);
+    playSongRef.current(songToPlay, isPulse ? { startTime: clipStart } : undefined);
+    setClip(
+      isPulse
+        ? { songId: songToPlay.id, startSeconds: clipStart, windowSeconds: 10 }
+        : isRoom
+          ? { songId: songToPlay.id, startSeconds: 0, windowSeconds: 30 }
+          : null,
+    );
   }, [resolvePostSong]);
 
   const decideActiveCardRef = useRef(decideActiveCard);
@@ -410,6 +425,10 @@ export default function Social() {
 
   return (
     <div className="screen-h bg-black relative overflow-hidden">
+      {/* Holds the card in view to its own piece of the record. */}
+      {clip && (
+        <ClipLooper songId={clip.songId} startSeconds={clip.startSeconds} windowSeconds={clip.windowSeconds} />
+      )}
 
       {/* ── Scrollable feed ── */}
       <div
