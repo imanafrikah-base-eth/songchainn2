@@ -368,6 +368,36 @@ Deno.serve(async (req) => {
     }
     if (!cfg) return json(origin, { error: "Unknown world" }, 404);
 
+    // THE FIRST WORLDS ARE NOT ROWS. iman-afrikah and the worlds like it are
+    // defined in the app's own registry, so there is no worlds row to read an
+    // owner_id from, and their artist was treated as a stranger at their own
+    // door: IMan was told "hold 500,000 $IMAN and this door opens. You are
+    // holding 0" in the world he built (founder, 16 Sep 2026).
+    //
+    // A world's key IS its artist's creator coin, so whoever holds the artist
+    // account behind that coin owns the world. That is read here, from the
+    // database, against the caller's JWT, and it covers both kinds of world.
+    if (!isOwner && userId) {
+      const keyAddress = tokenAddressFor(cfg);
+      if (keyAddress) {
+        const { data: coinRow } = await db
+          .from("artist_coins")
+          .select("artist_id")
+          .ilike("coin_address", keyAddress)
+          .maybeSingle();
+        const artistId = (coinRow as { artist_id?: string } | null)?.artist_id;
+        if (artistId) {
+          const { data: account } = await db
+            .from("artist_accounts")
+            .select("artist_id")
+            .eq("artist_id", artistId)
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (account) isOwner = true;
+        }
+      }
+    }
+
     // The drops in this world that are live. Each one the caller holds is
     // reported by id, and a drop marked as a key grants its ring.
     const { data: dropRows } = await db

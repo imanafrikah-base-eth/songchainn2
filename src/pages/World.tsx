@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, RefreshCw, Wallet, Disc3, Shirt } from 'lucide-react';
+import { ArrowLeft, Pencil, RefreshCw, Wallet, Disc3, Shirt } from 'lucide-react';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { ARTISTS } from '@/data/musicData';
 import { getWorldBySlug, formatWorldNumber } from '@/worlds/registry';
@@ -296,7 +296,10 @@ function WorldInner({
                 >
                   <ArrowLeft className="h-3.5 w-3.5" /> Leave the world
                 </Link>
-                <WalletChip world={world} wallet={wallet} balance={rings.balance} onConnect={() => void connect()} onRefresh={refresh} />
+                <div className="flex items-center gap-2">
+                  {isOwner && <EditWorldButton worldId={world.id} />}
+                  <WalletChip world={world} wallet={wallet} balance={rings.balance} onConnect={() => void connect()} onRefresh={refresh} />
+                </div>
               </div>
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-300/80">{brand}</p>
@@ -435,7 +438,13 @@ function WorldInner({
                     <ArrowLeft className="h-3.5 w-3.5" />{' '}
                     {homeCity ? `Back to ${homeCity.name}` : 'Back to the town square'}
                   </Link>
-                  <WalletChip world={world} wallet={wallet} balance={rings.balance} onConnect={() => void connect()} onRefresh={refresh} />
+                  <div className="flex items-center gap-2">
+                    {/* The way into the builder, right here on the room the
+                        artist is looking at, not only in the bar at the foot
+                        of the screen. */}
+                    {isOwner && <EditWorldButton worldId={world.id} />}
+                    <WalletChip world={world} wallet={wallet} balance={rings.balance} onConnect={() => void connect()} onRefresh={refresh} />
+                  </div>
                 </div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-300/80 drop-shadow">
                   <ArtistName name={world.artistName} artistId={world.artistId} size={10} /> World
@@ -526,6 +535,23 @@ function NowWearing({ theme }: { theme: ReturnType<typeof useCityTheme> }) {
  * resolved exactly as it is anywhere else; the city is an address, never a
  * second gate.
  */
+/**
+ * The way into the builder, standing on the art of whatever the artist is
+ * looking at. The bar at the foot of the screen has one too; an artist should
+ * never have to hunt for the way to change their own world.
+ */
+function EditWorldButton({ worldId }: { worldId?: string }) {
+  return (
+    <Link
+      to={worldId ? `/world-builder?id=${worldId}` : '/world-builder'}
+      className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-white/90 px-3 text-xs font-semibold text-black backdrop-blur-sm transition hover:bg-white"
+    >
+      <Pencil className="h-3.5 w-3.5" />
+      Edit world
+    </Link>
+  );
+}
+
 function CityView({
   world,
   city,
@@ -586,7 +612,10 @@ function CityView({
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Back to the skyline
             </Link>
-            <WalletChip world={world} wallet={wallet} balance={rings.balance} onConnect={onConnect} onRefresh={onRefresh} />
+            <div className="flex items-center gap-2">
+              {ownerView && <EditWorldButton worldId={world.id} />}
+              <WalletChip world={world} wallet={wallet} balance={rings.balance} onConnect={onConnect} onRefresh={onRefresh} />
+            </div>
           </div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-300/80 drop-shadow">
             <ArtistName name={world.artistName} artistId={world.artistId} size={10} /> World

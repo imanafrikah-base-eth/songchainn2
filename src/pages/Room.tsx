@@ -24,6 +24,7 @@ import { RoomChatMessage } from '@/components/room/RoomChatMessage';
 import { HdEmoji, isEmojiOnly, withHdEmoji } from '@/components/room/HdEmoji';
 import { toast } from 'sonner';
 import { announceRoomName, playRoomCue, sendRoomCue, setRoomSoundsOn, useRoomSoundsOn } from '@/lib/roomCues';
+import { useProfilePictures } from '@/hooks/useProfilePictures';
 import { useRoomRequests, ROOM_REQUEST_MIN_POINTS } from '@/hooks/useRoomRequests';
 import { RoomRequestSheet, Cover, type RoomLineEntry } from '@/components/room/RoomRequestSheet';
 
@@ -349,6 +350,8 @@ export default function Room() {
   const typingSentRef = useRef(false);
   const typingSeenAtRef = useRef<Record<string, number>>({});
   const roomSounds = useRoomSoundsOn();
+  // Everyone talking on screen, so the chat shows faces rather than initials.
+  const faces = useProfilePictures(messages.map((m) => m.user_id));
   const pulseBannerTimeoutRef = useRef<number | null>(null);
   const hasMoshaGreetedRef = useRef(false);
   const lastMoshaReplyToIdRef = useRef<string | null>(null);
@@ -1868,6 +1871,7 @@ export default function Room() {
                       key={m.id}
                       name={m.room_name}
                       userId={m.user_id}
+                      avatarUrl={faces[m.user_id]?.avatar ?? null}
                       body={big ? withHdEmoji(text.replace(/\s+/g, ''), 44, m.id) : renderMessageWithCustomEmojis(text)}
                       copyText={text}
                       bigEmoji={big}

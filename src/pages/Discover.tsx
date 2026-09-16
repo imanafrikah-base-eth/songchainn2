@@ -488,8 +488,9 @@ export default function Discover() {
                 </div>
               <div className="max-h-[420px] overflow-y-auto pr-2">
                 <CatalogGrid>
+                  {/* The heading already says these are new. */}
                   {newReleases.map((catalog) => (
-                    <CatalogCard key={catalog.id} catalog={catalog} isNew={isCatalogNew(catalog)} />
+                    <CatalogCard key={catalog.id} catalog={catalog} />
                   ))}
                 </CatalogGrid>
               </div>

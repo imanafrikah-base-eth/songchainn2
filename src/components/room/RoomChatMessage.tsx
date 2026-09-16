@@ -43,6 +43,7 @@ function roomTime(date: Date) {
 export function RoomChatMessage({
   name,
   userId,
+  avatarUrl,
   body,
   copyText,
   parent,
@@ -56,6 +57,8 @@ export function RoomChatMessage({
 }: {
   name: string;
   userId?: string | null;
+  /** Their profile picture, when they have one. */
+  avatarUrl?: string | null;
   body: ReactNode;
   copyText: string;
   parent?: { name: string; text: string } | null;
@@ -235,14 +238,20 @@ export function RoomChatMessage({
           WebkitTouchCallout: 'none',
         }}
       >
+        {/* The person's own picture. A letter in a circle is what an app shows
+            when it does not know who is talking, and we do know. */}
         <div
           aria-hidden
           className={[
-            'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold uppercase',
+            'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-semibold uppercase',
             isMine ? 'bg-primary/25 text-primary' : 'bg-white/10 text-zinc-300',
           ].join(' ')}
         >
-          {(name || '?').trim().charAt(0) || '?'}
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            (name || '?').trim().charAt(0) || '?'
+          )}
         </div>
 
         <div className="min-w-0 flex-1">
