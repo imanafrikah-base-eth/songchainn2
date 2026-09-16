@@ -697,7 +697,7 @@ export default function Marketplace() {
                     <span className="text-[11px] text-muted-foreground">{catalog.songs.length} tracks</span>
                   </h4>
                 </div>
-                <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+                <div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {catalog.songs.map((song) => (
                       <MarketplaceSongCard key={song.id} song={song} />

@@ -392,7 +392,7 @@ export default function Discover() {
                     </div>
                   </div>
                 </div>
-                <div className="max-h-[420px] overflow-y-auto pr-2">
+                <div>
                   <div className="space-y-3">
                     {todayHotSongs.map(({ song, playsToday }, index) => (
                       <div key={song.id} className="space-y-1">
@@ -486,7 +486,7 @@ export default function Discover() {
                   </div>
                 </div>
                 </div>
-              <div className="max-h-[420px] overflow-y-auto pr-2">
+              <div>
                 <CatalogGrid>
                   {/* The heading already says these are new. */}
                   {newReleases.map((catalog) => (
@@ -599,7 +599,7 @@ export default function Discover() {
                       </div>
                     </div>
                   </motion.div>
-                  <div className="max-h-[420px] overflow-y-auto pr-2">
+                  <div>
                     <CatalogGrid>
                       {recommendedCatalogs.map((catalog) => (
                         <CatalogCard key={catalog.id} catalog={catalog} />

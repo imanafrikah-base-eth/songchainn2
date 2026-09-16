@@ -678,6 +678,15 @@ export default function Auth() {
     // sign-in options, which is not what a deep link asked for.
     setAuthView('email');
     window.history.replaceState(null, '', window.location.pathname);
+    // On a phone the form is the screen. On a computer the landing page is,
+    // and the form sits inside it, so a link that said "sign in" appeared to
+    // do nothing at all. Put it in front of them and in the field.
+    window.setTimeout(() => {
+      const field = document.querySelector<HTMLInputElement>('form input[type="email"]');
+      if (!field) return;
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      field.focus({ preventScroll: true });
+    }, 250);
   }, []);
 
   const handleNewMusicPlayAttempt = useCallback(() => {
@@ -998,7 +1007,7 @@ export default function Auth() {
                 <h2 className="text-xl font-heading text-foreground">Hot Today</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
-              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+              <div>
               <div className="grid grid-cols-2 gap-3">
                 {hotTodaySongs.slice(0, 10).map(({ song, playsToday }, index) => (
                   <button
@@ -1085,7 +1094,7 @@ export default function Auth() {
                 <h2 className="text-xl font-heading text-foreground">Today’s Featured Catalogs</h2>
                 <button type="button" onClick={handleBrowseWithoutAuthModal} className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
-              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+              <div>
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                 {previewCatalogs.map((catalog) => (
                   <button
@@ -1127,7 +1136,7 @@ export default function Auth() {
                 </div>
                 <button type="button" onClick={handleNewMusicPlayAttempt} className="text-sm text-muted-foreground hover:text-foreground">Show all</button>
               </div>
-              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+              <div>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                   {newMusicReleases.map((release) => (
                     release.kind === 'catalog' ? (

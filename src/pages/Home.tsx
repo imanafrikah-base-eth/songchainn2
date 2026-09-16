@@ -668,7 +668,7 @@ export default function Home() {
                         </div>
                       </div>
                     </div>
-                    <div className="max-h-[420px] overflow-y-auto pr-2">
+                    <div>
                       <div className="space-y-3">
                         {hotTodaySongs.length === 0 && (
                           <p className="text-sm text-muted-foreground text-center py-6">
@@ -744,7 +744,7 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <div className="max-h-[420px] overflow-y-auto pr-2">
+                  <div>
                     <CatalogGrid>
                       {/* No NEW sticker under a heading that already says New
                           Releases. It earns its place everywhere else. */}
@@ -774,7 +774,7 @@ export default function Home() {
                       <span>{likedArtistSongs.length} songs</span>
                     </div>
                   </div>
-                  <div className="max-h-[420px] overflow-y-auto pr-2">
+                  <div>
                     <div className="space-y-3">
                       {likedArtistSongs.map((song, index) => (
                         <SongCard key={song.id} song={song} index={index} variant="compact" />
@@ -808,7 +808,7 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <div className="max-h-[420px] overflow-y-auto pr-2">
+                  <div>
                     <CatalogGrid>
                       {featuredCatalogs.map((catalog) => (
                         <CatalogCard key={catalog.id} catalog={catalog} />
