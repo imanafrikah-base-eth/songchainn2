@@ -2,12 +2,13 @@ import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { useNavigate } from 'react-router-dom';
-import { Bell, BellOff, CheckCircle2, ChevronDown, ListMusic, ListPlus, LogOut, Share2, HardDrive, Bot, SendHorizontal, SmilePlus, UserPlus, UserRound } from 'lucide-react';
+import { Bell, BellOff, CheckCircle2, ChevronDown, Heart, HeartPulse, ListMusic, ListPlus, LogOut, Share2, HardDrive, Bot, SendHorizontal, SmilePlus, UserPlus, UserRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { ARTISTS } from '@/data/musicData';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
+import { useEngagement } from '@/context/EngagementContext';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import type { Song } from '@/data/musicData';
@@ -295,6 +296,8 @@ export default function Room() {
   const { isPlaying, isRoomMode, currentSong, isRoomHidden } = usePlayerState();
   const { enterRoomMode, exitRoomMode, setVolume, volume, play, hideRoom, showRoom } = usePlayerActions();
   const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
+  // Loving the record that is on, without leaving the Room.
+  const { toggleLike, isLiked, sendPulse } = useEngagement();
   const { artists: publishedArtists } = usePublishedCatalog();
 
   // Every record the Room plays, and the Room's one schedule. The server keeps
@@ -1797,6 +1800,37 @@ export default function Room() {
                 <div className="text-zinc-500">•</div>
                 <div className="flex-shrink-0 tabular-nums text-zinc-400">
                   Next in {formatCountdownSeconds(segmentProgress.remaining)}
+                </div>
+                <div className="ml-auto flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={!currentSong}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (currentSong) void toggleLike(currentSong.id);
+                    }}
+                    aria-pressed={currentSong ? isLiked(currentSong.id) : false}
+                    aria-label={currentSong && isLiked(currentSong.id) ? 'Unlike this song' : 'Like this song'}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:opacity-40"
+                  >
+                    <Heart className={`h-4 w-4 ${currentSong && isLiked(currentSong.id) ? 'fill-current text-rose-400' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!currentSong}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!currentSong) return;
+                      sendPulse(currentSong.id, { positionSeconds: segmentProgress.elapsed });
+                    }}
+                    aria-label="Pulse this moment to everyone listening"
+                    title="Pulse this moment"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:opacity-40"
+                  >
+                    <HeartPulse className="h-4 w-4" />
+                  </button>
                 </div>
                 {roomPulseSummary && (
                   <>

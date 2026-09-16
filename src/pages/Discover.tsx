@@ -272,7 +272,7 @@ export default function Discover() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-primary mb-0.5">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5">
+                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-primary/10 px-1.5 py-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                     <span>Now Playing in The Room</span>
                   </span>
@@ -296,7 +296,7 @@ export default function Discover() {
                   className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs sm:text-sm px-3 py-1.5 min-h-10"
                 >
                   <Headphones className="w-3.5 h-3.5" />
-                  <span>Jump into Room</span>
+                  <span className="hidden sm:inline">Jump into Room</span><span className="sm:hidden">Room</span>
                   <span className="inline-flex items-center rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
                     {`${roomOnlineCount} live`}
                   </span>

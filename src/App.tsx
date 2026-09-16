@@ -147,7 +147,8 @@ function AppShell() {
       }
       pulseTimeoutRef.current = window.setTimeout(() => {
         setIsGlobalPulsing(false);
-      }, 650);
+        // As long as the heartbeat takes. A shorter timer cut the second beat off.
+      }, 1800);
     });
   }, []);
 

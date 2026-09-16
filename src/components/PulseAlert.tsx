@@ -42,6 +42,8 @@ interface PulseRow {
 interface Pulsed {
   song: Song;
   atSeconds: number | null;
+  /** Who threw it, so tapping lands on their post rather than a generic page. */
+  byUserId: string | null;
   key: number;
 }
 
@@ -76,6 +78,7 @@ export function PulseAlert() {
     setPulsed({
       song,
       atSeconds: typeof row.position_seconds === 'number' ? row.position_seconds : null,
+      byUserId: row.user_id ?? null,
       key: now,
     });
 
@@ -108,10 +111,35 @@ export function PulseAlert() {
     };
   }, [show, user?.id]);
 
-  const hear = useCallback(() => {
+  /**
+   * Tapping it goes to the pulse itself: the post the person made when they
+   * threw it, with their name on it. The song is still there to play, but the
+   * moment belongs to somebody, and that is the part worth landing on.
+   */
+  const hear = useCallback(async () => {
     if (!pulsed) return;
-    const { song, atSeconds } = pulsed;
+    const { song, atSeconds, byUserId } = pulsed;
     setPulsed(null);
+
+    if (byUserId) {
+      const { data } = await supabase
+        .from('social_posts')
+        .select('id')
+        .eq('post_type', 'song_pulse')
+        .eq('user_id', byUserId)
+        .eq('song_id', String(song.id))
+        .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const postId = (data as { id?: string } | null)?.id;
+      if (postId) {
+        navigate(`/post/${postId}`);
+        return;
+      }
+    }
+
+    // No post to land on: the song from the second they pulsed it.
     playSong(song, atSeconds != null && atSeconds > 0 ? { startTime: atSeconds } : undefined);
     navigate(songPath(song));
   }, [pulsed, playSong, navigate]);
@@ -131,7 +159,7 @@ export function PulseAlert() {
         >
           <button
             type="button"
-            onClick={hear}
+            onClick={() => void hear()}
             aria-label={`${pulsed.song.title} by ${pulsed.song.artist} was just pulsed${moment ? ` at ${moment}` : ''}. Play it from there.`}
             className="pointer-events-auto flex min-h-14 w-full max-w-sm items-center gap-3 rounded-2xl border border-border bg-card p-2 pr-3 text-left shadow-lg transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           >

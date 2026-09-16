@@ -183,7 +183,7 @@ export function Navigation() {
             {/* One line, always. Nothing here may wrap or shrink, so the menu
                 button can never be pushed off the right edge of a phone
                 (founder, 15 Sep 2026). */}
-            <div className="flex min-w-0 flex-nowrap items-center gap-1 sm:gap-2 [&>*]:shrink-0">
+            <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden sm:gap-2 [&>*]:shrink-0">
               {/* Search button — always visible */}
               <motion.button
                 type="button"
@@ -254,7 +254,11 @@ export function Navigation() {
                 </motion.div>
               </div>
 
-              <WalletChip />
+              {/* The one thing here allowed to give way. A long balance used
+                  to push the menu button clean off a narrow phone. */}
+              <span className="min-w-0 max-w-[40vw] overflow-hidden !shrink sm:max-w-none">
+                <WalletChip />
+              </span>
 
               <UpdateButton />
 
