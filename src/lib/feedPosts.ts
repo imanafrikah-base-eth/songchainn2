@@ -86,6 +86,15 @@ export function postInSection(post: SocialPostWithProfile, section: FeedSection)
   // for posts, which is what the founder asked for on 16 Sep 2026 after
   // watching somebody scroll past a wall of them hunting for the music.
   if (section === 'videos') return isVideo || hasPlayCard(post) || isRoom;
-  if (section === 'photos') return !isVideo && !hasPlayCard(post) && !isRoom;
+  // Posts is what a person sat down and wrote or photographed. The app's own
+  // chatter, that somebody followed somebody, that a battle ended, that a
+  // playlist exists, is news rather than a post: it still runs in For you and
+  // Following, where news belongs.
+  if (section === 'photos') {
+    if (isVideo || hasPlayCard(post) || isRoom) return false;
+    if (post.post_type === 'system' || post.post_type === 'activity') return false;
+    if (post.post_type === 'artist_follow') return false;
+    return true;
+  }
   return true;
 }
