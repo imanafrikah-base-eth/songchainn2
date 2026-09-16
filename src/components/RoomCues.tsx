@@ -64,6 +64,9 @@ function RoomCueChannel({ userId }: { userId: string }) {
     let greeted = false;
     let name = '';
     const lastArrivalAt = new Map<string, number>();
+    // What this device has already sounded for, so the fast path and the
+    // honest path never play the same message twice.
+    const heard = new Set<string>();
     let gathered: string[] = [];
     let gatherTimer: number | null = null;
 
@@ -71,7 +74,9 @@ function RoomCueChannel({ userId }: { userId: string }) {
       if (!playRoomCue(kind, seed)) return;
       if (kind === 'join') duckRef.current(0.35, 650);
       else if (kind === 'self-join') duckRef.current(0.5, 500);
-      else if (kind === 'message') duckRef.current(0.65, 120);
+      // A ping has to be heard over the record, so the music steps back a
+      // little further and for a little longer than it used to.
+      else if (kind === 'message') duckRef.current(0.45, 260);
     };
 
     const announceArrivals = () => {
@@ -126,14 +131,56 @@ function RoomCueChannel({ userId }: { userId: string }) {
       for (const key of Object.keys(channel.presenceState())) lastArrivalAt.set(key, now);
     });
 
-    channel.on('broadcast', { event: 'message' }, () => {
+    // A broadcast is the fast path. It only exists if the sender's browser is
+    // running today's code, which is why it cannot be the only path: a message
+    // from somebody on a cached build made no sound at all (founder, 16 Sep).
+    channel.on('broadcast', { event: 'message' }, ({ payload }) => {
+      const id = typeof payload?.id === 'string' ? payload.id : '';
+      if (id) {
+        if (heard.has(id)) return;
+        heard.add(id);
+      }
       cue('message');
     });
 
     channel.on('broadcast', { event: 'reaction' }, ({ payload }) => {
       const emoji = typeof payload?.emoji === 'string' ? payload.emoji.slice(0, 16) : '';
+      const id = typeof payload?.id === 'string' ? payload.id : '';
+      if (id) {
+        if (heard.has(id)) return;
+        heard.add(id);
+      }
       cue('reaction', emoji);
     });
+
+    // The database is the honest path: whatever browser it came from, the row
+    // lands here and the Room hears it.
+    const fromDb = supabase
+      .channel(`room-cues-db:${ROOM_ID}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'room_messages', filter: `room_id=eq.${ROOM_ID}` },
+        ({ new: row }) => {
+          const message = row as { id?: string; user_id?: string } | undefined;
+          if (!message?.id || message.user_id === userId) return;
+          if (heard.has(message.id)) return;
+          heard.add(message.id);
+          cue('message');
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'room_message_reactions' },
+        ({ new: row }) => {
+          const reaction = row as { message_id?: string; user_id?: string; emoji?: string } | undefined;
+          if (!reaction?.message_id || reaction.user_id === userId) return;
+          const key = `${reaction.message_id}:${reaction.user_id}:${reaction.emoji ?? ''}`;
+          if (heard.has(key)) return;
+          heard.add(key);
+          cue('reaction', reaction.emoji ?? '');
+        },
+      )
+      .subscribe();
 
     channel.subscribe((status) => {
       if (status !== 'SUBSCRIBED' || !active) return;
@@ -184,6 +231,7 @@ function RoomCueChannel({ userId }: { userId: string }) {
       if (gatherTimer) window.clearTimeout(gatherTimer);
       void channel.untrack().catch(() => undefined);
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(fromDb);
     };
   }, [userId]);
 

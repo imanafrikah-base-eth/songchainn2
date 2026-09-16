@@ -227,9 +227,13 @@ export function playRoomCue(kind: RoomCueKind, seed = ''): boolean {
       [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => bell(c, f, 0.22 + i * 0.075, 0.17 + i * 0.02, i === 3 ? 1 : 0.45));
       break;
     case 'message':
-      // A message: a round little pop with a lighter one after it.
-      voice(c, { freq: 540, glideTo: 1080, glideTime: 0.07, at: 0, peak: 0.24, attack: 0.004, decay: 0.13 });
-      voice(c, { freq: 1620, at: 0.06, peak: 0.07, attack: 0.003, decay: 0.09, echo: 0.4 });
+      // A message: a ping, the way a phone pings. Two bright bells a breath
+      // apart, high enough to sit over a record rather than under it. The
+      // round little pop this replaced was lost the moment the music got
+      // loud (founder, 16 Sep 2026).
+      bell(c, 1318.51, 0, 0.3, 0.5);
+      bell(c, 1760, 0.075, 0.34, 0.75);
+      voice(c, { freq: 2637, at: 0.075, type: 'sine', peak: 0.1, attack: 0.002, decay: 0.3, echo: 0.5 });
       break;
     case 'reaction': {
       // A reaction: one pluck, and each emoji has its own note, so a run of
@@ -246,8 +250,8 @@ export function playRoomCue(kind: RoomCueKind, seed = ''): boolean {
 /* ---------- the way out: Room.tsx sends, RoomCues carries ---------- */
 
 export type RoomCueEvent =
-  | { event: 'message' }
-  | { event: 'reaction'; emoji: string };
+  | { event: 'message'; id?: string }
+  | { event: 'reaction'; emoji: string; id?: string };
 
 type Sender = (cue: RoomCueEvent) => void;
 let sender: Sender | null = null;

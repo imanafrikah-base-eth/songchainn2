@@ -1207,7 +1207,9 @@ export default function Room() {
     });
     broadcastRef.current?.postMessage({ type: 'message', message: optimistic });
     broadcastRoomMessage(optimistic);
-    sendRoomCue({ event: 'message' });
+    // The id travels with it, so a device that hears the broadcast and then
+    // the database row does not ping twice for the same message.
+    sendRoomCue({ event: 'message', id: optimisticId });
     setDraft('');
     setReplyTo(null);
     shouldAutoScrollRef.current = true;
@@ -1279,7 +1281,7 @@ export default function Room() {
     const payload = { message_id: messageId, emoji, delta, user_id: user.id };
     broadcastRoomReaction(payload);
     // Taking a reaction back is quiet; adding one is heard by the Room.
-    if (delta > 0) sendRoomCue({ event: 'reaction', emoji });
+    if (delta > 0) sendRoomCue({ event: 'reaction', emoji, id: [messageId, user.id, emoji].join(':') });
     if (chatBackend === 'local') {
       broadcastRef.current?.postMessage({ type: 'reaction', reaction: payload });
     } else {
@@ -1535,7 +1537,11 @@ export default function Room() {
       return;
     }
     toast.success(`${song.title} is in the line`, {
-      description: result.ahead === 0 ? 'It plays next, for everyone in the Room.' : `${result.ahead} ${result.ahead === 1 ? 'song' : 'songs'} ahead of it.`,
+      // Where it sits, and what it cost, said once and plainly.
+      description: [
+        result.ahead === 0 ? 'It plays next, for everyone in the Room.' : `Number ${result.ahead + 1} in the line.`,
+        result.pointsLeft == null ? 'That was one point.' : `That was one point, you have ${result.pointsLeft.toLocaleString()} left.`,
+      ].join(' '),
     });
     setIsRequestOpen(false);
   }, [requestRoomSong, roomName]);

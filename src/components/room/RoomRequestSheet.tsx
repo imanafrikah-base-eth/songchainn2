@@ -142,7 +142,8 @@ export function RoomRequestSheet({
           <div className="min-w-0">
             <SheetTitle className="text-xl font-bold text-zinc-50">Request a song</SheetTitle>
             <SheetDescription className="mt-0.5 text-sm text-zinc-400">
-              Pick a record and the whole room hears it next. One request at a time.
+              Pick a record and the whole room hears it next. One point a request, one request at a
+              time, up to ten every five hours.
             </SheetDescription>
           </div>
           <button
@@ -175,7 +176,8 @@ export function RoomRequestSheet({
             <Cover song={mine.song} size={44} />
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-                Your request · {minePosition === 0 ? 'next up' : `${minePosition} ahead of it`}
+                {/* Where they actually stand, counted the way a person counts. */}
+                Your request · {minePosition === 0 ? 'next up' : `#${minePosition + 1} in the line`}
               </p>
               <p className="truncate text-sm font-semibold text-zinc-50">{mine.song.title}</p>
               <p className="truncate text-xs text-zinc-400">{mine.song.artist}</p>

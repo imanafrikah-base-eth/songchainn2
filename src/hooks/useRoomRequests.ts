@@ -16,15 +16,15 @@ export function useRoomRequests() {
   const [pending, setPending] = useState(false);
 
   const request = useCallback(
-    async (songId: string, name?: string | null): Promise<{ ok: true; ahead: number } | { ok: false; error: string }> => {
+    async (songId: string, name?: string | null): Promise<{ ok: true; ahead: number; pointsLeft: number | null } | { ok: false; error: string }> => {
       setPending(true);
       try {
         const { data, error } = await supabase.rpc('request_room_song' as never, { p_song_id: songId, p_name: name ?? null } as never);
         if (error) return { ok: false, error: error.message || 'That request did not go through.' };
         await queryClient.invalidateQueries({ queryKey: ROOM_TIMELINE_KEY });
         const rows = data as unknown;
-        const row = (Array.isArray(rows) ? rows[0] : rows) as { ahead?: number } | null;
-        return { ok: true, ahead: Number(row?.ahead ?? 0) };
+        const row = (Array.isArray(rows) ? rows[0] : rows) as { ahead?: number; points_left?: number } | null;
+        return { ok: true, ahead: Number(row?.ahead ?? 0), pointsLeft: row?.points_left == null ? null : Number(row.points_left) };
       } finally {
         setPending(false);
       }
