@@ -847,12 +847,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(FC_USER_KEY, JSON.stringify({ user: fcUser, profile }));
         localStorage.setItem('songchainn_needs_onboarding', '0');
       } catch { void 0; }
-      if (isSupabaseConfigured) {
-        void supabase.from('farcaster_profiles' as any).upsert(
-          { fid: fc.fid, username: fc.username ?? null, display_name: fc.displayName ?? fc.username ?? `User ${fc.fid}`, pfp_url: fc.pfpUrl ?? null, location: fc.location ?? null, updated_at: new Date().toISOString() },
-          { onConflict: 'fid' }
-        ).then(() => {});
-      }
+      // This used to upsert the unverified sdk.context into farcaster_profiles,
+      // a table the Community page shows to everyone, through a policy that let
+      // the bare anon key write any fid. Closed 18 Sep 2026: the table is
+      // service-role only now, and an unverified identity stays local.
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Farcaster sign-in failed') };
@@ -933,13 +931,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(FB_USER_KEY, JSON.stringify({ user: fbUser, profile }));
         localStorage.setItem('songchainn_needs_onboarding', '0');
       } catch { void 0; }
-      // Write to facebook_profiles for community visibility
-      if (isSupabaseConfigured) {
-        void supabase.from('facebook_profiles' as any).upsert(
-          { facebook_id: fb.id, name: fb.name, email: fb.email ?? null, picture_url: fb.picture_url ?? null, updated_at: new Date().toISOString() },
-          { onConflict: 'facebook_id' }
-        ).then(() => {});
-      }
+      // The same anon-key write into facebook_profiles lived here. Closed with
+      // the farcaster one: a fallback identity nobody verified is not something
+      // to publish on the Community page.
       return { error: null };
     } catch (err: any) {
       return { error: new Error(err?.message || 'Facebook sign-in failed') };

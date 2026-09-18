@@ -2044,7 +2044,7 @@ export default function Room() {
             </div>
           )}
           {!replyTo && (
-            <div className="text-[11px] text-zinc-600 truncate">
+            <div className="text-[11px] text-zinc-400 truncate">
               Hold a message to react. Slide it right to reply.
             </div>
           )}

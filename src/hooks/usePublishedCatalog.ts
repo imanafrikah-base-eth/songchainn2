@@ -111,7 +111,13 @@ export function usePublishedCatalog() {
         .select('id, title, artist_name, audio_url, cover_art_url, artist_image_url, genre, town_square, artist_id, created_at, audition, duration_seconds, release_id, track_number, explicit, release_date, featured')
         .eq('is_published', true)
         .not('artist_id', 'is', null)
-        .or(`release_date.is.null,release_date.lte.${today}`);
+        .or(`release_date.is.null,release_date.lte.${today}`)
+        // Newest first, with a ceiling. Today the whole catalogue is a few
+        // hundred rows and every page wants all of it; the ceiling is there so
+        // an unbounded select never becomes the thing that takes the app down
+        // once the catalogue is ten times this size. Raise it deliberately.
+        .order('created_at', { ascending: false })
+        .limit(2000);
       if (error) throw error;
       return (data || []) as unknown as PublishedSongRow[];
     },

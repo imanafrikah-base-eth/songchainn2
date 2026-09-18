@@ -78,7 +78,8 @@ function parseSiwe(message: string) {
   const domain = message.match(/^(.+?) wants you to sign in/m)?.[1]?.trim() ?? '';
   const issuedAt = message.match(/^Issued At: (.+)$/m)?.[1]?.trim() ?? '';
   const expirationTime = message.match(/^Expiration Time: (.+)$/m)?.[1]?.trim() ?? '';
-  return { address, domain, issuedAt, expirationTime };
+  const nonce = message.match(/^Nonce: ([A-Za-z0-9]+)$/m)?.[1]?.trim() ?? '';
+  return { address, domain, issuedAt, expirationTime, nonce };
 }
 
 function checkTimestamps(issuedAt: string, expirationTime: string): string | null {
@@ -106,7 +107,7 @@ Deno.serve(async (req) => {
       return json(origin, { error: 'message and signature are required strings' }, 400);
     }
 
-    const { address, domain, issuedAt, expirationTime } = parseSiwe(message);
+    const { address, domain, issuedAt, expirationTime, nonce } = parseSiwe(message);
 
     // 1. Domain allowlist
     if (!ALLOWED_DOMAINS.has(domain)) {
@@ -116,6 +117,30 @@ Deno.serve(async (req) => {
     // 2. Timestamp freshness
     const timeErr = checkTimestamps(issuedAt, expirationTime);
     if (timeErr) return json(origin, { error: timeErr }, 400);
+
+    // 2b. The nonce is single use. The client has always written one into the
+    // message; this function never read it, so the same signed message could
+    // be replayed for a fresh session any number of times inside the five
+    // minute window. A nonce that has been seen is a message that has been
+    // spent, whatever else is true about it.
+    if (!nonce || nonce.length < 8) {
+      return json(origin, { error: 'That sign-in request was not readable. Please try again.' }, 400);
+    }
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false } },
+    );
+    await admin.from('used_nonces').delete().lt('expires_at', new Date().toISOString());
+    const { error: nonceErr } = await admin.from('used_nonces').insert({
+      nonce,
+      used_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 2 * MAX_AGE_MS).toISOString(),
+    });
+    if (nonceErr?.code === '23505') {
+      return json(origin, { error: 'That sign-in request was already used. Sign in again.' }, 400);
+    }
+    if (nonceErr) throw nonceErr;
 
     // 3. Address present
     if (!address || !address.startsWith('0x')) {
@@ -159,12 +184,6 @@ Deno.serve(async (req) => {
     if (!valid) return json(origin, { error: 'Signature verification failed' }, 401);
 
     // 5. Find-or-create Supabase user keyed by wallet address
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      { auth: { persistSession: false } },
-    );
-
     const email = `wallet-${address.toLowerCase()}@wallet.songchainn.xyz`;
 
     const { error: createErr } = await admin.auth.admin.createUser({

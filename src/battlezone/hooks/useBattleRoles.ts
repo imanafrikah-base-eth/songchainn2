@@ -97,6 +97,11 @@ export const getRolePermissions = (role: BattleRole): RolePermissions => {
 
 const VALID_ROLES: BattleRole[] = ['host', 'co-host', 'speaker', 'audience'];
 
+/* A counter, not a clock: two mounts in the same millisecond would share a
+   channel name and therefore share one channel object. */
+let channelSeq = 0;
+const nextChannelId = () => ++channelSeq;
+
 /** How long somebody counts as in the room after their last heartbeat (every 20s). */
 const AUDIENCE_WINDOW_MS = 3 * 60_000;
 const STAGE_WINDOW_MS = 10 * 60_000;
@@ -328,9 +333,10 @@ export const useBattleRoles = (battleId: string) => {
     // Initial fetch
     fetchParticipants();
 
-    // Timestamp suffix prevents Supabase from reusing an already-subscribed
-    // channel on rapid unmount/remount cycles (same bug as social-feed).
-    const ts = Date.now();
+    // A counter, not a timestamp: two mounts in the same millisecond got the
+    // same channel name, and in realtime-js 2.89 a duplicate subscribe fails
+    // silently rather than throwing. The sibling hooks already count.
+    const ts = nextChannelId();
 
     const participantChannel = supabase
       .channel(`battle-participants-${battleId}-${ts}`)

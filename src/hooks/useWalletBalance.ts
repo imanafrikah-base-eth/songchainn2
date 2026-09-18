@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPublicClient, formatEther, http, type Address } from 'viem';
 import { base } from 'viem/chains';
+import { BASE_RPC_URL } from '@/lib/baseRpc';
 
 interface WalletBalanceState {
   /** ETH on Base as a plain decimal string ("0.00005"), safe for Number(). */
@@ -13,7 +14,7 @@ interface WalletBalanceState {
   refetch: () => Promise<void>;
 }
 
-const client = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') });
+const client = createPublicClient({ chain: base, transport: http(BASE_RPC_URL) });
 
 /** Short and honest: never rounds a real balance down to "0". */
 export function formatEth(eth: number): string {

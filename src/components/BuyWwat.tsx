@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { buyAsset } from '@/lib/safeBuy';
 import { reportPayment } from '@/lib/paymentReceipt';
 import { requestWalletConnection } from '@/lib/walletGate';
+import { ConsentNotice } from '@/components/ConsentNotice';
 import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
 
 /**
@@ -96,7 +97,8 @@ export function BuyWwat({ compact = false }: { compact?: boolean }) {
         ))}
       </div>
 
-      <p className="mt-3 text-xs text-muted-foreground">Paid from your own wallet on Base. It never leaves $ongChainn.</p>
+      <ConsentNotice which="wwat_risk" className="mt-3" />
+      <p className="mt-3 text-xs text-muted-foreground">Paid from your own wallet, on Base. SONGCHAINN never holds it.</p>
     </div>
   );
 }

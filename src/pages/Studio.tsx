@@ -13,6 +13,7 @@ import {
 import { GENRES } from '@/data/musicData';
 import { Navigation } from '@/components/Navigation';
 import { ConsentNotice } from '@/components/ConsentNotice';
+import { AdultOnly } from '@/components/AdultOnly';
 import { useCompliance } from '@/hooks/useCompliance';
 import { MediaManager } from '@/components/gallery/MediaManager';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -1505,14 +1506,18 @@ function ReleaseCard({ release, siblings, hasWallet, artistId }: { release: Arti
             <Coins className="h-3.5 w-3.5" /> Coin on its way
           </span>
         ) : release.status === 'published' ? (
-          <button
-            type="button"
-            onClick={takeOnchain}
-            disabled={asking}
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-60 min-h-10"
-          >
-            <Coins className="h-3.5 w-3.5" /> Take it onchain
-          </button>
+          /* Releasing music is open from 13. Taking it onchain is where money
+             starts, which the Terms close under 18, so that one door is gated. */
+          <AdultOnly reason="money" silent>
+            <button
+              type="button"
+              onClick={takeOnchain}
+              disabled={asking}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-60 min-h-10"
+            >
+              <Coins className="h-3.5 w-3.5" /> Take it onchain
+            </button>
+          </AdultOnly>
         ) : null}
         {release.status === 'published' && !minted && <StopReleaseControl release={release} siblings={siblings} />}
         {release.status === 'held' && <HeldReleaseControl release={release} siblings={siblings} />}

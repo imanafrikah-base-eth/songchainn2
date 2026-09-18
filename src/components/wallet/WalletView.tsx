@@ -852,8 +852,8 @@ function TokenRow({
         <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
           {symbol === 'WWAT' ? '$WWAT' : symbol}
           {href && (
-            <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`${symbol} on Zora`} className="text-muted-foreground hover:text-foreground">
-              <ExternalLink className="h-3 w-3" />
+            <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`${symbol} on Zora`} className="-my-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:text-foreground">
+              <ExternalLink className="h-3.5 w-3.5" />
             </a>
           )}
         </span>

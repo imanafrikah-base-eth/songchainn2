@@ -378,7 +378,10 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
       const extensionFromName = file.name.includes('.') ? file.name.split('.').pop() || '' : '';
       const extensionFromType = file.type.includes('/') ? file.type.split('/').pop() || '' : '';
       const extension = (extensionFromName || extensionFromType || 'jpg').toLowerCase();
-      const fileName = `cover_photo_url-${ownerUserId}-${Date.now()}.${extension}`;
+      // Inside the owner's folder: the covers bucket only lets a person write
+      // under their own id (or an admin anywhere) since 18 Sep 2026. Before that
+      // any signed-in listener could overwrite any artist's cover by its path.
+      const fileName = `${ownerUserId}/cover-${Date.now()}.${extension}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('covers')
@@ -663,7 +666,11 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
       totalLikes += songData?.like_count ?? song.likes ?? 0;
     });
 
-    return { totalPlays, totalLikes };
+    // A fresh load of N3M3SIS showed "-453 Streams / -8 Likes" for one paint
+    // on 18 Sep 2026 before settling on the real 1,600 / 15. A count of
+    // things that happened is never below zero, whatever the intermediate
+    // data says, so the floor is zero.
+    return { totalPlays: Math.max(0, totalPlays), totalLikes: Math.max(0, totalLikes) };
   }, [artistSongs, popularityData]);
   const artistFollowers = useMemo(
     () => followerCounts?.find((entry) => entry.artist_id === id)?.follower_count || 0,

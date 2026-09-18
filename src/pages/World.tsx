@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Pencil, RefreshCw, Wallet, Disc3, Shirt } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Pencil, RefreshCw, Wallet, Disc3, Shirt } from 'lucide-react';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { ARTISTS } from '@/data/musicData';
 import { getWorldBySlug, formatWorldNumber } from '@/worlds/registry';
@@ -268,6 +268,15 @@ function WorldInner({
             className="h-full w-full object-cover object-top opacity-40"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#07070b]/30 to-[#07070b]" />
+          {/* On a phone the first screen was the doors and nothing else: no
+              words, no button, and tapping the picture did nothing. A stranger
+              had no cue that the world starts below. */}
+          <div className="absolute inset-x-0 bottom-16 flex justify-center sm:hidden">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/50 px-3 py-1.5 text-xs font-medium text-white/85">
+              <ChevronDown className="h-3.5 w-3.5 animate-bounce" aria-hidden="true" />
+              Scroll down to enter
+            </span>
+          </div>
         </div>
       )}
       <div className="relative mx-auto max-w-5xl px-4 pb-32 pt-6 sm:px-6">

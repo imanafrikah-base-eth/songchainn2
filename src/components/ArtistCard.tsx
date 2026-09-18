@@ -3,9 +3,10 @@ import { memo, useMemo } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { MapPin, Music, Users } from 'lucide-react';
-import { Artist, SONGS } from '@/data/musicData';
+import { Artist, SONGS, songInArtistCatalog } from '@/data/musicData';
 import { Link } from 'react-router-dom';
 import { useArtistFollowerCounts, useArtistStreamTotals, usePulseCounts } from '@/hooks/usePopularity';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { thumb } from '@/lib/img';
 
 interface ArtistCardProps {
@@ -17,10 +18,20 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
   const { data: pulseCounts } = usePulseCounts();
   const { data: followerCounts } = useArtistFollowerCounts();
   const { data: streamTotals } = useArtistStreamTotals();
-  
-  // Calculate real stats from database
+  const { songs: publishedSongs } = usePublishedCatalog();
+
+  // The song count used to read the build-time catalogue only, so an artist
+  // who had uploaded since it was last regenerated showed fewer songs here
+  // than on their own page (IMan 86 against 97, N3M3SIS 6 against 40, on
+  // 18 Sep 2026). Same merge as the Artists page: static plus published,
+  // collaborations included.
   const { artistSongs, totalPulses, totalStreams, totalFollowers } = useMemo(() => {
-    const songs = SONGS.filter(s => s.artistId === artist.id);
+    const seen = new Set<string>();
+    const songs = [...SONGS, ...publishedSongs].filter((s) => {
+      if (!songInArtistCatalog(s, artist.id) || seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
     let pulses = 0;
     songs.forEach(song => {
       const pulseData = pulseCounts?.find(p => p.song_id === song.id);
@@ -29,7 +40,7 @@ export const ArtistCard = memo(function ArtistCard({ artist, index = 0 }: Artist
     const streams = streamTotals?.find((row) => row.artist_id === artist.id)?.stream_count || 0;
     const followers = followerCounts?.find((row) => row.artist_id === artist.id)?.follower_count || 0;
     return { artistSongs: songs, totalPulses: pulses, totalStreams: streams, totalFollowers: followers };
-  }, [artist.id, pulseCounts, streamTotals, followerCounts]);
+  }, [artist.id, pulseCounts, streamTotals, followerCounts, publishedSongs]);
 
   return (
     <Link to={artistPath(artist.id)}>

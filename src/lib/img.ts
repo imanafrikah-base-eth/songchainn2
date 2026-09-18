@@ -112,5 +112,11 @@ export function decorativeVideoAllowed(): boolean {
   const conn = (navigator as Navigator & { connection?: Connection }).connection;
   if (conn?.saveData) return false;
   if (conn?.effectiveType && /^(slow-2g|2g|3g)$/.test(conn.effectiveType)) return false;
+  // Safari has no connection API at all, so every iPhone used to pass this
+  // gate and pull the full preview files (three of them on /worlds, 55 MB
+  // together, measured 18 Sep 2026). When the browser cannot say what the
+  // connection is, a phone-sized screen is taken to be on mobile data and
+  // gets the still.
+  if (!conn && window.innerWidth < 768) return false;
   return true;
 }

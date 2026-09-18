@@ -479,79 +479,12 @@ export default function Marketplace() {
             </p>
           </motion.div>
 
-          <div className="max-w-2xl mx-auto mt-6">
-            <HolderStanding />
-          </div>
-          
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="grid grid-cols-3 gap-4 max-w-lg mx-auto mt-8"
-          >
-            <Card className="p-4 text-center glass-card">
-              <div className="text-2xl font-bold text-primary">{tokenGatedSongs.length}</div>
-              <div className="text-xs text-muted-foreground">Songs On-Chain</div>
-            </Card>
-            {/*
-              These two used to read "95% To Artists" and "1000 Offline Plays".
-              Neither was true. The purchase is a pool swap with no split in it,
-              and the offline number was a constant written to localStorage that
-              nothing ever counted down. Both are replaced with figures the app
-              can actually stand behind.
-            */}
-            <Card className="p-4 text-center glass-card">
-              <div className="text-2xl font-bold text-primary whitespace-nowrap">$1</div>
-              <div className="text-xs text-muted-foreground">A copy</div>
-            </Card>
-            <Card className="p-4 text-center glass-card">
-              <div className="text-2xl font-bold text-primary whitespace-nowrap">Base</div>
-              <div className="text-xs text-muted-foreground">Where it settles</div>
-            </Card>
-          </motion.div>
         </div>
       </div>
       
       {/* Drops: NFTs artists minted in their worlds and chose to show here */}
       <MarketplaceDrops />
 
-      {/* How It Works */}
-      <div className="px-4 py-6">
-        <h3 className="text-lg font-heading font-semibold text-foreground mb-4">
-          How It Works
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="p-4 glass-card">
-            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center mb-3">
-              <Play size={20} className="text-primary-foreground" />
-            </div>
-            <h4 className="font-semibold text-foreground mb-1">1. Preview</h4>
-            <p className="text-sm text-muted-foreground">
-              Listen to any song once for free. Get a taste before you commit.
-            </p>
-          </Card>
-          <Card className="p-4 glass-card">
-            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center mb-3">
-              <Wallet size={20} className="text-primary-foreground" />
-            </div>
-            <h4 className="font-semibold text-foreground mb-1">2. Purchase</h4>
-            <p className="text-sm text-muted-foreground">
-              Buy with ETH on Base, from your own wallet. The artist earns the creator share of every trade in their song's coin.
-            </p>
-          </Card>
-          <Card className="p-4 glass-card">
-            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center mb-3">
-              <Music size={20} className="text-primary-foreground" />
-            </div>
-            <h4 className="font-semibold text-foreground mb-1">3. Stream Forever</h4>
-            <p className="text-sm text-muted-foreground">
-              Unlimited streaming once you own $1+ worth.
-            </p>
-          </Card>
-        </div>
-      </div>
-      
       {/* Wallet gate: the Marketplace is on-chain territory. Connecting is
           free - no gas, no signature, just picking a wallet. */}
       {!hasWallet && !justConnected ? (
@@ -819,6 +752,79 @@ export default function Marketplace() {
       </div>
       </>
       )}
+      {/* The blurb used to come first: a hero paragraph, your standing and a
+          stats block, two phone screens of copy before the first price. The
+          founder's rule for buying is action first, so the songs lead and the
+          explaining follows for whoever wants it. */}
+      <div className="px-4 pb-6">
+          <div className="max-w-2xl mx-auto mt-6">
+            <HolderStanding />
+          </div>
+          
+          {/* Stats */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="grid grid-cols-3 gap-4 max-w-lg mx-auto mt-8"
+          >
+            <Card className="p-4 text-center glass-card">
+              <div className="text-2xl font-bold text-primary">{tokenGatedSongs.length}</div>
+              <div className="text-xs text-muted-foreground">Songs On-Chain</div>
+            </Card>
+            {/*
+              These two used to read "95% To Artists" and "1000 Offline Plays".
+              Neither was true. The purchase is a pool swap with no split in it,
+              and the offline number was a constant written to localStorage that
+              nothing ever counted down. Both are replaced with figures the app
+              can actually stand behind.
+            */}
+            <Card className="p-4 text-center glass-card">
+              <div className="text-2xl font-bold text-primary whitespace-nowrap">$1</div>
+              <div className="text-xs text-muted-foreground">A copy</div>
+            </Card>
+            <Card className="p-4 text-center glass-card">
+              <div className="text-2xl font-bold text-primary whitespace-nowrap">Base</div>
+              <div className="text-xs text-muted-foreground">Where it settles</div>
+            </Card>
+          </motion.div>
+      </div>
+      {/* How It Works */}
+      <div className="px-4 py-6">
+        <h3 className="text-lg font-heading font-semibold text-foreground mb-4">
+          How It Works
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="p-4 glass-card">
+            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center mb-3">
+              <Play size={20} className="text-primary-foreground" />
+            </div>
+            <h4 className="font-semibold text-foreground mb-1">1. Preview</h4>
+            <p className="text-sm text-muted-foreground">
+              Listen to any song once for free. Get a taste before you commit.
+            </p>
+          </Card>
+          <Card className="p-4 glass-card">
+            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center mb-3">
+              <Wallet size={20} className="text-primary-foreground" />
+            </div>
+            <h4 className="font-semibold text-foreground mb-1">2. Purchase</h4>
+            <p className="text-sm text-muted-foreground">
+              Buy with ETH on Base, from your own wallet. The artist earns the creator share of every trade in their song's coin.
+            </p>
+          </Card>
+          <Card className="p-4 glass-card">
+            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center mb-3">
+              <Music size={20} className="text-primary-foreground" />
+            </div>
+            <h4 className="font-semibold text-foreground mb-1">3. Stream Forever</h4>
+            <p className="text-sm text-muted-foreground">
+              Unlimited streaming once you own $1+ worth.
+            </p>
+          </Card>
+        </div>
+      </div>
+      
     </div>
   );
 }

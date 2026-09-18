@@ -108,10 +108,8 @@ Key modules:
 | `farcaster-auth` | Verifies Farcaster frame signature |
 | `facebook-auth` | Exchanges Facebook token, upserts profile |
 | `hikulu-judge` | $HIKULU + NAKULU AI judges: room chat replies and post-battle verdicts |
-| `generate-artwork` | AI artwork generation |
-| `moderate-comment` | Comment moderation |
-| `artist-follow-counts` | Aggregates follow counts |
-| `verify-base-signature` | Verifies Base chain signatures |
+
+This table is not the deployed list. On 18 Sep 2026 the live project had 27 active functions, several repo folders were never deployed (`verify-base-signature` is dead code, superseded by `wallet-auth`), and four names once listed here (`generate-artwork`, `moderate-comment`, `artist-follow-counts`, `verify-base-signature`) are not deployed and not called. Check the live list before building on a function.
 
 Deploy with `supabase functions deploy <name>`.
 

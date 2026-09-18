@@ -70,8 +70,9 @@ export function AgeGate({ onDone }: { onDone?: () => void }) {
       <h2 className="font-heading text-lg font-semibold text-foreground">When were you born?</h2>
       <p className="mt-2 max-w-prose text-sm text-muted-foreground">
         We ask once. It decides which parts of SONGCHAINN are open to you, and we have to know
-        rather than guess. Under {ADULT_AGE} the app keeps private messaging, uploads and anything
-        involving money closed. Everything else works the same.
+        rather than guess. Under {ADULT_AGE} the app keeps private messaging, photo and video uploads,
+        and anything involving money closed. Releasing your own music, listening, posting and the
+        battles work the same.
       </p>
 
       <input

@@ -11,6 +11,7 @@ import {
   ListMusic, Headphones, MoreHorizontal, Trash2, Flag, UserMinus, Link2, Pencil,
 } from 'lucide-react';
 import { ReportDialog } from '@/components/ReportDialog';
+import { thumb } from '@/lib/img';
 import { InlineEdit, EditedMark } from '@/components/social/InlineEdit';
 import {
   AlertDialog,
@@ -311,7 +312,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
         <div className="absolute inset-0 bg-secondary" />
       ) : coverUrl && !imgErr ? (
         <>
-          <img src={coverUrl} alt="" aria-hidden onError={handleImgError}
+          <img src={thumb(coverUrl, 320) ?? coverUrl} alt="" aria-hidden onError={handleImgError}
             className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60" />
         </>
       ) : (
@@ -369,7 +370,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
                 animate={isThisSongPlaying ? { scale: [1, 1.03, 1] } : {}}
                 transition={isThisSongPlaying ? { duration: 2, repeat: Infinity } : {}}
               >
-                <img src={postArtist.profileImage ?? '/placeholder.svg'} alt={postArtist.name}
+                <img src={thumb(postArtist.profileImage, 256) ?? postArtist.profileImage ?? '/placeholder.svg'} alt={postArtist.name}
                   className="w-full h-full object-cover" onError={handleImgError} />
                 {/* Pulsing ring */}
                 <motion.div className="absolute inset-0 rounded-full border-4 border-border"
@@ -404,7 +405,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
                 />
               ) : (
                 <img
-                  src={post.media_url!}
+                  src={thumb(post.media_url, 720) ?? post.media_url!}
                   alt={post.content ?? 'A post'}
                   className="h-full w-full object-contain"
                   loading="lazy"
@@ -434,7 +435,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
                   animate={isThisSongPlaying ? { rotate: 360 } : {}}
                   transition={isThisSongPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : {}}
                 >
-                  <img src={coverUrl} alt={activeSong?.title ?? ''} className="w-full h-full object-cover" onError={handleImgError} />
+                  <img src={thumb(coverUrl, 256) ?? coverUrl} alt={activeSong?.title ?? ''} className="w-full h-full object-cover" onError={handleImgError} />
                 </motion.div>
               ) : (
                 <div className="w-52 h-52 rounded-full bg-primary/20 flex items-center justify-center">
@@ -649,7 +650,7 @@ export function MusicFeedCard({ post, previewComments, onQuickComment, mentions,
             {artistSong && (
               <button onClick={goToArtist}
                 className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors min-h-10">
-                <img src={postArtist.profileImage ?? ''} className="w-4 h-4 rounded-full object-cover" alt="" onError={(e)=>{e.currentTarget.style.display='none'}} />
+                <img src={thumb(postArtist.profileImage, 32) ?? postArtist.profileImage ?? ''} className="w-4 h-4 rounded-full object-cover" alt="" onError={(e)=>{e.currentTarget.style.display='none'}} />
                 {postArtist.name} · {postArtist.location}
               </button>
             )}

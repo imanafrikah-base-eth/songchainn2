@@ -313,13 +313,11 @@ export function UnlockSongModal({
                   </div>
                   
                   <p className="text-lg font-semibold text-foreground mb-2">
-                    {purchaseType === 'buy' ? 'You now own this track!' : 'You own it'}
+                    {purchaseType === 'buy' ? 'Your copies are yours' : 'Your copy is yours'}
                   </p>
-                  
+
                   <p className="text-muted-foreground text-sm">
-                    {purchaseType === 'buy' 
-                      ? 'Enjoy unlimited streaming' 
-                      : 'Enjoy unlimited streaming access'}
+                    Your name is on this song now, and every copy counts for the artist.
                   </p>
                   
                   <div className="mt-4 flex items-center justify-center gap-2 text-xs text-green-500">

@@ -8,7 +8,9 @@
  * such as showing a holder when the artist is online.
  */
 
-const RPC = 'https://mainnet.base.org';
+import { BASE_RPC_URL } from '@/lib/baseRpc';
+
+const RPC = BASE_RPC_URL;
 const BALANCE_OF = '0x70a08231';
 const cache = new Map<string, { at: number; value: number }>();
 const TTL = 60_000;

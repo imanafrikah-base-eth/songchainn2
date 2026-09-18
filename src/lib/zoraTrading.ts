@@ -2,6 +2,7 @@ import { createWalletClient, createPublicClient, custom, http, parseEther, parse
 import { base } from 'viem/chains';
 import { tradeCoin, createQuote } from '@zoralabs/coins-sdk';
 import { getWalletProvider } from './baseWallet';
+import { BASE_RPC_URL } from '@/lib/baseRpc';
 
 /*
  * THE 4% WE CANNOT CURRENTLY CLAIM, and why there is no referrer below.
@@ -38,7 +39,7 @@ import { getWalletProvider } from './baseWallet';
  * is permanent, which is why coins created before SONGCHAINN existed can never
  * pay us that share.
  */
-const RPC_URL = 'https://mainnet.base.org';
+const RPC_URL = BASE_RPC_URL;
 const ERC20_BALANCE_OF_ABI = parseAbi(['function balanceOf(address account) view returns (uint256)']);
 
 export interface TradeResult {

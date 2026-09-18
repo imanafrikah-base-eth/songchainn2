@@ -32,7 +32,8 @@ const Leaderboard = () => {
           <h1 className="font-heading text-3xl font-bold text-foreground">Top Fans</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-6">
-          Points come from real listening, likes, and battle votes. The more you move the music, the higher you climb.
+          Points come from real listening, likes, pulses and battle votes. The more you move the music, the higher you climb.
+          Holding artists' song coins multiplies what each action earns: one song held is 1.1x, three is 1.25x, seven is 1.5x, fifteen or more is 1.75x.
         </p>
 
         {user && (

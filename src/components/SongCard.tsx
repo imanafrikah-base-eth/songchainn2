@@ -1,6 +1,6 @@
 import { artistPath } from '@/lib/slugRoutes';
 import { NewBadge } from '@/components/NewBadge';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { Play, Pause, Heart, Image as ImageIcon } from 'lucide-react';
@@ -34,6 +34,23 @@ interface SongCardProps {
 
 const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 14;
 
+/**
+ * The one subscriber to the player clock, mounted only on the card whose song
+ * is playing. PlayerTimeCtx ticks about four times a second, and SongCard used
+ * to read it directly, so every card on a page (twenty on an artist page)
+ * re-rendered on every tick whenever anything played anywhere. This reports
+ * the time into a ref and only wakes the card when the answer that matters
+ * (has it played twenty seconds yet) changes.
+ */
+function PlayerTimeTap({ onTime }: { onTime: (seconds: number) => void }) {
+  const { currentTime } = usePlayerTime();
+  useEffect(() => {
+    onTime(currentTime);
+  }, [currentTime, onTime]);
+  useEffect(() => () => onTime(0), [onTime]);
+  return null;
+}
+
 function NowPlayingDot() {
   return (
     <motion.span
@@ -47,7 +64,13 @@ function NowPlayingDot() {
 export const SongCard = memo(function SongCard({ song, index = 0, variant = 'default' }: SongCardProps) {
   const { currentSong, isPlaying } = usePlayerState();
   const { playSong, togglePlay } = usePlayerActions();
-  const { currentTime } = usePlayerTime();
+  const currentTimeRef = useRef(0);
+  const [playedEnough, setPlayedEnough] = useState(false);
+  const onTime = useCallback((seconds: number) => {
+    currentTimeRef.current = seconds;
+    const enough = seconds >= 20;
+    setPlayedEnough((prev) => (prev === enough ? prev : enough));
+  }, []);
   const { toggleLike, isLiked, sendPulse } = useEngagement();
   const { data: popularityData } = useSongPopularity();
   const { data: pulseCounts } = usePulseCounts();
@@ -81,7 +104,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
   const isTokenGated = song.isTokenGated;
   const isSaved = isSongCached(song.id);
   const isSaving = cachingInProgress === song.id;
-  const hasPlayedEnoughToSave = isCurrentSong && currentTime >= 20;
+  const hasPlayedEnoughToSave = isCurrentSong && playedEnough;
   const isNewSong = (() => {
     if (!song.addedAt) return false;
     const ts = new Date(song.addedAt).getTime();
@@ -125,8 +148,8 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     if (!isCurrentSong) {
       playSong(song);
     }
-    sendPulse(song.id, isCurrentSong ? { positionSeconds: currentTime } : undefined);
-  }, [isCurrentSong, playSong, sendPulse, song, currentTime]);
+    sendPulse(song.id, isCurrentSong ? { positionSeconds: currentTimeRef.current } : undefined);
+  }, [isCurrentSong, playSong, sendPulse, song]);
 
   const handleShareToFeed = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -189,9 +212,12 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
     song.duration,
   ]);
 
+  const timeTap = isCurrentSong ? <PlayerTimeTap onTime={onTime} /> : null;
+
   if (variant === 'compact') {
     return (
       <>
+        {timeTap}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -367,6 +393,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
   if (variant === 'featured') {
     return (
       <>
+        {timeTap}
         <motion.div
           whileHover={{ y: -4, scale: 1.02 }}
           className="group relative overflow-hidden rounded-2xl glass-card cursor-pointer shine-overlay"
@@ -518,6 +545,8 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
 
   // Default variant
   return (
+    <>
+    {timeTap}
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -668,5 +697,6 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
         </div>
       </div>
     </motion.div>
+    </>
   );
 });

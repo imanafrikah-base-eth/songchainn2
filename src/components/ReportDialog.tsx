@@ -120,8 +120,24 @@ export function ReportDialog({ targetType, targetId, targetUser, onClose }: Prop
         </div>
 
         <div className="border-t border-border px-4 py-3">
-          <Button onClick={() => void send()} disabled={!reason || sending} className="h-11 w-full">
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send report'}
+          {/* A signed-out visitor used to fill this in and press Send, and the
+              press did nothing at all. A takedown notice that gets eaten is
+              worse than no button, so the door says where it leads. */}
+          {!user && (
+            <p className="mb-2 text-sm text-foreground">
+              Sign in to send this from your account, or email{' '}
+              <a href="mailto:songchaindao@gmail.com" className="font-semibold text-primary hover:underline">
+                songchaindao@gmail.com
+              </a>{' '}
+              with a link to what you are reporting. A person reads both.
+            </p>
+          )}
+          <Button
+            onClick={() => (user ? void send() : (window.location.href = '/?auth=signin'))}
+            disabled={(user && !reason) || sending}
+            className="h-11 w-full"
+          >
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : user ? 'Send report' : 'Sign in to report'}
           </Button>
           <p className="mt-2 text-xs text-muted-foreground">
             Reporting is not a vote. One report on something serious is enough, and reporting

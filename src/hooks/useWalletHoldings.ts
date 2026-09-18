@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ARTIST_COINS } from '@/lib/artistCoins';
 import { useArtistCoinRegistry } from '@/hooks/useArtistCoinMeta';
 import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
+import { BASE_RPC_URL } from '@/lib/baseRpc';
 
 /**
  * Everything a wallet holds that SONGCHAINN put in the world, read off Base in
@@ -13,7 +14,7 @@ import { WWAT_TOKEN_ADDRESS, wwatIsLive } from '@/battlezone/config';
  * batches them.
  */
 
-const client = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') });
+const client = createPublicClient({ chain: base, transport: http(BASE_RPC_URL) });
 const ERC20 = parseAbi(['function balanceOf(address) view returns (uint256)']);
 const ERC1155 = parseAbi(['function balanceOf(address account, uint256 id) view returns (uint256)']);
 const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const;

@@ -44,6 +44,7 @@ import {
 } from '@zoralabs/protocol-sdk';
 import { getWalletProvider, BASE_CHAIN_ID } from '@/lib/baseWallet';
 import { TREASURY_ADDRESS } from '@/lib/onchain';
+import { BASE_RPC_URL } from '@/lib/baseRpc';
 
 /** The platform's referral address for Zora protocol rewards. */
 export const PLATFORM_REFERRAL: Address = TREASURY_ADDRESS;
@@ -70,7 +71,7 @@ export function basescanTokenUrl(contract: string, tokenId?: number | bigint | n
     : `https://basescan.org/token/${contract}?a=${tokenId.toString()}`;
 }
 
-const RPC_URL = (import.meta.env.VITE_BASE_RPC_URL as string | undefined) || 'https://mainnet.base.org';
+const RPC_URL = BASE_RPC_URL;
 
 let publicClient: PublicClient | null = null;
 

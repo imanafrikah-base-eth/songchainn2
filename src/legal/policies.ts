@@ -16,7 +16,7 @@
 
 export const POLICY_VERSIONS = {
   terms: '2026-09-01',
-  privacy: '2026-09-06',
+  privacy: '2026-09-18',
   guidelines: '2026-09-01',
   launch_risk: '2026-09-01',
   upload_rights: '2026-09-01',
@@ -168,19 +168,20 @@ export const PRIVACY: PolicyDoc = {
   key: 'privacy',
   title: 'Privacy Policy',
   version: POLICY_VERSIONS.privacy,
-  updated: '6 September 2026',
+  updated: '18 September 2026',
   summary:
     'What we hold about you, why, and what you can do about it. We collect what the app needs to work, and not much else.',
   sections: [
     {
       heading: 'What we hold',
       body: [
-        'Your account: email address, a display name, a username, and a password we never see in readable form, and how you would like to be referred to, if you tell us. If you sign in with a wallet, Farcaster or Facebook instead, we hold the identifier that service gives us.',
+        'Your account: email address, a display name, a username, and a password we never see in readable form, and how you would like to be referred to, if you tell us. If you sign in with a wallet, Google, Farcaster or Facebook instead, we hold the identifier that service gives us.',
         'Your date of birth, to know whether you are old enough and which parts of the app are open to you.',
         'What you put here: your posts, comments, messages, playlists, uploads and worlds.',
         'What you do here: what you play, like, pulse and collect. This is what powers the charts, your points, and what the app shows you next.',
         'If you connect a wallet, its public address. A public address is public by nature. We never hold a private key or a seed phrase, and we will never ask for one.',
         'Roughly where you are: the city and country your connection resolves to when you play a song, read from the request itself, never from a location permission and never GPS accurate. It powers the activity numbers artists and visitors see on a song page, and cities with only a few plays are grouped as Other.',
+        'If you talk to Mo$ha, the app\'s assistant, it keeps a short private note about you: what you like, what you are working on, what it has already helped you with. Mo$ha writes and rewrites that note from your chats so it does not ask you the same thing twice. It never stores health, religion, politics or anything sensitive, nobody but you and Mo$ha reads it, and it is deleted with your account.',
       ],
     },
     {
@@ -204,6 +205,7 @@ export const PRIVACY: PolicyDoc = {
       heading: 'Who else sees it',
       body: [
         'Supabase, which hosts our database and handles sign-in. Cloudflare R2, which stores the audio, images and video. Vercel, which serves the app.',
+        'LiveKit, which carries live voice during battles and world stations. Resend, which sends email on our behalf. Google, if you sign in with it. Anthropic and Google, whose models answer when you talk to Mo$ha or the battle judges: they receive the message you send and the context needed to answer it, not your account.',
         'Where an artist has a world, that world\'s owner can see who is a member of it.',
         'Anything you post publicly is public. Your display name, your username, your picture and your public activity can be seen by anyone.',
         'We hand data to law enforcement only when we are legally required to, and only what is asked for.',
@@ -368,6 +370,8 @@ export const CONSENT_LINES: Record<string, string> = {
     'By getting this key you buy the artist\'s coin on Base with your own wallet, on a market SONGCHAINN does not run. A key is access, not an investment: its price can fall to nothing, the trade is final, and SONGCHAINN neither holds your funds nor guarantees any door stays open if you sell.',
   drop_risk:
     'By making this drop you deploy it with your own wallet and you own the contract. The price, the copies and what holders get are your promises to keep. You confirm the song, artwork or content is yours to sell. SONGCHAINN provides the tool and takes no position in it.',
+  wwat_risk:
+    'By getting $WWAT you buy a token on Base with your own wallet, on a market SONGCHAINN does not run. It is what hosting a battle is paid in, not an investment: its price can fall to nothing, the trade is final, and SONGCHAINN never holds it for you.',
   messaging:
     'By sending a message you agree to the Community Guidelines. Messages are private between you and the person you send them to, but they can be reported to us.',
   world_visit:

@@ -1,5 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,9 +14,6 @@ export interface UserPoints {
   streak: number;
 }
 
-const LEGACY_POINTS_KEY = 'songchainn_points';
-const LEGACY_CLAIM_FLAG = 'songchainn_legacy_points_claimed_v1';
-
 function tierFromLifetime(lifetime: number): PointsTier {
   if (lifetime >= 10000) return 'Platinum';
   if (lifetime >= 2500) return 'Gold';
@@ -26,15 +22,18 @@ function tierFromLifetime(lifetime: number): PointsTier {
 }
 
 /**
- * Server-authoritative points for the signed-in user. On first run for a user
- * it imports their pre-Phase-Two localStorage balance exactly once (the RPC is
- * capped and idempotent, so a tampered client cannot mint points), then reads
- * the real balance from the ledger the DB triggers maintain.
+ * Server-authoritative points for the signed-in user, read from the ledger the
+ * DB triggers maintain.
+ *
+ * This used to import a pre-Phase-Two localStorage balance on first run by
+ * handing the RPC whatever number the browser held. "Capped and idempotent"
+ * still meant anybody could type 50,000 into devtools once and walk in as
+ * Platinum with the OG badge. The S6 Security seat proved it live on 18 Sep
+ * 2026. The import is closed: the RPC now awards nothing, and nothing here
+ * calls it.
  */
 export function useUserPoints() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const claimAttempted = useRef(false);
 
   const query = useQuery<UserPoints | null>({
     queryKey: ['user-points', user?.id],
@@ -67,26 +66,6 @@ export function useUserPoints() {
     },
     staleTime: 15_000,
   });
-
-  // One-time migration of the old localStorage balance.
-  useEffect(() => {
-    if (!user || claimAttempted.current) return;
-    if (query.isLoading || !query.data) return;
-    if (query.data.legacyClaimed) return;
-    if (localStorage.getItem(LEGACY_CLAIM_FLAG) === 'true') return;
-
-    claimAttempted.current = true;
-    const legacy = parseInt(localStorage.getItem(LEGACY_POINTS_KEY) || '0', 10);
-    const amount = Number.isFinite(legacy) && legacy > 0 ? legacy : 0;
-
-    (async () => {
-      const { error } = await (supabase as any).rpc('claim_legacy_points', { _amount: amount });
-      if (!error) {
-        localStorage.setItem(LEGACY_CLAIM_FLAG, 'true');
-        queryClient.invalidateQueries({ queryKey: ['user-points', user.id] });
-      }
-    })();
-  }, [user, query.isLoading, query.data, queryClient]);
 
   return {
     points: query.data?.points ?? 0,

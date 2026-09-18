@@ -883,17 +883,23 @@ body[data-feed-open='true'] .agent-dock {
 
    The feed keeps its own placement (above), where the right edge belongs to
    the action rail. */
+/* Bottom right, just above the tab bar, where a thumb already is. It used to
+   sit at the vertical centre of the right edge, and at rest it covered whatever
+   row happened to be there: on the leaderboard that was the top score, read as
+   "1,53" instead of "1,539" (S6 Interface seat, 18 Sep 2026). Down here it
+   sits over the page's own bottom clearance once a list is scrolled to its end,
+   and over nothing that cannot be scrolled up into the open. */
 .agent-tab {
   right: 0;
-  top: 50%;
-  bottom: auto;
-  transform: translateY(-50%);
+  top: auto;
+  bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px) + 0.75rem);
+  transform: none;
 }
 
 .agent-tab-button {
   writing-mode: vertical-rl;
   /* Big enough to hit with a thumb on any phone, sized to the screen. */
-  min-height: clamp(6.5rem, 22vh, 8rem);
+  min-height: clamp(5rem, 15vh, 6rem);
   width: clamp(2.5rem, 7vw, 2.9rem);
   padding: 1rem 0;
   font-size: clamp(0.75rem, 2.8vw, 0.85rem);
@@ -932,7 +938,7 @@ body[data-feed-open='true'] .agent-tab-button {
   }
   .agent-tab-button {
     width: clamp(2.5rem, 7vw, 2.9rem);
-    min-height: clamp(6.5rem, 22vh, 8rem);
+    min-height: clamp(5rem, 15vh, 6rem);
   }
 }
 
@@ -943,7 +949,7 @@ body[data-feed-open='true'] .agent-tab-button {
 body[data-scrolling='true'] .agent-tab {
   opacity: 0;
   pointer-events: none;
-  transform: translate(0.75rem, -50%);
+  transform: translate(0.75rem, 0);
 }
 
 /* ------------------------------------------------------------------

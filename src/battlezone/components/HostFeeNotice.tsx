@@ -34,8 +34,8 @@ export function HostFeeNotice() {
         </p>
         <p className="mt-1 text-muted-foreground">
           {artistPct}% goes straight from your wallet to the artists whose songs you picked. The
-          rest goes to the pot the winning side's backers share. You pay when you launch, and if an
-          artist has no payout wallet on file yet you are not charged at all.
+          rest goes to the SONGCHAINN treasury that keeps the battles running. You pay when you
+          launch, and if an artist has no payout wallet on file yet you are not charged at all.
         </p>
         <p className="mt-1 text-xs text-muted-foreground/80">
           {fee.capped
