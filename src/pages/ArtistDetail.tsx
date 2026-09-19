@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { artistPath } from '@/lib/slugRoutes';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { motion } from 'framer-motion';
@@ -89,7 +89,7 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
     editComment,
   } = useSocial();
   
-  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  const { songs: publishedSongs, artists: publishedArtists, isLoading: isCatalogLoading } = usePublishedCatalog();
   const catalogArtist = ARTISTS.find(a => a.id === id) ?? publishedArtists.find(a => a.id === id);
   // Their own records plus any collaboration they are on ("A & B" sits with both).
   const artistSongs = [...SONGS, ...publishedSongs].filter(s => songInArtistCatalog(s, id));
@@ -196,22 +196,13 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
     retry: 1,
   });
 
-  // An artist who was granted an account but has no record in the catalogue
-  // yet (a page claimed through "New here?", or a claimed page with nothing
-  // published) still has a page: the account is the artist, and their own
-  // profile dresses it until a record does. Without this, Profile sent a
-  // newly approved artist to their own page and the page said Not Found.
-  const artist: Artist | undefined = catalogArtist ?? (artistAccount?.user_id && id
-    ? {
-        id,
-        name: (artistProfile as any)?.profile_name || (artistProfile as any)?.display_name || 'New artist',
-        bio: (artistProfile as any)?.bio || '',
-        location: (artistProfile as any)?.location || '',
-        townSquare: '',
-        profileImage: (artistProfile as any)?.profile_picture_url || (artistProfile as any)?.avatar_url || undefined,
-        songs: [],
-      }
-    : undefined);
+  // An artist account with nothing released is an audience profile until the
+  // first record is live (the founder's rule, 19 Sep 2026). This used to dress
+  // the empty page with the person's profile, then swap the address for their
+  // name, and the resolver had never heard the name: five people who signed up
+  // as artists and had not dropped a song were a 404 from the Community page.
+  // The redirect lives below, once the account read is in.
+  const artist: Artist | undefined = catalogArtist;
 
   const displayName = (artistProfile as any)?.profile_name || artist?.name;
 
@@ -685,8 +676,15 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
   }, [id, publishedArtists, publishedSongs]);
 
   if (!artist) {
+    // Signed up as an artist, nothing live yet: their audience profile is
+    // their page, wherever the link came from. Only once the published
+    // catalogue is in: before that every uploaded artist looks song-less for a
+    // moment, and T-RAW with two records live was sent to his audience page.
+    if (!isCatalogLoading && !isArtistAccountLoading && artistAccount?.user_id) {
+      return <Navigate to={`/audience/${artistAccount.user_id}`} replace />;
+    }
     // Still loading — show skeleton while artist account/profile resolves
-    if (isArtistAccountLoading || (artistAccount?.user_id && artistProfile === undefined)) {
+    if (isCatalogLoading || isArtistAccountLoading || (artistAccount?.user_id && artistProfile === undefined)) {
       return (
         <div className="min-h-screen bg-background">
           <Navigation />

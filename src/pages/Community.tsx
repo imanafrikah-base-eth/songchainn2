@@ -1,4 +1,6 @@
 import { artistPath } from '@/lib/slugRoutes';
+import { ARTISTS } from '@/data/musicData';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { useState, useEffect, useMemo, useCallback, useRef, type SyntheticEvent } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -158,7 +160,15 @@ export default function Community() {
      page rather than a query per tap. Somebody counts as an artist once a
      record of theirs is actually out. */
   const directory = useArtistDirectory();
-  
+  // The artists who have a page: the founding catalogue plus anyone with a
+  // record live. An artist account with nothing out is not in here.
+  const { artists: publishedArtists } = usePublishedCatalog();
+  const artistsWithMusic = useMemo(() => {
+    const ids = new Set<string>(ARTISTS.map((a) => a.id));
+    for (const a of publishedArtists) ids.add(a.id);
+    return ids;
+  }, [publishedArtists]);
+
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -496,29 +506,15 @@ export default function Community() {
     await followUser(userId);
   };
 
-  const goToProfile = async (userId: string) => {
-    // Their page, if they hold one. This asks the directory the whole page
-    // already loaded instead of querying artist_accounts on every single tap.
-    // Note it keys on holding an artist page, not on having released: an
-    // artist's page exists and should still be where their name leads, even
-    // while the directory itself still counts them as audience.
+  const goToProfile = (userId: string) => {
+    // Their artist page only once a record of theirs is live; until then an
+    // artist account is an audience profile (the founder's rule, 19 Sep 2026).
+    // Five people who had signed up as artists without dropping a song were a
+    // 404 from here. The artist page applies the same rule for links that do
+    // not pass through this handler.
     const known = directory.artistIdByUser.get(userId);
-    if (known) {
+    if (known && artistsWithMusic.has(known)) {
       navigate(artistPath(known));
-      return;
-    }
-    if (directory.artistIdByUser.size > 0) {
-      navigate(`/audience/${userId}`);
-      return;
-    }
-    // Directory not back yet. Fall back to the single row it would have held.
-    const { data } = await (supabase as any)
-      .from('artist_accounts')
-      .select('artist_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (data?.artist_id) {
-      navigate(artistPath(data.artist_id));
       return;
     }
     navigate(`/audience/${userId}`);
