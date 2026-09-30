@@ -20,7 +20,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { SONGS, ARTISTS } from '@/data/musicData';
+import { songInArtistCatalog, type Song } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
 import { useSongCoins } from '@/hooks/useSongCoins';
 import { useSongPopularity, useTodayHotSongs } from '@/hooks/usePopularity';
@@ -62,7 +63,7 @@ function MarketplaceDrops() {
 }
 
 // Component for individual marketplace song card
-function MarketplaceSongCard({ song }: { song: typeof SONGS[0] }) {
+function MarketplaceSongCard({ song }: { song: Song }) {
   const { currentSong, isPlaying } = usePlayerState();
   const { playSong, togglePlay } = usePlayerActions();
   const { user } = useAuth();
@@ -339,31 +340,33 @@ export default function Marketplace() {
   const { data: todayHotSongs = [] } = useTodayHotSongs(20);
   const { ownedSongs, hasWallet, isLoading: ownedLoading, refetch: refetchOwned } = useOwnedSongs();
 
+  const { songs: allSongs, artists: allArtists, songById, artistById } = useLiveCatalog();
+
   const mintedIds = useMemo(() => {
     if (!songCoins) return new Set<string>();
     return new Set(songCoins.filter((c) => c.mint_status === 'minted').map((c) => c.song_id));
   }, [songCoins]);
 
   // Songs with a real, live Zora Content Coin
-  const tokenGatedSongs = useMemo(() => SONGS.filter((song) => mintedIds.has(song.id)), [mintedIds]);
+  const tokenGatedSongs = useMemo(() => allSongs.filter((song) => mintedIds.has(song.id)), [allSongs, mintedIds]);
 
   // Artists with at least one on-chain song, most tokenized first
   const marketArtists = useMemo(() => {
-    return ARTISTS
-      .map((artist) => ({ artist, onchainCount: artist.songs.filter((id) => mintedIds.has(id)).length }))
+    return allArtists
+      .map((artist) => ({ artist, onchainCount: tokenGatedSongs.filter((s) => songInArtistCatalog(s, artist.id)).length }))
       .filter((entry) => entry.onchainCount > 0)
       .sort((a, b) => b.onchainCount - a.onchainCount);
-  }, [mintedIds]);
+  }, [allArtists, tokenGatedSongs]);
 
   const selectedArtist = useMemo(
-    () => (selectedArtistId ? ARTISTS.find((a) => a.id === selectedArtistId) ?? null : null),
-    [selectedArtistId]
+    () => (selectedArtistId ? artistById.get(String(selectedArtistId)) ?? null : null),
+    [artistById, selectedArtistId]
   );
 
   // Selected artist's on-chain songs grouped by catalog, newest release first
   const selectedCatalogs = useMemo(() => {
     if (!selectedArtist) return [];
-    const songs = tokenGatedSongs.filter((s) => s.artistId === selectedArtist.id);
+    const songs = tokenGatedSongs.filter((s) => songInArtistCatalog(s, selectedArtist.id));
     const groups = new Map<string, typeof songs>();
     songs.forEach((song) => {
       const label = song.volume ? (song.volume === 'Single' ? 'Singles' : song.volume) : 'Vol1';
@@ -380,8 +383,8 @@ export default function Marketplace() {
   }, [selectedArtist, tokenGatedSongs]);
 
   const ownedSongObjs = useMemo(
-    () => ownedSongs.map((o) => SONGS.find((s) => s.id === o.songId)).filter(Boolean) as typeof SONGS,
-    [ownedSongs]
+    () => ownedSongs.map((o) => songById.get(String(o.songId))).filter(Boolean) as Song[],
+    [ownedSongs, songById]
   );
 
   // Signal: live listener data for on-chain songs, ranked by real activity

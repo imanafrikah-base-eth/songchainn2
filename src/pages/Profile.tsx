@@ -21,7 +21,8 @@ import { formatPresenceLabel, useUserPresence } from '@/hooks/useUserPresence';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useToast } from '@/hooks/use-toast';
 import { Navigation } from '@/components/Navigation';
-import { CATALOGS, SONGS } from '@/data/musicData';
+import { songInArtistCatalog } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { CatalogCard } from '@/components/CatalogCard';
 import { CatalogGrid } from '@/components/CatalogGrid';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -599,9 +600,10 @@ export default function Profile() {
     }
   };
 
-  const savedCatalogsData = CATALOGS.filter((catalog) => savedCatalogs.includes(catalog.id));
+  const { songs: allSongs, catalogs: allCatalogs, songById } = useLiveCatalog();
+  const savedCatalogsData = allCatalogs.filter((catalog) => savedCatalogs.includes(catalog.id));
 
-  const artistSongsData = isArtist && artistId ? SONGS.filter(s => s.artistId === artistId) : [];
+  const artistSongsData = isArtist && artistId ? allSongs.filter(s => songInArtistCatalog(s, artistId)) : [];
 
   const { data: artistFollowerCount = 0 } = useQuery({
     queryKey: ['artist-followers-profile', artistId],
@@ -1367,7 +1369,7 @@ export default function Profile() {
                 {[...cachedSongs]
                   .sort((a, b) => (b.cachedAt || 0) - (a.cachedAt || 0))
                   .map((cached) => {
-                    const known = SONGS.find((s) => s.id === cached.songId);
+                    const known = songById.get(String(cached.songId));
                     const title = cached.title || known?.title || 'A song';
                     const artistName = cached.artist || known?.artist || '';
                     const size = formatBytes(Number(cached.sizeBytes ?? 0));

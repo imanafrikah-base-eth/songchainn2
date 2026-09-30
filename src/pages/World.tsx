@@ -19,7 +19,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ChevronDown, Pencil, RefreshCw, Wallet, Disc3, Shirt } from 'lucide-react';
 import { AudioPlayer } from '@/components/AudioPlayer';
-import { ARTISTS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { getWorldBySlug, formatWorldNumber } from '@/worlds/registry';
 import { fetchWorldBySlug } from '@/worlds/loader';
 import { BuiltRoom } from '@/worlds/components/BuiltRoom';
@@ -193,7 +193,7 @@ function WorldInner({
   const theme = useCityTheme(world);
   const citizen = useCitizen(world, rings);
   const [dressing, setDressing] = useState(false);
-  const artist = ARTISTS.find((a) => a.id === world.artistId);
+  const artist = useLiveCatalog().artistById.get(String(world.artistId));
 
   // Cities win the name race, then rooms. Nothing else is a valid address.
   const city = segment ? getCityBySlug(world, segment) : undefined;

@@ -4,7 +4,8 @@
 
 import { useMemo, useState } from 'react';
 import { Flame, ListMusic, Play } from 'lucide-react';
-import { SONGS } from '@/data/musicData';
+import { songInArtistCatalog } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { usePlayerActions } from '@/context/PlayerContext';
 import { useRankedSongs } from '@/hooks/usePopularity';
 import type { WorldConfig } from '../../types';
@@ -17,7 +18,8 @@ export function StreetsRoom({ world }: { world: WorldConfig }) {
   const { rankedSongs } = useRankedSongs();
   const [visible, setVisible] = useState(CATALOG_PAGE);
 
-  const artistSongs = useMemo(() => SONGS.filter((s) => s.artistId === world.artistId), [world.artistId]);
+  const { songs: allSongs } = useLiveCatalog();
+  const artistSongs = useMemo(() => allSongs.filter((s) => songInArtistCatalog(s, world.artistId)), [allSongs, world.artistId]);
   const hot = useMemo(
     () => rankedSongs.filter((s) => s.artistId === world.artistId).slice(0, 10),
     [rankedSongs, world.artistId],

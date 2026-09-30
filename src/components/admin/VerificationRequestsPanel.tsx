@@ -4,7 +4,7 @@ import { Check, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
-import { ARTISTS } from '@/data/musicData';
+import { findArtist } from '@/lib/liveCatalog';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -50,7 +50,7 @@ export function VerificationRequestsPanel() {
       }
       return list.map((r) => ({
         ...r,
-        who: names.get(r.user_id) || ARTISTS.find((a) => a.id === r.artist_id)?.name || `Artist ${r.artist_id}`,
+        who: names.get(r.user_id) || findArtist(r.artist_id)?.name || `Artist ${r.artist_id}`,
       }));
     },
   });

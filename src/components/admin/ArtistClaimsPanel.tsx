@@ -4,7 +4,7 @@ import { Check, X, Loader2, BadgeCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ARTISTS } from '@/data/musicData';
+import { findArtist } from '@/lib/liveCatalog';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 
 /**
@@ -124,7 +124,7 @@ export function ArtistClaimsPanel() {
         ) : (
           <div className="space-y-3">
             {pending.map((claim) => {
-              const artist = ARTISTS.find((a) => a.id === claim.artist_id);
+              const artist = findArtist(claim.artist_id);
               const who = claim.profile?.profile_name || claim.profile?.username || 'Someone';
               return (
                 <div key={claim.id} className="rounded-xl border border-border bg-card p-4">
@@ -169,7 +169,7 @@ export function ArtistClaimsPanel() {
           </h3>
           <div className="space-y-2">
             {settled.map((claim) => {
-              const artist = ARTISTS.find((a) => a.id === claim.artist_id);
+              const artist = findArtist(claim.artist_id);
               const who = claim.profile?.profile_name || claim.profile?.username || 'Someone';
               return (
                 <div

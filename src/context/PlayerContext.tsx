@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode, useMemo } from 'react';
 import { Song, SONGS } from '@/data/musicData';
+import { liveSongs } from '@/lib/liveCatalog';
 import { supabase } from '@/integrations/supabase/client';
 import { setRoomListening } from '@/lib/playSource';
 
@@ -139,12 +140,13 @@ function pickAutoplayContinuation(currentQueue: Song[], playedIds: Set<string>):
     }
   };
 
-  take(SONGS.filter(song => artistIds.has(song.artistId) && !excluded.has(song.id)));
+  const pool = liveSongs();
+  take(pool.filter(song => artistIds.has(song.artistId) && !excluded.has(song.id)));
   if (picks.length < targetCount) {
-    take(SONGS.filter(song => genres.has(song.genre) && !excluded.has(song.id)));
+    take(pool.filter(song => genres.has(song.genre) && !excluded.has(song.id)));
   }
   if (picks.length < targetCount) {
-    take(SONGS.filter(song => !excluded.has(song.id)));
+    take(pool.filter(song => !excluded.has(song.id)));
   }
 
   return picks;

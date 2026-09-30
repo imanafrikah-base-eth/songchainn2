@@ -12,7 +12,7 @@ import { useMemo } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
 import { Play } from 'lucide-react';
-import { SONGS, ARTISTS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { usePlayerActions } from '@/context/PlayerContext';
 import { Button } from '@/components/ui/button';
 import { WorldDrops } from '../components/WorldDrops';
@@ -87,12 +87,13 @@ function CatalogListBlock({ props, ctx }: BlockProps) {
 
   // Scoped to this world's artist, always. A block cannot reach another
   // artist's catalog, which is enforced by never giving it the ability to ask.
+  const { songs: allSongs, artistById } = useLiveCatalog();
   const songs = useMemo(() => {
-    const artist = ARTISTS.find((a) => a.id === ctx.world.artistId);
+    const artist = artistById.get(String(ctx.world.artistId));
     const ids = new Set(artist?.songs ?? []);
-    const mine = SONGS.filter((s) => ids.has(s.id) || s.artist === ctx.world.artistName);
+    const mine = allSongs.filter((s) => ids.has(s.id) || s.artistId === ctx.world.artistId || s.artist === ctx.world.artistName);
     return mine.slice(0, limit);
-  }, [ctx.world.artistId, ctx.world.artistName, limit]);
+  }, [allSongs, artistById, ctx.world.artistId, ctx.world.artistName, limit]);
 
   if (!songs.length) return null;
 

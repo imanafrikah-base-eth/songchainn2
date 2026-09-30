@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SocialPostWithProfile, PostComment } from '@/types/social';
-import { SONGS, ARTISTS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { Input } from '@/components/ui/input';
@@ -73,9 +73,10 @@ export function PostCard({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const { isOnline } = useUserPresence(post.user_id, { includeLastSeen: false, includeNowPlayingFallback: false });
 
-  const song = post.song_id ? SONGS.find(s => s.id === post.song_id) : null;
-  const artist = song ? ARTISTS.find(a => a.id === song.artistId) : null;
-  const postArtist = post.artist_id ? ARTISTS.find(a => a.id === post.artist_id) : null;
+  const { songById, artistById } = useLiveCatalog();
+  const song = post.song_id ? songById.get(String(post.song_id)) ?? null : null;
+  const artist = song ? artistById.get(String(song.artistId)) ?? null : null;
+  const postArtist = post.artist_id ? artistById.get(String(post.artist_id)) ?? null : null;
   const displayName = postArtist?.name || post.profile?.profile_name || 'Anonymous';
   const avatarUrl = post.profile?.profile_picture_url || postArtist?.profileImage || '';
   const isArtistPost = !!post.artist_id;

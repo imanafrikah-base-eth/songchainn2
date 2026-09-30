@@ -28,7 +28,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCommentLikes } from '@/hooks/useCommentLikes';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { ARTISTS } from '@/data/musicData';
+import { findArtist } from '@/lib/liveCatalog';
 import { useOnlineUsers } from '@/hooks/useUserPresence';
 
 interface CommentSheetProps {
@@ -248,7 +248,7 @@ export function CommentSheet({
                 <div className="py-4 space-y-4">
                   {localComments.map((comment) => {
                     const isArtistComment = !!comment.artist_id;
-                    const artist = comment.artist_id ? ARTISTS.find(a => a.id === comment.artist_id) : null;
+                    const artist = comment.artist_id ? findArtist(comment.artist_id) ?? null : null;
                     const displayName = artist?.name || comment.profile?.profile_name || 'Anonymous';
                     const isVerifiedArtist = !!comment.artist_is_verified;
                     const avatarSrc = isArtistComment ? (artist?.profileImage || comment.profile?.profile_picture_url || '') : (comment.profile?.profile_picture_url || '');

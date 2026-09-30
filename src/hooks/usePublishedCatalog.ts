@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ARTISTS, GENRES, type Song, type Artist, type Genre } from '@/data/musicData';
 import { registerArtistNames } from '@/lib/slugRoutes';
+import { setLiveCatalog } from '@/lib/liveCatalog';
 
 interface PublishedSongRow {
   id: string;
@@ -210,6 +211,12 @@ export function usePublishedCatalog() {
     registerArtistNames(rows.flatMap((r) => collabsOf(r).map((c) => ({ id: c.artistId, name: c.name }))));
     return list;
   }, [rows]);
+
+  // Hand the result to the shared live catalogue, for everything that reads
+  // the catalogue without this hook (the player, Mo$ha, lookups by id).
+  useEffect(() => {
+    if (query.data) setLiveCatalog(query.data, releaseRows ?? null, songs, artists);
+  }, [query.data, releaseRows, songs, artists]);
 
   return {
     songs,

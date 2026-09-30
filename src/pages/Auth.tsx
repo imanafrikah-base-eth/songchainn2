@@ -20,7 +20,8 @@ import sdk from '@farcaster/miniapp-sdk';
 import { fcOpenUrl } from '@/lib/farcasterActions';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
-import { CATALOGS, SONGS, type Song } from '@/data/musicData';
+import { type Song } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { usePlayerActions, usePlayerState, usePlayerTime } from '@/context/PlayerContext';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { useRankedArtists, useSongPopularity, useTodayHotSongs } from '@/hooks/usePopularity';
@@ -188,8 +189,10 @@ export default function Auth() {
     return map;
   }, [popularityData]);
 
+  const { songs: allSongs, catalogs: allCatalogs } = useLiveCatalog();
+
   const previewCatalogs = useMemo(() => {
-    return [...CATALOGS]
+    return [...allCatalogs]
       .map((catalog) => {
         const livePlays = catalog.songIds.reduce((sum, songId) => sum + (popularityBySongId.get(songId) || 0), 0);
         const mergedPlays = Math.max(catalog.totalPlays, livePlays);
@@ -197,7 +200,7 @@ export default function Auth() {
       })
       .sort((a, b) => b.totalPlays - a.totalPlays)
       .slice(0, 6);
-  }, [popularityBySongId]);
+  }, [allCatalogs, popularityBySongId]);
 
   // Every artist on the platform, not a top slice. There are eleven; showing
   // all of them is the point, and the row scrolls.
@@ -215,10 +218,10 @@ export default function Auth() {
   }, [previewArtists]);
 
   const previewSongs = useMemo(() => {
-    return [...SONGS].sort(
+    return [...allSongs].sort(
       (a, b) => (popularityBySongId.get(b.id) || b.plays || 0) - (popularityBySongId.get(a.id) || a.plays || 0)
     );
-  }, [popularityBySongId]);
+  }, [allSongs, popularityBySongId]);
 
   // The landing used to open on a three-line poster headline over a stock
   // image: "Discover. Vibe. Support. Real music. Real people." Words about
@@ -241,7 +244,7 @@ export default function Auth() {
     const catalogsByKey = new Map<string, Extract<NewRelease, { kind: 'catalog' }>>();
     const releases: NewRelease[] = [];
 
-    SONGS.forEach((song) => {
+    allSongs.forEach((song) => {
       if (!song.addedAt) return;
       const addedAt = new Date(song.addedAt).getTime();
       if (addedAt < cutoff) return;
@@ -270,7 +273,7 @@ export default function Auth() {
     });
 
     return releases.sort((a, b) => b.addedAt - a.addedAt).slice(0, 12);
-  }, []);
+  }, [allSongs]);
 
   const landingPick = useMemo<HeroFeature | null>(() => {
     const pick = pickHeroSong({

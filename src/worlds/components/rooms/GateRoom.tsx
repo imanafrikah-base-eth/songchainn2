@@ -3,7 +3,7 @@
 
 import { Link } from 'react-router-dom';
 import { ArrowRight, CameraOff } from 'lucide-react';
-import { ARTISTS, SONGS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { getArtistSlugUrl } from '@/lib/slugRoutes';
 import { useRankedSongs } from '@/hooks/usePopularity';
 import type { WorldConfig, WorldRings } from '../../types';
@@ -11,13 +11,14 @@ import { GetKeyCta } from '../GetKeyCta';
 import { WorldTrackRow } from '../WorldTrackRow';
 
 export function GateRoom({ world, rings }: { world: WorldConfig; rings: WorldRings }) {
-  const artist = ARTISTS.find((a) => a.id === world.artistId);
+  const { songById, artistById } = useLiveCatalog();
+  const artist = artistById.get(String(world.artistId));
   const { rankedSongs } = useRankedSongs();
 
   const featured =
     world.featuredSongIds.length > 0
       ? world.featuredSongIds
-          .map((id) => SONGS.find((s) => s.id === id))
+          .map((id) => songById.get(String(id)))
           .filter((s): s is NonNullable<typeof s> => Boolean(s))
           .slice(0, 3)
       : rankedSongs.filter((s) => s.artistId === world.artistId).slice(0, 3);

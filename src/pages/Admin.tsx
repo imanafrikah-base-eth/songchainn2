@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { Music, Users, Upload, ExternalLink, Plus, FileMusic, BadgeCheck, Wallet, Lightbulb } from 'lucide-react';
 import { artistPath, songPath } from '@/lib/slugRoutes';
 import { useAuth } from '@/context/AuthContext';
-import { ARTISTS, SONGS, Artist, Song } from '@/data/musicData';
+import { Artist, Song } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useSongPopularity } from '@/hooks/usePopularity';
@@ -20,10 +21,10 @@ export default function Admin() {
   const { isAdmin, isLoading } = useAuth();
   const { data: popularityData } = useSongPopularity();
   const [activeTab, setActiveTab] = useState<'artists' | 'songs' | 'applications' | 'claims' | 'payouts' | 'requests' | 'coins'>('artists');
-  const [artists, setArtists] = useState(ARTISTS);
+  const { songs: allSongs, artists } = useLiveCatalog();
 
   const songsWithRealStats = useMemo(() => {
-    return SONGS.map(song => {
+    return allSongs.map(song => {
       const dbData = popularityData?.find(p => p.song_id === song.id);
       return {
         ...song,
@@ -31,7 +32,7 @@ export default function Admin() {
         likes: dbData?.like_count || 0,
       };
     });
-  }, [popularityData]);
+  }, [allSongs, popularityData]);
 
   if (isLoading) return null;
 

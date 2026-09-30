@@ -12,7 +12,7 @@
 // nothing in it renders as a fenced plot and says so. An empty building that
 // pretends to be full teaches people the world is dead.
 
-import { SONGS } from '@/data/musicData';
+import { liveSongs } from '@/lib/liveCatalog';
 import type { WorldCityDef, WorldConfig, WorldRoomDef } from './types';
 
 export const CLASSIC_FIVE_CITIES: WorldCityDef[] = [
@@ -117,7 +117,7 @@ export interface CityInventory {
  * exported and loaded; that zero is deliberate and shows on the map.
  */
 export function cityInventory(world: WorldConfig, city: WorldCityDef): CityInventory {
-  const own = SONGS.filter((s) => s.artistId === world.artistId);
+  const own = liveSongs().filter((s) => s.artistId === world.artistId);
 
   switch (city.kind) {
     case 'music':

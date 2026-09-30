@@ -32,7 +32,7 @@ import {
 import { useWorldDrops, type WorldNft } from '@/hooks/useWorldNfts';
 import { reportPayment } from '@/lib/paymentReceipt';
 import { usePlayerActions } from '@/context/PlayerContext';
-import { SONGS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import type { Address } from 'viem';
 
 export function termsOf(drop: WorldNft): DropTerms {
@@ -98,7 +98,8 @@ export function DropCard({
   const canCollect = drop.status === 'live' && !soldOut && !closed && !native
     && drop.contract_address && drop.token_id != null && drop.minter_address && drop.contract_version;
 
-  const song = useMemo(() => (drop.song_id ? SONGS.find((s) => s.id === drop.song_id) ?? null : null), [drop.song_id]);
+  const { songById } = useLiveCatalog();
+  const song = useMemo(() => (drop.song_id ? songById.get(String(drop.song_id)) ?? null : null), [drop.song_id, songById]);
 
   useEffect(() => {
     let live = true;

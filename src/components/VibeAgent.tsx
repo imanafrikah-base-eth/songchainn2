@@ -8,7 +8,8 @@ import { Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState, usePlayerTime } from '@/context/PlayerContext';
-import { ARTISTS, CATALOGS, SONGS, Song } from '@/data/musicData';
+import { Song } from '@/data/musicData';
+import { findArtist, findSong, liveCatalogs, liveSongs } from '@/lib/liveCatalog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useEngagement } from '@/context/EngagementContext';
@@ -93,7 +94,7 @@ function getWaveWarzPrimer() {
 }
 
 function getTopCatalogBySong(song: Song) {
-  return CATALOGS.find((catalog) => catalog.songIds.includes(song.id)) || null;
+  return liveCatalogs().find((catalog) => catalog.songIds.includes(song.id)) || null;
 }
 
 function buildTasteLane(mode: AgentMode, topGenre: string | null) {
@@ -115,7 +116,7 @@ function pickNextSong(params: {
   artistStarts: Record<string, number>;
 }) {
   const { currentSong, mood, mode, genreStarts, artistStarts } = params;
-  const candidates = SONGS.filter((song) => song.id !== currentSong.id);
+  const candidates = liveSongs().filter((song) => song.id !== currentSong.id);
   if (!candidates.length) return null;
 
   const scored = candidates.map((song) => {
@@ -448,7 +449,7 @@ export function VibeAgent() {
     const prevSongId = prevSongIdRef.current;
     if (prevSongId) {
       const listened = signalRef.current.listenSecondsBySong[prevSongId] || 0;
-      const prevSongMeta = SONGS.find((song) => song.id === prevSongId);
+      const prevSongMeta = findSong(prevSongId);
       const duration = Number(prevSongMeta?.duration || 0);
       if (duration > 0 && listened < duration * 0.33) {
         signalRef.current.skipCount += 1;
@@ -621,7 +622,7 @@ export function VibeAgent() {
   const recommendedArtist = useMemo(() => {
     const target = suggestedSong || currentSong;
     if (!target) return null;
-    return ARTISTS.find((artist) => artist.id === target.artistId) || null;
+    return findArtist(target.artistId) || null;
   }, [currentSong, suggestedSong]);
 
   const toneLead = useMemo(() => {
@@ -638,7 +639,7 @@ export function VibeAgent() {
     if (isBuildingLane) return;
     setIsBuildingLane(true);
     try {
-      const laneSongs = [...SONGS]
+      const laneSongs = [...liveSongs()]
         .sort((a, b) => {
           const genreScoreA = signalRef.current.genreStarts[a.genre] || 0;
           const genreScoreB = signalRef.current.genreStarts[b.genre] || 0;

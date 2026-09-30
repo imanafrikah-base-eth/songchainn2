@@ -4,7 +4,7 @@ import { MentionInput } from '@/components/social/MentionInput';
 import type { MentionPerson } from '@/lib/mentions';
 import { Music, ListMusic, Send, ImagePlus, UserPlus, X, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { SONGS, ARTISTS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { toast } from 'sonner';
 import { useMediaUpload } from '@/hooks/useArtistMedia';
 import { TagPeople, type TaggablePerson } from '@/components/social/TagPeople';
@@ -132,12 +132,10 @@ export function PostComposer({ onPost, initialType = 'text', initialSongId }: Po
   };
 
   const getArtistName = (artistId: string) => {
-    return ARTISTS.find(a => a.id === artistId)?.name || 'Unknown Artist';
+    return artistById.get(String(artistId))?.name || 'Unknown Artist';
   };
 
-  const songs = Array.from(
-    new Map(SONGS.map((song) => [song.id, song])).values(),
-  );
+  const { songs, artistById } = useLiveCatalog();
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-4">

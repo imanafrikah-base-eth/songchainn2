@@ -5,7 +5,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Sparkles, UserPlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ARTISTS, SONGS, Song } from '@/data/musicData';
+import { Song } from '@/data/musicData';
+import { findArtist, findSong, liveSongs } from '@/lib/liveCatalog';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -64,7 +65,7 @@ function selectSimilarSong(params: {
   recentlyPlayedSongIds: Set<string>;
 }): Song | null {
   const { sourceSong, recentlyPlayedSongIds } = params;
-  const candidates = SONGS.filter((song) => {
+  const candidates = liveSongs().filter((song) => {
     if (song.id === sourceSong.id) return false;
     if (song.artistId === sourceSong.artistId) return false;
     if (song.genre !== sourceSong.genre) return false;
@@ -237,7 +238,7 @@ export function BehaviorCtaPopups() {
     behaviorCtaHandlersByUser.set(userId, (row) => {
       if (row.event_type !== 'play' || !row.song_id) return;
 
-      const song = SONGS.find((entry) => entry.id === row.song_id);
+      const song = findSong(row.song_id);
       if (!song) return;
 
       const isMoshaContextNow = isMoshaContextRef.current;
@@ -254,7 +255,7 @@ export function BehaviorCtaPopups() {
       const canQueueCta = now - lastQueuedAtRef.current > CTA_MIN_GAP_MS;
 
       if (artistUniqueCount >= 2 && canPromptFollow && canQueueCta && !isArtistLikedRef.current(song.artistId)) {
-        const artist = ARTISTS.find((entry) => entry.id === song.artistId);
+        const artist = findArtist(song.artistId);
         if (artist) {
           followPromptedAtRef.current[song.artistId] = now;
           lastQueuedAtRef.current = now;

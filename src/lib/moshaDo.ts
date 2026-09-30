@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
-import { ARTISTS, SONGS, type Artist, type Song } from '@/data/musicData';
+import { type Artist, type Song } from '@/data/musicData';
+import { liveArtists, liveSongs } from '@/lib/liveCatalog';
 import { broadcastCountDelta } from '@/hooks/usePopularity';
 import { songPath } from '@/lib/slugRoutes';
 
@@ -50,9 +51,9 @@ export interface DoCtx {
   songShareUrl?: (song: Song) => string;
 }
 
-/** The founding catalogue only: used when a job runs with nothing else to go on. */
+/** The catalogue as it stands: used when a job runs with nothing else to go on. */
 export function baseDoCtx(): DoCtx {
-  return { userId: null, songs: SONGS, artists: ARTISTS };
+  return { userId: null, songs: liveSongs(), artists: liveArtists() };
 }
 
 export interface DoChoice {

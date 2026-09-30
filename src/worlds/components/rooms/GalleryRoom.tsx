@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
-import { SONGS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import type { WorldConfig } from '../../types';
 
 type ArtItem = { key: string; image: string; title: string };
@@ -12,17 +12,18 @@ type ArtItem = { key: string; image: string; title: string };
 export function GalleryRoom({ world }: { world: WorldConfig }) {
   const [openItem, setOpenItem] = useState<ArtItem | null>(null);
 
+  const { songs } = useLiveCatalog();
   const covers = useMemo<ArtItem[]>(() => {
     const seen = new Set<string>();
     const items: ArtItem[] = [];
-    for (const song of SONGS) {
+    for (const song of songs) {
       if (song.artistId !== world.artistId || !song.coverImage) continue;
       if (seen.has(song.coverImage)) continue;
       seen.add(song.coverImage);
       items.push({ key: song.id, image: song.coverImage, title: song.title });
     }
     return items;
-  }, [world.artistId]);
+  }, [songs, world.artistId]);
 
   return (
     <div className="space-y-6">

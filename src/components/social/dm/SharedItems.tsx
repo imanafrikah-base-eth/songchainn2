@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ListMusic, Music, Pause, Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { SONGS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
 import { ArtistName } from '@/components/ArtistName';
 import { cn } from '@/lib/utils';
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 const CARD = 'flex w-[min(17rem,72vw)] items-center gap-3 rounded-2xl border border-border bg-card p-2 text-left';
 
 export function SongInMessage({ songId }: { songId: string }) {
-  const song = SONGS.find((s) => s.id === songId);
+  const song = useLiveCatalog().songById.get(String(songId));
   const { currentSong, isPlaying } = usePlayerState();
   const { playSong, togglePlay } = usePlayerActions();
 

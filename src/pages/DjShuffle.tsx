@@ -7,7 +7,8 @@ import { AnimatedBackground } from '@/components/ui/animated-background';
 import { AmbientBackground } from '@/components/AmbientBackground';
 import { Button } from '@/components/ui/button';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
-import { ARTISTS, CATALOGS, SONGS, Song } from '@/data/musicData';
+import { ARTISTS, SONGS, Song, buildCatalogs, songInArtistCatalog } from '@/data/musicData';
+import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 
 type DjMode = 'artists' | 'all-songs' | 'catalogs';
 
@@ -56,17 +57,31 @@ export default function DjShuffle() {
     else el.pause();
   }, [rolling]);
 
+  /* The founding catalogue plus everything published since, so an artist who
+     joins today is in the DJ's crates as soon as their first song is live. */
+  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
+  const allSongs = useMemo(() => {
+    const byId = new Map<string, Song>();
+    for (const s of [...SONGS, ...publishedSongs]) byId.set(String(s.id), s);
+    return Array.from(byId.values());
+  }, [publishedSongs]);
+  const allArtists = useMemo(() => {
+    const ids = new Set(ARTISTS.map((a) => String(a.id)));
+    return [...ARTISTS, ...publishedArtists.filter((a) => !ids.has(String(a.id)))];
+  }, [publishedArtists]);
+  const allCatalogs = useMemo(() => buildCatalogs(allSongs), [allSongs]);
+
   const selectedArtistSongs = useMemo(
-    () => SONGS.filter((song) => selectedArtistIds.includes(song.artistId)),
-    [selectedArtistIds]
+    () => allSongs.filter((song) => selectedArtistIds.some((id) => songInArtistCatalog(song, id))),
+    [allSongs, selectedArtistIds]
   );
 
   const selectedCatalogSongs = useMemo(() => {
     const songIds = new Set(
-      CATALOGS.filter((catalog) => selectedCatalogIds.includes(catalog.id)).flatMap((catalog) => catalog.songIds)
+      allCatalogs.filter((catalog) => selectedCatalogIds.includes(catalog.id)).flatMap((catalog) => catalog.songIds)
     );
-    return SONGS.filter((song) => songIds.has(song.id));
-  }, [selectedCatalogIds]);
+    return allSongs.filter((song) => songIds.has(song.id));
+  }, [allSongs, allCatalogs, selectedCatalogIds]);
 
   const canStart =
     mode === 'all-songs' ||
@@ -75,7 +90,7 @@ export default function DjShuffle() {
 
   const startDjShuffle = () => {
     setDjOn(true);
-    let sourceSongs: Song[] = SONGS;
+    let sourceSongs: Song[] = allSongs;
     if (mode === 'artists') sourceSongs = selectedArtistSongs;
     if (mode === 'catalogs') sourceSongs = selectedCatalogSongs;
     const shuffled = shuffleSongs(sourceSongs, {
@@ -184,7 +199,7 @@ export default function DjShuffle() {
             <div className="space-y-2">
               <p className="text-sm text-zinc-200">Pick one or more artists.</p>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 max-h-[320px] overflow-y-auto pr-1">
-                {ARTISTS.map((artist) => (
+                {allArtists.map((artist) => (
                   <button
                     key={artist.id}
                     type="button"
@@ -206,7 +221,7 @@ export default function DjShuffle() {
             <div className="space-y-2">
               <p className="text-sm text-zinc-200">Pick one or more catalogs.</p>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 max-h-[320px] overflow-y-auto pr-1">
-                {CATALOGS.map((catalog) => (
+                {allCatalogs.map((catalog) => (
                   <button
                     key={catalog.id}
                     type="button"
