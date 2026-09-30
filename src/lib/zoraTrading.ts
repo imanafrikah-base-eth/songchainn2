@@ -1,7 +1,7 @@
 import { createWalletClient, createPublicClient, custom, http, parseEther, parseAbi, type Address } from 'viem';
 import { base } from 'viem/chains';
 import { tradeCoin, createQuote } from '@zoralabs/coins-sdk';
-import { getWalletProvider } from './baseWallet';
+import { BASE_CHAIN_ID, getWalletProvider, switchToBaseChain } from './baseWallet';
 import { BASE_RPC_URL } from '@/lib/baseRpc';
 
 /*
@@ -52,16 +52,35 @@ function getPublicClient() {
   return createPublicClient({ chain: base, transport: http(RPC_URL) });
 }
 
-function getUserWalletClient() {
-  const provider = getWalletProvider();
-  if (!provider) return null;
-  return createWalletClient({ chain: base, transport: custom(provider) });
+const WRONG_NETWORK = 'Your wallet is on another network. Switch it to Base and try again.';
+
+/**
+ * True once the wallet is on Base, asking it to move there first when it is
+ * not. Zora trades used to go straight to the wallet on whatever chain it was
+ * on and hand the artist a raw "chain mismatch" (N3M3SIS, 21 Sep 2026).
+ */
+async function onBase(provider: NonNullable<ReturnType<typeof getWalletProvider>>): Promise<boolean> {
+  const chainId = async () => Number.parseInt((await provider.request({ method: 'eth_chainId' })) as string, 16);
+  try {
+    if ((await chainId()) === BASE_CHAIN_ID) return true;
+  } catch {
+    return false;
+  }
+  await switchToBaseChain(provider);
+  try {
+    return (await chainId()) === BASE_CHAIN_ID;
+  } catch {
+    return false;
+  }
 }
 
 function describeTradeError(err: any): string {
   if (err?.code === 4001 || err?.code === 'ACTION_REJECTED') return 'Transaction cancelled';
   if (typeof err?.message === 'string' && err.message.toLowerCase().includes('rejected')) {
     return 'Transaction cancelled';
+  }
+  if (typeof err?.message === 'string' && /chain.*(mismatch|does not match)/i.test(err.message)) {
+    return WRONG_NETWORK;
   }
   if (typeof err?.message === 'string' && err.message.toLowerCase().includes('insufficient')) {
     return 'Insufficient balance for this trade plus network fee';
@@ -77,8 +96,10 @@ export async function buyCoinWithEth(params: {
   ethAmount: string;
   userAddress: Address;
 }): Promise<TradeResult> {
-  const walletClient = getUserWalletClient();
-  if (!walletClient) return { success: false, error: 'No wallet detected' };
+  const provider = getWalletProvider();
+  if (!provider) return { success: false, error: 'No wallet detected' };
+  if (!(await onBase(provider))) return { success: false, error: WRONG_NETWORK };
+  const walletClient = createWalletClient({ chain: base, transport: custom(provider) });
   const publicClient = getPublicClient();
 
   try {
@@ -108,8 +129,10 @@ export async function sellCoinForEth(params: {
   tokenAmount: bigint;
   userAddress: Address;
 }): Promise<TradeResult> {
-  const walletClient = getUserWalletClient();
-  if (!walletClient) return { success: false, error: 'No wallet detected' };
+  const provider = getWalletProvider();
+  if (!provider) return { success: false, error: 'No wallet detected' };
+  if (!(await onBase(provider))) return { success: false, error: WRONG_NETWORK };
+  const walletClient = createWalletClient({ chain: base, transport: custom(provider) });
   const publicClient = getPublicClient();
 
   try {

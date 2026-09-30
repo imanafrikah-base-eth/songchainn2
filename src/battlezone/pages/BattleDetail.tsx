@@ -23,6 +23,7 @@ import type { Artist, Song } from "@/data/musicData";
 import { findSong } from "@/lib/liveCatalog";
 import { useLiveCatalog } from "@/hooks/useLiveCatalog";
 import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
+import { useShare } from "@/hooks/useShare";
 import { installBattleAudioGestureUnlock } from "@/battlezone/lib/audioUnlock";
 
 /* Enter room and Go live are taps; they unlock the room's sound on the way in. */
@@ -177,18 +178,13 @@ const BattleDetail = () => {
     navigate(embedTo(`/room/${battle.id}`));
   };
 
+  // The share sheet where there is one, the link copied where there is not,
+  // and a word either way. Before this every failure was swallowed and the
+  // button looked dead (N3M3SIS, 21 Sep 2026).
+  const { nativeShare } = useShare();
   const handleShare = async () => {
     if (!battle) return;
-    const url = `${window.location.origin}/wavewarz-africa/battle/${battle.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: battle.title, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-      }
-    } catch {
-      void 0;
-    }
+    await nativeShare({ title: battle.title, url: `${window.location.origin}/wavewarz-africa/battle/${battle.id}` });
   };
 
   if (isLoading) {

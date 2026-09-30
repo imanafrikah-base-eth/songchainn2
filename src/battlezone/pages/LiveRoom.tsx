@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Mic, Hand, Send, Play, Pause, SkipForward,
-  Square, UserPlus, Volume2, ExternalLink, Crown, Smile, Music, Heart,
+  Square, UserPlus, Volume2, ExternalLink, Share2, Crown, Smile, Music, Heart,
   Feather, Music2, Flame, Hourglass, Users, MessageCircle, type LucideIcon,
 } from "lucide-react";
 import { VOICE_ENABLED } from "@/battlezone/config";
@@ -46,7 +46,10 @@ import { useAuth as useSongchainnAuth } from "@/context/AuthContext";
 import { useMyWallets } from "@/hooks/useMyWallets";
 import { RoomPeople } from "@/battlezone/components/RoomPeople";
 import { SpeakInvitePrompt } from "@/battlezone/components/SpeakInvitePrompt";
-import { RoomChatComposer, MentionText, mentionedIn, type MentionPerson } from "@/battlezone/components/RoomChatComposer";
+import { RoomChatComposer, MentionText, mentionedIn, mergePeople, type MentionPerson } from "@/battlezone/components/RoomChatComposer";
+import { useLiveCatalog } from "@/hooks/useLiveCatalog";
+import { useShare } from "@/hooks/useShare";
+import { supabase as appDb } from "@/integrations/supabase/client";
 
 /* A counter, not a clock: two mounts in the same millisecond would share a
    channel name and therefore share one channel object. */
@@ -333,6 +336,7 @@ const LiveRoom = () => {
 
     if (error) {
       setChatInput(messageText);
+      toast({ title: "Message not sent", description: "Try again." });
       return;
     }
 
@@ -341,11 +345,12 @@ const LiveRoom = () => {
       .filter((m) => m.userId !== user.id && !JUDGE_BY_USER_ID.has(m.userId))
       .map((m) => m.userId);
     if (tagged.length) {
-      await supabase.rpc("notify_battle_mentions" as never, {
+      const { error: tagError } = await supabase.rpc("notify_battle_mentions" as never, {
         p_battle_id: roomId,
         p_user_ids: tagged,
         p_message: messageText,
       } as never);
+      if (tagError) toast({ title: "Sent, but the tag did not reach them", description: tagError.message });
     }
 
     // Summon every judge addressed by name: the couple or any Council elder.
@@ -360,16 +365,6 @@ const LiveRoom = () => {
   // Speaker approval functionality is now handled by SpeakerManagement component
 
   // Speaker muting functionality is now handled by SpeakerManagement component
-
-  const shareRoomLink = async () => {
-    if (!roomId || typeof window === "undefined") return;
-    const url = `${window.location.origin}/wavewarz-africa/entry/${roomId}`;
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      void 0;
-    }
-  };
 
   const advanceRound = async () => {
     if (!roomId || !battle) return;
@@ -467,11 +462,65 @@ const LiveRoom = () => {
      belong to Artist Worlds. */
 
   const host = getParticipantsByRole('host')[0];
-  const mentionPeople: MentionPerson[] = participants
-    .filter((p) => p.display_name)
-    .map((p) => ({ userId: p.user_id, name: p.display_name }));
+  // Everybody who can be tagged: the people in the room now, the artists in
+  // the battle when they have an account here, and anyone picked from a name
+  // search. Before this only people in the room at that moment could be
+  // tagged, so the artists a host most wants to tag never could be
+  // (N3M3SIS, 21 Sep 2026: "@faith" reached nobody).
+  const [taggable, setTaggable] = useState<MentionPerson[]>([]);
+  const catalog = useLiveCatalog();
+  const artistAName = battle?.artistA.name ?? "";
+  const artistBName = battle?.artistB.name ?? "";
+  useEffect(() => {
+    const wanted = [artistAName, artistBName].map((n) => n.trim().toLowerCase()).filter(Boolean);
+    const ids = catalog.artists.filter((a) => wanted.includes(a.name.trim().toLowerCase())).map((a) => a.id);
+    if (!ids.length) return;
+    let cancelled = false;
+    void appDb
+      .from("artist_accounts")
+      .select("artist_id, user_id")
+      .in("artist_id", ids)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const found: MentionPerson[] = [];
+        for (const row of data as Array<{ artist_id: string; user_id: string }>) {
+          const artist = catalog.artistById.get(String(row.artist_id));
+          if (artist && row.user_id) found.push({ userId: row.user_id, name: artist.name });
+        }
+        if (found.length) setTaggable((prev) => mergePeople(prev, found));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [artistAName, artistBName, catalog]);
+  const searchPeople = useCallback(async (q: string): Promise<MentionPerson[]> => {
+    const { data } = await appDb
+      .from("audience_profiles")
+      .select("user_id, display_name")
+      .ilike("display_name", `%${q.replace(/[%_]/g, "")}%`)
+      .limit(6);
+    return ((data ?? []) as Array<{ user_id: string; display_name: string | null }>)
+      .filter((r) => r.display_name)
+      .map((r) => ({ userId: r.user_id, name: r.display_name as string }));
+  }, []);
+  const rememberPerson = useCallback((p: MentionPerson) => setTaggable((prev) => mergePeople(prev, [p])), []);
+  const mentionPeople: MentionPerson[] = mergePeople(
+    participants.filter((p) => p.display_name).map((p) => ({ userId: p.user_id, name: p.display_name })),
+    taggable,
+  );
   const mentionPeopleRef = useRef(mentionPeople);
   mentionPeopleRef.current = mentionPeople;
+
+  // The share sheet where there is one, the link copied where there is not,
+  // and a word either way. Before this the copy was silent and every failure
+  // swallowed, so the button looked dead on a phone (N3M3SIS, 21 Sep 2026).
+  // The battle page is the address shared: it carries the share card and the
+  // room is one tap from it.
+  const { nativeShare } = useShare();
+  const shareRoomLink = async () => {
+    if (!roomId || typeof window === "undefined") return;
+    await nativeShare({ title: battle?.title || "WaveWarz Africa battle", url: `${window.location.origin}/wavewarz-africa/battle/${roomId}` });
+  };
   const coHosts = getParticipantsByRole('co-host');
   const speakers = getParticipantsByRole('speaker');
   const audience = getParticipantsByRole('audience');
@@ -1131,7 +1180,7 @@ const LiveRoom = () => {
 
           {/* Share Link */}
           <button onClick={shareRoomLink} className="min-h-12 w-full rounded-2xl border border-border bg-card/60 px-4 py-3 text-sm font-semibold text-foreground hover:border-primary/40 hover:text-primary transition-colors flex items-center justify-center gap-2">
-            <ExternalLink className="h-4 w-4" /> Share Room
+            <Share2 className="h-4 w-4" /> Share this battle
           </button>
         </div>
 
@@ -1260,6 +1309,8 @@ const LiveRoom = () => {
                     onChange={setChatInput}
                     onSend={() => void sendMessage()}
                     people={mentionPeople.filter((m) => m.userId !== user?.id)}
+                    search={searchPeople}
+                    onPick={rememberPerson}
                   />
                 </div>
               </div>

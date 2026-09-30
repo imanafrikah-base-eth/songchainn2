@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AtSign, Send, Smile } from "lucide-react";
 
 /**
@@ -11,6 +11,12 @@ import { AtSign, Send, Smile } from "lucide-react";
 export interface MentionPerson {
   userId: string;
   name: string;
+}
+
+/** Two lists of people as one, the first list's entry kept where a person is in both. */
+export function mergePeople(first: MentionPerson[], second: MentionPerson[]): MentionPerson[] {
+  const seen = new Set(first.map((p) => p.userId));
+  return [...first, ...second.filter((p) => !seen.has(p.userId) && seen.add(p.userId))];
 }
 
 /** The @word being typed at the end of the text, if any. */
@@ -85,11 +91,17 @@ export function RoomChatComposer({
   onChange,
   onSend,
   people,
+  search,
+  onPick,
 }: {
   value: string;
   onChange: (next: string) => void;
   onSend: () => void;
   people: MentionPerson[];
+  /** Anyone on SONGCHAINN by name, for people who are not in the room right now. */
+  search?: (query: string) => Promise<MentionPerson[]>;
+  /** Told whoever was picked, so the room page can recognise the tag when the message goes. */
+  onPick?: (person: MentionPerson) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [caret, setCaret] = useState(0);
@@ -97,15 +109,38 @@ export function RoomChatComposer({
   const [highlight, setHighlight] = useState(0);
 
   const q = activeQuery(value, caret);
+  const query = q?.query.trim() ?? "";
+  const [found, setFound] = useState<MentionPerson[]>([]);
+  useEffect(() => {
+    if (!search || query.length < 2) {
+      setFound([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void search(query)
+        .then((list) => {
+          if (!cancelled) setFound(list);
+        })
+        .catch(() => {
+          if (!cancelled) setFound([]);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, search]);
   const matches = useMemo(() => {
     if (!q) return [];
     const needle = q.query.toLowerCase();
-    return people.filter((p) => p.name && p.name.toLowerCase().includes(needle)).slice(0, 6);
-  }, [q, people]);
+    return mergePeople(people.filter((p) => p.name && p.name.toLowerCase().includes(needle)), found).slice(0, 6);
+  }, [q, people, found]);
   const open = !!q && matches.length > 0;
 
   const pick = (p: MentionPerson) => {
     if (!q) return;
+    onPick?.(p);
     const next = `${value.slice(0, q.start)}@${p.name} ${value.slice(caret)}`;
     onChange(next);
     const pos = q.start + p.name.length + 2;
@@ -136,7 +171,7 @@ export function RoomChatComposer({
       {open && (
         <ul
           role="listbox"
-          aria-label="Tag somebody in the room"
+          aria-label="Tag somebody"
           className="absolute bottom-full left-0 right-12 z-20 mb-2 overflow-hidden rounded-xl border border-primary/30 bg-card shadow-[0_0_24px_hsl(var(--neon-green)/0.15)]"
         >
           {matches.map((p, i) => (

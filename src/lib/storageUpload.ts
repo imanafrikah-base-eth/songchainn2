@@ -10,10 +10,14 @@ import { getEnv } from '@/lib/env';
  * one artist on her connection: every file stalled or errored on the way in,
  * nothing recorded why, and she was told to try smaller files. So now:
  *
- *   1. The direct send runs, and a send that makes no progress for a while
- *      counts as failed rather than hanging forever.
- *   2. If it fails, why is written to upload_failures.
- *   3. The same file goes again through upload-relay, over the connection the
+ *   1. A big file goes up in pieces, each on its own signed link and each
+ *      tried up to four times, so one piece that stalls is sent again alone
+ *      and a 57 MB WAV never starts over from nothing (S.R.Chappell, 21 Sep
+ *      2026: three WAVs "never started moving", too big for the relay).
+ *   2. A smaller file goes in one direct send, and a send that makes no
+ *      progress for a while counts as failed rather than hanging forever.
+ *   3. If that fails, why is written to upload_failures.
+ *   4. The same file goes again through upload-relay, over the connection the
  *      app already uses for everything else, and that failure is written down
  *      too if it happens.
  *
@@ -29,10 +33,20 @@ export const RELAY_MAX_BYTES = 25 * 1024 * 1024;
 
 /** No bytes moving for this long means stalled, not slow. */
 const STALL_MS = 45_000;
+/**
+ * The first byte gets longer. A phone, or a Chromebook with the file on
+ * Drive, can spend a good while reading a big file before one byte leaves,
+ * and that used to count as a stall at 45 seconds.
+ */
+const FIRST_BYTE_MS = 150_000;
 /** Once every byte is sent, how long the other end may take to say it has them. */
 const ANSWER_MS = 120_000;
+/** From this size the file goes in pieces. Under it one send is fine and the relay can still catch it. */
+const PIECES_FROM_BYTES = 12 * 1024 * 1024;
+/** How many times one piece is tried before the whole send is called off. */
+const PIECE_TRIES = 4;
 
-type Stage = 'send' | 'relay';
+type Stage = 'send' | 'relay' | 'parts';
 
 class SendError extends Error {
   constructor(message: string, readonly status: number | null) {
@@ -43,7 +57,7 @@ class SendError extends Error {
 function xhrSend(
   method: 'PUT' | 'POST',
   url: string,
-  file: File,
+  body: Blob,
   headers: Record<string, string>,
   onProgress?: (pct: number) => void,
 ): Promise<void> {
@@ -77,8 +91,8 @@ function xhrSend(
       else finish(new SendError(`refused with ${xhr.status}: ${(xhr.responseText || '').slice(0, 200)}`, xhr.status));
     };
     xhr.onerror = () => finish(new SendError('network error before any answer', 0));
-    wait(STALL_MS, 'stalled: never started moving');
-    xhr.send(file);
+    wait(FIRST_BYTE_MS, 'stalled: never started moving');
+    xhr.send(body);
   });
 }
 
@@ -102,9 +116,99 @@ async function recordFailure(target: StorageTarget, file: File, stage: Stage, er
   }
 }
 
+/* ------------------------------------------------------------- pieces --- */
+
+interface PiecePlan {
+  uploadId: string;
+  partBytes: number;
+  parts: Array<{ partNumber: number; url: string }>;
+}
+
+/** One word to upload-url about a file in pieces. Throws a SendError when it says no. */
+async function pieceCall(body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase.functions.invoke('upload-url', { body: { purpose: 'multipart', ...body } });
+  if (error) throw new SendError(`pieces: ${error.message || 'no answer'}`, null);
+  const answer = (data ?? null) as Record<string, unknown> | null;
+  if (answer && typeof answer.error === 'string') throw new SendError(`pieces: ${answer.error}`, null);
+  return answer;
+}
+
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The file in pieces, each sent on its own link and tried up to four times.
+ * Resolves true once the bucket has stitched them together. Resolves false
+ * when the pieces could not be arranged at all, or when a piece gave up on a
+ * file the relay can still carry, so the roads below get their turn. Throws
+ * a plain sentence when a big file's piece would not go after every try.
+ */
+async function sendInPieces(file: File, target: StorageTarget, onProgress?: (pct: number) => void): Promise<boolean> {
+  let plan: PiecePlan;
+  try {
+    const answer = await pieceCall({
+      op: 'start',
+      kind: target.kind,
+      id: target.id,
+      fileBytes: file.size,
+      contentType: file.type,
+    });
+    plan = answer as unknown as PiecePlan;
+    if (!plan?.uploadId || !Array.isArray(plan.parts) || !plan.parts.length || !(plan.partBytes > 0)) return false;
+  } catch (err) {
+    void recordFailure(target, file, 'parts', err);
+    return false;
+  }
+
+  const landed = new Map<number, number>();
+  const report = () => {
+    if (!onProgress) return;
+    let sent = 0;
+    for (const n of landed.values()) sent += n;
+    onProgress(Math.min(99, Math.round((sent / file.size) * 100)));
+  };
+
+  try {
+    for (const part of plan.parts) {
+      const from = (part.partNumber - 1) * plan.partBytes;
+      const piece = file.slice(from, Math.min(file.size, from + plan.partBytes), file.type);
+      let lastErr: unknown = null;
+      for (let attempt = 1; attempt <= PIECE_TRIES; attempt++) {
+        try {
+          await xhrSend('PUT', part.url, piece, {}, (pct) => {
+            landed.set(part.partNumber, (piece.size * pct) / 100);
+            report();
+          });
+          lastErr = null;
+          break;
+        } catch (err) {
+          lastErr = err;
+          landed.set(part.partNumber, 0);
+          report();
+          if (attempt < PIECE_TRIES) await pause(1500 * attempt);
+        }
+      }
+      if (lastErr) throw lastErr;
+      landed.set(part.partNumber, piece.size);
+      report();
+    }
+    await pieceCall({ op: 'complete', kind: target.kind, id: target.id, uploadId: plan.uploadId, partCount: plan.parts.length });
+    onProgress?.(100);
+    return true;
+  } catch (err) {
+    void recordFailure(target, file, 'parts', err);
+    void pieceCall({ op: 'abort', kind: target.kind, id: target.id, uploadId: plan.uploadId }).catch(() => undefined);
+    if (file.size <= RELAY_MAX_BYTES) return false;
+    throw new Error(
+      'That did not upload. It went in pieces and one piece would not go through after four tries. Check the connection and try again.',
+    );
+  }
+}
+
+/* --------------------------------------------------------------- send --- */
+
 /**
  * Put one file where its reserved row says it belongs. Resolves once the bytes
- * are in storage; throws a plain sentence when neither road got them there.
+ * are in storage; throws a plain sentence when no road got them there.
  */
 export async function sendFile(
   uploadUrl: string,
@@ -112,6 +216,11 @@ export async function sendFile(
   target: StorageTarget,
   onProgress?: (pct: number) => void,
 ): Promise<void> {
+  if (file.size >= PIECES_FROM_BYTES) {
+    if (await sendInPieces(file, target, onProgress)) return;
+    onProgress?.(0);
+  }
+
   try {
     await xhrSend('PUT', uploadUrl, file, { 'Content-Type': file.type }, onProgress);
     return;

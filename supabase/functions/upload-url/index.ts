@@ -417,6 +417,8 @@ async function presignPut(opts: {
   bucket: string;
   key: string;
   expiresIn: number;
+  /** For one piece of a multipart upload: partNumber and uploadId ride in the query and are signed. */
+  query?: Array<[string, string]>;
 }): Promise<string> {
   const host = `${opts.accountId}.r2.cloudflarestorage.com`;
   const region = "auto";
@@ -435,6 +437,7 @@ async function presignPut(opts: {
     ["X-Amz-Date", amzDate],
     ["X-Amz-Expires", String(opts.expiresIn)],
     ["X-Amz-SignedHeaders", "host"],
+    ...(opts.query ?? []),
   ];
   params.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   const canonicalQuery = params
@@ -464,6 +467,174 @@ async function presignPut(opts: {
   const signature = hex(await hmac(kSigning, stringToSign));
 
   return `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
+/* ------------------------------------------------ multipart, big files --- */
+
+// A file over the browser's PIECES_FROM_BYTES goes up in pieces, each on its
+// own signed link, so a piece that stalls is sent again alone and the whole
+// file never starts over (S.R.Chappell, 20 and 21 Sep 2026: three WAVs and
+// even one MP3 "never started moving", and at 39 and 57 MB the relay could
+// not catch them). The browser asks here to start (R2 opens the upload and
+// one link per piece comes back) and to finish (R2 lists what arrived and
+// stitches it together). The bucket keys never leave this function.
+const PART_BYTES = 8 * 1024 * 1024;
+const PART_TTL = 3600;               // an hour to get every piece in
+
+type R2Creds = { accountId: string; accessKeyId: string; secretAccessKey: string; bucket: string };
+
+/** One header-signed call to R2 itself (SigV4, unsigned payload). */
+async function r2Call(o: R2Creds & {
+  key: string;
+  method: "POST" | "GET" | "DELETE";
+  query: Array<[string, string]>;
+  body?: string;
+}): Promise<Response> {
+  const host = `${o.accountId}.r2.cloudflarestorage.com`;
+  const region = "auto";
+  const service = "s3";
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = amzDate.slice(0, 8);
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const canonicalUri = `/${o.bucket}/${uriEncode(o.key, false)}`;
+  const params = [...o.query].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const canonicalQuery = params.map(([k, v]) => `${uriEncode(k)}=${uriEncode(v)}`).join("&");
+  const payloadHash = "UNSIGNED-PAYLOAD";
+  const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
+  const canonicalRequest = [
+    o.method,
+    canonicalUri,
+    canonicalQuery,
+    `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, await sha256Hex(canonicalRequest)].join("\n");
+  const kDate = await hmac(enc.encode(`AWS4${o.secretAccessKey}`), dateStamp);
+  const kRegion = await hmac(kDate, region);
+  const kService = await hmac(kRegion, service);
+  const kSigning = await hmac(kService, "aws4_request");
+  const signature = hex(await hmac(kSigning, stringToSign));
+  const headers: Record<string, string> = {
+    Authorization: `AWS4-HMAC-SHA256 Credential=${o.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+    "x-amz-content-sha256": payloadHash,
+    "x-amz-date": amzDate,
+  };
+  if (o.body !== undefined) headers["Content-Type"] = "application/xml";
+  return fetch(`https://${host}${canonicalUri}${canonicalQuery ? `?${canonicalQuery}` : ""}`, {
+    method: o.method,
+    headers,
+    body: o.body,
+  });
+}
+
+function xmlTag(xml: string, tag: string): string | null {
+  const m = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
+  return m ? m[1] : null;
+}
+
+/** Where this upload's file lives, when the row is the caller's own. Mirrors upload-relay. */
+async function storageKeyFor(
+  db: ReturnType<typeof createClient>,
+  userId: string,
+  kind: string,
+  id: string,
+  contentType: string,
+): Promise<{ key: string } | { error: string; status: number }> {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID.test(id)) return { error: "Bad request.", status: 400 };
+  if (kind === "mosha") {
+    const ext = MOSHA_AUDIO_TYPES[contentType.split(";")[0].trim().toLowerCase()];
+    if (!ext) return { error: "That audio type is not one Mo$ha takes.", status: 415 };
+    return { key: ["mosha", userId, `${id.toLowerCase()}.${ext}`].join("/") };
+  }
+  const table = kind === "visual" ? "artist_media" : kind === "episode" ? "world_episodes" : kind === "song" ? "songs" : null;
+  const owner = kind === "visual" ? "user_id" : kind === "episode" ? "host_id" : "owner_id";
+  if (!table) return { error: "Bad request.", status: 400 };
+  const { data: row } = await db.from(table).select("storage_key").eq("id", id).eq(owner, userId).maybeSingle();
+  const key = (row as { storage_key?: string | null } | null)?.storage_key;
+  if (!key) return { error: "That upload was not started, or is not yours.", status: 404 };
+  return { key };
+}
+
+async function handleMultipart(
+  origin: string | null,
+  body: Record<string, unknown>,
+  userId: string,
+  db: ReturnType<typeof createClient>,
+  creds: R2Creds,
+): Promise<Response> {
+  const op = str(body.op, 12);
+  const kind = str(body.kind, 12);
+  const id = str(body.id, 40);
+  const found = await storageKeyFor(db, userId, kind, id, str(body.contentType, 100));
+  if ("error" in found) return json(origin, { error: found.error }, found.status);
+  const base = { ...creds, key: found.key };
+
+  if (op === "start") {
+    const bytes = Number(body.fileBytes);
+    if (!Number.isFinite(bytes) || bytes <= 0 || bytes > MAX_VIDEO_BYTES) return json(origin, { error: "Bad request." }, 400);
+    const res = await r2Call({ ...base, method: "POST", query: [["uploads", ""]] });
+    const xml = await res.text();
+    const uploadId = res.ok ? xmlTag(xml, "UploadId") : null;
+    if (!uploadId) {
+      console.error("multipart start failed:", res.status, xml.slice(0, 300));
+      return json(origin, { error: "Could not start the upload. Try again." }, 502);
+    }
+    const count = Math.max(1, Math.ceil(bytes / PART_BYTES));
+    const parts: Array<{ partNumber: number; url: string }> = [];
+    for (let n = 1; n <= count; n++) {
+      parts.push({
+        partNumber: n,
+        url: await presignPut({ ...base, expiresIn: PART_TTL, query: [["partNumber", String(n)], ["uploadId", uploadId]] }),
+      });
+    }
+    return json(origin, { uploadId, partBytes: PART_BYTES, parts, expiresIn: PART_TTL });
+  }
+
+  const uploadId = str(body.uploadId, 400);
+  if (!uploadId) return json(origin, { error: "Bad request." }, 400);
+
+  if (op === "abort") {
+    await r2Call({ ...base, method: "DELETE", query: [["uploadId", uploadId]] }).catch(() => undefined);
+    return json(origin, { ok: true });
+  }
+
+  if (op === "complete") {
+    // R2 says which pieces it holds, so the browser never has to read an ETag
+    // header the bucket's CORS may not expose.
+    const listed = await r2Call({ ...base, method: "GET", query: [["uploadId", uploadId], ["max-parts", "1000"]] });
+    const listXml = await listed.text();
+    if (!listed.ok) {
+      console.error("multipart list failed:", listed.status, listXml.slice(0, 300));
+      return json(origin, { error: "Could not finish the upload. Try again." }, 502);
+    }
+    const pieces: Array<{ n: number; etag: string }> = [];
+    for (const m of listXml.matchAll(/<Part>([\s\S]*?)<\/Part>/g)) {
+      const n = Number(xmlTag(m[1], "PartNumber"));
+      const etag = xmlTag(m[1], "ETag");
+      if (Number.isFinite(n) && etag) pieces.push({ n, etag });
+    }
+    pieces.sort((a, b) => a.n - b.n);
+    const expected = Number(body.partCount);
+    if (!pieces.length || (Number.isFinite(expected) && expected > 0 && pieces.length !== expected)) {
+      return json(origin, { error: `Only ${pieces.length} of ${expected} pieces arrived.`, arrived: pieces.map((p) => p.n) }, 409);
+    }
+    // The ETags come back XML-escaped and go out the same way; they are XML on both sides.
+    const xmlBody = `<CompleteMultipartUpload>${
+      pieces.map((p) => `<Part><PartNumber>${p.n}</PartNumber><ETag>${p.etag}</ETag></Part>`).join("")
+    }</CompleteMultipartUpload>`;
+    const done = await r2Call({ ...base, method: "POST", query: [["uploadId", uploadId]], body: xmlBody });
+    const doneXml = await done.text();
+    if (!done.ok || /<Error>/.test(doneXml)) {
+      console.error("multipart complete failed:", done.status, doneXml.slice(0, 300));
+      return json(origin, { error: "Could not finish the upload. Try again." }, 502);
+    }
+    return json(origin, { ok: true });
+  }
+
+  return json(origin, { error: "Bad request." }, 400);
 }
 
 /* ------------------------------------------------------------ helpers --- */
@@ -543,6 +714,19 @@ Deno.serve(async (req) => {
   const contentType = str(body.contentType, 100).toLowerCase();
   const genre = str(body.genre, 60) || null;
   const fileBytes = Number(body.fileBytes);
+
+  /* --------------------------------------------- big files, in pieces --- */
+
+  // purpose: 'multipart' starts or finishes a file that goes up in pieces.
+  // The row was reserved by an ordinary ticket first; this only ever touches
+  // the caller's own row's key.
+  if (str(body.purpose, 20) === "multipart") {
+    const mdb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    return await handleMultipart(origin, body, user.id, mdb, {
+      accountId: accountId!, accessKeyId: accessKeyId!, secretAccessKey: secretAccessKey!, bucket: bucket!,
+    });
+  }
+
 
   /* ------------------------------------------------------- Mo$ha files --- */
 

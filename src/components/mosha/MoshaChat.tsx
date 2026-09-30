@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+const DRAFT_KEY = 'songchainn:mosha-draft:v1';
 import { Link, useNavigate } from 'react-router-dom';
 import { rememberEditWhere } from '@/lib/moshaWatch';
 import { Loader2, Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
@@ -181,7 +183,26 @@ export function MoshaChat({
   // A world only opens for a musician with a song out (founder, 14 Sep 2026).
   const { hasLiveSong } = useHasLiveSong();
   const [turns, setTurns] = useState<ChatTurn[]>(initial ?? []);
-  const [draft, setDraft] = useState('');
+  // The typed line survives a reload (Android discards the page behind a
+  // file picker), so nothing typed to Mo$ha goes with it (N3M3SIS, 13 Sep 2026).
+  const [draft, setDraftState] = useState(() => {
+    try {
+      return sessionStorage.getItem(DRAFT_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const setDraft = useCallback((next: string | ((current: string) => string)) => {
+    setDraftState((current) => {
+      const value = typeof next === 'function' ? next(current) : next;
+      try {
+        sessionStorage.setItem(DRAFT_KEY, value);
+      } catch {
+        /* a browser with no storage still keeps the line in memory */
+      }
+      return value;
+    });
+  }, []);
   const [busy, setBusy] = useState(false);
   const [hasArchive, setHasArchive] = useState(false);
   const [pulling, setPulling] = useState(false);
@@ -322,7 +343,7 @@ export function MoshaChat({
       setBusy(false);
       input.current?.focus();
     },
-    [busy, isArtist, userId],
+    [busy, isArtist, setDraft, userId],
   );
 
   /* A question handed in with the call, asked once, so nobody has to type

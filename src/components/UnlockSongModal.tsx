@@ -5,7 +5,7 @@ import { X, Unlock, Loader2, Music, Wallet, AlertCircle, Check, ArrowRight, Crow
 import { Button } from '@/components/ui/button';
 import { AdultOnly } from '@/components/AdultOnly';
 import { Song } from '@/data/musicData';
-import { hasWalletProvider } from '@/lib/baseWallet';
+import { getWalletProvider, hasWalletProvider } from '@/lib/baseWallet';
 import { requestWalletConnection } from '@/lib/walletGate';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { getEthUsdPrice } from '@/lib/ethPrice';
@@ -127,6 +127,14 @@ export function UnlockSongModal({
 
   const handleUnlock = async () => {
     if (!isConnected || !connectedAddress) {
+      await handleConnectWallet();
+      return;
+    }
+
+    // A remembered address is not a wallet. With no provider reachable in this
+    // browser (a phone, a fresh session) paying failed with "No wallet detected"
+    // and Try again looped back to it, so the connect sheet comes first.
+    if (!getWalletProvider()) {
       await handleConnectWallet();
       return;
     }
@@ -420,9 +428,9 @@ export function UnlockSongModal({
                   <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 text-sm flex items-start gap-2">
                     <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">No wallet detected</p>
+                      <p className="font-medium">No wallet in this browser yet</p>
                       <p className="text-xs mt-1 text-amber-500/80">
-                        Install MetaMask, Coinbase Wallet, or any wallet that supports Base network.
+                        Tap Connect and pick Coinbase Wallet or MetaMask. They open on your phone and bring you straight back here.
                       </p>
                     </div>
                   </div>
@@ -430,7 +438,7 @@ export function UnlockSongModal({
 
                 <Button
                   onClick={handleConnectWallet}
-                  disabled={isConnecting || !hasWallet}
+                  disabled={isConnecting}
                   className="w-full gradient-primary text-primary-foreground h-11 sm:h-12"
                 >
                   {isConnecting ? (

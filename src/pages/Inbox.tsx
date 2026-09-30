@@ -1,6 +1,7 @@
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Conversations } from '@/components/social/Conversations';
+import { ThankYouCelebration } from '@/components/ThankYouCelebration';
 
 /**
  * Messages. The people you talk to and Mo$ha live in one list now, Mo$ha
@@ -11,6 +12,7 @@ export default function Inbox() {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
+      <ThankYouCelebration />
       <main className="mx-auto max-w-[1400px] px-4 pb-4 pt-3 sm:px-6 sm:pt-5 lg:px-8 lg:pl-28 lg:pt-6">
         <Conversations />
       </main>

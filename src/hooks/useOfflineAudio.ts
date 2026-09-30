@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { serviceWorkerAvailable } from '@/lib/native';
 import { toast } from '@/hooks/use-toast';
 
 export interface CachedSong {
@@ -103,12 +104,12 @@ export function useOfflineAudio() {
       }
     };
 
-    if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true') {
+    if (serviceWorkerAvailable()) {
       navigator.serviceWorker?.addEventListener('message', handleSwMessage);
     }
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true' && 'serviceWorker' in navigator) {
+    if (serviceWorkerAvailable()) {
       navigator.serviceWorker.ready
         .then((registration) => {
           registration.active?.postMessage({ type: 'GET_AUDIO_CACHE_STATS' });
@@ -120,14 +121,14 @@ export function useOfflineAudio() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true') {
+      if (serviceWorkerAvailable()) {
         navigator.serviceWorker?.removeEventListener('message', handleSwMessage as any);
       }
     };
   }, []);
 
   const cacheSong = useCallback(async (songId: string, audioUrl: string, metadata?: { title?: string; artist?: string; duration?: number }) => {
-    if (!import.meta.env.PROD || import.meta.env.VITE_ENABLE_SERVICE_WORKER !== 'true' || !('serviceWorker' in navigator)) {
+    if (!serviceWorkerAvailable()) {
       toast({ 
         title: 'Offline mode not supported', 
         variant: 'destructive' 
@@ -171,7 +172,7 @@ export function useOfflineAudio() {
 
   const removeCachedSong = useCallback(async (songId: string) => {
     const existing = cachedSongs.find(s => s.songId === songId);
-    if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true' && 'serviceWorker' in navigator) {
+    if (serviceWorkerAvailable()) {
       try {
         const registration = await navigator.serviceWorker.ready;
         if (registration.active) {

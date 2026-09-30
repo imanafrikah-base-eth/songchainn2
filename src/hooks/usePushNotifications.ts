@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { serviceWorkerAvailable } from '@/lib/native';
 import { toast } from '@/hooks/use-toast';
 
 const VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
@@ -11,9 +12,7 @@ export function usePushNotifications() {
   useEffect(() => {
     const checkSupport = async () => {
       const supported =
-        import.meta.env.PROD &&
-        import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true' &&
-        'serviceWorker' in navigator &&
+        serviceWorkerAvailable() &&
         'PushManager' in window &&
         'Notification' in window;
       setIsSupported(supported);

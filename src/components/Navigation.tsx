@@ -1,4 +1,5 @@
 import { useProfilePath } from '@/hooks/useProfilePath';
+import { serviceWorkerAvailable } from '@/lib/native';
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -86,7 +87,7 @@ export function Navigation() {
     // the song has played once. Everyone else was told it worked when it
     // could not, so the note waits for the one person it is true for.
     if (!user) return;
-    if (!(import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true')) return;
+    if (!serviceWorkerAvailable()) return;
     let installed = false;
     try {
       installed =
