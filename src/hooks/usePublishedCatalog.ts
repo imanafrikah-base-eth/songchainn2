@@ -143,7 +143,25 @@ export function usePublishedCatalog() {
   // changes when the rows do. Consumers put `songs`/`artists` in effect deps
   // (PlaylistDetail, for one), and a fresh array every render made those
   // effects re-fire forever.
-  const rows = query.data ?? EMPTY_ROWS;
+  // Artists on a break. Their rows stay published in the table only until
+  // pause_my_music runs, but their founding records live in the app, so the
+  // catalogue has to know who is away either way.
+  const pausedQuery = useQuery({
+    queryKey: ['paused-artists'],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase.from('paused_artists' as never).select('artist_id');
+      if (error) throw error;
+      return ((data ?? []) as unknown as Array<{ artist_id: string }>).map((r) => String(r.artist_id).toLowerCase());
+    },
+    staleTime: 60_000,
+  });
+  const paused = useMemo<ReadonlySet<string>>(() => new Set(pausedQuery.data ?? []), [pausedQuery.data]);
+
+  const rows = useMemo(() => {
+    const all = query.data ?? EMPTY_ROWS;
+    if (!paused.size) return all;
+    return all.filter((row) => !row.artist_id || !paused.has(row.artist_id.toLowerCase()));
+  }, [query.data, paused]);
   const releaseRows = releasesQuery.data;
 
   const songs = useMemo<Song[]>(() => {
@@ -215,8 +233,8 @@ export function usePublishedCatalog() {
   // Hand the result to the shared live catalogue, for everything that reads
   // the catalogue without this hook (the player, Mo$ha, lookups by id).
   useEffect(() => {
-    if (query.data) setLiveCatalog(query.data, releaseRows ?? null, songs, artists);
-  }, [query.data, releaseRows, songs, artists]);
+    if (query.data) setLiveCatalog(query.data, releaseRows ?? null, songs, artists, paused);
+  }, [query.data, releaseRows, songs, artists, paused]);
 
   return {
     songs,

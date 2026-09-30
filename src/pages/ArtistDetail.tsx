@@ -3,7 +3,8 @@ import { artistPath } from '@/lib/slugRoutes';
 import { ClaimArtistPage } from '@/components/ClaimArtistPage';
 import { motion } from 'framer-motion';
 import { ArrowLeft, MapPin, Music, UserPlus, UserCheck, Heart, Share2, Copy, Check, CheckCircle2, Camera, Edit3, Save, X as XIcon, Loader2, Users, PlayCircle, Search, KeyRound, Mic2, MessageSquare } from 'lucide-react';
-import { ARTISTS, SONGS, getRelatedArtists, songInArtistCatalog, type Artist } from '@/data/musicData';
+import { ARTISTS, getRelatedArtists, songInArtistCatalog, type Artist } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { getWorldByArtistId } from '@/worlds/registry';
 import { ArtistCoinPanel } from '@/components/ArtistCoinPanel';
 import { WORLDS_ENABLED } from '@/lib/features';
@@ -89,11 +90,29 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
     editComment,
   } = useSocial();
   
-  const { songs: publishedSongs, artists: publishedArtists, isLoading: isCatalogLoading } = usePublishedCatalog();
-  const catalogArtist = ARTISTS.find(a => a.id === id) ?? publishedArtists.find(a => a.id === id);
+  const { isLoading: isCatalogLoading } = usePublishedCatalog();
+  // The live catalogue, so an artist on a break is not here, founding or not.
+  const catalog = useLiveCatalog();
+  const catalogArtist = id ? catalog.artistById.get(id) : undefined;
   // Their own records plus any collaboration they are on ("A & B" sits with both).
-  const artistSongs = [...SONGS, ...publishedSongs].filter(s => songInArtistCatalog(s, id));
+  const artistSongs = catalog.songs.filter(s => songInArtistCatalog(s, id));
   const isFollowingArtist = id ? isArtistLiked(id) : false;
+
+  // An artist on a break gets a quiet page, not their audience profile.
+  const { data: pausedArtist } = useQuery({
+    queryKey: ['paused-artist', id],
+    enabled: !!id && !catalogArtist,
+    staleTime: 60_000,
+    queryFn: async (): Promise<{ until: string | null } | null> => {
+      const { data } = await supabase
+        .from('paused_artists' as never)
+        .select('artist_id, resume_at')
+        .eq('artist_id', id ?? '')
+        .maybeSingle();
+      const row = data as { resume_at: string | null } | null;
+      return row ? { until: row.resume_at } : null;
+    },
+  });
 
   const { data: artistAccount, isLoading: isArtistAccountLoading } = useQuery({
     queryKey: ['artist-account', id],
@@ -670,12 +689,26 @@ export default function ArtistDetail({ artistIdOverride }: { artistIdOverride?: 
 
   const relatedArtists = useMemo(() => {
     if (!id) return [];
-    const allArtists = [...ARTISTS, ...publishedArtists];
-    const allSongs = [...SONGS, ...publishedSongs];
-    return getRelatedArtists(id, allArtists, allSongs, 6);
-  }, [id, publishedArtists, publishedSongs]);
+    return getRelatedArtists(id, catalog.artists, catalog.songs, 6);
+  }, [id, catalog]);
 
   if (!artist) {
+    if (pausedArtist) {
+      const restingName = ARTISTS.find((a) => a.id === id)?.name ?? (artistProfile as { display_name?: string | null } | null | undefined)?.display_name ?? 'This artist';
+      return (
+        <div className="min-h-screen bg-background">
+          <Navigation />
+          <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-16 text-center">
+            <p className="text-lg font-semibold text-foreground">{restingName} is taking a break.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {pausedArtist.until
+                ? `Their music is back on ${new Date(pausedArtist.until).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}.`
+                : 'Their music will be back when they are.'}
+            </p>
+          </main>
+        </div>
+      );
+    }
     // Signed up as an artist, nothing live yet: their audience profile is
     // their page, wherever the link came from. Only once the published
     // catalogue is in: before that every uploaded artist looks song-less for a

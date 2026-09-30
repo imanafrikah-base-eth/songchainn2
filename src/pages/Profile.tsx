@@ -47,6 +47,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { BlockedPeople } from '@/components/BlockedPeople';
 import { DeleteAccount } from '@/components/DeleteAccount';
+import { TakeABreak } from '@/components/TakeABreak';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
@@ -1575,6 +1576,7 @@ export default function Profile() {
           <ChangePassword />
           <ChangeEmail />
           <BlockedPeople />
+          <TakeABreak />
           <DeleteAccount />
           <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
             <div>

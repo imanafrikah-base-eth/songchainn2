@@ -27,9 +27,12 @@ function build(songs: Song[], artists: Artist[], catalogs: Catalog[]): LiveCatal
   };
 }
 
+const NO_ONE: ReadonlySet<string> = new Set();
+
 let snapshot: LiveCatalog = build(SONGS, ARTISTS, CATALOGS);
 let lastSource: unknown = null;
 let lastReleases: unknown = null;
+let lastPaused: ReadonlySet<string> = NO_ONE;
 const listeners = new Set<() => void>();
 
 /**
@@ -37,17 +40,29 @@ const listeners = new Set<() => void>();
  * are the query results themselves, which every instance of the hook shares,
  * so many mounted instances still rebuild the catalogue only once.
  */
-export function setLiveCatalog(source: unknown, releases: unknown, publishedSongs: Song[], publishedArtists: Artist[]): void {
-  if (source === lastSource && releases === lastReleases) return;
+export function setLiveCatalog(
+  source: unknown,
+  releases: unknown,
+  publishedSongs: Song[],
+  publishedArtists: Artist[],
+  pausedArtistIds: ReadonlySet<string> = NO_ONE,
+): void {
+  if (source === lastSource && releases === lastReleases && pausedArtistIds === lastPaused) return;
   lastSource = source;
   lastReleases = releases;
+  lastPaused = pausedArtistIds;
+
+  // An artist on a break is out of the catalogue altogether, founding records
+  // included (those live here, not in a songs row anyone could hide).
+  const away = (artistId: string | number | null | undefined) =>
+    artistId != null && pausedArtistIds.has(String(artistId).toLowerCase());
 
   // The founding entry wins where an id is in both.
   const songById = new Map<string, Song>();
-  for (const s of SONGS) songById.set(String(s.id), s);
+  for (const s of SONGS) if (!away(s.artistId)) songById.set(String(s.id), s);
   for (const s of publishedSongs) if (!songById.has(String(s.id))) songById.set(String(s.id), s);
   const artistById = new Map<string, Artist>();
-  for (const a of ARTISTS) artistById.set(String(a.id), a);
+  for (const a of ARTISTS) if (!away(a.id)) artistById.set(String(a.id), a);
   for (const a of publishedArtists) if (!artistById.has(String(a.id))) artistById.set(String(a.id), a);
 
   const songs = Array.from(songById.values());
