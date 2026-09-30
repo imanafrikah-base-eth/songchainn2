@@ -184,7 +184,7 @@ const BattleDetail = () => {
   const { nativeShare } = useShare();
   const handleShare = async () => {
     if (!battle) return;
-    await nativeShare({ title: battle.title, url: `${window.location.origin}/wavewarz-africa/battle/${battle.id}` });
+    await nativeShare({ title: battle.title, text: `${battle.artistA.name} vs ${battle.artistB.name} on WaveWarz Africa`, url: `${window.location.origin}/wavewarz-africa/battle/${battle.id}` });
   };
 
   if (isLoading) {

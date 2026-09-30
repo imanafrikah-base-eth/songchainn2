@@ -519,7 +519,7 @@ const LiveRoom = () => {
   const { nativeShare } = useShare();
   const shareRoomLink = async () => {
     if (!roomId || typeof window === "undefined") return;
-    await nativeShare({ title: battle?.title || "WaveWarz Africa battle", url: `${window.location.origin}/wavewarz-africa/battle/${roomId}` });
+    await nativeShare({ title: battle?.title || "WaveWarz Africa battle", text: battle ? `${battle.artistA.name} vs ${battle.artistB.name} on WaveWarz Africa` : "A battle on WaveWarz Africa", url: `${window.location.origin}/wavewarz-africa/battle/${roomId}` });
   };
   const coHosts = getParticipantsByRole('co-host');
   const speakers = getParticipantsByRole('speaker');
