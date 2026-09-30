@@ -19,7 +19,9 @@ import AppLink from "@/battlezone/components/AppLink";
 import wavewarzLogo from "@/battlezone/assets/WaveWarz Africa music logo transparent.webp";
 import { BattleCountdown } from "@/battlezone/components/BattleCountdown";
 import { STAGES, buildClock } from "@/battlezone/lib/battleStages";
-import { ARTISTS, SONGS } from "@/data/musicData";
+import type { Artist, Song } from "@/data/musicData";
+import { findSong } from "@/lib/liveCatalog";
+import { useLiveCatalog } from "@/hooks/useLiveCatalog";
 import { useHostPerks } from "@/battlezone/hooks/useHostPerks";
 import { installBattleAudioGestureUnlock } from "@/battlezone/lib/audioUnlock";
 
@@ -126,10 +128,10 @@ const BattleDetail = () => {
       for (const r of rows ?? []) uploadedUrls.set(String(r.id), r.audio_url);
     }
     const measured = await durationsFromUrls(
-      allSongs.map((s) => SONGS.find((catalogue) => catalogue.id === s.id)?.audioUrl || uploadedUrls.get(s.id) || null),
+      allSongs.map((s) => findSong(s.id)?.audioUrl || uploadedUrls.get(s.id) || null),
     );
     const clock = buildClock(
-      allSongs.map((s, i) => measured[i] ?? SONGS.find((catalogue) => catalogue.id === s.id)?.duration),
+      allSongs.map((s, i) => measured[i] ?? findSong(s.id)?.duration),
     );
     const startedAt = Date.now();
 
@@ -430,24 +432,25 @@ export default BattleDetail;
 /* ------------------------------------------------- names that go somewhere --- */
 
 /** Look up a catalogue artist by the name a battle stored. */
-function artistIdFor(name: string | null | undefined): string | null {
+function artistIdFor(name: string | null | undefined, artists: Artist[]): string | null {
   const wanted = (name ?? '').trim().toLowerCase();
   if (!wanted) return null;
-  return ARTISTS.find((a) => a.name.trim().toLowerCase() === wanted)?.id ?? null;
+  return artists.find((a) => a.name.trim().toLowerCase() === wanted)?.id ?? null;
 }
 
 /** Look up a record by its title, preferring the one by this artist. */
-function songIdFor(title: string | null | undefined, artistName: string | null | undefined): string | null {
+function songIdFor(title: string | null | undefined, artistName: string | null | undefined, songs: Song[]): string | null {
   const wanted = (title ?? '').trim().toLowerCase();
   if (!wanted || wanted === 'tbd') return null;
   const byArtist = (artistName ?? '').trim().toLowerCase();
-  const matches = SONGS.filter((s) => s.title.trim().toLowerCase() === wanted);
+  const matches = songs.filter((s) => s.title.trim().toLowerCase() === wanted);
   const mine = matches.find((s) => s.artist.trim().toLowerCase() === byArtist);
   return (mine ?? matches[0])?.id ?? null;
 }
 
 function BattleArtistName({ name }: { name: string }) {
-  const id = artistIdFor(name);
+  const { artists } = useLiveCatalog();
+  const id = artistIdFor(name, artists);
   if (!id) return <h3 className="font-bold text-foreground">{name}</h3>;
   return (
     <AppLink to={artistPath(id)} className="font-bold text-foreground hover:text-primary transition-colors">
@@ -457,7 +460,8 @@ function BattleArtistName({ name }: { name: string }) {
 }
 
 function BattleSongTitle({ title, artistName }: { title: string; artistName: string }) {
-  const id = songIdFor(title, artistName);
+  const { songs } = useLiveCatalog();
+  const id = songIdFor(title, artistName, songs);
   if (!id) return <span className="text-xs text-muted-foreground">{title}</span>;
   return (
     <AppLink to={songPath({ id })} className="text-xs text-muted-foreground hover:text-primary transition-colors">

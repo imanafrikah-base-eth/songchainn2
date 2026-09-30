@@ -6,11 +6,11 @@ import { Bell, BellOff, CheckCircle2, ChevronDown, Heart, HeartPulse, ListMusic,
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { usePlayerActions, usePlayerState } from '@/context/PlayerContext';
-import { ARTISTS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
+import { findArtist, liveArtists } from '@/lib/liveCatalog';
 import { useAudienceInteractions } from '@/hooks/useAudienceInteractions';
 import { useEngagement } from '@/context/EngagementContext';
 import { useOfflineAudio } from '@/hooks/useOfflineAudio';
-import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import type { Song } from '@/data/musicData';
 import { useRoomSongs } from '@/hooks/useRoomSongs';
 import { roomClock, roomEntriesAt, useRoomTimeline } from '@/hooks/useRoomTimeline';
@@ -80,9 +80,11 @@ const MOSHA_NAME = 'Mo$ha';
 const MOSHA_ROOM_GREETING_PREFIX = 'songchainn:mosha-room-greeted:v1:';
 const MOSHA_MODE_KEY = 'songchainn:mosha-room-mode:v1';
 
-const KNOWN_ARTIST_NAMES = new Set(
-  ARTISTS.map(a => a.name.trim().toLowerCase()).filter(Boolean)
-);
+/** Whether a name belongs to an artist in the catalogue, founding or published. */
+function isKnownArtistName(name: string): boolean {
+  const wanted = name.trim().toLowerCase();
+  return Boolean(wanted) && liveArtists().some(a => a.name.trim().toLowerCase() === wanted);
+}
 
 function stripUrls(text: string) {
   const withoutUrls = text.replace(
@@ -298,7 +300,13 @@ export default function Room() {
   const { isArtistLiked, toggleLikeArtist, isLoading: isAudienceInteractionsLoading } = useAudienceInteractions();
   // Loving the record that is on, without leaving the Room.
   const { toggleLike, isLiked, sendPulse } = useEngagement();
-  const { artists: publishedArtists } = usePublishedCatalog();
+  const catalog = useLiveCatalog();
+  // The name this artist goes by in the Room, from the live catalogue, so an
+  // artist who joined through the app can post as themselves too.
+  const myArtistName = useMemo(
+    () => (isArtist && artistId ? catalog.artistById.get(String(artistId))?.name ?? null : null),
+    [artistId, catalog, isArtist],
+  );
 
   // Every record the Room plays, and the Room's one schedule. The server keeps
   // the schedule, so everybody in here hears the same second of the same song
@@ -629,9 +637,7 @@ export default function Room() {
         localStorage.setItem(`room_username:${user.id}`, normalized);
       }
 
-      const resolvedArtistName = isArtist
-        ? ARTISTS.find(a => a.id === artistId)?.name ?? null
-        : null;
+      const resolvedArtistName = myArtistName;
 
       if (isArtist && resolvedArtistName) {
         if (!storedIdentity) {
@@ -703,7 +709,7 @@ export default function Room() {
     };
 
     void run();
-  }, [artistId, isArtist, loadLocalMessages, user]);
+  }, [isArtist, loadLocalMessages, myArtistName, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -1134,7 +1140,7 @@ export default function Room() {
     const normalized = normalizeRoomName(nameDraft);
     if (normalized.length < 2) return;
 
-    if ((!isArtist || identityDraft === 'incognito') && KNOWN_ARTIST_NAMES.has(normalized.toLowerCase())) {
+    if ((!isArtist || identityDraft === 'incognito') && isKnownArtistName(normalized)) {
       toast.error('That name is reserved for verified artists.');
       return;
     }
@@ -1145,7 +1151,7 @@ export default function Room() {
   const applyArtistIdentity = useCallback(async (mode: 'artist' | 'incognito') => {
     if (!user) return;
     if (!isArtist) return;
-    const resolvedArtistName = ARTISTS.find(a => a.id === artistId)?.name ?? null;
+    const resolvedArtistName = findArtist(artistId)?.name ?? null;
     if (!resolvedArtistName) return;
 
     localStorage.setItem(`${LOCAL_IDENTITY_KEY}:${user.id}`, mode);
@@ -1502,11 +1508,11 @@ export default function Room() {
   // Everyone behind a record in the Room, with their picture, for the request picker.
   const roomArtists = useMemo(() => {
     const map = new Map<string, { name: string; image?: string }>();
-    for (const a of [...ARTISTS, ...publishedArtists]) {
+    for (const a of catalog.artists) {
       if (!map.has(a.id)) map.set(a.id, { name: a.name, image: a.profileImage });
     }
     return map;
-  }, [publishedArtists]);
+  }, [catalog]);
 
   const roomNowEntries = useMemo(() => {
     if (!timeline) return { current: null, next: null };
@@ -1604,8 +1610,8 @@ export default function Room() {
 
   const currentArtist = useMemo(() => {
     if (!currentSong?.artistId) return null;
-    return ARTISTS.find(a => a.id === currentSong.artistId) ?? null;
-  }, [currentSong?.artistId]);
+    return catalog.artistById.get(String(currentSong.artistId)) ?? null;
+  }, [catalog, currentSong?.artistId]);
 
   const isCurrentArtistFollowed = useMemo(() => {
     if (!currentArtist?.id) return false;
@@ -2303,7 +2309,7 @@ export default function Room() {
                     variant="ghost"
                     className="text-zinc-300 hover:text-zinc-100"
                     onClick={() => {
-                      const resolvedArtistName = ARTISTS.find(a => a.id === artistId)?.name ?? '';
+                      const resolvedArtistName = findArtist(artistId)?.name ?? '';
                       const normalizedArtistName = normalizeRoomName(resolvedArtistName);
                       const normalizedCurrent = normalizeRoomName(roomName || '');
                       setNameDraft(

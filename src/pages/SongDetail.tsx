@@ -4,8 +4,7 @@ import { songPath } from '@/lib/slugRoutes';
 import { ArtistName } from '@/components/ArtistName';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play, Pause, Heart, Music, ListMusic, ListPlus, Clock, Headphones } from 'lucide-react';
-import { SONGS, ARTISTS } from '@/data/musicData';
-import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/ui/button';
@@ -44,9 +43,9 @@ export default function SongDetail({ songIdOverride }: { songIdOverride?: string
 
   const [isPlaylistDialogOpen, setIsPlaylistDialogOpen] = useState(false);
 
-  const { songs: publishedSongs, artists: publishedArtists } = usePublishedCatalog();
-  const song = SONGS.find(s => s.id === id) ?? publishedSongs.find(s => s.id === id);
-  const artist = song ? (ARTISTS.find(a => a.id === song.artistId) ?? publishedArtists.find(a => a.id === song.artistId)) : null;
+  const catalog = useLiveCatalog();
+  const song = id ? catalog.songById.get(id) : undefined;
+  const artist = song ? catalog.artistById.get(String(song.artistId)) ?? null : null;
   const isCurrentSong = currentSong?.id === song?.id;
   const liked = song ? isLiked(song.id) : false;
   const { coinAddress } = useSongOwnership(song?.id ?? '');
@@ -131,8 +130,8 @@ export default function SongDetail({ songIdOverride }: { songIdOverride?: string
   // Get more songs from same artist
   const moreSongs = useMemo(() => {
     if (!song) return [];
-    return SONGS.filter(s => s.artistId === song.artistId && s.id !== song.id).slice(0, 4);
-  }, [song]);
+    return catalog.songs.filter(s => s.artistId === song.artistId && s.id !== song.id).slice(0, 4);
+  }, [catalog, song]);
 
   if (!song || !artist) {
     return (

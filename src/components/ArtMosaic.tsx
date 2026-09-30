@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
-import { ARTISTS, SONGS } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 import { songPath } from '@/lib/slugRoutes';
 import { thumb } from '@/lib/img';
 import { WorldArt } from '@/worlds/components/WorldArt';
@@ -30,9 +29,9 @@ function pick<T>(list: T[], n: number, seed: number): T[] {
 }
 
 export function useCoverArt(count: number, seed = 7): string[] {
-  const { songs } = usePublishedCatalog();
+  const { songs } = useLiveCatalog();
   return useMemo(() => {
-    const pool = (songs.length ? songs : SONGS).map((s) => s.coverImage).filter((u): u is string => Boolean(u));
+    const pool = songs.map((s) => s.coverImage).filter((u): u is string => Boolean(u));
     const unique = [...new Set(pool)];
     return pick(unique, count, seed);
   }, [songs, count, seed]);
@@ -40,10 +39,10 @@ export function useCoverArt(count: number, seed = 7): string[] {
 
 /** One song per cover, so every picture in the strip knows where it leads. */
 function useCoverSongs(count: number, seed: number) {
-  const { songs } = usePublishedCatalog();
+  const { songs } = useLiveCatalog();
   return useMemo(() => {
     const seen = new Set<string>();
-    const pool = (songs.length ? songs : SONGS).filter((s) => {
+    const pool = songs.filter((s) => {
       if (!s.coverImage || seen.has(s.coverImage)) return false;
       seen.add(s.coverImage);
       return true;
@@ -117,7 +116,15 @@ export function ArtMosaic({
 
 /** A row of the artists' own faces, overlapping the way a guest list does. */
 export function ArtistFaces({ count = 8, className = '', size = 'md' }: { count?: number; className?: string; size?: 'sm' | 'md' }) {
-  const faces = useMemo(() => ARTISTS.filter((a) => a.profileImage).slice(0, count), [count]);
+  const { artists } = useLiveCatalog();
+  // The founding faces lead and the newest to join close the row, so an
+  // artist who came in through the app is seen here too.
+  const faces = useMemo(() => {
+    const withFace = artists.filter((a) => a.profileImage);
+    const half = Math.ceil(count / 2);
+    const picked = [...withFace.slice(0, half), ...withFace.slice(-half)];
+    return [...new Map(picked.map((a) => [a.id, a])).values()].slice(0, count);
+  }, [artists, count]);
   const dim = size === 'sm' ? 'h-8 w-8' : 'h-10 w-10 sm:h-12 sm:w-12';
   if (!faces.length) return null;
   return (

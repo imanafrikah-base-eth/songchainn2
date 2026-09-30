@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { SONGS, ARTISTS, type Song } from '@/data/musicData';
-import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
+import type { Song } from '@/data/musicData';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
 
 /**
  * What someone has actually been listening to.
@@ -45,7 +45,7 @@ export interface RankedArtist {
  * touch another person's taste.
  */
 export function useLikedActivity(userId: string | undefined) {
-  const { songs: publishedSongs } = usePublishedCatalog();
+  const catalog = useLiveCatalog();
 
   const { data, isLoading } = useQuery({
     queryKey: ['liked-activity', userId],
@@ -75,7 +75,7 @@ export function useLikedActivity(userId: string | undefined) {
 
   return useMemo(() => {
     const byId = new Map<string, Song>();
-    for (const s of [...SONGS, ...publishedSongs]) byId.set(s.id, s);
+    for (const s of catalog.songs) byId.set(s.id, s);
 
     const songs = (data?.songs ?? [])
       .map((r) => ({ song: byId.get(r.song_id), at: r.created_at }))
@@ -83,7 +83,7 @@ export function useLikedActivity(userId: string | undefined) {
 
     const artists = (data?.artists ?? [])
       .map((r) => {
-        const artist = ARTISTS.find((x) => x.id === r.artist_id);
+        const artist = catalog.artistById.get(String(r.artist_id));
         const fromSong = [...byId.values()].find((s) => s.artistId === r.artist_id);
         const name = artist?.name ?? fromSong?.artist;
         if (!name) return null;
@@ -92,11 +92,11 @@ export function useLikedActivity(userId: string | undefined) {
       .filter((a): a is { artistId: string; name: string; image: string | undefined; at: string } => !!a);
 
     return { isLoading, songs, artists, hasAny: songs.length > 0 || artists.length > 0 };
-  }, [data, isLoading, publishedSongs]);
+  }, [catalog, data, isLoading]);
 }
 
 export function useMusicActivity(userId: string | undefined) {
-  const { songs: publishedSongs } = usePublishedCatalog();
+  const catalog = useLiveCatalog();
 
   const { data: events = [], isLoading } = useQuery({
     queryKey: ['music-activity', userId],
@@ -116,7 +116,7 @@ export function useMusicActivity(userId: string | undefined) {
 
   return useMemo(() => {
     const byId = new Map<string, Song>();
-    for (const s of [...SONGS, ...publishedSongs]) byId.set(s.id, s);
+    for (const s of catalog.songs) byId.set(s.id, s);
 
     const plays = events.filter((e) => e.event_type === 'play');
     const pulses = events.filter((e) => e.event_type === 'pulse');
@@ -139,7 +139,7 @@ export function useMusicActivity(userId: string | undefined) {
 
     const topArtists: RankedArtist[] = [...artistCounts.entries()]
       .map(([artistId, count]) => {
-        const artist = ARTISTS.find((a) => a.id === artistId);
+        const artist = catalog.artistById.get(String(artistId));
         const fromSong = [...byId.values()].find((s) => s.artistId === artistId);
         const name = artist?.name ?? fromSong?.artist;
         if (!name) return null;
@@ -174,5 +174,5 @@ export function useMusicActivity(userId: string | undefined) {
       topArtists,
       recent,
     };
-  }, [events, isLoading, publishedSongs]);
+  }, [catalog, events, isLoading]);
 }

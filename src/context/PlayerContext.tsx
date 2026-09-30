@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode, useMemo } from 'react';
-import { Song, SONGS } from '@/data/musicData';
+import { Song } from '@/data/musicData';
 import { liveSongs } from '@/lib/liveCatalog';
 import { supabase } from '@/integrations/supabase/client';
 import { setRoomListening } from '@/lib/playSource';
@@ -158,7 +158,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(() => readStoredVolume());
-  const [queue, setQueue] = useState<Song[]>(SONGS);
+  const [queue, setQueue] = useState<Song[]>(() => liveSongs());
   const [isCrossfading, setIsCrossfading] = useState(false);
   const [audioVersion, setAudioVersion] = useState(0);
   const [isRoomMode, setIsRoomMode] = useState(false);
@@ -181,7 +181,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const volumeRef = useRef(readStoredVolume());
   // Where the volume was before M muted it, so M again brings it back.
   const lastAudibleVolumeRef = useRef(volumeRef.current > 0 ? volumeRef.current : DEFAULT_VOLUME);
-  const queueRef = useRef<Song[]>(SONGS);
+  const queueRef = useRef<Song[]>(liveSongs());
   const currentSongRef = useRef<Song | null>(null);
   const playHistoryRef = useRef<Set<string>>(new Set());
   const isPlayingRef = useRef(false);
@@ -565,6 +565,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const playSong = useCallback((song: Song, options?: { userAddress?: string; hasOwnership?: boolean; force?: boolean; startTime?: number }) => {
     if (isRoomModeRef.current && !options?.force) return;
+    // A record played on its own, outside any queue, walks the whole live
+    // catalogue from there instead of dropping back into the founding list.
+    if (!isRoomModeRef.current) {
+      setQueue((prev) => {
+        if (prev.some((s) => s.id === song.id)) return prev;
+        const pool = liveSongs();
+        return pool.some((s) => s.id === song.id) ? pool : [...prev, song];
+      });
+    }
     if (audioRef.current) {
       if (typeof options?.startTime === 'number' && options.startTime > 0) {
         // A specific playback position was requested (e.g. seeking a feed
