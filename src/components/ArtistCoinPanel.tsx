@@ -77,7 +77,7 @@ export function ArtistCoinPanel({ artistId }: { artistId: string | undefined }) 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Market cap" value={money(data.marketCapUsd, 0)} />
             <Stat
-              label="24 hours"
+              label="Cap change, 24h"
               value={data.marketCapDelta24h == null ? 'n/a' : money(Math.abs(data.marketCapDelta24h), 0)}
               tone={data.marketCapDelta24h == null ? undefined : up ? 'up' : 'down'}
             />

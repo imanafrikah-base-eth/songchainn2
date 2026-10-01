@@ -3,6 +3,9 @@ import { ExternalLink, FileText } from 'lucide-react';
 import { DayBars } from '@/components/charts/DayBars';
 import { BarList } from '@/components/charts/BarList';
 import { useArtistActivity } from '@/lib/songDetails';
+import { useSongPopularity } from '@/hooks/usePopularity';
+import { useLiveCatalog } from '@/hooks/useLiveCatalog';
+import { songInArtistCatalog } from '@/data/musicData';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
@@ -33,6 +36,22 @@ interface SyncRequest { id: string; song_id: string; requester_name: string; req
 export function ActivityBoard({ artistId }: { artistId: string }) {
   const { user } = useAuth();
   const { data, isLoading } = useArtistActivity(artistId);
+
+  // All-time streams come from the same count the artist's public page shows:
+  // the record's stream history from before plays were logged here, plus every
+  // play since, a shared Room or battle listen counted once. artist_activity()
+  // only counts raw play rows on songs it owns by id, so N3M3SIS's Studio read
+  // about 180 all time while their page read 1,641. One number, both places.
+  const { data: popularity } = useSongPopularity();
+  const catalog = useLiveCatalog();
+  const streamsBySong = new Map<string, number>();
+  let allTimeStreams = 0;
+  for (const song of catalog.songs) {
+    if (!songInArtistCatalog(song, artistId)) continue;
+    const plays = popularity?.find((p) => p.song_id === song.id)?.play_count ?? 0;
+    streamsBySong.set(song.id, plays);
+    allTimeStreams += plays;
+  }
 
   const { data: hostFees = [] } = useQuery({
     queryKey: ['host-fees', user?.id],
@@ -73,12 +92,12 @@ export function ActivityBoard({ artistId }: { artistId: string }) {
       <div>
         <h2 className="font-heading text-lg font-bold text-foreground">Activity</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Counted on the server, not estimated. Plays are listens past thirty seconds. Cities come from the network. This board is the one to send your manager.
+          Counted on the server, not estimated. Plays are listens past thirty seconds. All time is the same number your page shows, your record's history included. Cities come from the network. This board is the one to send your manager.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <Tile label="Plays, 30 days" value={data.plays_30d.toLocaleString()} hint={`${data.plays_total.toLocaleString()} all time`} />
+        <Tile label="Plays, 30 days" value={data.plays_30d.toLocaleString()} hint={`${Math.max(allTimeStreams, data.plays_total).toLocaleString()} all time`} />
         <Tile label="Listeners, 30 days" value={data.listeners_30d.toLocaleString()} />
         <Tile label="Saves" value={data.saves.toLocaleString()} />
         <Tile label="Followers" value={data.followers.toLocaleString()} />
@@ -123,7 +142,7 @@ export function ActivityBoard({ artistId }: { artistId: string }) {
                 <tr key={s.song_id} className="border-t border-border">
                   <td className="px-3 py-2 text-foreground">{s.title}</td>
                   <td className="px-3 py-2 text-right text-foreground">{s.plays_30d.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">{s.plays_total.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{Math.max(streamsBySong.get(s.song_id) ?? 0, s.plays_total).toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{s.saves.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{s.purchases.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{s.holders.toLocaleString()}</td>
