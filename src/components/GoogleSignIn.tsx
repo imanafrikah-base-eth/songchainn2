@@ -95,6 +95,97 @@ async function sha256Hex(input: string): Promise<string> {
     .join('');
 }
 
+/*
+ * ONE GOOGLE SETUP PER PAGE (9 Oct 2026).
+ *
+ * The sign-in screen mounts this component again every time somebody moves
+ * between the options menu and the email form. Each mount used to call
+ * initialize() with a fresh nonce and fire prompt() again while the last
+ * One Tap was still open. Chrome allows one FedCM request at a time, so the
+ * auto prompt died and Google never handed back a token: the auth logs held
+ * no id_token attempt at all while people tapped their account in it. Now
+ * Google is set up once, the auto prompt fires once per page, and whichever
+ * button is on screen hears the result.
+ */
+interface GsiListener {
+  onVerifying: (on: boolean) => void;
+  onFallback: () => void;
+}
+
+const listeners = new Set<GsiListener>();
+let gsiReady: Promise<boolean> | null = null;
+let promptFired = false;
+
+function tellAll(fn: (l: GsiListener) => void) {
+  listeners.forEach((l) => {
+    try {
+      fn(l);
+    } catch {
+      /* a listener that left mid-call */
+    }
+  });
+}
+
+/** Load Google's script and initialise it exactly once. Resolves false if it cannot be used. */
+function setUpGsi(): Promise<boolean> {
+  if (!gsiReady) {
+    gsiReady = (async () => {
+      try {
+        await loadGsi();
+        if (!window.google?.accounts?.id) return false;
+        const rawNonce = crypto.randomUUID().replace(/-/g, '');
+        const hashedNonce = await sha256Hex(rawNonce);
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async (response: { credential?: string }) => {
+            if (!response?.credential) return;
+            tellAll((l) => l.onVerifying(true));
+            try {
+              const { error } = await supabase.auth.signInWithIdToken({
+                provider: 'google',
+                token: response.credential,
+                nonce: rawNonce,
+              });
+              // Google said yes and our check said no. Never leave them there:
+              // the redirect asks Google again and always lands.
+              if (error) tellAll((l) => l.onFallback());
+              // Success: AuthContext's onAuthStateChange picks up the session
+              // and routes new users into onboarding.
+            } catch {
+              tellAll((l) => l.onFallback());
+            } finally {
+              tellAll((l) => l.onVerifying(false));
+            }
+          },
+          nonce: hashedNonce,
+          use_fedcm_for_prompt: true,
+          use_fedcm_for_button: true,
+          itp_support: true,
+          cancel_on_tap_outside: false,
+          context: 'signin',
+          ux_mode: 'popup',
+        });
+        return true;
+      } catch {
+        gsiReady = null;
+        return false;
+      }
+    })();
+  }
+  return gsiReady;
+}
+
+/** The auto prompt, once per page load. A second prompt() while one is open kills both. */
+function promptOnce() {
+  if (promptFired) return;
+  promptFired = true;
+  try {
+    window.google.accounts.id.prompt();
+  } catch {
+    /* the button is still there */
+  }
+}
+
 /** Google's four-colour G, drawn here so the fallback button needs nothing from Google to look right. */
 function GoogleMark({ className = '' }: { className?: string }) {
   return (
@@ -185,6 +276,21 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Whichever copy of the button is on screen hears what Google answered,
+  // including one handed to the auto prompt by an earlier copy.
+  const redirectRef = useRef(redirectSignIn);
+  redirectRef.current = redirectSignIn;
+  useEffect(() => {
+    const me: GsiListener = {
+      onVerifying: setVerifying,
+      onFallback: () => void redirectRef.current(),
+    };
+    listeners.add(me);
+    return () => {
+      listeners.delete(me);
+    };
+  }, []);
+
   // Google's own button (and One Tap beside it), with the redirect as the net.
   useEffect(() => {
     if (webview || !isSupabaseConfigured || !GOOGLE_CLIENT_ID) return;
@@ -196,40 +302,8 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
 
     (async () => {
       try {
-        await loadGsi();
-        if (cancelled || !window.google?.accounts?.id) return;
-        const rawNonce = crypto.randomUUID().replace(/-/g, '');
-        const hashedNonce = await sha256Hex(rawNonce);
+        if (!(await setUpGsi())) throw new Error('Google sign-in unavailable');
         if (cancelled) return;
-
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: async (response: { credential?: string }) => {
-            if (!response?.credential) return;
-            setVerifying(true);
-            try {
-              const { error } = await supabase.auth.signInWithIdToken({
-                provider: 'google',
-                token: response.credential,
-                nonce: rawNonce,
-              });
-              if (error) onError?.(error.message);
-              // Success: AuthContext's onAuthStateChange picks up the session
-              // and routes new users into onboarding.
-            } catch (err: any) {
-              onError?.(err?.message || 'Google sign-in failed');
-            } finally {
-              setVerifying(false);
-            }
-          },
-          nonce: hashedNonce,
-          use_fedcm_for_prompt: true,
-          use_fedcm_for_button: true,
-          itp_support: true,
-          cancel_on_tap_outside: false,
-          context: 'signin',
-          ux_mode: 'popup',
-        });
 
         const host = buttonHost.current;
         if (host) {
@@ -255,7 +329,7 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
           });
         }
 
-        if (oneTap) window.google.accounts.id.prompt();
+        if (oneTap) promptOnce();
       } catch {
         /* Script blocked or refused: the redirect button takes over. */
         window.clearTimeout(giveUp);
@@ -263,17 +337,14 @@ export function GoogleSignIn({ oneTap = true, onError }: GoogleSignInProps) {
       }
     })();
 
+    // The auto prompt is NOT cancelled here: moving from the menu to the
+    // email form unmounts this copy, and cancelling closed the prompt under
+    // a person who was choosing their account in it.
     return () => {
       cancelled = true;
       window.clearTimeout(giveUp);
       observer?.disconnect();
-      try {
-        window.google?.accounts?.id?.cancel();
-      } catch {
-        /* noop */
-      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oneTap, webview]);
 
   if (!isSupabaseConfigured || !GOOGLE_CLIENT_ID) return null;
