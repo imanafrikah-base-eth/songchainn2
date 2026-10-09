@@ -518,6 +518,12 @@ export function MoshaChat({
               {FLOW_LABEL[c.flow]}
             </button>
           ))}
+          {/* Asked, not opened: Mo$ha answers and offers the one-tap opt in, or the plan when already on. */}
+          {isArtist && (
+            <button type="button" disabled={busy} onClick={() => void send('Manage my career')} className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50 min-h-10">
+              Manage my career
+            </button>
+          )}
         </div>
       )}
 

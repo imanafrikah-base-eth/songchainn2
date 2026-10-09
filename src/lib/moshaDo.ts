@@ -31,6 +31,9 @@ export const MOSHA_DO_OPS = [
   'remove_failed_uploads',
   'stop_release',
   'move_release',
+  'manage_my_career',
+  'set_career_goal',
+  'stop_managing_my_career',
 ] as const;
 export type MoshaDoOp = (typeof MOSHA_DO_OPS)[number];
 
@@ -360,6 +363,28 @@ async function releaseIds(ids: string[], at: Date | null): Promise<number> {
   const { data, error } = await supabase.rpc('release_held' as never, { p_song_ids: ids, p_release_at: at ? at.toISOString() : null } as never);
   if (error) throw new Error(error.message);
   return Number(data ?? 0);
+}
+
+/* ------------------------------------------------------------- career --- */
+
+interface CareerPlan {
+  active: boolean;
+  goals: string[];
+}
+
+/** mosha_career is newer than the generated types. Row level security keeps every call to the person's own row. */
+const careerTable = () => (supabase as unknown as { from: (t: string) => any }).from('mosha_career');
+
+async function careerPlan(uid: string): Promise<CareerPlan | null> {
+  const { data } = await careerTable().select('active, goals').eq('user_id', uid).maybeSingle();
+  return (data as CareerPlan | null) ?? null;
+}
+
+/** Newest goal last, five at most, no repeats. */
+function withGoal(goals: string[], goal: string): string[] {
+  if (!goal) return goals;
+  const kept = goals.filter((g) => norm(g) !== norm(goal));
+  return [...kept, goal].slice(-5);
 }
 
 const OPS: Record<MoshaDoOp, DoOp> = {
@@ -732,6 +757,102 @@ const OPS: Record<MoshaDoOp, DoOp> = {
     },
     working: 'Moving the release',
     refresh: [['artist_releases'], ['published-catalog']],
+  },
+
+  manage_my_career: {
+    check: async (_ctx, arg) => {
+      const uid = await sessionUserId();
+      if (!uid) return SIGN_IN;
+      const plan = await careerPlan(uid);
+      const goal = clip(arg, 120);
+      if (plan?.active && !goal) return { nothing: 'I am already managing your career. Ask me for this week\'s plan.' };
+      return {
+        question: plan?.active ? `Add "${goal}" to your goals?` : 'Want me to manage your career?',
+        confirm: plan?.active ? 'Add it' : 'Yes, manage me',
+        note: plan?.active
+          ? undefined
+          : `I keep your goals, plan your releases with you and check in every Monday with your real numbers.${goal ? ` First goal: ${goal}.` : ''} Say stop any time.`,
+      };
+    },
+    run: async (_ctx, arg) => {
+      const uid = await sessionUserId();
+      if (!uid) throw new Error('Sign in first.');
+      const plan = await careerPlan(uid);
+      const goal = clip(arg, 120);
+      const goals = withGoal(plan?.active ? plan.goals : plan?.goals ?? [], goal);
+      const { error } = await careerTable().upsert({
+        user_id: uid,
+        active: true,
+        goals,
+        ...(plan?.active ? {} : { started_at: new Date().toISOString(), stopped_at: null }),
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw new Error('That did not save. Try again in a moment.');
+      if (plan?.active) return `Done. "${goal}" is on your goals.`;
+      return goals.length
+        ? `Done. I am your manager now. Goal one: ${goals[0]}. Ask me for this week's plan.`
+        : 'Done. I am your manager now. Tell me what you want this year to look like and I will plan it with you.';
+    },
+    working: 'Setting it up',
+    refresh: [['mosha_career']],
+  },
+
+  set_career_goal: {
+    check: async (_ctx, arg) => {
+      const uid = await sessionUserId();
+      if (!uid) return SIGN_IN;
+      const goal = clip(arg, 120);
+      if (!goal) return { nothing: 'Tell me the goal in a few words and I will keep it.' };
+      const plan = await careerPlan(uid);
+      return {
+        question: plan?.active ? `Keep "${goal}" as a goal?` : `Keep "${goal}" as your goal and let me manage your career?`,
+        confirm: 'Keep it',
+        note: (plan?.goals.length ?? 0) >= 5 ? `You have five goals, so "${plan!.goals[0]}" makes way.` : undefined,
+      };
+    },
+    run: async (_ctx, arg) => {
+      const uid = await sessionUserId();
+      if (!uid) throw new Error('Sign in first.');
+      const goal = clip(arg, 120);
+      if (!goal) throw new Error('Tell me the goal in a few words.');
+      const plan = await careerPlan(uid);
+      const { error } = await careerTable().upsert({
+        user_id: uid,
+        active: true,
+        goals: withGoal(plan?.goals ?? [], goal),
+        ...(plan?.active ? {} : { started_at: new Date().toISOString(), stopped_at: null }),
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw new Error('That did not save. Try again in a moment.');
+      return `Done. "${goal}" is on your goals.`;
+    },
+    working: 'Keeping it',
+    refresh: [['mosha_career']],
+  },
+
+  stop_managing_my_career: {
+    check: async () => {
+      const uid = await sessionUserId();
+      if (!uid) return SIGN_IN;
+      const plan = await careerPlan(uid);
+      if (!plan?.active) return { nothing: 'I am not managing your career right now. Say the word if you want me to.' };
+      return {
+        question: 'Stop managing your career?',
+        confirm: 'Stop',
+        note: 'No more Monday check-ins. Your goals are kept in case you want me back.',
+      };
+    },
+    run: async () => {
+      const uid = await sessionUserId();
+      if (!uid) throw new Error('Sign in first.');
+      const { error } = await careerTable()
+        .update({ active: false, stopped_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('user_id', uid);
+      if (error) throw new Error('That did not save. Try again in a moment.');
+      return 'Done. I have stepped back. Ask me any time and I will pick it up where we left it.';
+    },
+    working: 'Stepping back',
+    refresh: [['mosha_career']],
   },
 };
 
