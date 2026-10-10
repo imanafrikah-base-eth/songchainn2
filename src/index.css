@@ -475,6 +475,25 @@
   }
 }
 
+/* The bars beside whatever is playing (src/components/NowPlayingBars.tsx). */
+.now-playing-bar {
+  height: 35%;
+  transition: height 300ms ease-out;
+}
+
+.now-playing-bar.is-playing {
+  animation-name: equalizer;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .now-playing-bar.is-playing {
+    animation: none;
+    height: 60%;
+  }
+}
+
 /* Animation classes */
 .animate-pulse-glow {
   animation: pulse-glow 3s ease-in-out infinite;

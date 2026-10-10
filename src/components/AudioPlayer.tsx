@@ -16,6 +16,7 @@ import { useArtworkColor } from '@/hooks/useArtworkColor';
 import { useSongOwnership } from '@/hooks/useSongOwnership';
 import { OwnershipBadge } from '@/components/OwnershipBadge';
 import { UnlockSongModal } from '@/components/UnlockSongModal';
+import { NowPlayingBars } from '@/components/NowPlayingBars';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -364,6 +365,7 @@ export const AudioPlayer = memo(function AudioPlayer() {
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
+                    <NowPlayingBars playing={isPlaying} />
                     <p className="font-medium text-foreground truncate text-sm sm:text-base group-hover:text-primary transition-colors">
                       {currentSong.title}
                     </p>

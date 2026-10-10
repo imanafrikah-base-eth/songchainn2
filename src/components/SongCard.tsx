@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
 import { toast } from '@/hooks/use-toast';
 import { reallyBroken, thumb } from '@/lib/img';
+import { NowPlayingBars } from '@/components/NowPlayingBars';
 
 interface SongCardProps {
   song: Song;
@@ -51,15 +52,6 @@ function PlayerTimeTap({ onTime }: { onTime: (seconds: number) => void }) {
   return null;
 }
 
-function NowPlayingDot() {
-  return (
-    <motion.span
-      className="inline-block w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"
-      animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
-      transition={{ duration: 1.5, repeat: Infinity }}
-    />
-  );
-}
 
 export const SongCard = memo(function SongCard({ song, index = 0, variant = 'default' }: SongCardProps) {
   const { currentSong, isPlaying } = usePlayerState();
@@ -223,6 +215,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: index * 0.05, ease: [0.4, 0, 0.2, 1] }}
           whileHover={{ scale: 1.01, x: 4 }}
+          whileTap={{ scale: 0.97 }}
           className={cn(
             "group flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl sm:rounded-2xl transition-all cursor-pointer",
             isCurrentSong
@@ -270,7 +263,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              {isCurrentSong && isPlaying && <NowPlayingDot />}
+              {isCurrentSong && <NowPlayingBars playing={isPlaying} />}
               <p className={cn(
                 "font-medium truncate text-sm sm:text-base",
                 isCurrentSong ? "text-primary" : "text-foreground"
@@ -396,6 +389,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
         {timeTap}
         <motion.div
           whileHover={{ y: -4, scale: 1.02 }}
+          whileTap={{ scale: 0.96 }}
           className="group relative overflow-hidden rounded-2xl glass-card cursor-pointer shine-overlay"
           onClick={handlePlay}
           role="button"
@@ -470,7 +464,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-heading font-semibold text-foreground truncate flex items-center gap-2">
-                {isCurrentSong && isPlaying && <NowPlayingDot />}
+                {isCurrentSong && <NowPlayingBars playing={isPlaying} />}
                 <span className="truncate">{song.title}</span>
                 {isNewSong && <NewBadge />}
               </h3>
@@ -552,6 +546,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.05, ease: [0.4, 0, 0.2, 1] }}
       whileHover={{ y: -6 }}
+      whileTap={{ scale: 0.97 }}
       className="group relative glass-card rounded-2xl overflow-hidden hover:shadow-float transition-all duration-300 cursor-pointer shine-overlay"
       style={artworkGlowStyle}
       onClick={handlePlay}
@@ -607,7 +602,7 @@ export const SongCard = memo(function SongCard({ song, index = 0, variant = 'def
             "font-heading font-semibold truncate text-base flex items-center gap-2",
             isCurrentSong ? "text-primary" : "text-foreground"
           )}>
-            {isCurrentSong && isPlaying && <NowPlayingDot />}
+            {isCurrentSong && <NowPlayingBars playing={isPlaying} />}
             <span className="truncate">{song.title}</span>
             {isNewSong && <NewBadge />}
           </h3>

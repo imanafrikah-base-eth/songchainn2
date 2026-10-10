@@ -1329,12 +1329,25 @@ export default function Room() {
       broadcastRef.current?.postMessage({ type: 'reaction', reaction: payload });
     } else {
       // Kept, so it is still there after leaving and coming back.
-      const table = (supabase as any).from('room_message_reactions');
+      const table = () => (supabase as any).from('room_message_reactions');
       const write = already
-        ? table.delete().eq('message_id', messageId).eq('user_id', user.id).eq('emoji', emoji)
-        : table.insert({ message_id: messageId, user_id: user.id, emoji });
-      void write.then(({ error }: { error: unknown }) => {
-        if (error) console.warn('room reaction not saved', error);
+        ? table().delete().eq('message_id', messageId).eq('user_id', user.id).eq('emoji', emoji)
+        : table().insert({ message_id: messageId, user_id: user.id, emoji });
+      void write.then(({ error }: { error: { code?: string } | null }) => {
+        if (!error) return;
+        // A reaction to a message seconds old can land before the message's
+        // own row does (23503, the foreign key). Give it a moment, once.
+        if (!already && error.code === '23503') {
+          window.setTimeout(() => {
+            void table()
+              .insert({ message_id: messageId, user_id: user.id, emoji })
+              .then(({ error: again }: { error: unknown }) => {
+                if (again) console.warn('room reaction not saved', again);
+              });
+          }, 2500);
+          return;
+        }
+        console.warn('room reaction not saved', error);
       });
     }
   }, [applyReactionDelta, broadcastRoomReaction, chatBackend, myReactionsByMessageId, user]);
