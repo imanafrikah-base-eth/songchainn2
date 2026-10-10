@@ -127,8 +127,9 @@
     --shadow-inner-glow: none;
 
     /* Typography */
-    --font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
-    --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    /* One confident typeface across the app (10 Oct 2026); the system stack is the fallback while it loads. */
+    --font-heading: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
+    --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
 
     --sidebar-background: 220 8% 7%;
     --sidebar-foreground: 210 6% 93%;
