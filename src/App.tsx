@@ -23,7 +23,6 @@ import { PointsMilestones } from "@/components/PointsMilestones";
 import { RoomPresenceKeeper } from "@/components/RoomPresenceKeeper";
 import { RoomTimelineSync } from "@/components/RoomTimelineSync";
 import { RoomCues } from "@/components/RoomCues";
-import { NotificationBanner } from "@/components/NotificationBanner";
 import { GlobalAmbientLayer } from "@/components/GlobalAmbientLayer";
 import { PulseRipple } from "@/components/PulseRipple";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -343,7 +342,11 @@ function AppContent() {
 
   return (
     <>
-      <ErrorBoundary fallback={null}><NotificationBanner /></ErrorBoundary>
+      {/* No "turn on notifications" pop-up: nothing sends push yet (see
+          usePushNotifications), so asking promised alerts that never came, and on
+          the landing it covered the headline (10 Oct 2026). Bring it back with
+          the server sender, after a later visit, from the bottom. The bell and
+          Settings still work. */}
       {!isAuthenticated ? (
         <ErrorBoundary>
           <PlayerProvider>
