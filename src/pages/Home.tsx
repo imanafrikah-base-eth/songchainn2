@@ -49,6 +49,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DayOnesPanel } from '@/components/dayones/DayOnesPanel';
 import { SearchModal } from '@/components/SearchModal';
+import { useRoomTimeline, roomClock, roomEntriesAt } from '@/hooks/useRoomTimeline';
+import { findSong } from '@/lib/liveCatalog';
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -188,6 +190,13 @@ export default function Home() {
     () => rankedArtists.map((a) => ({ id: a.id, name: a.name, image: a.profileImage })),
     [rankedArtists],
   );
+  // Whose song is playing in the Room this minute: that face wears the turning ring.
+  const { data: roomTimeline } = useRoomTimeline(Boolean(user));
+  const liveArtistId = useMemo(() => {
+    if (!roomTimeline) return null;
+    const { current } = roomEntriesAt(roomTimeline, roomClock(roomTimeline));
+    return current ? findSong(current.songId)?.artistId ?? null : null;
+  }, [roomTimeline]);
 
   const songsByCatalog = useMemo(
     () =>
@@ -480,7 +489,7 @@ export default function Home() {
           </div>
         )}
         {heroFeature ? (
-          <HomeHero feature={heroFeature} onPlay={handlePlayHero} faces={heroFaces} />
+          <HomeHero feature={heroFeature} onPlay={handlePlayHero} faces={heroFaces} liveArtistId={liveArtistId} />
         ) : (
           // Holds the space while today's counts arrive, so the page does not
           // jump when the record of the day lands.

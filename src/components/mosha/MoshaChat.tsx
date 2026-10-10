@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const DRAFT_KEY = 'songchainn:mosha-draft:v1';
 import { Link, useNavigate } from 'react-router-dom';
 import { rememberEditWhere } from '@/lib/moshaWatch';
-import { Loader2, Mic2, SendHorizontal, Sparkles, X } from 'lucide-react';
+import { Loader2, Mic2, SendHorizontal, X } from 'lucide-react';
 import { AttachButton, AttachmentTray, useAttachDrop, useMoshaTray } from '@/components/mosha/MoshaAttachmentTray';
 import { MoshaAttachmentList } from '@/components/mosha/MoshaAttachmentView';
 import { MoshaText } from '@/components/mosha/MoshaText';
@@ -13,7 +13,7 @@ import { useHasLiveSong } from '@/hooks/useHasLiveSong';
 import type { MoshaDoOp } from '@/lib/moshaDo';
 import { filesOnlyLine, type MoshaAttachment } from '@/lib/moshaAttachments';
 import { clearTray, getTray, settleTray } from '@/lib/moshaTray';
-import { askMoshaFull, MOSHA_INTRO, type MoshaAction, type MoshaTurn } from '@/lib/mosha';
+import { askMoshaFull, MOSHA_INTRO, MOSHA_PFP, type MoshaAction, type MoshaTurn } from '@/lib/mosha';
 import {
   getCache,
   loadEarlier,
@@ -382,7 +382,7 @@ export function MoshaChat({
     <div className={`flex flex-col ${compact ? 'h-[60vh] max-h-[28rem]' : 'h-[68vh] max-h-[34rem]'}`} {...drop.bind}>
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
-          <Sparkles className="h-3.5 w-3.5" /> Mo$ha
+          <img src={MOSHA_PFP} alt="" aria-hidden="true" className="h-6 w-6 rounded-full object-cover" /> Mo$ha
           <span className="rounded border border-current/40 px-1 text-[9px] font-semibold uppercase tracking-wide opacity-80" title="An AI guide. Replies are generated.">AI</span>
         </span>
         {onClose && (

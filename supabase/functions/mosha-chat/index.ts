@@ -967,6 +967,9 @@ async function liveContext(db: Db, token: string | null, page: string | null, ex
   const now = new Date();
   lines.push(`Today is ${now.toUTCString().slice(0, 16)}.`);
   if (page) lines.push(`The person is on the ${page} page right now.`);
+  if (extra.surface === "room") {
+    lines.push("You are answering IN PUBLIC, in The Room's group chat, where everybody listening can read it. You are the guide everybody in here knows: the one who knows this whole place and helps anyone who asks. Answer the question in one or two short sentences, warm and sure, and you may greet them by the name they asked under. Say NOTHING private about them or anyone: no wallet, points, holdings, uploads, worlds in progress, memory, open problems or anything from their account, even if you were given it; if the answer needs their account, tell them to open your chat (the Mo$ha button) for that. No action tags at all here, they do nothing in the Room. Never invent a fact.");
+  }
   if (extra.surface === "guide") {
     lines.push("You are riding along beside them on the World Builder page while they build, in a small card on that page, not the main chat. One or two short sentences only: a few words on what they just did, then the one next question that fits the step they are on. No flow tags, they are already on the page; a go tag only if what they need is on a different page. A message in brackets that starts with \"On the page I just\" was written by the app, not typed by them: react to what it says they did.");
   }
@@ -1742,7 +1745,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (uid && !silent) {
+    // A public Room answer is not part of their private history with Mo$ha.
+    if (uid && !silent && extra.surface !== "room") {
       const work = remember(db, uid, turns, words, action, reported, extra.surface, attachments);
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work);
       else void work;

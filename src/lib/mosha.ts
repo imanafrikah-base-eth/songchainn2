@@ -29,7 +29,7 @@ export type MoshaAction =
   /** Songs and art sent in the chat, handed to the release flow. */
   | { type: 'flow'; flow: 'release_files'; attachments?: MoshaAttachment[] };
 
-export type MoshaSurface = 'bubble' | 'inbox' | 'guide';
+export type MoshaSurface = 'bubble' | 'inbox' | 'guide' | 'room';
 
 export interface MoshaReply {
   reply: string;
@@ -108,3 +108,6 @@ function pageName(pathname: string): string {
   if (pathname.startsWith('/leaderboard')) return 'the leaderboard';
   return pathname.replace(/^\//, '').split('/')[0] || 'home';
 }
+
+/** Mo$ha's face for every round avatar: the Room, the inbox, his chat (public/mosha-pfp.webp). */
+export const MOSHA_PFP = '/mosha-pfp.webp';

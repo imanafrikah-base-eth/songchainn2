@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
-import moshaAvatar from '@/assets/Mo$ha chat pop up.webp';
+import { MOSHA_PFP as moshaAvatar } from '@/lib/mosha';
 import { ChatMessageList, TypingBubble, type ChatItem } from './ChatMessageList';
 import { Composer } from './Composer';
 import { DmAvatar } from './DmAvatar';

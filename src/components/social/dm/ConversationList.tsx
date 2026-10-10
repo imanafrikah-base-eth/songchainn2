@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Pin, Search, X } from 'lucide-react';
-import moshaAvatar from '@/assets/Mo$ha chat pop up.webp';
+import { MOSHA_PFP as moshaAvatar } from '@/lib/mosha';
 import { ArtistName } from '@/components/ArtistName';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Conversation } from '@/hooks/useDirectMessages';

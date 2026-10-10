@@ -49,6 +49,7 @@ export function RoomChatMessage({
   parent,
   sentAt,
   isMine = false,
+  guide = false,
   bigEmoji = false,
   reactions,
   myReactions,
@@ -66,6 +67,8 @@ export function RoomChatMessage({
   sentAt?: string | null;
   /** Your own words, tinted so the column is readable at a glance. */
   isMine?: boolean;
+  /** Mo$ha, the one who knows the place: his face, a Guide tag, and a bubble of his own. */
+  guide?: boolean;
   /** Only emoji: shown big and without a bubble. */
   bigEmoji?: boolean;
   reactions?: Record<string, number>;
@@ -245,6 +248,7 @@ export function RoomChatMessage({
           className={[
             'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-semibold uppercase',
             isMine ? 'bg-primary/25 text-primary' : 'bg-white/10 text-zinc-300',
+            guide ? 'ring-2 ring-primary/60' : '',
           ].join(' ')}
         >
           {avatarUrl ? (
@@ -260,7 +264,7 @@ export function RoomChatMessage({
             className={[
               'inline-block max-w-full rounded-2xl px-3 py-2 transition-transform',
               menu ? 'scale-[0.98]' : '',
-              bigEmoji ? 'border border-transparent' : isMine ? 'border border-primary/25 bg-primary/10' : 'border border-white/10 bg-white/[0.04]',
+              bigEmoji ? 'border border-transparent' : guide ? 'border border-primary/30 bg-white/[0.06]' : isMine ? 'border border-primary/25 bg-primary/10' : 'border border-white/10 bg-white/[0.04]',
             ].join(' ')}
           >
             {parent && (
@@ -269,7 +273,12 @@ export function RoomChatMessage({
               </div>
             )}
             <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] font-semibold text-zinc-100">
-              <ArtistName name={name} userId={userId} size={14} />
+              {guide ? <span>{name}</span> : <ArtistName name={name} userId={userId} size={14} />}
+              {guide && (
+                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  Guide
+                </span>
+              )}
               {clock && (
                 <time dateTime={sentAt ?? undefined} title={fullTime} className="text-[11px] font-normal tabular-nums text-zinc-500">
                   {clock}

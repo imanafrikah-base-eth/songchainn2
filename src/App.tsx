@@ -25,6 +25,7 @@ import { RoomTimelineSync } from "@/components/RoomTimelineSync";
 import { RoomCues } from "@/components/RoomCues";
 import { NotificationBanner } from "@/components/NotificationBanner";
 import { GlobalAmbientLayer } from "@/components/GlobalAmbientLayer";
+import { PulseRipple } from "@/components/PulseRipple";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 const VibeAgent = lazyWithRecovery(() => import("@/components/VibeAgent").then(m => ({ default: m.VibeAgent })));
 // The play-triggered follow/next-track cards are gone; earning a Day One is the one moment that shows a card.
@@ -174,16 +175,13 @@ function AppShell() {
     };
   }, [triggerGlobalPulse, user?.id]);
 
-  const rootPulseClass = isGlobalPulsing
-    ? prefersReducedMotion
-      ? 'app-global-pulse app-global-pulse--reduced'
-      : 'app-global-pulse'
-    : '';
 
   return (
     <>
-      <div className={`${hideFloatingChrome || isFullScreenFeed ? '' : 'pb-chrome lg:pb-0'} ${rootPulseClass}`.trim()}>
+      <div className={hideFloatingChrome || isFullScreenFeed ? '' : 'pb-chrome lg:pb-0'}>
         <GlobalAmbientLayer isGlobalPulsing={isGlobalPulsing} prefersReducedMotion={prefersReducedMotion} />
+        {/* Your pulse: a heartbeat from where you tapped (replaced the cyan screen-edge glow, 10 Oct 2026). */}
+        <PulseRipple />
         <RedirectHandler />
         <Suspense fallback={<PageLoader />}>
           <AnimatePresence mode="wait" initial={false}>

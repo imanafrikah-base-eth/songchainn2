@@ -26,6 +26,7 @@ import { HdEmoji, isEmojiOnly, withHdEmoji } from '@/components/room/HdEmoji';
 import { toast } from 'sonner';
 import { announceRoomName, playRoomCue, sendRoomCue, setRoomSoundsOn, useRoomSoundsOn } from '@/lib/roomCues';
 import { useProfilePictures } from '@/hooks/useProfilePictures';
+import { askMosha, MOSHA_PFP } from '@/lib/mosha';
 import { useRoomRequests, ROOM_REQUEST_MIN_POINTS } from '@/hooks/useRoomRequests';
 import { RoomRequestSheet, Cover, type RoomLineEntry } from '@/components/room/RoomRequestSheet';
 
@@ -1009,7 +1010,7 @@ export default function Room() {
     };
   }, [chatBackend, fetchRecentMessages, mergeRecentMessages, user]);
 
-  const appendMoshaMessage = useCallback((text: string) => {
+  const appendMoshaMessage = useCallback((text: string, replyTo: string | null = null, toEveryone = false) => {
     if (!text.trim()) return;
     const next: RoomMessage = {
       id: makeMessageId(),
@@ -1018,15 +1019,17 @@ export default function Room() {
       content: text.trim().slice(0, 280),
       message: text.trim().slice(0, 280),
       created_at: new Date().toISOString(),
-      reply_to_message_id: null,
+      reply_to_message_id: replyTo,
     };
+    // An answer is for the whole Room to see, not only the person who asked.
+    if (toEveryone) broadcastRoomMessage(next);
     setMessages(prev => {
       if (prev.some((m) => m.id === next.id)) return prev;
       const updated = [...prev, next].slice(-50);
       if (chatBackend === 'local') persistLocalMessages(updated);
       return updated;
     });
-  }, [chatBackend, persistLocalMessages]);
+  }, [broadcastRoomMessage, chatBackend, persistLocalMessages]);
 
   useEffect(() => {
     if (!user || hasMoshaGreetedRef.current) return;
@@ -1051,6 +1054,8 @@ export default function Room() {
     if (!messages.length) return;
     const latest = messages[messages.length - 1];
     if (!latest || latest.user_id === MOSHA_USER_ID) return;
+    // Only the asker's device asks him, so he answers once and everyone sees it.
+    if (!user || latest.user_id !== user.id) return;
     if (lastMoshaReplyToIdRef.current === latest.id) return;
 
     const raw = (latest.content || latest.message || '').trim();
@@ -1066,19 +1071,26 @@ export default function Room() {
     if (!isReplyToMosha && !callsMosha) return;
 
     lastMoshaReplyToIdRef.current = latest.id;
-    const minDelayMs = 2200;
-    const jitterMs = Math.floor(Math.random() * 2200);
-    const timer = window.setTimeout(() => {
-      const reply = buildMoshaReply({
+    // He answers from his real brain, in public: the server's 'room' surface
+    // keeps it short and never says anything private about the asker.
+    const playing = currentSong ? ` (Playing in the Room right now: "${currentSong.title}" by ${currentSong.artist}.)` : '';
+    const fallback = () =>
+      buildMoshaReply({
         content: raw,
         currentSongTitle: currentSong?.title || null,
         currentArtistName: currentSong?.artist || null,
         mode: moshaMode,
       });
-      appendMoshaMessage(reply);
-    }, minDelayMs + jitterMs);
-    return () => window.clearTimeout(timer);
-  }, [appendMoshaMessage, currentSong?.artist, currentSong?.title, messages, moshaMode]);
+    let answered = false;
+    void askMosha([{ role: 'user', content: `${latest.room_name || 'Someone'} asks in the Room: ${raw}${playing}` }], 'room')
+      .then((reply) => {
+        answered = true;
+        appendMoshaMessage(reply?.trim() ? reply : fallback(), latest.id, true);
+      })
+      .catch(() => {
+        if (!answered) appendMoshaMessage(fallback(), latest.id, true);
+      });
+  }, [appendMoshaMessage, currentSong, messages, moshaMode, user]);
 
   useEffect(() => {
     if (!shouldAutoScrollRef.current) return;
@@ -1964,7 +1976,8 @@ export default function Room() {
                       key={m.id}
                       name={m.room_name}
                       userId={m.user_id}
-                      avatarUrl={faces[m.user_id]?.avatar ?? null}
+                      avatarUrl={m.user_id === MOSHA_USER_ID ? MOSHA_PFP : faces[m.user_id]?.avatar ?? null}
+                      guide={m.user_id === MOSHA_USER_ID}
                       body={big ? withHdEmoji(text.replace(/\s+/g, ''), 44, m.id) : renderMessageWithCustomEmojis(text)}
                       copyText={text}
                       bigEmoji={big}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import moshaAvatar from '@/assets/Mo$ha chat pop up.webp';
+import { MOSHA_PFP as moshaAvatar } from '@/lib/mosha';
 import { claimInterruption, releaseInterruption } from '@/lib/interruptions';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
