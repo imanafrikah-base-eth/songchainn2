@@ -55,6 +55,44 @@ export function catalogEarnedPlacement(
 }
 
 /** Index songs by id, for catalogEarnedPlacement. */
-export function indexSongs(songs: Song[]): Map<string, Placeable> {
+export function indexSongs(songs: Song[]): Map<string, Song> {
   return new Map(songs.map((song) => [song.id, song]));
+}
+
+// The front store: who reaches the rails a stranger sees first.
+//
+// The rung measures finish, not taste. A rough mix from a founding artist and
+// a rough mix from someone who signed up yesterday read the same on a meter,
+// so the meter alone cannot keep the front store sounding like SONGCHAINN.
+// What can is the verified mark (artist_accounts.is_verified), which the
+// founder grants by hand to artists who rep the place.
+//
+// Anyone can still upload and publish. An unverified artist's records get a
+// page, a player, a share link, search, All Catalogs and their own profile.
+// They do not get New Releases, the opening record, Hot Today, featured rails,
+// the landing page or the artist faces until the founder verifies them, and
+// the moment he does, everything they have already released moves up with
+// them.
+
+type FrontStorable = Pick<Song, 'qualityTier' | 'artistId'>;
+type IsVerified = (artistId?: string | null) => boolean;
+
+/**
+ * True when a track belongs on the front store. Founding-catalog tracks carry
+ * no rung and always do; an uploaded track needs a verified artist.
+ */
+export function onFrontStore(song: FrontStorable, isVerifiedArtist: IsVerified): boolean {
+  if (!song.qualityTier) return true;
+  return isVerifiedArtist(song.artistId);
+}
+
+/** Same rule for a catalog: it is on the front when its artist is. */
+export function catalogOnFrontStore(
+  catalog: Pick<Catalog, 'songIds' | 'artistId'>,
+  songById: Map<string, FrontStorable>,
+  isVerifiedArtist: IsVerified,
+): boolean {
+  const known = catalog.songIds.map((id) => songById.get(id)).filter(Boolean) as FrontStorable[];
+  if (known.length === 0) return true;
+  return known.some((song) => onFrontStore(song, isVerifiedArtist));
 }

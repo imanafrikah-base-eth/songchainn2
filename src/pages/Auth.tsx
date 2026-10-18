@@ -40,6 +40,8 @@ import { WorldsPhase3 } from '@/components/worlds/WorldsPhase3';
 import { HomeHero, type HeroFeature } from '@/components/HomeHero';
 import { useSettledHero } from '@/hooks/useSettledHero';
 import { pickHeroSong } from '@/lib/heroPick';
+import { useFrontStore } from '@/hooks/useFrontStore';
+import { earnedPlacement } from '@/lib/placement';
 import { GenreExplorer } from '@/components/GenreExplorer';
 import { MoshaIntroPopup, useMoshaIntroTrigger } from '@/components/MoshaIntroPopup';
 import { AUTH_PROVIDERS, WORLDS_ENABLED } from '@/lib/features';
@@ -161,9 +163,20 @@ export default function Auth() {
   const { playSong, pause } = usePlayerActions();
   const { currentSong, isPlaying } = usePlayerState();
   const { currentTime, duration } = usePlayerTime();
-  const { rankedArtists } = useRankedArtists();
+  const { rankedArtists: allRankedArtists } = useRankedArtists();
+  // The landing is the front store: only artists who rep the place, and only
+  // their records. Everyone else is one search away, never on this page.
+  const { songOnFront, artistOnFront } = useFrontStore();
+  const rankedArtists = useMemo(
+    () => allRankedArtists.filter((a) => artistOnFront(a.id)),
+    [allRankedArtists, artistOnFront],
+  );
   const { data: popularityData = [] } = useSongPopularity();
-  const { data: hotTodaySongs = [], isPlaceholderData: hotStillComing } = useTodayHotSongs(10);
+  const { data: allHotTodaySongs = [], isPlaceholderData: hotStillComing } = useTodayHotSongs(10);
+  const hotTodaySongs = useMemo(
+    () => allHotTodaySongs.filter(({ song }) => earnedPlacement(song) && songOnFront(song)),
+    [allHotTodaySongs, songOnFront],
+  );
   const { data: songCoins = [] } = useSongCoins();
 
   const dailyMixSong = useMemo<Song>(() => ({
@@ -192,7 +205,8 @@ export default function Auth() {
   const { songs: allSongs, catalogs: allCatalogs } = useLiveCatalog();
 
   const previewCatalogs = useMemo(() => {
-    return [...allCatalogs]
+    return allCatalogs
+      .filter((catalog) => artistOnFront(catalog.artistId))
       .map((catalog) => {
         const livePlays = catalog.songIds.reduce((sum, songId) => sum + (popularityBySongId.get(songId) || 0), 0);
         const mergedPlays = Math.max(catalog.totalPlays, livePlays);
@@ -200,7 +214,7 @@ export default function Auth() {
       })
       .sort((a, b) => b.totalPlays - a.totalPlays)
       .slice(0, 6);
-  }, [allCatalogs, popularityBySongId]);
+  }, [allCatalogs, popularityBySongId, artistOnFront]);
 
   // Every artist on the platform, not a top slice. There are eleven; showing
   // all of them is the point, and the row scrolls.
@@ -218,10 +232,10 @@ export default function Auth() {
   }, [previewArtists]);
 
   const previewSongs = useMemo(() => {
-    return [...allSongs].sort(
+    return allSongs.filter(songOnFront).sort(
       (a, b) => (popularityBySongId.get(b.id) || b.plays || 0) - (popularityBySongId.get(a.id) || a.plays || 0)
     );
-  }, [allSongs, popularityBySongId]);
+  }, [allSongs, popularityBySongId, songOnFront]);
 
   // The landing used to open on a three-line poster headline over a stock
   // image: "Discover. Vibe. Support. Real music. Real people." Words about
@@ -245,7 +259,7 @@ export default function Auth() {
     const releases: NewRelease[] = [];
 
     allSongs.forEach((song) => {
-      if (!song.addedAt) return;
+      if (!song.addedAt || !songOnFront(song)) return;
       const addedAt = new Date(song.addedAt).getTime();
       if (addedAt < cutoff) return;
 
@@ -273,7 +287,7 @@ export default function Auth() {
     });
 
     return releases.sort((a, b) => b.addedAt - a.addedAt).slice(0, 12);
-  }, [allSongs]);
+  }, [allSongs, songOnFront]);
 
   const landingPick = useMemo<HeroFeature | null>(() => {
     const pick = pickHeroSong({

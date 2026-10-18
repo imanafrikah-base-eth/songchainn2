@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useTodayHotSongs } from '@/hooks/usePopularity';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { catalogEarnedPlacement, indexSongs } from '@/lib/placement';
+import { useFrontStore } from '@/hooks/useFrontStore';
 import { CatalogCard } from '@/components/CatalogCard';
 import { CatalogGrid } from '@/components/CatalogGrid';
 import { SongCard } from '@/components/SongCard';
@@ -140,16 +141,18 @@ export default function Discover() {
       .map(([genre]) => genre as Genre);
   }, [likedSongIds, allSongs]);
 
+  const { catalogOnFront } = useFrontStore();
   const newReleases = useMemo(
     () =>
-      [...catalogs]
+      catalogs
+        .filter((catalog) => catalogOnFront(catalog, songById))
         .sort((a, b) => {
           const timeA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
           const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
           return timeB - timeA;
         })
         .slice(0, 5),
-    [catalogs],
+    [catalogs, catalogOnFront, songById],
   );
 
   const catalogBySongId = useMemo(() => {
@@ -173,7 +176,9 @@ export default function Discover() {
   // Featured is a push, not a shelf: only catalogs that earned placement reach
   // it. New Releases below still carries every release, on any rung.
   const recommendedCatalogs = useMemo(() => {
-    const placeable = catalogs.filter((catalog) => catalogEarnedPlacement(catalog, songById));
+    const placeable = catalogs.filter(
+      (catalog) => catalogEarnedPlacement(catalog, songById) && catalogOnFront(catalog, songById),
+    );
 
     if (preferredGenres.length === 0) {
       return [...placeable]
@@ -191,7 +196,7 @@ export default function Discover() {
     return Array.from(catalogSet.values())
       .sort((a, b) => (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0))
       .slice(0, 6);
-  }, [catalogs, preferredGenres, hotScoreByCatalog, songById]);
+  }, [catalogs, preferredGenres, hotScoreByCatalog, songById, catalogOnFront]);
 
   const filteredCatalogs = useMemo(() => {
     if (selectedGenre === 'all') return catalogs;

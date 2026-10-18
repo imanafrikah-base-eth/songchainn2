@@ -35,6 +35,7 @@ import { HomeHero, type HeroFeature } from '@/components/HomeHero';
 import { useMoshaTour } from '@/hooks/useMoshaTour';
 import { useSettledHero } from '@/hooks/useSettledHero';
 import { pickHeroSong } from '@/lib/heroPick';
+import { useFrontStore } from '@/hooks/useFrontStore';
 import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
 import { ZABAL_GAMEZ_ENABLED, WORLDS_ENABLED } from '@/lib/features';
 import { WorldsPhase3 } from '@/components/worlds/WorldsPhase3';
@@ -93,7 +94,13 @@ function getPlaylistGradient(playlist: { id: string; name: string; mood?: string
 }
 
 export default function Home() {
-  const { rankedArtists } = useRankedArtists();
+  const { rankedArtists: allRankedArtists } = useRankedArtists();
+  const { songOnFront, catalogOnFront, artistOnFront } = useFrontStore();
+  // The front of Home is the front store: only artists who rep the place.
+  const rankedArtists = useMemo(
+    () => allRankedArtists.filter((a) => artistOnFront(a.id)),
+    [allRankedArtists, artistOnFront],
+  );
   const { audienceProfile, refreshProfile, user } = useAuth();
   const { data: todayHotSongs = [], isPlaceholderData: hotStillComing } = useTodayHotSongs(10);
   const { playlists, createPlaylist, addSongsToPlaylist, likedArtists } = useAudienceInteractions();
@@ -149,14 +156,14 @@ export default function Home() {
   const featuredCatalogs = useMemo(
     () =>
       catalogs
-        .filter((catalog) => catalogEarnedPlacement(catalog, songById))
+        .filter((catalog) => catalogEarnedPlacement(catalog, songById) && catalogOnFront(catalog, songById))
         .sort((a, b) => {
           const scoreDelta = (hotScoreByCatalog.get(b.id) || 0) - (hotScoreByCatalog.get(a.id) || 0);
           if (scoreDelta !== 0) return scoreDelta;
           return a.title.localeCompare(b.title);
         })
         .slice(0, 6),
-    [catalogs, hotScoreByCatalog, songById],
+    [catalogs, hotScoreByCatalog, songById, catalogOnFront],
   );
   const allCatalogs = useMemo(
     () =>
@@ -173,11 +180,11 @@ export default function Home() {
       const timeB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
       return timeB - timeA;
     });
-    return sorted.filter(isCatalogNew);
-  }, [catalogs]);
+    return sorted.filter((catalog) => isCatalogNew(catalog) && catalogOnFront(catalog, songById));
+  }, [catalogs, catalogOnFront, songById]);
   const hotTodaySongs = useMemo(
-    () => todayHotSongs.filter(({ song }) => earnedPlacement(song)),
-    [todayHotSongs],
+    () => todayHotSongs.filter(({ song }) => earnedPlacement(song) && songOnFront(song)),
+    [todayHotSongs, songOnFront],
   );
   // The page opens on one record at size rather than on copy about the app.
   // Newest release first, then whatever is hottest, then anything at all: Home
@@ -247,7 +254,7 @@ export default function Home() {
     const pick = pickHeroSong({
       hotToday: hotTodaySongs.map(({ song }) => song),
       newMusic: songsFromCatalogs(newReleases),
-      allSongs,
+      allSongs: allSongs.filter(songOnFront),
     });
     if (!pick) return null;
     return {
@@ -259,7 +266,7 @@ export default function Home() {
       label: pick.label,
       href: songPath(pick.song),
     };
-  }, [hotTodaySongs, newReleases, allSongs, songsFromCatalogs]);
+  }, [hotTodaySongs, newReleases, allSongs, songsFromCatalogs, songOnFront]);
   // Nothing is shown until today's counts have actually landed, otherwise the
   // newest release wins the pick for a moment and is then swapped for the real
   // number one, which reads as a flash.
