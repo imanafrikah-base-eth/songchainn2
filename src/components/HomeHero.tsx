@@ -188,7 +188,7 @@ export const HomeHero = memo(function HomeHero({ feature, onPlay, faces = [], li
             </Link>
           </motion.div>
 
-          <div className="min-w-0 flex-1">
+          <div className="w-full min-w-0 flex-1 sm:w-auto">
             {feature.label ? (
               <motion.p {...rise(0.15)} className="text-xs font-medium uppercase tracking-[0.14em] text-foreground/75">
                 {feature.label}

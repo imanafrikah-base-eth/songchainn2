@@ -1,11 +1,14 @@
 import { songPath } from '@/lib/slugRoutes';
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArtistName } from '@/components/ArtistName';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform } from 'framer-motion';
-import { Sparkles, Headphones, Users, ArrowRight, Music, Coins, Home as HomeIcon, Flame, ListMusic, Globe, Lock, Plus, Heart, PlayCircle, Disc3, Info, Search, Wand2 } from 'lucide-react';
-// Note: Sword removed — WaveWarz quick action replaced by Search
-import { CATALOGS, ARTISTS, SONGS, type Catalog, type Song, buildCatalogs } from '@/data/musicData';
+import { Headphones, Users, ArrowRight, Music, Coins, Flame, Globe, Lock, Plus, Play, Pause, Disc3, Info, Swords, Sparkles } from 'lucide-react';
+import { CATALOGS, SONGS, type Catalog, type Song, buildCatalogs } from '@/data/musicData';
+import { artistPath } from '@/lib/slugRoutes';
+import { cn, compactCount } from '@/lib/utils';
+import { thumb } from '@/lib/img';
+import { ScrollRail } from '@/components/ScrollRail';
+import { NowPlayingBars } from '@/components/NowPlayingBars';
 import { useRankedArtists, useTodayHotSongs } from '@/hooks/usePopularity';
 import { usePublishedCatalog } from '@/hooks/usePublishedCatalog';
 import { catalogEarnedPlacement, earnedPlacement, indexSongs } from '@/lib/placement';
@@ -17,28 +20,20 @@ import { useToast } from '@/hooks/use-toast';
 import { useSocial } from '@/hooks/useSocial';
 import { useNotifications } from '@/hooks/useNotifications';
 import { supabase } from '@/integrations/supabase/client';
-import { ArtistCard } from '@/components/ArtistCard';
-import { CatalogCard } from '@/components/CatalogCard';
-import { CatalogGrid } from '@/components/CatalogGrid';
 import { SongCard } from '@/components/SongCard';
-import { EngagementPanel } from '@/components/EngagementPanel';
-import { ZoneShortcuts } from '@/components/ZoneShortcuts';
-import { WhatsLive } from '@/components/WhatsLive';
 import { Navigation } from '@/components/Navigation';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { WorldMusicRow } from '@/components/WorldMusicRow';
 import { Hint } from '@/components/Hint';
 import { AnimatedBackground } from '@/components/ui/animated-background';
-import { DownloadAppBanner, getDeferredInstallPrompt, clearDeferredInstallPrompt } from '@/components/DownloadAppBanner';
+import { DownloadAppBanner } from '@/components/DownloadAppBanner';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { HomeHero, type HeroFeature } from '@/components/HomeHero';
 import { useMoshaTour } from '@/hooks/useMoshaTour';
 import { useSettledHero } from '@/hooks/useSettledHero';
 import { pickHeroSong } from '@/lib/heroPick';
 import { useFrontStore } from '@/hooks/useFrontStore';
-import { ZabalGamezPromo } from '@/components/ZabalGamezPromo';
 import { ZABAL_GAMEZ_ENABLED, WORLDS_ENABLED } from '@/lib/features';
-import { WorldsPhase3 } from '@/components/worlds/WorldsPhase3';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -46,26 +41,126 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DayOnesPanel } from '@/components/dayones/DayOnesPanel';
-import { SearchModal } from '@/components/SearchModal';
 import { useRoomTimeline, roomClock, roomEntriesAt } from '@/hooks/useRoomTimeline';
 import { findSong } from '@/lib/liveCatalog';
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
-};
+/** How many genre shelves Home shows before the rest share one last shelf. */
+const MAX_GENRE_SHELVES = 6;
+
+/**
+ * One record on a shelf: the cover at size, a play button that plays the
+ * whole catalog from the shelf, and the bars when it is the one playing.
+ */
+function ShelfCard({
+  catalog,
+  onPlay,
+  isOn,
+  isPlaying,
+}: {
+  catalog: Catalog;
+  onPlay: (catalog: Catalog) => void;
+  isOn: boolean;
+  isPlaying: boolean;
+}) {
+  return (
+    <li className="w-[38vw] max-w-[176px] flex-shrink-0 sm:w-44">
+      <Link to={`/catalog/${catalog.id}`} className="group block">
+        <div
+          className={cn(
+            'relative aspect-square w-full overflow-hidden rounded-xl bg-secondary shadow-soft',
+            isOn && 'ring-2 ring-primary',
+          )}
+        >
+          {catalog.coverImage ? (
+            <img
+              src={thumb(catalog.coverImage, 352)}
+              alt={catalog.title}
+              width={176}
+              height={176}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <Music className="h-10 w-10 text-muted-foreground" />
+            </div>
+          )}
+          {isOn && (
+            <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-background/85 px-2 py-1">
+              <NowPlayingBars playing={isPlaying} />
+            </span>
+          )}
+          <button
+            type="button"
+            aria-label={`Play ${catalog.title}`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onPlay(catalog);
+            }}
+            className={cn(
+              'absolute bottom-2 right-2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-300',
+              // Always there on a touch screen; rises in on hover with a mouse.
+              '[@media(pointer:fine)]:translate-y-2 [@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:group-hover:translate-y-0 [@media(pointer:fine)]:group-hover:opacity-100',
+              isOn && '[@media(pointer:fine)]:translate-y-0 [@media(pointer:fine)]:opacity-100',
+            )}
+          >
+            {isOn && isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+          </button>
+        </div>
+        <p className={cn('mt-2 truncate text-sm font-medium', isOn ? 'text-primary' : 'text-foreground')}>{catalog.title}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          <ArtistName name={catalog.artist} artistId={catalog.artistId} size={12} />
+        </p>
+      </Link>
+    </li>
+  );
+}
+
+function Shelf({
+  title,
+  line,
+  catalogs,
+  onPlayCatalog,
+  onPlayAll,
+  playingSongId,
+  isPlaying,
+}: {
+  title: string;
+  line?: string;
+  catalogs: Catalog[];
+  onPlayCatalog: (catalog: Catalog) => void;
+  onPlayAll: () => void;
+  playingSongId?: string;
+  isPlaying: boolean;
+}) {
+  return (
+    <section aria-label={title}>
+      <div className="mb-3 sm:mb-4 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate font-heading text-xl sm:text-2xl font-semibold text-foreground">{title}</h2>
+          {line && <p className="text-xs sm:text-sm text-muted-foreground">{line}</p>}
+        </div>
+        <Button size="sm" variant="outline" className="h-10 flex-shrink-0 rounded-full px-4 text-xs" onClick={onPlayAll}>
+          <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
+          Play all
+        </Button>
+      </div>
+      <ScrollRail label={title} listClassName="-mx-1 gap-3 sm:gap-4 px-1 pb-1">
+        {catalogs.map((catalog) => (
+          <ShelfCard
+            key={catalog.id}
+            catalog={catalog}
+            onPlay={onPlayCatalog}
+            isOn={Boolean(playingSongId && catalog.songIds.includes(playingSongId))}
+            isPlaying={isPlaying}
+          />
+        ))}
+      </ScrollRail>
+    </section>
+  );
+}
 
 const NEW_SONG_WINDOW_MS = 1000 * 60 * 60 * 24 * 7;
 
@@ -107,7 +202,6 @@ export default function Home() {
   const { toast } = useToast();
   const { createPost } = useSocial();
   const { createNotification } = useNotifications();
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [newPlaylistDescription, setNewPlaylistDescription] = useState('');
@@ -116,9 +210,8 @@ export default function Home() {
   const [newPlaylistVibe, setNewPlaylistVibe] = useState('');
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const [isSubmittingPlaylist, setIsSubmittingPlaylist] = useState(false);
-  const [moshaInfoOpen, setMoshaInfoOpen] = useState(false);
   const playerState = useSafePlayerState();
-  const { playQueue } = usePlayerActions();
+  const { playQueue, togglePlay } = usePlayerActions();
   const roomOnlineCount = useRoomOnlineCount({
     roomId: 'global',
     viewerUserId: user?.id,
@@ -199,11 +292,13 @@ export default function Home() {
   );
   // Whose song is playing in the Room this minute: that face wears the turning ring.
   const { data: roomTimeline } = useRoomTimeline(Boolean(user));
-  const liveArtistId = useMemo(() => {
+  // The same record shows in the strip under the hero.
+  const roomSong = useMemo(() => {
     if (!roomTimeline) return null;
     const { current } = roomEntriesAt(roomTimeline, roomClock(roomTimeline));
-    return current ? findSong(current.songId)?.artistId ?? null : null;
+    return current ? findSong(current.songId) ?? null : null;
   }, [roomTimeline]);
+  const liveArtistId = roomSong?.artistId ?? null;
 
   const songsByCatalog = useMemo(
     () =>
@@ -233,13 +328,26 @@ export default function Home() {
     },
     [likedArtists, todayHotSongs, allSongs],
   );
-  const allCatalogsCardRef = useRef<HTMLDivElement | null>(null);
-  const { scrollYProgress: allCatalogsScrollProgress } = useScroll({
-    target: allCatalogsCardRef,
-    offset: ['start 0.9', 'end 0.1'],
-  });
-  const allCatalogsGlowY = useTransform(allCatalogsScrollProgress, [0, 1], [24, -24]);
-  const allCatalogsGlowOpacity = useTransform(allCatalogsScrollProgress, [0, 1], [0.12, 0.35]);
+  // All Catalogs used to be one long wall of squares. Now it is shelved by
+  // sound, the genre with the most heat today first, so the rest of the page
+  // reads like a record shop and not a spreadsheet.
+  const genreShelves = useMemo(() => {
+    const byGenre = new Map<string, Catalog[]>();
+    for (const catalog of allCatalogs) {
+      const genre = catalog.genre || 'More to find';
+      const list = byGenre.get(genre) ?? [];
+      list.push(catalog);
+      byGenre.set(genre, list);
+    }
+    const heat = (list: Catalog[]) => list.reduce((sum, c) => sum + (hotScoreByCatalog.get(c.id) || 0), 0);
+    const ordered = [...byGenre.entries()]
+      .map(([genre, list]) => ({ genre, catalogs: list }))
+      .sort((a, b) => heat(b.catalogs) - heat(a.catalogs) || b.catalogs.length - a.catalogs.length);
+    if (ordered.length <= MAX_GENRE_SHELVES) return ordered;
+    const kept = ordered.slice(0, MAX_GENRE_SHELVES - 1);
+    const rest = ordered.slice(MAX_GENRE_SHELVES - 1).flatMap((shelf) => shelf.catalogs);
+    return [...kept, { genre: 'More to find', catalogs: rest }];
+  }, [allCatalogs, hotScoreByCatalog]);
 
   const songsFromCatalogs = useCallback((catalogList: Catalog[]) => {
     const songIds = Array.from(new Set(catalogList.flatMap((catalog) => catalog.songIds)));
@@ -293,41 +401,27 @@ export default function Home() {
     if (queueSongs.length) playQueue(queueSongs);
   }, [featuredCatalogs, playQueue, songsFromCatalogs]);
 
-  const handlePlayAllCatalogs = useCallback(() => {
-    const queueSongs = songsFromCatalogs(allCatalogs);
+  // A shelf's play button: tap the one already playing to pause it.
+  const handlePlayCatalog = useCallback((catalog: Catalog) => {
+    const current = playerState?.currentSong;
+    if (current && catalog.songIds.includes(current.id)) {
+      togglePlay();
+      return;
+    }
+    const queueSongs = songsFromCatalogs([catalog]);
     if (queueSongs.length) playQueue(queueSongs);
-  }, [allCatalogs, playQueue, songsFromCatalogs]);
+  }, [playerState?.currentSong, playQueue, songsFromCatalogs, togglePlay]);
 
-  const handleOpenMosha = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('songchainn:open-mosha'));
-  }, []);
-
-  const quickActions = useMemo(() => ([
-    {
-      label: 'Join The Room',
-      description: 'Hop into live global listening now.',
-      icon: Headphones,
-      to: '/room',
-    },
-    {
-      label: 'Search',
-      description: 'Find songs, artists and catalogs instantly.',
-      icon: Search,
-      action: () => setIsSearchOpen(true),
-    },
-    {
-      label: 'Open DJ Shuffle',
-      description: 'Instant random vibe across $ongChainn.',
-      icon: Wand2,
-      to: '/dj-shuffle',
-    },
-    {
-      label: 'Create Playlist',
-      description: 'Save your taste lane in one tap.',
-      icon: ListMusic,
-      action: () => setIsCreatePlaylistOpen(true),
-    },
-  ]), []);
+  // Everything on $ongChainn that is not a record, reachable but out of the way.
+  const moreDoors = useMemo(() => [
+    { label: 'The Room', to: '/room', icon: Headphones },
+    { label: 'DJ $huffle', to: '/dj-shuffle', icon: Disc3 },
+    { label: 'WaveWarz Africa', to: '/wavewarz-africa', icon: Swords },
+    ...(WORLDS_ENABLED ? [{ label: 'Artist Worlds', to: '/worlds', icon: Sparkles }] : []),
+    { label: 'Marketplace', to: '/marketplace', icon: Coins },
+    { label: 'Community', to: '/community', icon: Users },
+    { label: 'About', to: '/about', icon: Info },
+  ], []);
 
   // The old welcome fired a 40-word paragraph 900ms after login, before the
   // user had seen a single song. Replaced by a paced, signal-driven tour:
@@ -454,47 +548,12 @@ export default function Home() {
       <Navigation />
       <DownloadAppBanner />
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 relative z-10">
-        {playerState?.isRoomMode && playerState.currentSong && (
-          <div className="mb-4 sm:mb-6">
-            <div className="rounded-2xl border border-border bg-primary/5 px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3 sm:gap-4">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/40 overflow-hidden flex-shrink-0">
-                {playerState.currentSong.coverImage ? (
-                  <img
-                    src={playerState.currentSong.coverImage}
-                    alt={playerState.currentSong.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : null}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 text-[11px] sm:text-xs text-primary mb-0.5">
-                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-primary/10 px-1.5 py-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                    <span>Now Playing in The Room</span>
-                  </span>
-                </div>
-                <div className="text-sm sm:text-base font-medium text-foreground truncate">
-                  {playerState.currentSong.title}
-                </div>
-                <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                  {playerState.currentSong.artist}
-                </div>
-              </div>
-              <Link to="/room" className="flex-shrink-0">
-                <Button size="sm" className="text-xs sm:text-sm gap-1.5">
-                  <Headphones className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Jump into Room</span><span className="sm:hidden">Room</span>
-                  <span className="inline-flex items-center rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
-                    {`${roomOnlineCount} live`}
-                  </span>
-                  <ArrowRight className="w-3 h-3" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
+      {/* Music first (founder, 27 Oct 2026). Home used to stack quick actions,
+          a Mo$ha button, zone tiles, a "what's here" mosaic, the worlds pitch,
+          two adverts, a community card and an about card around the music.
+          Now it is the record of the day, Hot Today, then shelves of records,
+          and one quiet row of doors at the bottom for everything else. */}
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 lg:pl-28 pt-4 sm:pt-6 pb-8 relative z-10">
         {heroFeature ? (
           <HomeHero feature={heroFeature} onPlay={handlePlayHero} faces={heroFaces} liveArtistId={liveArtistId} />
         ) : (
@@ -506,751 +565,286 @@ export default function Home() {
           />
         )}
 
-        <section className="mb-4 sm:mb-6">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 className="text-sm sm:text-base font-semibold text-foreground">$ongChainn Quick Actions</h2>
-            <span className="pr-1 text-[11px] sm:text-xs text-muted-foreground">Smart shortcuts</span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
-            {quickActions.map((item) => {
-              const Icon = item.icon;
-              const content = (
-                <div className="h-full min-h-[98px] rounded-xl border border-border bg-card/60 px-3 py-2.5 text-left hover:border-border hover:bg-primary/5 transition-colors">
-                  <div className="mb-1.5 flex items-center gap-2">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/12">
-                      <Icon className="h-3.5 w-3.5 text-primary" />
-                    </span>
-                    <span className="text-[13px] sm:text-sm font-semibold leading-tight text-foreground">{item.label}</span>
-                  </div>
-                  <p className="text-[10px] sm:text-xs leading-relaxed text-muted-foreground">{item.description}</p>
-                </div>
-              );
-
-              if ((item as any).href) {
-                return (
-                  <a
-                    key={item.label}
-                    href={(item as any).href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block h-full"
-                  >
-                    {content}
-                  </a>
-                );
-              }
-
-              if (item.to) {
-                return (
-                  <Link key={item.label} to={item.to} className="block h-full">
-                    {content}
-                  </Link>
-                );
-              }
-
-              return (
-                <button key={item.label} type="button" onClick={item.action} className="h-full w-full text-left">
-                  {content}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {ZABAL_GAMEZ_ENABLED && <ZabalGamezPromo variant="card" />}
-
-        <div className="my-4 sm:my-6 flex items-center gap-2">
-          <Button
-            type="button"
-            onClick={handleOpenMosha}
-            className="flex-1 h-11 sm:h-12 rounded-2xl gradient-primary text-primary-foreground shadow-glow-intense text-sm sm:text-base font-semibold tracking-wide"
+        {/* What everyone is hearing in The Room this second, as a record, not a pitch. */}
+        {roomSong && (
+          <Link
+            to="/room"
+            className="group mb-6 sm:mb-10 flex items-center gap-3 rounded-2xl border border-border bg-card/60 p-2.5 pr-3 sm:p-3 sm:pr-4 transition-colors hover:bg-card"
           >
-            Call Mo$ha
-          </Button>
-          <div className="shrink-0">
-            <TooltipProvider>
-              <div className="hidden sm:block">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="What this button does"
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-background/80 text-primary hover:bg-primary/10 transition-colors"
-                    >
-                      <Info className="h-4 w-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[16rem] text-xs">
-                    Opens Mo$ha instantly if you closed chat and want help again.
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </TooltipProvider>
-
-            <div className="sm:hidden">
-              <Popover open={moshaInfoOpen} onOpenChange={setMoshaInfoOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="What this button does"
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-background/80 text-primary hover:bg-primary/10 transition-colors"
-                  >
-                    <Info className="h-4 w-4" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-[16rem] p-3">
-                  <p className="text-xs text-foreground">
-                    Opens Mo$ha instantly if you closed chat and want help again.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 h-10 w-full text-xs"
-                    onClick={() => setMoshaInfoOpen(false)}
-                  >
-                    Close
-                  </Button>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-        </div>
-
-        <ZoneShortcuts />
-
-        <WhatsLive />
-
-        {/* Phase Three, to somebody already inside. Full width and above the
-            two column grid, because a world is not a sidebar item, and the ask
-            here is the key rather than an account they already have. */}
-        {WORLDS_ENABLED && <WorldsPhase3 variant="member" className="mb-6 sm:mb-8" />}
-
-        <div className="grid lg:grid-cols-3 gap-4 sm:gap-8">
-          {/* Main Content */}
-          <motion.div
-            className="lg:col-span-2 space-y-6 sm:space-y-12"
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-          >
-            <motion.section variants={itemVariants}>
-                <div className="relative overflow-hidden">
-                  <motion.div
-                    aria-hidden="true"
-                    initial={{ opacity: 0.4, scale: 1 }}
-                    animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.05, 1] }}
-                    transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                    className="hidden"
-                  />
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-sky-400" />
-                          <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
-                            Hot Today
-                          </h2>
-                          <Hint label="What Hot Today means">
-                            The songs played most across SONGCHAINN since midnight. It starts empty
-                            every night and fills through the day, so a record released this morning
-                            can be number one by evening.
-                          </Hint>
-                        </div>
-                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          Top 10 most streamed songs today on $ongChainn. Resets at midnight.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" className="h-10 text-xs border-sky-400/40 text-sky-100 bg-sky-500/10 hover:bg-sky-500/20" onClick={handlePlayAllHotToday}>
-                          <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
-                          Play All
-                        </Button>
-                        <div className="hidden sm:flex items-center gap-2 text-xs text-sky-300">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                            <span>Live Heat</span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="space-y-3">
-                        {hotTodaySongs.length === 0 && (
-                          <p className="text-sm text-muted-foreground text-center py-6">
-                            No streams yet today. Be the first to play a song!
-                          </p>
-                        )}
-                        {hotTodaySongs.map(({ song }, index) => (
-                          <div key={song.id} className="space-y-1">
-                            <SongCard song={song} index={index} variant="compact" />
-                            <div className="text-[10px] sm:text-xs text-muted-foreground px-1 flex items-center gap-2">
-                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-300 font-semibold text-[9px]">
-                                #{index + 1}
-                              </span>
-                              {playerState?.currentSong && playerState.currentSong.id === song.id && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-sky-100">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                                  Now Playing
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.section>
-
-            {/* What artists have put inside their own worlds, shown as the
-                preview the artist made rather than an advert for it. */}
-            <motion.section variants={itemVariants}>
-              <WorldMusicRow />
-            </motion.section>
-
-            {showCatalogSkeleton && (
-              <motion.section variants={itemVariants} aria-busy="true" aria-label="Loading new releases">
-                <div className="mb-3 sm:mb-4">
-                  <Skeleton className="h-7 w-40 mb-2" />
-                  <Skeleton className="h-4 w-56" />
-                </div>
-                <CatalogGrid>
-                  {[0, 1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="space-y-2">
-                      <Skeleton className="aspect-square w-full rounded-2xl" />
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  ))}
-                </CatalogGrid>
-              </motion.section>
-            )}
-
-            {newReleases.length > 0 && (
-              <motion.section variants={itemVariants}>
-                <div className="relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <div>
-                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
-                        New Releases
-                      </h2>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        Fresh catalogs, just arrived on $ongChainn.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-primary">
-                      <Button size="sm" variant="outline" className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllNewReleases}>
-                        <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
-                        Play All
-                      </Button>
-                      <div className="hidden sm:flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        <span>{newReleases.length} catalogs</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <CatalogGrid>
-                      {/* No NEW sticker under a heading that already says New
-                          Releases. It earns its place everywhere else. */}
-                      {newReleases.map((catalog) => (
-                        <CatalogCard key={catalog.id} catalog={catalog} />
-                      ))}
-                    </CatalogGrid>
-                  </div>
-                </div>
-              </motion.section>
-            )}
-
-            {likedArtistSongs.length > 0 && (
-              <motion.section variants={itemVariants}>
-                <div className="relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <div>
-                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
-                        From Artists You Like
-                      </h2>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        Songs from artists you have tapped heart on.
-                      </p>
-                    </div>
-                    <div className="hidden sm:flex items-center gap-2 text-xs text-primary">
-                      <Heart className="w-4 h-4" />
-                      <span>{likedArtistSongs.length} songs</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="space-y-3">
-                      {likedArtistSongs.map((song, index) => (
-                        <SongCard key={song.id} song={song} index={index} variant="compact" />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </motion.section>
-            )}
-
-            {featuredCatalogs.length > 0 && (
-              <motion.section variants={itemVariants}>
-                <div className="glass-card rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 shine-overlay border border-border">
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <div>
-                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
-                        Featured Catalogs
-                      </h2>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        Signature collections from your favorite artists.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-primary">
-                      <Button size="sm" variant="outline" className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllFeatured}>
-                        <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
-                        Play All
-                      </Button>
-                      <div className="hidden sm:flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        <span>{featuredCatalogs.length} catalogs</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <CatalogGrid>
-                      {featuredCatalogs.map((catalog) => (
-                        <CatalogCard key={catalog.id} catalog={catalog} />
-                      ))}
-                    </CatalogGrid>
-                  </div>
-                </div>
-              </motion.section>
-            )}
-
-            <motion.section variants={itemVariants}>
-              <div
-                ref={allCatalogsCardRef}
-                className="relative overflow-hidden"
-              >
-                <motion.div
-                  aria-hidden="true"
-                  style={{ y: allCatalogsGlowY, opacity: allCatalogsGlowOpacity }}
-                  className="hidden"
+            <div className="relative h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 overflow-hidden rounded-xl bg-secondary">
+              {roomSong.coverImage ? (
+                <img
+                  src={thumb(roomSong.coverImage, 112)}
+                  alt=""
+                  width={56}
+                  height={56}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
-                    <div>
-                      <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
-                        All Catalogs
-                      </h2>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        Every project on $ongChainn, ready to explore.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Button size="sm" variant="outline" className="h-10 text-xs border-border bg-primary/10 hover:bg-primary/20" onClick={handlePlayAllCatalogs}>
-                        <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
-                        Play All
-                      </Button>
-                      <div className="hidden sm:flex items-center gap-2">
-                        <Music className="w-4 h-4 text-primary" />
-                        <span>{allCatalogs.length} catalogs</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <CatalogGrid>
-                      {allCatalogs.map((catalog) => (
-                        <CatalogCard key={catalog.id} catalog={catalog} />
-                      ))}
-                    </CatalogGrid>
-                  </div>
-                </div>
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="mb-0.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                <NowPlayingBars playing />
+                <span>On in The Room</span>
               </div>
-            </motion.section>
+              <p className="truncate text-sm sm:text-base font-medium text-foreground">{roomSong.title}</p>
+              <p className="truncate text-xs sm:text-sm text-muted-foreground">{roomSong.artist}</p>
+            </div>
+            <span className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
+              <Headphones className="h-3.5 w-3.5" />
+              {roomOnlineCount > 0 ? `${roomOnlineCount} in` : 'Join'}
+              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </Link>
+        )}
 
-            {/* Artists Preview - Ranked by popularity */}
-            <motion.section variants={itemVariants}>
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">Top Artists</h2>
-                <Link to="/artists">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-primary hover:text-primary/80 hover:bg-primary/10 gap-1.5 text-xs sm:text-sm"
-                  >
-                    <Music className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>Meet the Artists</span>
-                    <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  </Button>
-                </Link>
+        <div className="space-y-8 sm:space-y-12">
+          {/* Hot Today: the ten records played most since midnight, numbered
+              like a chart, with today's count beside each one. */}
+          <section aria-labelledby="hot-today-heading">
+            <div className="mb-3 sm:mb-4 flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                  <h2 id="hot-today-heading" className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                    Hot Today
+                  </h2>
+                  <Hint label="What Hot Today means">
+                    The songs played most across SONGCHAINN since midnight. It starts empty
+                    every night and fills through the day, so a record released this morning
+                    can be number one by evening.
+                  </Hint>
+                </div>
+                <p className="mt-1 flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:hidden" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
+                  </span>
+                  Top 10, counting live since midnight
+                </p>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-                {rankedArtists.slice(0, 4).map((artist, index) => (
-                  <ArtistCard key={artist.id} artist={artist} index={index} />
+              {hotTodaySongs.length > 0 && (
+                <Button size="sm" className="h-10 flex-shrink-0 rounded-full px-4 text-xs" onClick={handlePlayAllHotToday}>
+                  <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
+                  Play all
+                </Button>
+              )}
+            </div>
+            {hotTodaySongs.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+                No streams yet today. Press play on anything and it starts the chart.
+              </p>
+            ) : (
+              <ol className={cn('grid gap-x-6 gap-y-1', hotTodaySongs.length > 5 && 'lg:grid-cols-2 lg:grid-flow-col lg:grid-rows-[repeat(5,auto)]')}>
+                {hotTodaySongs.map(({ song, playsToday }, index) => {
+                  const isOn = playerState?.currentSong?.id === song.id;
+                  return (
+                    <li key={song.id} className="flex items-center gap-1 sm:gap-2">
+                      <div className="flex w-9 sm:w-11 flex-shrink-0 flex-col items-center leading-none">
+                        <span
+                          className={cn(
+                            'font-heading text-2xl sm:text-3xl font-bold tabular-nums',
+                            isOn ? 'text-primary' : index < 3 ? 'text-foreground' : 'text-muted-foreground/70',
+                          )}
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="mt-1 text-[9px] sm:text-[10px] tabular-nums text-muted-foreground" title={`${playsToday} plays today`}>
+                          {compactCount(playsToday)} today
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <SongCard song={song} index={index} variant="compact" />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </section>
+
+          {showCatalogSkeleton && (
+            <section aria-busy="true" aria-label="Loading new releases">
+              <Skeleton className="mb-3 h-7 w-40" />
+              <div className="flex gap-3 overflow-hidden">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="w-[38vw] max-w-[176px] flex-shrink-0 space-y-2 sm:w-44">
+                    <Skeleton className="aspect-square w-full rounded-xl" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
                 ))}
               </div>
-            </motion.section>
+            </section>
+          )}
 
-            <motion.section variants={itemVariants} id="playlists">
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <div className="flex items-center gap-2">
-                    <ListMusic className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                    <h2 className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
-                      Your Playlists
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm text-muted-foreground">
-                      {playlists.length === 1 ? '1 playlist' : `${playlists.length} playlists`}
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="inline-flex"
-                      onClick={() => setIsCreatePlaylistOpen(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      New
-                    </Button>
-                  </div>
-                </div>
-                {playlists.length === 0 ? (
-                  <div className="bg-card border border-border rounded-xl p-4 text-center">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      You have not created any playlists yet.
-                    </p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="gradient-primary"
-                      onClick={() => setIsCreatePlaylistOpen(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Start a playlist
-                    </Button>
-                  </div>
-                ) : (
-                  <ScrollArea className="max-h-80 pr-2">
-                    <div className="space-y-3">
-                      {playlists.map((playlist) => (
-                        <div
-                          key={playlist.id}
-                          className="flex items-center justify-between gap-3 p-3 bg-card border border-border rounded-xl hover:bg-card/70 transition-colors"
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div
-                              className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xs sm:text-sm font-semibold text-primary-foreground ${getPlaylistGradient(playlist)}`}
-                            >
-                              <span className="truncate max-w-[2.5rem] sm:max-w-[3rem]">
-                                {playlist.name.slice(0, 2).toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <Link
-                                to={`/playlist/${playlist.id}`}
-                                className="block"
-                              >
-                                <p className="font-medium text-foreground truncate">
-                                  {playlist.name}
-                                </p>
-                                {playlist.description && (
-                                  <p className="text-sm text-muted-foreground truncate">
-                                    {playlist.description}
-                                  </p>
-                                )}
-                                {(playlist.mood || playlist.vibe) && (
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {[playlist.mood, playlist.vibe].filter(Boolean).join(' • ')}
-                                  </p>
-                                )}
-                              </Link>
-                            </div>
-                          </div>
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border border-border flex-shrink-0"
-                          >
-                            {playlist.is_public ? (
-                              <>
-                                <Globe className="w-3 h-3" />
-                                Public
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="w-3 h-3" />
-                                Private
-                              </>
-                            )}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
-              </div>
-            </motion.section>
+          {newReleases.length > 0 && (
+            <Shelf
+              title="New Releases"
+              line="Fresh this week."
+              catalogs={newReleases}
+              onPlayCatalog={handlePlayCatalog}
+              onPlayAll={handlePlayAllNewReleases}
+              playingSongId={playerState?.currentSong?.id}
+              isPlaying={Boolean(playerState?.isPlaying)}
+            />
+          )}
 
-            {/* Marketplace CTA - Featured Ad Style */}
-            <motion.section variants={itemVariants}>
-              <Link to="/dj-shuffle" className="block group">
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-cyan-300/35 bg-black/60 p-4 sm:p-5">
-                  <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr] items-center">
-                    <div className="space-y-2">
-                      <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-500/15 px-3 py-1 text-xs font-semibold text-cyan-100">
-                        <Disc3 className="w-3.5 h-3.5" />
-                        DJ Shuffle
-                      </p>
-                      <h3 className="text-xl sm:text-2xl font-semibold text-white">Meet DJ $huffle</h3>
-                      <p className="text-sm text-zinc-200">
-                        Shuffle artist picks, catalogs, or all songs with nonstop random playback.
-                      </p>
-                      <Button size="sm" className="bg-emerald-400 text-black hover:bg-emerald-300">
-                        Open DJ Shuffle
-                        <ArrowRight className="w-4 h-4 ml-1.5" />
-                      </Button>
-                    </div>
-                    <div className="rounded-2xl border border-cyan-300/25 bg-black/35 p-2">
-                      {/* The DJ's own clip, silent and looping, the same one
-                          that runs on his page when the music is on. */}
-                      <video
-                        src="/dj-shuffle.mp4"
-                        poster="/dj-shuffle.jpg"
-                        muted
-                        loop
-                        playsInline
-                        autoPlay
-                        preload="none"
-                        aria-label="DJ $huffle"
-                        className="h-full w-full rounded-xl object-cover motion-reduce:hidden"
-                      />
-                      <img
-                        src="/dj-shuffle.jpg"
-                        alt=""
-                        className="hidden h-full w-full rounded-xl object-cover motion-reduce:block"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </motion.section>
-
-            <motion.section variants={itemVariants}>
-              <Link to="/marketplace" className="block group">
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-border hover:border-primary/60 transition-all duration-300">
-                  {/* Animated gradient background */}
-                  <div className="absolute inset-0 gradient-primary opacity-10 group-hover:opacity-20 transition-opacity" />
-                  <div className="absolute top-0 right-0 w-64 h-64 opacity-40">
-                    <motion.div
-                      className="absolute inset-0 rounded-full"
-                      style={{
-                        background: 'none',
-                        filter: 'blur(60px)',
-                      }}
-                      animate={{ 
-                        scale: [1, 1.4, 1],
-                        x: [0, 20, 0],
-                        y: [0, -10, 0]
-                      }}
-                      transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                    />
-                  </div>
-                  <div className="absolute bottom-0 left-0 w-40 h-40 opacity-30">
-                    <motion.div
-                      className="absolute inset-0 rounded-full"
-                      style={{
-                        background: 'none',
-                        filter: 'blur(40px)',
-                      }}
-                      animate={{ 
-                        scale: [1, 1.2, 1],
-                      }}
-                      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-                    />
-                  </div>
-                  
-                  {/* Badge */}
-                  <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
-                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-primary text-primary-foreground animate-pulse">
-                      NEW
-                    </span>
-                  </div>
-                  
-                  <div className="relative z-10 p-5 sm:p-8">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-                      {/* Icon */}
-                      <div className="p-3 sm:p-4 rounded-2xl gradient-primary shadow-glow-intense flex-shrink-0">
-                        <Coins className="w-7 h-7 sm:w-10 sm:h-10 text-primary-foreground" />
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="flex-1">
-                        <h3 className="font-heading font-bold text-foreground text-lg sm:text-2xl mb-1 sm:mb-2 flex items-center gap-2">
-                          Music Marketplace
-                          <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary group-hover:translate-x-1 transition-transform" />
-                        </h3>
-                        <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4 max-w-lg">
-                          A dollar buys one digital copy of a song, held in your own wallet on Base. Its
-                          price moves with the song, so it can be worth more than you paid or less.
-                          Holding it backs the artist and earns you points, badges and doors in their world.
-                        </p>
-                        
-                        {/* Stats */}
-                        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs sm:text-sm font-medium">
-                            <Music className="w-3.5 h-3.5" />
-                            <span>On-Chain Songs</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 text-green-500 text-xs sm:text-sm font-medium">
-                            <span>Backs the artist</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 text-xs sm:text-sm font-medium">
-                            <span>Base Blockchain</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </motion.section>
-
-            {/* Discover Community Section */}
-            <motion.section variants={itemVariants}>
-              <div className="relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
-                  <motion.div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      background: 'none',
-                      filter: 'blur(30px)',
-                    }}
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                </div>
-                <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-start gap-3 sm:gap-4">
-                    <div className="p-2.5 sm:p-3 rounded-xl gradient-primary shadow-glow flex-shrink-0">
-                      <Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <h3 className="font-heading font-semibold text-foreground text-base sm:text-lg mb-1">
-                        Discover Community
-                      </h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground max-w-md">
-                        Connect with fellow music lovers, see who's listening, and build your network in the $ongChainn community.
-                      </p>
-                    </div>
-                  </div>
-                  <Link to="/community" className="w-full sm:w-auto">
-                    <Button className="w-full sm:w-auto gradient-primary text-primary-foreground shadow-glow gap-2">
-                      <span>Explore</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </motion.section>
-          </motion.div>
-
-          {/* Sidebar */}
-          <motion.aside
-            className="space-y-4 sm:space-y-6"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <EngagementPanel />
-
-            <Link to="/room" className="block group">
-              <div className="rounded-2xl sm:rounded-3xl border border-border/60 bg-black/80 p-4 sm:p-6 transition-colors group-hover:border-primary/50">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1.5">
-                    <div className="font-heading font-semibold text-zinc-100">The Room</div>
-                    <div className="text-xs sm:text-sm text-zinc-400">
-                      Global chat + one shared playlist. No distractions.
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-xl bg-white/5 border border-white/10">
-                    <Headphones className="w-5 h-5 text-zinc-100" />
-                  </div>
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    {roomOnlineCount > 0 ? (
-                      <>
-                        <span className="inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>Live now</span>
-                        </span>
-                        <span>{roomOnlineCount} listening</span>
-                      </>
-                    ) : (
-                      <span>Be the first to start the room</span>
-                    )}
-                  </div>
-                  <Button className="w-full bg-white text-black hover:bg-white/90">
-                    Enter
-                  </Button>
-                </div>
-              </div>
-            </Link>
-
-            {/* Day Ones: a fan's own cards, or an artist's first fans. It replaced a
-                "Live now" list of four slogans that told nobody anything. */}
-            <DayOnesPanel />
-          </motion.aside>
-        </div>
-
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="px-4 mt-6 sm:mt-10 mb-4 sm:mb-6"
-        >
-          <div className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 opacity-25">
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: 'none',
-                  filter: 'blur(40px)',
-                }}
-                animate={{ scale: [1, 1.1, 1], x: [0, 8, 0], y: [0, -6, 0] }}
-                transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-              />
-            </div>
-            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-8">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="p-3 sm:p-4 rounded-2xl gradient-primary shadow-glow-intense flex-shrink-0">
-                  <HomeIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
-                </div>
+          {likedArtistSongs.length > 0 && (
+            <section aria-labelledby="liked-artists-heading">
+              <div className="mb-3 sm:mb-4 flex items-end justify-between gap-3">
                 <div>
-                  <h2 className="font-heading text-lg sm:text-2xl md:text-3xl font-semibold text-foreground">
-                    Want the full $ongChainn story?
+                  <h2 id="liked-artists-heading" className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                    From Artists You Like
                   </h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xl mt-1">
-                    Learn how listening, markets, and culture intersect, and why this
-                    is more than just another music app.
-                  </p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Because you tapped the heart.</p>
                 </div>
               </div>
-              <div className="w-full md:w-auto flex md:justify-end">
-                <Link to="/about" className="w-full md:w-auto">
-                  <Button className="w-full md:w-auto gradient-primary text-primary-foreground shadow-glow gap-2">
-                    <span>About $ongChainn</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
+              <div className="grid gap-1 lg:grid-cols-2 lg:gap-x-6">
+                {likedArtistSongs.map((song, index) => (
+                  <SongCard key={song.id} song={song} index={index} variant="compact" />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {featuredCatalogs.length > 0 && (
+            <Shelf
+              title="Featured"
+              line="The records people keep coming back to."
+              catalogs={featuredCatalogs}
+              onPlayCatalog={handlePlayCatalog}
+              onPlayAll={handlePlayAllFeatured}
+              playingSongId={playerState?.currentSong?.id}
+              isPlaying={Boolean(playerState?.isPlaying)}
+            />
+          )}
+
+          {/* Top Artists as faces you can swipe, highest first. */}
+          {rankedArtists.length > 0 && (
+            <section aria-labelledby="top-artists-heading">
+              <div className="mb-3 sm:mb-4 flex items-end justify-between gap-3">
+                <h2 id="top-artists-heading" className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                  Top Artists
+                </h2>
+                <Link to="/artists" className="inline-flex min-h-10 items-center gap-1 text-xs sm:text-sm font-semibold text-primary">
+                  See all <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
+              <ScrollRail label="Top artists" listClassName="-mx-1 gap-3 sm:gap-5 px-1 pb-1">
+                {rankedArtists.slice(0, 16).map((artist) => (
+                  <li key={artist.id} className="w-[26vw] max-w-[132px] flex-shrink-0 sm:w-32">
+                    <Link to={artistPath(artist.id)} className="group block text-center">
+                      <div
+                        className={cn(
+                          'mx-auto aspect-square w-full overflow-hidden rounded-full bg-secondary ring-2 ring-offset-2 ring-offset-background transition-transform duration-300 group-hover:scale-[1.04]',
+                          liveArtistId === artist.id ? 'ring-primary' : 'ring-transparent',
+                        )}
+                      >
+                        {artist.profileImage ? (
+                          <img
+                            src={thumb(artist.profileImage, 160)}
+                            alt=""
+                            width={128}
+                            height={128}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : null}
+                      </div>
+                      <p className="mt-2 truncate text-xs sm:text-sm font-medium text-foreground">
+                        <ArtistName name={artist.name} artistId={artist.id} size={12} />
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ScrollRail>
+            </section>
+          )}
+
+          {/* Every catalog, shelved by sound instead of one long wall of squares. */}
+          {genreShelves.map(({ genre, catalogs: shelfCatalogs }) => (
+            <Shelf
+              key={genre}
+              title={genre}
+              catalogs={shelfCatalogs}
+              onPlayCatalog={handlePlayCatalog}
+              onPlayAll={() => {
+                const queueSongs = songsFromCatalogs(shelfCatalogs);
+                if (queueSongs.length) playQueue(queueSongs);
+              }}
+              playingSongId={playerState?.currentSong?.id}
+              isPlaying={Boolean(playerState?.isPlaying)}
+            />
+          ))}
+
+          {/* What artists have put inside their own worlds. */}
+          <WorldMusicRow />
+
+          <section id="playlists" aria-labelledby="playlists-heading">
+            <div className="mb-3 sm:mb-4 flex items-center justify-between gap-3">
+              <h2 id="playlists-heading" className="font-heading text-xl sm:text-2xl font-semibold text-foreground">
+                Your Playlists
+              </h2>
+              <Button type="button" size="sm" variant="outline" className="h-10 rounded-full" onClick={() => setIsCreatePlaylistOpen(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                New
+              </Button>
             </div>
-          </div>
-        </motion.section>
+            {playlists.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setIsCreatePlaylistOpen(true)}
+                className="w-full rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground transition-colors hover:bg-card/60"
+              >
+                No playlists yet. Tap to start one.
+              </button>
+            ) : (
+              <ScrollRail label="Your playlists" listClassName="-mx-1 gap-3 sm:gap-4 px-1 pb-1">
+                {playlists.map((playlist) => (
+                  <li key={playlist.id} className="w-[38vw] max-w-[176px] flex-shrink-0 sm:w-44">
+                    <Link to={`/playlist/${playlist.id}`} className="group block">
+                      <div
+                        className={`flex aspect-square w-full items-center justify-center rounded-xl text-2xl font-bold text-primary-foreground transition-transform duration-300 group-hover:scale-[1.03] ${getPlaylistGradient(playlist)}`}
+                      >
+                        {playlist.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <p className="mt-2 truncate text-sm font-medium text-foreground">{playlist.name}</p>
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {playlist.is_public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                        {playlist.is_public ? 'Public' : 'Private'}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ScrollRail>
+            )}
+          </section>
+
+          {/* Everything that is not a record, as one quiet row of doors. */}
+          <nav aria-label="More on $ongChainn" className="border-t border-border/60 pt-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">More on $ongChainn</p>
+            <div className="flex flex-wrap gap-2">
+              {moreDoors.map(({ label, to, icon: Icon }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-border bg-card/60 px-3.5 text-xs sm:text-sm font-medium text-foreground transition-colors hover:bg-card"
+                >
+                  <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+        </div>
       </main>
 
       <AudioPlayer />
 
-      <SearchModal open={isSearchOpen} onOpenChange={setIsSearchOpen} />
 
       <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
         <DialogContent className="max-w-2xl w-[95vw] sm:w-full">
